@@ -1,0 +1,136 @@
+# THRONG v2 — Phase 5: Forced Communication Architecture
+#
+# USE: python main.py --config config_phase5.yaml --fresh
+#
+# Three changes from Phase 4 to make signals load-bearing:
+# 1. Shrink observation radius to 5×5 local patch (was 3×3)
+# 2. Remove direct red detection beyond patch — reds only visible in 5×5 or via neighbor signals
+# 3. Add 20% Gaussian noise to resource observations — agents can't reliably locate food alone
+#
+# If survival < 0.7 at step 10k, pull noise back to 10% and restore 3-cell red detection.
+
+grid_size: 128
+window_size: 1200
+
+population_size: 500
+red_population_size: 75
+min_population: 40
+min_red_population: 30
+
+# Curriculum
+curriculum_red_count: 6
+curriculum_blue_threshold: 80
+curriculum_sustain_steps: 2000
+
+max_age: 20000
+base_maturation_steps: 200
+
+# Brain architecture — same as Phase 4
+n_layers: 2
+brain_max_layers: 6
+brain_token_dim: 128
+brain_n_heads: 4
+agent_hidden_dim: 256
+signal_dim: 32
+symbol_dim: 16
+
+neighbor_k: 6
+local_obs_radius: 2              # 5×5 patch centered on agent (was 1 = 3×3)
+
+# Theory of mind head
+tom_enabled: true
+tom_lr: 1.0e-4
+tom_reward_coef: 0.01
+tom_head_independent: true
+
+# Signal gate
+signal_gate_enabled: true
+signal_gate_mask_frac: 0.5
+
+symbol_decay: 0.993
+
+red_starvation_steps: 400
+red_spawn_step: 2000
+red_catch_radius: 0
+
+# ── Discrete token bottleneck (Phase 4→5, unchanged) ────────────────────────────
+vocab_size: 64
+gumbel_tau: 1.5
+
+# ── Anneal: diversity → crystallization (Phase 4→5, unchanged) ─────────────────
+gumbel_tau_start: 1.5
+gumbel_tau_end: 0.5
+gumbel_tau_anneal_start: 20000
+gumbel_tau_anneal_end: 50000
+
+# ZERO signal entropy bonus — Phase 4 showed it prevents semantic binding
+signal_entropy_coef_start: 0.0
+signal_entropy_coef_end: 0.0
+signal_entropy_anneal_start: 20000
+signal_entropy_anneal_end: 50000
+
+# ── Procedural environment (Phase 4→5, unchanged) ─────────────────────────────
+wall_density: 0.08
+resource_n_patches: 20
+resource_regen_rate: 0.005
+
+# ── Energy mechanics (Phase 4→5, unchanged) ────────────────────────────────────
+energy_decay: 0.001
+starvation_threshold: 0.05
+reward_starvation: -0.5
+reward_resource: 0.1
+
+# ── MAPPO (Phase 4→5, unchanged) ──────────────────────────────────────────────
+ppo_rollout_steps: 512
+ppo_epochs: 1
+ppo_minibatch_size: 4096
+ppo_warmup_steps: 15
+ppo_clip: 0.2
+ppo_lr: 3.0e-4
+ppo_gamma: 0.99
+ppo_gae_lam: 0.95
+ppo_value_coef: 0.25
+ppo_entropy_coef: 0.05
+ppo_max_grad_norm: 2.0
+
+# Rewards (Phase 4→5, unchanged)
+reward_blue_alive: 0.05
+reward_blue_caught: -1.0
+reward_blue_red_proximity: -0.01
+reward_red_catch: 1.0
+reward_red_starve_per_step: -0.01
+reward_move: 0.01
+
+# Observation constraints (Phase 5 — key changes)
+red_detection_radius: 0       # NO direct red detection beyond 5×5 patch
+resource_obs_noise: 0.2       # 20% Gaussian noise on resource observations
+
+brain_vote_interval: 5000
+brain_vote_survival_threshold: 0.55
+force_brain_layers: 4
+
+# ── Misc ──────────────────────────────────────────────────────────────────────
+steps_per_render: 32
+target_fps: 60
+dashboard_update_interval: 20.0
+
+log_dir: runs_large
+checkpoint_interval: 2000
+log_interval: 200
+
+mi_analysis_interval: 1000
+mi_window: 1000
+signal_cluster_k: 12
+
+# Signal corpus (offline language analysis)
+corpus_sample_frac: 0.08
+corpus_every_n_steps: 20
+
+# Within-lifetime Hebbian learning
+hebb_lr: 0.001
+
+# Alarm call analysis
+alarm_scout_range: 8
+alarm_min_group: 20
+
+exit_on_graduation: false

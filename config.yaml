@@ -1,0 +1,91 @@
+# THRONG v2 — Predator-Prey Intelligence Emergence (Phase 2: MAPPO)
+# Parameter-sharing MARL: one shared policy per team, trained via PPO.
+# Brain depth starts fixed; population "votes" to grow it when struggling.
+
+grid_size: 96
+window_size: 900
+
+population_size: 400
+red_population_size: 40
+min_population: 30
+min_red_population: 15     # 15 reds on 96x96 gives good dist_to_red variance for MI
+
+# Curriculum: start reds at curriculum_red_count, grow to red_population_size
+# once blues sustain >= curriculum_blue_threshold for curriculum_sustain_steps consecutive steps
+curriculum_red_count: 4        # gentle start — let blues grow above 60 before graduating to full pressure
+curriculum_blue_threshold: 250 # require genuine recovery before graduating to full red pressure
+curriculum_sustain_steps: 3000 # consecutive steps needed to graduate 4 → min_red_population (15)
+
+max_age: 20000
+base_maturation_steps: 200    # flat — no per-layer cost; survival drives brain depth
+
+# Brain architecture (shared policy)
+n_layers: 2                   # shared starting depth; grows via brain_vote_interval
+brain_max_layers: 6           # max allowed depth (model grows incrementally)
+brain_token_dim: 32
+brain_n_heads: 2
+agent_hidden_dim: 64
+signal_dim: 4                  # communication bottleneck: forces agents to prioritise WHAT to signal (was 16)
+symbol_dim: 8
+
+neighbor_k: 6
+local_obs_radius: 1
+
+symbol_decay: 0.993
+
+red_starvation_steps: 400
+red_spawn_step: 2000
+red_catch_radius: 0
+
+# ── MAPPO ─────────────────────────────────────────────────────────────────────
+ppo_rollout_steps: 512
+ppo_epochs: 2
+ppo_minibatch_size: 2048
+ppo_warmup_steps: 2        # was 15 — high catch rate means most agents die young; 15 excluded nearly everyone from pg
+ppo_clip: 0.2
+ppo_lr: 5.0e-4
+ppo_gamma: 0.99
+ppo_gae_lam: 0.95
+ppo_value_coef: 0.5            # standard PPO; was 0.25 and vf never dropped below 0.4 across all runs
+ppo_entropy_coef: 0.01         # was 0.05; with recurrent PPO the policy gradient is now real and 0.05 drowned it ~80x
+ppo_max_grad_norm: 2.0         # raised from 0.5; was clipping 96% of updates
+tom_reward_coef: 0.0     # PHASE 3 WITHDRAWAL — scaffolding removed; was 0.002
+
+# Rewards
+reward_blue_alive: 0.05       # stronger survival gradient
+reward_blue_caught: -1.0      # caught by a red
+reward_blue_red_proximity: -0.01
+reward_red_catch: 1.0         # caught a blue
+reward_red_starve_per_step: -0.01   # hunger pressure
+
+# Partial observability — forces communication
+# A blue agent can only detect reds within this radius.
+# Agents outside it must rely on neighbour signals.
+red_detection_radius: 8       # cells; 0 = all-seeing (disables the mechanic)
+
+# Brain growth via population vote
+brain_vote_interval: 5000     # steps between checks
+brain_vote_survival_threshold: 0.55   # if blue survival rate < this, grow brain
+
+# ── Misc ──────────────────────────────────────────────────────────────────────
+steps_per_render: 32
+target_fps: 60
+dashboard_update_interval: 20.0
+
+log_dir: runs
+checkpoint_interval: 2000
+log_interval: 200
+
+mi_analysis_interval: 1000
+mi_window: 1000
+signal_cluster_k: 8
+
+# Signal corpus (offline language analysis)
+corpus_sample_frac: 0.08     # fraction of alive agents sampled per record burst
+corpus_every_n_steps: 20     # record every N steps (sparse; negligible overhead)
+
+# Alarm call analysis
+# sig_range covers the ~6.6-cell k-NN communication radius (√(k/πρ) at 400 agents/96²)
+# min_group prevents nan without distorting the metric via too-tight a radius
+alarm_scout_range: 8
+alarm_min_group: 20

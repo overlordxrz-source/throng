@@ -1,0 +1,109 @@
+# THRONG v2 — Large model config (post-graduation scale-up)
+#
+# USE: python main.py --config config_large.yaml   (NO --resume)
+#
+# Fresh start with threat-encoding as core competency from step 1.
+# Rationale: the large model learns threat-encoding under 15-red pressure from
+# the first gradient step, rather than overwriting resource-encoding learned
+# at smaller capacity.  MPS speedup (2.56s/PPO cycle) makes cold-start viable.
+
+grid_size: 128
+window_size: 1200
+
+population_size: 500
+red_population_size: 75
+min_population: 40
+min_red_population: 30      # DOUBLED at step 74k (Cam intervention) — force threat encoding via density
+
+# Curriculum: still active — blues need to recover before full red pressure
+curriculum_red_count: 6
+curriculum_blue_threshold: 80
+curriculum_sustain_steps: 2000
+
+max_age: 20000
+base_maturation_steps: 200
+
+# Brain architecture — scaled up 4×
+n_layers: 2
+brain_max_layers: 6
+brain_token_dim: 128         # 32 → 128
+brain_n_heads: 4             # 2  → 4
+agent_hidden_dim: 256        # 64 → 256
+signal_dim: 32               # 16 → 32
+symbol_dim: 16               # 8  → 16
+
+neighbor_k: 6
+local_obs_radius: 1
+
+# Theory of mind head (enabled)
+tom_enabled: true
+tom_lr: 1.0e-4               # separate lower lr for prediction head
+tom_reward_coef: 0.0         # PHASE B — scaffolding removed; signals must be load-bearing by construction
+tom_head_independent: true   # per-neighbour: concat(carry, sig_i) → 5 logits each
+                             # prevents head collapsing to "predict most common action"
+
+# Signal gate — makes neighbour signals structurally load-bearing
+# Randomly masks sensor dims each step; a learned cross-attention gate
+# over neighbour signals restores the missing information.
+# Withdrawal would crater fitness by construction.
+signal_gate_enabled: true
+signal_gate_mask_frac: 0.5   # fraction of own_state + loc_pres dims zeroed each step
+
+symbol_decay: 0.993
+
+red_starvation_steps: 400
+red_spawn_step: 2000
+red_catch_radius: 0
+
+# ── MAPPO ─────────────────────────────────────────────────────────────────────
+ppo_rollout_steps: 512
+ppo_epochs: 1
+ppo_minibatch_size: 4096     # larger minibatch for larger model
+ppo_warmup_steps: 15
+ppo_clip: 0.2
+ppo_lr: 3.0e-4               # higher lr for fresh training; decay to 1e-4 after 20 PPO cycles
+ppo_gamma: 0.99
+ppo_gae_lam: 0.95
+ppo_value_coef: 0.25
+ppo_entropy_coef: 0.05      # bumped from 0.01 — break monoculture (Cam, step 131k)
+ppo_max_grad_norm: 2.0
+
+# Rewards
+reward_blue_alive: 0.05
+reward_blue_caught: -1.0
+reward_blue_red_proximity: -0.01
+reward_red_catch: 1.0
+reward_red_starve_per_step: -0.01
+reward_move: 0.01            # tiny bonus for non-STAY — breaks freeze attractor (Cam, step 121k)
+
+red_detection_radius: 4      # 50% reduction — more blind agents, stronger signal dependence
+
+brain_vote_interval: 5000
+brain_vote_survival_threshold: 0.55
+
+# ── Misc ──────────────────────────────────────────────────────────────────────
+steps_per_render: 32
+target_fps: 60
+dashboard_update_interval: 20.0
+
+log_dir: runs_large
+checkpoint_interval: 2000
+log_interval: 200
+
+mi_analysis_interval: 1000
+mi_window: 1000
+signal_cluster_k: 12
+
+# Signal corpus (offline language analysis)
+corpus_sample_frac: 0.08
+corpus_every_n_steps: 20
+
+# Within-lifetime Hebbian learning on signal reception
+hebb_lr: 0.001                # gain increment proportional to mean |neighbor signal| for survivors
+
+# Alarm call analysis
+alarm_scout_range: 8
+alarm_min_group: 20
+
+# Exit when curriculum graduates so the user can launch the large model fresh
+exit_on_graduation: false

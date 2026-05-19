@@ -1,0 +1,23 @@
+# Large run output directories
+runs_large/
+runs/
+runs_withdrawal/
+runs_pre_recurrent_ppo/
+
+# Virtual environment
+.venv/
+
+# Checkpoints and binary files
+*.pkl
+*.pyc
+
+# Python cache
+__pycache__/
+*/__pycache__/
+
+# IDE
+.idea/
+.vscode/
+
+# OS
+.DS_Store

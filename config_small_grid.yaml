@@ -1,0 +1,91 @@
+# THRONG v2 — Small Grid Experiment (64×64)
+# Identical to config.yaml except grid_size: 64.
+# 2.25× higher threat density vs 96×96 → shifts ESS from
+# resource-encoding toward danger-encoding without touching any rewards.
+#
+# Start this run ONLY after awayΔ ≥ 0.15 confirmed on ≥ 3 consecutive
+# measurements on the 96×96 run. Use --fresh (no resume).
+# Run: .venv/bin/python -u main.py --headless --config config_small_grid.yaml --fresh
+#
+# NOTE (Cam, Session 5): 64×64 alone probably will NOT flip the ESS.
+# Encounter probability goes ~28% → ~54% at 64×64, boosting MI_red_dist
+# to ~0.14 — still below MI_resource (~0.20). True flip needs 64×64 AND
+# ~22-25 reds. Protocol:
+#   1. Run 64×64 with min_red_population=15 first (this file as-is).
+#   2. If MI_red_dist < 0.12 after 10k steps, bump min_red_population to 23.
+#   3. Then re-measure; MI_red_dist ~0.18-0.21 should be competitive with resource.
+
+grid_size: 64
+window_size: 900
+
+population_size: 400
+red_population_size: 40
+min_population: 30
+min_red_population: 15
+
+curriculum_red_count: 4
+curriculum_blue_threshold: 250
+curriculum_sustain_steps: 3000
+
+max_age: 20000
+base_maturation_steps: 200
+
+n_layers: 2
+brain_max_layers: 6
+brain_token_dim: 32
+brain_n_heads: 2
+agent_hidden_dim: 64
+signal_dim: 4
+symbol_dim: 8
+
+neighbor_k: 6
+local_obs_radius: 1
+
+symbol_decay: 0.993
+
+red_starvation_steps: 400
+red_spawn_step: 2000
+red_catch_radius: 0
+
+ppo_rollout_steps: 512
+ppo_epochs: 2
+ppo_minibatch_size: 2048
+ppo_warmup_steps: 2
+ppo_clip: 0.2
+ppo_lr: 5.0e-4
+ppo_gamma: 0.99
+ppo_gae_lam: 0.95
+ppo_value_coef: 0.5
+ppo_entropy_coef: 0.01
+ppo_max_grad_norm: 2.0
+tom_reward_coef: 0.0
+
+reward_blue_alive: 0.05
+reward_blue_caught: -1.0
+reward_blue_red_proximity: -0.01
+reward_red_catch: 1.0
+reward_red_starve_per_step: -0.01
+
+red_detection_radius: 8
+
+brain_vote_interval: 5000
+brain_vote_survival_threshold: 0.55
+
+steps_per_render: 32
+target_fps: 60
+dashboard_update_interval: 20.0
+
+log_dir: runs
+checkpoint_interval: 2000
+log_interval: 200
+
+mi_analysis_interval: 1000
+mi_window: 1000
+signal_cluster_k: 8
+
+corpus_sample_frac: 0.08
+corpus_every_n_steps: 20
+
+# At 400 agents / 64²: k-NN radius ≈ √(6/π×0.0977) ≈ 4.4 cells; 8 covers it
+alarm_scout_range: 8
+alarm_min_group: 20
