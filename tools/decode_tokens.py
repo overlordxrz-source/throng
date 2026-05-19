@@ -251,51 +251,94 @@ def print_mi_vocabulary_map(
 # ── ALARM metric: flee rate for blind agents that received token vs not ─────────
 
 def compute_alarm_metric(
+    records: List[dict],
     token_ids: np.ndarray,
-    ctx: Dict[str, np.ndarray],
     top_n: int = 10,
     vocab_size: int = 64,
 ) -> List[Tuple[int, float, float, float, str]]:
     """
     For each top-N token, compute:
-      blind_flee_with    = flee rate among blind agents that RECEIVED this token
+      blind_flee_with    = flee rate among blind agents that received this token
+                           in the last 5 steps of telemetry
       blind_flee_without = flee rate among blind agents that did NOT receive it
+                           in the last 5 steps
       Δ = with - without
 
     Blind = nearest_red_dist > 2 (beyond 5x5 patch, must rely on signals).
     Flee  = action != STAY (agent is moving, not frozen).
 
-    Returns list of (token_id, with_rate, without_rate, delta, annotation).
+    Looks back 5 steps per agent to find received tokens, fixing the
+    timing mismatch that produced all 0.00 when checking the same step only.
     """
-    n = len(token_ids)
+    n = len(records)
     if n < 50:
         return []
 
-    is_blind = ctx.get("is_blind", np.zeros(n, dtype=bool))
-    actions = ctx.get("action", np.full(n, -1, dtype=np.int32))
-    received = ctx.get("received_tokens", [[] for _ in range(n)])
-    is_flee = (actions >= 0) & (actions != 4)  # action != STAY
+    # Build per-agent history: agent_id -> list of (step, action, nearest_red_dist, received_tokens)
+    from collections import defaultdict
+    agent_history = defaultdict(list)
+    for rec in records:
+        agent_id = rec.get("agent", -1)
+        if agent_id < 0:
+            continue
+        agent_history[agent_id].append((
+            rec.get("step", 0),
+            rec.get("action", -1),
+            rec.get("nearest_red_dist", float("nan")),
+            rec.get("received_tokens", []),
+        ))
+
+    # Sort each agent's history by step
+    for aid in agent_history:
+        agent_history[aid].sort(key=lambda x: x[0])
 
     counts = np.bincount(token_ids, minlength=vocab_size)
     top_tokens = np.argsort(counts)[::-1][:top_n]
 
+    # Accumulate stats per token
+    # with: {token_id: (fled_count, total_count)}
+    # without: {token_id: (fled_count, total_count)}
+    with_stats = {int(tid): [0, 0] for tid in top_tokens}
+    without_stats = {int(tid): [0, 0] for tid in top_tokens}
+
+    for rec in records:
+        agent_id = rec.get("agent", -1)
+        step = rec.get("step", 0)
+        action = rec.get("action", -1)
+        nr_dist = rec.get("nearest_red_dist", float("nan"))
+
+        is_blind = (not math.isfinite(nr_dist)) or (nr_dist > 2.0)
+        is_flee = (action >= 0) and (action != 4)
+
+        if not is_blind:
+            continue  # Only care about blind agents
+
+        # Look back 5 steps in this agent's history for received tokens
+        history = agent_history.get(agent_id, [])
+        recent_tokens = set()
+        for h_step, _, _, h_recv in history:
+            if step - 5 <= h_step <= step:
+                recent_tokens.update(h_recv)
+
+        for tid in top_tokens:
+            tid = int(tid)
+            if tid in recent_tokens:
+                with_stats[tid][1] += 1
+                if is_flee:
+                    with_stats[tid][0] += 1
+            else:
+                without_stats[tid][1] += 1
+                if is_flee:
+                    without_stats[tid][0] += 1
+
     results = []
     for tid in top_tokens:
-        # Which agents received this token?
-        has_token = np.array([tid in recv for recv in received], dtype=bool)
+        tid = int(tid)
+        fled_with, n_with = with_stats[tid]
+        fled_without, n_without = without_stats[tid]
 
-        # Blind + received token + fled
-        blind_with = is_blind & has_token
-        n_blind_with = blind_with.sum()
-        flee_with = (blind_with & is_flee).sum()
-        rate_with = flee_with / n_blind_with if n_blind_with > 0 else 0.0
-
-        # Blind + did NOT receive token + fled
-        blind_without = is_blind & ~has_token
-        n_blind_without = blind_without.sum()
-        flee_without = (blind_without & is_flee).sum()
-        rate_without = flee_without / n_blind_without if n_blind_without > 0 else 0.0
-
+        rate_with = fled_with / n_with if n_with > 0 else 0.0
+        rate_without = fled_without / n_without if n_without > 0 else 0.0
         delta = rate_with - rate_without
 
         if delta > 0.10:
@@ -436,8 +479,8 @@ def watch_point_50k(records: List[dict]) -> None:
     mi_results = token_mi_analysis(token_ids, ctx)
     print_mi_vocabulary_map(mi_results, top_n=10)
 
-    # ALARM metric
-    alarm_results = compute_alarm_metric(token_ids, ctx, top_n=10)
+    # ALARM metric (looks back 5 steps per agent for received tokens)
+    alarm_results = compute_alarm_metric(records, token_ids, top_n=10)
     print_alarm_metric(alarm_results)
 
     # Mean context profiles for top 10 tokens
