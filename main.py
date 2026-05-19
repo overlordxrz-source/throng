@@ -1456,10 +1456,15 @@ def run(config: Dict, resume_path: Optional[str] = None, headless: bool = False,
                         expand_brain(blue_pop, blue_n_layers)
                         recent_blue_survival.clear()
 
-                # ── Token telemetry log (every 100 steps, Phase 4) ────────────
+                # ── Token telemetry log (every 100 steps, Phase 4+) ───────────
                 if step % 100 == 0 and blue_pop.alive.sum() > 0:
                     _tok_alive = np.where(blue_pop.alive)[0]
                     if len(_tok_alive) > 0 and b_token_ids is not None and (b_token_ids >= 0).any():
+                        # Compute received tokens for each agent (neighbors' token IDs)
+                        _tok_neigh_idx = get_neighbour_indices_padded(
+                            blue_pop.positions, blue_pop.alive, K, gs
+                        )  # (N, K)
+                        _tok_received = b_token_ids[_tok_neigh_idx]  # (N, K)
                         _tok_sample = _tok_alive[:min(20, len(_tok_alive))]
                         for _ti in _tok_sample:
                             # Compute nearest red distance/direction for context
@@ -1479,6 +1484,7 @@ def run(config: Dict, resume_path: Optional[str] = None, headless: bool = False,
                                 "step": step,
                                 "agent": int(_ti),
                                 "token_id": int(b_token_ids[_ti]),
+                                "received_tokens": [int(t) for t in _tok_received[_ti]],
                                 "position": [int(blue_pop.positions[_ti, 0]), int(blue_pop.positions[_ti, 1])],
                                 "energy": float(blue_pop.energy[_ti]),
                                 "action": int(b_actions[_ti]),
