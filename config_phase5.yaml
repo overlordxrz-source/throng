@@ -91,6 +91,7 @@ ppo_gamma: 0.99
 ppo_gae_lam: 0.95
 ppo_value_coef: 0.25
 ppo_entropy_coef: 0.05
+action_entropy_coef: 0.05      # Explicit action diversity bonus (breaks STAY/E attractors)
 ppo_max_grad_norm: 2.0
 
 # Rewards (Phase 4→5, unchanged)

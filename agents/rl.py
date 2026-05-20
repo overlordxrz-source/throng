@@ -212,7 +212,7 @@ def ppo_update_step(
     epochs    = int(config["ppo_epochs"])
     mb_size   = int(config["ppo_minibatch_size"])
     val_coef  = float(config["ppo_value_coef"])
-    ent_coef  = float(config["ppo_entropy_coef"])
+    ent_coef  = float(config.get("action_entropy_coef", config["ppo_entropy_coef"]))
 
     rewards = buffer_data["rewards"]
     values  = buffer_data["values"]

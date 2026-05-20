@@ -160,7 +160,7 @@ def ppo_update_torch(
     epochs   = int(config["ppo_epochs"])
     mb_size  = int(config["ppo_minibatch_size"])
     val_coef = float(config["ppo_value_coef"])
-    ent_coef     = float(config["ppo_entropy_coef"])
+    ent_coef     = float(config.get("action_entropy_coef", config["ppo_entropy_coef"]))
     sig_ent_coef = float(config.get("signal_entropy_coef", 0.0))
     max_norm     = float(config["ppo_max_grad_norm"])
     device       = brain.device
