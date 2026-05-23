@@ -32,6 +32,10 @@ class ToroidalGrid:
         # Phase 7.5: dual cultural memory grids
         self.cultural_fast    = np.zeros((size, size, symbol_dim), dtype=np.float32)  # recent danger / coordination
         self.cultural_slow    = np.zeros((size, size, symbol_dim), dtype=np.float32)  # stable landmarks / long-term
+        # Phase 7.5d: cooperative puzzle
+        self.puzzle_nodes     = []
+        self.puzzle_grid      = np.zeros((size, size), dtype=np.float32)
+        self.puzzle_cooldown  = 100
 
     # ── Wrapping ─────────────────────────────────────────────────────────────
 
@@ -384,6 +388,102 @@ class ToroidalGrid:
             energy_gained[agents_on_cell] = consumed
         np.clip(self.contested_res, 0.0, 1.0, out=self.contested_res)
         return energy_gained
+
+    # ── Phase 7.5d: Cooperative Puzzle (Lock-and-Key) ───────────────────────
+
+    def generate_puzzle_nodes(
+        self,
+        rng: np.random.Generator,
+        n_nodes: int = 3,
+    ) -> None:
+        """Create lock-key pairs: two switches that must be pressed simultaneously."""
+        self.puzzle_nodes = []
+        for _ in range(n_nodes):
+            # Switch A (blue side)
+            ay, ax = rng.integers(0, self.size, size=2)
+            # Switch B (far side, min 20 cells away)
+            by, bx = rng.integers(0, self.size, size=2)
+            while abs(ay - by) + abs(ax - bx) < 20:
+                by, bx = rng.integers(0, self.size, size=2)
+            # Reward location (midpoint-ish)
+            ry, rx = ((ay + by) // 2) % self.size, ((ax + bx) // 2) % self.size
+            self.puzzle_nodes.append({
+                "switch_a": (int(ay), int(ax)),
+                "switch_b": (int(by), int(bx)),
+                "reward_pos": (int(ry), int(rx)),
+                "active": True,
+                "timeout": 0,
+            })
+        self.puzzle_grid = np.zeros((self.size, self.size), dtype=np.float32)
+        self._update_puzzle_grid()
+
+    def _update_puzzle_grid(self) -> None:
+        """Render puzzle state onto puzzle_grid for observation."""
+        self.puzzle_grid.fill(0.0)
+        for node in self.puzzle_nodes:
+            if not node["active"]:
+                continue
+            ay, ax = node["switch_a"]
+            by, bx = node["switch_b"]
+            ry, rx = node["reward_pos"]
+            self.puzzle_grid[ay, ax] = 0.5  # switch A
+            self.puzzle_grid[by, bx] = 0.6  # switch B
+            self.puzzle_grid[ry, rx] = 0.9  # reward location
+
+    def check_puzzle_solved(
+        self,
+        positions: np.ndarray,
+        alive: np.ndarray,
+        switch_dist: int = 2,
+    ) -> Tuple[np.ndarray, np.ndarray]:
+        """
+        Return (reward_per_agent, solved_mask).
+        A puzzle is solved if at least one agent is near switch_a AND
+        at least one agent is near switch_b simultaneously.
+        """
+        max_pop = positions.shape[0]
+        rewards = np.zeros(max_pop, dtype=np.float32)
+        solved_any = np.zeros(max_pop, dtype=bool)
+        alive_idx = np.where(alive)[0]
+        if len(alive_idx) == 0:
+            return rewards, solved_any
+        pos = positions[alive_idx]
+        for node in self.puzzle_nodes:
+            if not node["active"] or node["timeout"] > 0:
+                continue
+            ay, ax = node["switch_a"]
+            by, bx = node["switch_b"]
+            ry, rx = node["reward_pos"]
+            # Chebyshev distance for switch coverage
+            dist_a = np.max(np.abs(pos - np.array([ay, ax])), axis=1)
+            dist_b = np.max(np.abs(pos - np.array([by, bx])), axis=1)
+            on_a = dist_a <= switch_dist
+            on_b = dist_b <= switch_dist
+            if on_a.any() and on_b.any():
+                # Solved! Reward all agents near either switch
+                rewarded = alive_idx[(on_a | on_b)]
+                rewards[rewarded] += 1.0
+                solved_any[rewarded] = True
+                # Deactivate and set cooldown
+                node["active"] = False
+                node["timeout"] = int(self.puzzle_cooldown)
+        return rewards, solved_any
+
+    def decay_puzzle_timeout(self) -> None:
+        """Tick down puzzle cooldowns and reactivate if ready."""
+        for node in self.puzzle_nodes:
+            if not node["active"] and node["timeout"] > 0:
+                node["timeout"] -= 1
+                if node["timeout"] <= 0:
+                    node["active"] = True
+        self._update_puzzle_grid()
+
+    def get_local_puzzle(self, positions: np.ndarray, radius: int = 2) -> np.ndarray:
+        """Return (max_pop, W) float — puzzle node density in local window."""
+        dy, dx = np.mgrid[-radius:radius + 1, -radius:radius + 1]
+        offsets = np.stack([dy.ravel(), dx.ravel()], axis=1)
+        cells = (positions[:, None, :] + offsets[None, :, :]) % self.size
+        return self.puzzle_grid[cells[:, :, 0], cells[:, :, 1]].astype(np.float32)
 
     # ── Phase 7: Scent trails ─────────────────────────────────────────────────
 

@@ -26,6 +26,12 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Optional
 
+try:
+    import wandb
+    WANDB_AVAILABLE = True
+except ImportError:
+    WANDB_AVAILABLE = False
+
 
 class RunLogger:
     """
@@ -40,8 +46,10 @@ class RunLogger:
         log_dir:  str,
         run_id:   Optional[str] = None,
         headless: bool          = False,
+        use_wandb: bool         = False,
     ) -> None:
         self.headless = headless
+        self.use_wandb = use_wandb and WANDB_AVAILABLE
 
         # Create run directory
         log_path = Path(log_dir)
@@ -67,6 +75,15 @@ class RunLogger:
     # ------------------------------------------------------------------
 
     def log_run_start(self, config: Dict, step: int = 0) -> None:
+        if self.use_wandb:
+            wandb.init(
+                project="throng",
+                name=self.run_id,
+                config=config,
+                resume="allow",
+                id=self.run_id
+            )
+
         self._write({
             "type":   "run_start",
             "ts":     self._ts(),
@@ -85,16 +102,22 @@ class RunLogger:
         evo_steps:    int,
         top_lineage_age: int,
     ) -> None:
-        self._write({
-            "type":            "step_metrics",
-            "ts":              self._ts(),
-            "step":            step,
+        metrics = {
             "population":      population,
             "mean_fitness":    round(float(mean_fitness), 4),
             "max_fitness":     round(float(max_fitness),  4),
             "mean_energy":     round(float(mean_energy),  4),
             "evo_steps":       evo_steps,
             "top_lineage_age": top_lineage_age,
+        }
+        if self.use_wandb:
+            wandb.log(metrics, step=step)
+
+        self._write({
+            "type":            "step_metrics",
+            "ts":              self._ts(),
+            "step":            step,
+            **metrics
         })
 
     def log_evo_event(self, stats: Dict) -> None:
@@ -105,6 +128,9 @@ class RunLogger:
         Log an MISnapshot.  mi_matrix is serialised as a nested list so it
         can be read back without NumPy.
         """
+        if self.use_wandb:
+            wandb.log({"mi_max": float(snapshot.mi_matrix.max())}, step=step)
+
         self._write({
             "type":       "mi_snapshot",
             "ts":         self._ts(),
@@ -129,6 +155,8 @@ class RunLogger:
             "reason": reason,
         })
         self._file_obj.flush()
+        if self.use_wandb:
+            wandb.finish()
 
     # ------------------------------------------------------------------
     # Internals

@@ -356,6 +356,9 @@ def compute_obs_dim_torch(config: dict) -> int:
         base += mem_slots * (sd + 2)
     # Phase 7.5: dual cultural memory grids (fast + slow)
     base += W * symd * 2
+    # Phase 7.5d: puzzle observation
+    if config.get("puzzle_enabled", False):
+        base += W  # puzzle_grid is scalar per cell
     return base
 
 

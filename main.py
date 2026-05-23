@@ -157,6 +157,10 @@ def build_observations(
     # Phase 7.5: append dual cultural memory grids
     obs_parts.append(loc_cult_fast)
     obs_parts.append(loc_cult_slow)
+    # Phase 7.5d: append puzzle nodes if enabled
+    if config.get("puzzle_enabled", False) and hasattr(grid, "puzzle_grid"):
+        loc_puzzle = grid.get_local_puzzle(pop.positions, radius=obs_radius)
+        obs_parts.append(loc_puzzle.reshape(max_pop, -1))
 
     obs = np.concatenate(obs_parts, axis=1).astype(np.float32)
 
@@ -517,6 +521,10 @@ def run(config: Dict, resume_path: Optional[str] = None, headless: bool = False,
         # Phase 7.5: dual cultural grids start blank (knowledge accumulates during simulation)
         grid.cultural_fast.fill(0.0)
         grid.cultural_slow.fill(0.0)
+        # Phase 7.5d: cooperative puzzle
+        if config.get("puzzle_enabled", False):
+            grid.generate_puzzle_nodes(rng, n_nodes=int(config.get("puzzle_n_nodes", 3)))
+            grid.puzzle_cooldown = int(config.get("puzzle_timeout", 100))
         print(f"[init] walls={int(grid.walls.sum())} cells  resources={grid.resources.sum():.1f} total  "
               f"shelter={int(grid.shelter_spots.sum())} cells  contested_nodes={int((grid.contested_res > 0.1).sum())} cells")
 
@@ -604,9 +612,9 @@ def run(config: Dict, resume_path: Optional[str] = None, headless: bool = False,
     if resume_path:
         # Resume into existing run directory so logs/science.log stay contiguous
         _resume_run_id = Path(resume_path).parent.name
-        logger = RunLogger(config["log_dir"], run_id=_resume_run_id, headless=headless)
+        logger = RunLogger(config["log_dir"], run_id=_resume_run_id, headless=headless, use_wandb=config.get("use_wandb", False))
     else:
-        logger = RunLogger(config["log_dir"], headless=headless)
+        logger = RunLogger(config["log_dir"], headless=headless, use_wandb=config.get("use_wandb", False))
     logger.log_run_start(config, step=_start_step)
     ckpt_dir = logger.run_directory
 
@@ -1029,7 +1037,7 @@ def run(config: Dict, resume_path: Optional[str] = None, headless: bool = False,
                         red_pop.positions, red_pop.alive, red_pop.team
                     )
                     r_obs = build_observations(red_pop, grid, bm2, rm2.astype(np.float32), config, step)
-                    r_new_c, r_logits_np, r_sigs_np, r_sym_w_np, r_vals_np, _, _, r_cult_f_np, r_cult_s_np = red_brain.forward(
+                    r_new_c, r_logits_np, r_sigs_np, r_sym_w_np, r_vals_np, r_tom_np, _, r_cult_f_np, r_cult_s_np = red_brain.forward(
                         red_pop.carries, r_obs, red_n_layers, red_pop.nb_gain
                     )
                     red_pop.carries = r_new_c
@@ -1074,9 +1082,112 @@ def run(config: Dict, resume_path: Optional[str] = None, headless: bool = False,
                     red_pop.alive[red_pop.alive & (red_pop.ages >= config["max_age"])] = False
                     r_rew += np.where(red_pop.alive, config["reward_red_starve_per_step"], 0.0)
 
+                    # ── Red Theory-of-mind reward bonus ───────────────────────────
+                    _r_neigh_idx  = get_neighbour_indices_padded(
+                        red_pop.positions, red_pop.alive, _K, gs
+                    )  # (N, K) global indices
+                    _r_safe_idx      = np.clip(_r_neigh_idx, 0, max_pop_r - 1)
+                    _r_tom_targets = np.where(
+                        _r_neigh_idx >= 0,
+                        r_actions[_r_safe_idx],
+                        -1,
+                    ).astype(np.int64)  # (N, K) — -1 for missing neighbours
+                    _r_tom_lp = (
+                        r_tom_np
+                        - np.log(np.sum(np.exp(r_tom_np - r_tom_np.max(axis=-1, keepdims=True)),
+                                        axis=-1, keepdims=True))
+                        - r_tom_np.max(axis=-1, keepdims=True)
+                    )  # log_softmax, shape (N, K, 5)
+                    _r_valid_tgt   = np.clip(_r_tom_targets, 0, 4)
+                    _r_tom_lp_nb = _r_tom_lp[np.arange(max_pop_r)[:, None],
+                                              np.arange(_K)[None, :],
+                                              _r_valid_tgt]           # (N, K)
+                    _r_baseline_lp = float(np.log(1.0 / 5.0))
+                    _r_tom_bonus = (
+                        np.where(_r_tom_targets >= 0,
+                                 _r_tom_lp_nb - _r_baseline_lp, 0.0)
+                        .sum(axis=1) * float(config.get("tom_reward_coef", 0.002))
+                    )
+                    r_rew += (_r_tom_bonus * red_pop.alive.astype(np.float32)).astype(np.float32)
+
+                    # Phase 7: update episodic memory buffer for alive reds
+                    if red_pop.memory_buffer is not None:
+                        _r_mem_slots = red_pop.memory_buffer.shape[1]
+                        _r_sig_dim = config["signal_dim"]
+                        _r_mem_nb = get_neighbour_signals_padded(
+                            red_pop.positions, red_pop.signals, red_pop.alive,
+                            k=K, grid_size=gs,
+                        )
+                        _r_mem_recv = _r_mem_nb.mean(axis=1)
+                        _r_mem_surv = red_pop.alive.astype(np.float32)
+                        red_pop.memory_buffer[:, 1:] = red_pop.memory_buffer[:, :-1]
+                        red_pop.memory_buffer[:, 0, :_r_sig_dim] = _r_mem_recv
+                        red_pop.memory_buffer[:, 0, _r_sig_dim] = r_actions.astype(np.float32)
+                        red_pop.memory_buffer[:, 0, _r_sig_dim + 1] = _r_mem_surv
+                        red_pop.memory_buffer[~red_pop.alive] = 0.0
+
                 # ── Catch detection ───────────────────────────────────────────
                 if red_pop is not None:
                     apply_catches(blue_pop, red_pop, config, b_rew, r_rew)
+
+                # ── Phase 7.5d: Cooperative Puzzle (Lock-and-Key) ─────────────
+                if config.get("puzzle_enabled", False) and config.get("puzzle_n_nodes", 0) > 0:
+                    _puzzle_rew, _puzzle_solved = grid.check_puzzle_solved(
+                        blue_pop.positions, blue_pop.alive,
+                        switch_dist=int(config.get("puzzle_switch_distance", 2))
+                    )
+                    _puzzle_bonus = float(config.get("puzzle_reward", 5.0))
+                    b_rew += (_puzzle_rew * _puzzle_bonus * blue_pop.alive.astype(np.float32)).astype(np.float32)
+                    grid.decay_puzzle_timeout()
+
+                # ── Phase 7.5b: Mind-Melding (live knowledge transfer) ────────
+                if config.get("mind_meld_enabled", False):
+                    _mm_radius = int(config.get("mind_meld_radius", 1))
+                    _mm_rate = float(config.get("mind_meld_rate", 0.1))
+                    _mm_dir = config.get("mind_meld_direction", "older_to_younger")
+                    # Find pairs of adjacent alive blues
+                    b_alive_idx = np.where(blue_pop.alive)[0]
+                    if len(b_alive_idx) > 1:
+                        for i in b_alive_idx:
+                            for j in b_alive_idx:
+                                if i >= j:
+                                    continue
+                                dy = abs(blue_pop.positions[i, 0] - blue_pop.positions[j, 0])
+                                dx = abs(blue_pop.positions[i, 1] - blue_pop.positions[j, 1])
+                                # Toroidal wrap for distance
+                                dy = min(dy, gs - dy)
+                                dx = min(dx, gs - dx)
+                                if dy <= _mm_radius and dx <= _mm_radius:
+                                    # Found adjacent pair
+                                    older, younger = (i, j) if blue_pop.ages[i] > blue_pop.ages[j] else (j, i)
+                                    if _mm_dir == "older_to_younger":
+                                        blue_pop.carries[younger] = (
+                                            (1 - _mm_rate) * blue_pop.carries[younger] +
+                                            _mm_rate * blue_pop.carries[older]
+                                        )
+                                    else:  # bidirectional
+                                        avg = (blue_pop.carries[i] + blue_pop.carries[j]) * 0.5
+                                        blue_pop.carries[i] = (1 - _mm_rate) * blue_pop.carries[i] + _mm_rate * avg
+                                        blue_pop.carries[j] = (1 - _mm_rate) * blue_pop.carries[j] + _mm_rate * avg
+
+                # ── Phase 7.5c: Evolutionary Distillation ────────────────────
+                if config.get("distill_enabled", False):
+                    _distill_interval = int(config.get("distill_interval", 10000))
+                    if step > 0 and step % _distill_interval == 0:
+                        from agents.population import distill_population
+                        slog(f"[step {step:>8,}] DISTILL — blue population")
+                        blue_pop = distill_population(
+                            blue_pop, rng, gs,
+                            keep_frac=float(config.get("distill_keep_frac", 0.05)),
+                            noise_std=float(config.get("distill_noise_std", 0.1))
+                        )
+                        if red_pop is not None and red_pop.alive.sum() > 10:
+                            slog(f"[step {step:>8,}] DISTILL — red population")
+                            red_pop = distill_population(
+                                red_pop, rng, gs,
+                                keep_frac=float(config.get("distill_keep_frac", 0.05)),
+                                noise_std=float(config.get("distill_noise_std", 0.1))
+                            )
 
                 # ── Rollout collection ────────────────────────────────────────
                 b_alive_before = np.array(blue_pop.alive, dtype=np.float32)

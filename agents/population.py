@@ -118,11 +118,12 @@ def spawn_agent(
     pop.offspring_count[slot]   = 0
     pop.steps_since_catch[slot] = 0
     pop.signals[slot]  = 0.0
-    pop.carries[slot]  = 0.0
+    # Generational Knowledge Transfer: copy parent's brain state
+    pop.carries[slot]  = pop.carries[parent_idx].copy()
     pop.nb_gain[slot]  = 1.0
     pop.energy[slot]   = 1.0  # offspring start with full energy
     if pop.memory_buffer is not None:
-        pop.memory_buffer[slot] = 0.0
+        pop.memory_buffer[slot] = pop.memory_buffer[parent_idx].copy()
 
     if inherit_lineage:
         pop.lineage_ids[slot] = pop.lineage_ids[parent_idx]
@@ -205,11 +206,12 @@ def inject_offspring(
     pop.steps_since_catch[slot] = 0
     pop.lineage_ids[slot]       = pop.lineage_ids[parent_idx]   # same lineage
     pop.signals[slot]           = 0.0
-    pop.carries[slot]           = 0.0   # zero carry — avoid cloning behavioral bias into all offspring
+    # Generational Knowledge Transfer: copy highest-fitness parent's brain state
+    pop.carries[slot]           = pop.carries[parent_idx].copy()
     pop.nb_gain[slot]           = 1.0
     pop.energy[slot]            = 1.0
     if pop.memory_buffer is not None:
-        pop.memory_buffer[slot] = 0.0
+        pop.memory_buffer[slot] = pop.memory_buffer[parent_idx].copy()
     return pop
 
 
@@ -219,4 +221,54 @@ def expand_brain(
 ) -> PopulationState:
     """Update the display n_layers field when the team's shared brain grows."""
     pop.n_layers[:] = np.int8(new_n)
+    return pop
+
+
+def distill_population(
+    pop: PopulationState,
+    rng: np.random.Generator,
+    grid_size: int,
+    keep_frac: float = 0.05,
+    noise_std: float = 0.1,
+) -> PopulationState:
+    """
+    Evolutionary Distillation: keep the top 'keep_frac' agents (by age),
+    kill the rest, and repopulate the grid by cloning the elite agents
+    with Gaussian noise added to their carries.
+    """
+    alive_idx = np.where(pop.alive)[0]
+    n_alive = len(alive_idx)
+    if n_alive < 10:
+        return pop  # Too small to distill
+
+    # Sort by age (descending)
+    sorted_idx = alive_idx[np.argsort(pop.ages[alive_idx])[::-1]]
+    n_keep = max(1, int(n_alive * keep_frac))
+    elites = sorted_idx[:n_keep]
+    to_kill = sorted_idx[n_keep:]
+
+    # Kill non-elites
+    for idx in to_kill:
+        kill_agent(pop, idx)
+
+    # Repopulate
+    dead_idx = np.where(~pop.alive)[0]
+    for slot in dead_idx:
+        parent_idx = rng.choice(elites)
+        pop.positions[slot]         = rng.integers(0, grid_size, size=2)
+        pop.ages[slot]              = 0
+        pop.alive[slot]             = True
+        pop.team[slot]              = pop.team[parent_idx]
+        pop.n_layers[slot]          = pop.n_layers[parent_idx]
+        pop.offspring_count[slot]   = 0
+        pop.steps_since_catch[slot] = 0
+        pop.lineage_ids[slot]       = pop.lineage_ids[parent_idx]
+        pop.signals[slot]           = 0.0
+        # Clone with mutation
+        pop.carries[slot]           = pop.carries[parent_idx] + rng.normal(0, noise_std, size=pop.carries[parent_idx].shape).astype(np.float32)
+        pop.nb_gain[slot]           = 1.0
+        pop.energy[slot]            = 1.0
+        if pop.memory_buffer is not None:
+            # Clone episodic memory with mutation
+            pop.memory_buffer[slot] = pop.memory_buffer[parent_idx] + rng.normal(0, noise_std, size=pop.memory_buffer[parent_idx].shape).astype(np.float32)
     return pop

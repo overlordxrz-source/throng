@@ -93,6 +93,25 @@ culture_fast_decay: 0.90         # fast-decay layer: recent danger / coordinatio
 culture_slow_decay: 0.995        # slow-decay layer: stable landmarks / long-term memory
 culture_intensity: 0.3           # how strongly agents write to shared memory
 
+# ── Phase 7.5b: Mind-Melding (live knowledge transfer) ─────────────────────
+mind_meld_enabled: true
+mind_meld_radius: 1              # agents within 1 cell can meld
+mind_meld_rate: 0.1              # fraction of carry overwritten per step
+mind_meld_direction: older_to_younger  # or "bidirectional"
+
+# ── Phase 7.5c: Evolutionary Distillation ─────────────────────────────────
+distill_enabled: true
+distill_interval: 10000          # steps between distillation events
+distill_keep_frac: 0.05          # top 5% survive
+distill_noise_std: 0.1           # Gaussian noise on cloned carries
+
+# ── Phase 7.5d: Cooperative Puzzle (Lock-and-Key) ──────────────────────────
+puzzle_enabled: true
+puzzle_n_nodes: 3                # number of lock-key pairs
+puzzle_switch_distance: 2        # how close to stand on switch
+puzzle_reward: 5.0               # massive reward for solving
+puzzle_timeout: 100              # steps before puzzle resets
+
 # ── Energy mechanics ─────────────────────────────────────────────────────────
 energy_decay: 0.001
 starvation_threshold: 0.05
