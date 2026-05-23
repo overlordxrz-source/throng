@@ -36,6 +36,10 @@ class PopulationState:
     max_pop:         int
     next_lineage_id: int
 
+    # Phase 7: episodic memory buffer (max_pop, memory_slots, signal_dim + 2)
+    # Each slot: [signal_received (signal_dim), action_taken (1), survived (1)]
+    memory_buffer: Optional[np.ndarray] = None
+
 
 def create_population(
     config:    Dict,
@@ -51,6 +55,11 @@ def create_population(
     rng = np.random.default_rng(rng_seed)
     pos = rng.integers(0, grid_size, size=(max_pop, 2), dtype=np.int32)
 
+    mem_size = int(config.get("memory_buffer_size", 0))
+    mem_buf = None
+    if mem_size > 0 and config.get("memory_buffer_enabled", False):
+        mem_buf = np.zeros((max_pop, mem_size, sig_dim + 2), dtype=np.float32)
+
     return PopulationState(
         positions         = pos,
         ages              = np.zeros(max_pop, dtype=np.int32),
@@ -64,6 +73,7 @@ def create_population(
         signals           = np.zeros((max_pop, sig_dim), dtype=np.float32),
         nb_gain           = np.ones(max_pop, dtype=np.float32),
         energy            = np.ones(max_pop, dtype=np.float32),  # start full
+        memory_buffer     = mem_buf,
         max_pop           = max_pop,
         next_lineage_id   = max_pop,
     )
@@ -76,6 +86,8 @@ def kill_agent(pop: PopulationState, idx: int) -> None:
     pop.ages[idx]     = 0
     pop.carries[idx]  = 0.0
     pop.energy[idx]   = 0.0
+    if pop.memory_buffer is not None:
+        pop.memory_buffer[idx] = 0.0
 
 
 def _find_free_slot(pop: PopulationState) -> Optional[int]:
@@ -109,6 +121,8 @@ def spawn_agent(
     pop.carries[slot]  = 0.0
     pop.nb_gain[slot]  = 1.0
     pop.energy[slot]   = 1.0  # offspring start with full energy
+    if pop.memory_buffer is not None:
+        pop.memory_buffer[slot] = 0.0
 
     if inherit_lineage:
         pop.lineage_ids[slot] = pop.lineage_ids[parent_idx]
@@ -145,6 +159,8 @@ def inject_random_agent(
     pop.carries[slot]           = 0.0
     pop.nb_gain[slot]           = 1.0
     pop.energy[slot]            = 1.0
+    if pop.memory_buffer is not None:
+        pop.memory_buffer[slot] = 0.0
     return pop
 
 
@@ -192,6 +208,8 @@ def inject_offspring(
     pop.carries[slot]           = 0.0   # zero carry — avoid cloning behavioral bias into all offspring
     pop.nb_gain[slot]           = 1.0
     pop.energy[slot]            = 1.0
+    if pop.memory_buffer is not None:
+        pop.memory_buffer[slot] = 0.0
     return pop
 
 

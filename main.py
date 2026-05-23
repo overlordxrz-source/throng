@@ -113,12 +113,14 @@ def build_observations(
     if resource_noise > 0.0:
         loc_res = loc_res + np.random.normal(0.0, resource_noise, loc_res.shape)
         loc_res = np.clip(loc_res, 0.0, 1.0)
-    # Phase 4: concat presence + wall + resource into unified env channel (N, W*4)
-    loc_env = np.concatenate([loc_pres, loc_wall, loc_res], axis=1).astype(np.float32)
+    # Phase 7: new world observation channels
+    loc_shelter   = grid.get_local_shelter(pop.positions, radius=obs_radius)     # (N, W)
+    loc_contested = grid.get_local_contested(pop.positions, radius=obs_radius)   # (N, W)
+    loc_scent     = grid.get_local_scent(pop.positions, radius=obs_radius)       # (N, W)
+    # Phase 7: concat presence + wall + resource + shelter + contested + scent (N, W*7)
+    loc_env = np.concatenate([loc_pres, loc_wall, loc_res, loc_shelter, loc_contested, loc_scent], axis=1).astype(np.float32)
 
-    # Partial observability: blues only see reds within detection_radius cells.
-    # Per-agent: zero the red channel of loc_env for those too far from any red.
-    # This forces agents that can't see reds to rely on neighbours' signals.
+    # Phase 7: shelter doubles red detection radius
     det_r = int(config.get("red_detection_radius", 0))
     if det_r > 0 and red_map.max() > 0 and pop.alive.any() and pop.team[0] == 0:
         r_cells = np.argwhere(red_map > 0)           # (n_red_cells, 2)
@@ -126,7 +128,11 @@ def build_observations(
         diff    = np.abs(b_pos[:, None, :] - r_cells[None, :, :])   # (N, n_rc, 2)
         diff    = np.minimum(diff, gs - diff)         # toroidal
         min_dist = np.maximum(diff[:, :, 0], diff[:, :, 1]).min(axis=1)   # (N,) Chebyshev
-        blind    = min_dist > det_r                   # (N,) bool
+        # Shelter doubles effective detection radius
+        in_shelter = grid.get_local_shelter(pop.positions, radius=0).reshape(-1) > 0.5
+        effective_det_r = np.full(max_pop, det_r, dtype=np.float32)
+        effective_det_r[in_shelter] *= 2.0
+        blind = min_dist > effective_det_r            # (N,) bool
         W        = (2 * obs_radius + 1) ** 2
         loc_env[blind, W:2*W] = 0.0                   # zero out red channel in loc_env
 
@@ -135,13 +141,18 @@ def build_observations(
         mask_pres = np.array([np.random.default_rng(int(s) + 7).random(W) for s in _agent_seeds]) < gate_mask_frac
         loc_env[:, W:2*W][mask_pres] = 0.0
 
-    obs = np.concatenate([
+    obs_parts = [
         own_state,
         nb_sigs.reshape(max_pop, K * sig_dim),
         loc_sym,
         loc_env,
         pop.signals,
-    ], axis=1).astype(np.float32)
+    ]
+    # Phase 7: append episodic memory buffer
+    if pop.memory_buffer is not None:
+        obs_parts.append(pop.memory_buffer.reshape(max_pop, -1))
+
+    obs = np.concatenate(obs_parts, axis=1).astype(np.float32)
 
     obs[~pop.alive] = 0.0
     return obs
@@ -466,7 +477,9 @@ def run(config: Dict, resume_path: Optional[str] = None, headless: bool = False,
 
     from agents.network_torch import DEVICE
     blue_brain = TorchBrain(config)
-    red_brain  = TorchBrain(config)
+    # Phase 7: reds get smaller brain (half capacity)
+    _red_hd = int(config.get("red_hidden_dim", config["agent_hidden_dim"]))
+    red_brain = TorchBrain(config, hidden_dim=_red_hd)
 
     obs_dim  = compute_obs_dim(config)
     sig_dim  = config["signal_dim"]
@@ -487,10 +500,16 @@ def run(config: Dict, resume_path: Optional[str] = None, headless: bool = False,
     # Phase 4: generate procedural walls and resource patches on fresh start
     _wall_density = float(config.get("wall_density", 0.08))
     _res_patches  = int(config.get("resource_n_patches", 20))
+    # Phase 7: new world objects
+    _shelter_n    = int(config.get("shelter_n_spots", 5))
+    _contested_n  = int(config.get("contested_n_nodes", 3))
     if not resume_path:
         grid.generate_walls(rng, density=_wall_density)
         grid.generate_resources(rng, n_patches=_res_patches)
-        print(f"[init] walls={int(grid.walls.sum())} cells  resources={grid.resources.sum():.1f} total")
+        grid.generate_shelter_spots(rng, n_spots=_shelter_n)
+        grid.generate_contested_nodes(rng, n_nodes=_contested_n)
+        print(f"[init] walls={int(grid.walls.sum())} cells  resources={grid.resources.sum():.1f} total  "
+              f"shelter={int(grid.shelter_spots.sum())} cells  contested_nodes={int((grid.contested_res > 0.1).sum())} cells")
 
     if resume_path:
         ckpt  = load_checkpoint(resume_path, blue_brain=blue_brain, red_brain=red_brain)
@@ -508,7 +527,19 @@ def run(config: Dict, resume_path: Optional[str] = None, headless: bool = False,
             grid.resources = ckpt["grid_resources"]
         else:
             grid.generate_resources(rng, n_patches=_res_patches)
-        print(f"  [resume] walls={int(grid.walls.sum())} cells  resources={grid.resources.sum():.1f} total")
+        # Phase 7: restore new grid layers
+        if ckpt.get("grid_shelter") is not None:
+            grid.shelter_spots = ckpt["grid_shelter"]
+        else:
+            grid.generate_shelter_spots(rng, n_spots=_shelter_n)
+        if ckpt.get("grid_contested") is not None:
+            grid.contested_res = ckpt["grid_contested"]
+        else:
+            grid.generate_contested_nodes(rng, n_nodes=_contested_n)
+        if ckpt.get("grid_scent") is not None:
+            grid.scent_trails = ckpt["grid_scent"]
+        print(f"  [resume] walls={int(grid.walls.sum())} cells  resources={grid.resources.sum():.1f} total  "
+              f"shelter={int(grid.shelter_spots.sum())} cells  contested={(grid.contested_res > 0.1).sum()} cells")
         # Phase 4 backward compat: old checkpoints lack energy
         if not hasattr(blue_pop, "energy"):
             blue_pop.energy = np.ones(blue_pop.max_pop, dtype=np.float32)
@@ -539,10 +570,11 @@ def run(config: Dict, resume_path: Optional[str] = None, headless: bool = False,
 
     _K       = int(config["neighbor_k"])
     _hd      = int(config["agent_hidden_dim"])
+    _red_hd  = int(config.get("red_hidden_dim", _hd))
     blue_buf = RolloutBuffer(config["ppo_rollout_steps"], max_pop_b, obs_dim,
                              neighbor_k=_K, hidden_dim=_hd)
     red_buf  = None if red_pop is None else RolloutBuffer(
-        config["ppo_rollout_steps"], max_pop_r, obs_dim, hidden_dim=_hd
+        config["ppo_rollout_steps"], max_pop_r, obs_dim, hidden_dim=_red_hd
     )
 
     analyser = CommunicationAnalyser(
@@ -896,7 +928,14 @@ def run(config: Dict, resume_path: Optional[str] = None, headless: bool = False,
                 np.clip(blue_pop.energy, 0.0, 1.0, out=blue_pop.energy)
                 # Consume resources
                 _energy_gained = grid.consume_resources(blue_pop.positions, blue_pop.alive)
-                blue_pop.energy[blue_pop.alive] += _energy_gained[blue_pop.alive]
+                # Phase 7: contested resources (require 2+ agents)
+                _contested_yield = float(config.get("contested_yield_multiplier", 3.0))
+                _contested_min = int(config.get("contested_min_harvesters", 2))
+                _contested_gained = grid.consume_contested(
+                    blue_pop.positions, blue_pop.alive,
+                    min_harvesters=_contested_min, yield_mult=_contested_yield
+                )
+                blue_pop.energy[blue_pop.alive] += _energy_gained[blue_pop.alive] + _contested_gained[blue_pop.alive]
                 np.clip(blue_pop.energy, 0.0, 1.0, out=blue_pop.energy)
                 # Starvation
                 _starve_thresh = float(config.get("starvation_threshold", 0.05))
@@ -933,6 +972,25 @@ def run(config: Dict, resume_path: Optional[str] = None, headless: bool = False,
                 b_done = np.zeros(max_pop_b, dtype=np.float32)
                 b_done[old_age_deaths] = 1.0
 
+                # Phase 7: update episodic memory buffer for alive blues
+                if blue_pop.memory_buffer is not None:
+                    _mem_slots = blue_pop.memory_buffer.shape[1]
+                    _sig_dim = config["signal_dim"]
+                    # Compute received signals (mean of K neighbors)
+                    _mem_nb = get_neighbour_signals_padded(
+                        blue_pop.positions, blue_pop.signals, blue_pop.alive,
+                        k=K, grid_size=gs,
+                    )  # (N, K, sig_dim)
+                    _mem_recv = _mem_nb.mean(axis=1)  # (N, sig_dim)
+                    _mem_surv = blue_pop.alive.astype(np.float32)  # (N,)
+                    # Shift existing slots back, insert new at front
+                    blue_pop.memory_buffer[:, 1:] = blue_pop.memory_buffer[:, :-1]
+                    blue_pop.memory_buffer[:, 0, :_sig_dim] = _mem_recv
+                    blue_pop.memory_buffer[:, 0, _sig_dim] = b_actions.astype(np.float32)
+                    blue_pop.memory_buffer[:, 0, _sig_dim + 1] = _mem_surv
+                    # Zero memory for dead agents
+                    blue_pop.memory_buffer[~blue_pop.alive] = 0.0
+
                 # ── Red forward pass ──────────────────────────────────────────
                 r_rew = np.zeros(max_pop_r, dtype=np.float32) if red_pop is not None else None
                 r_carry_before = (red_pop.carries.copy()
@@ -964,6 +1022,9 @@ def run(config: Dict, resume_path: Optional[str] = None, headless: bool = False,
                     r_actions[~red_pop.alive] = A_STAY
 
                     apply_moves(red_pop, r_actions, gs, grid=grid)
+                    # Phase 7: reds leave scent trails
+                    _scent_intensity = float(config.get("scent_intensity", 0.8))
+                    grid.update_scent_trails(red_pop.positions, red_pop.alive, intensity=_scent_intensity)
                     grid.write_symbols(
                         red_pop.positions, r_sym_w_np, red_pop.alive
                     )
@@ -1168,6 +1229,9 @@ def run(config: Dict, resume_path: Optional[str] = None, headless: bool = False,
 
                 # ── Symbol decay + resource regeneration ────────────────────
                 grid.decay_symbols(config["symbol_decay"])
+                # Phase 7: decay scent trails
+                _scent_decay = float(config.get("scent_decay", 0.95))
+                grid.decay_scent_trails(decay=_scent_decay)
                 grid.regenerate_resources(rng, step,
                     regen_rate=float(config.get("resource_regen_rate", 0.002)),
                     n_patches=int(config.get("resource_n_patches", 20)),
@@ -1215,6 +1279,8 @@ def run(config: Dict, resume_path: Optional[str] = None, headless: bool = False,
                                     red_brain=red_brain if red_pop is not None else None,
                                     grid_symbols=grid.symbols, config=config,
                                     grid_walls=grid.walls, grid_resources=grid.resources,
+                                    grid_shelter=grid.shelter_spots, grid_contested=grid.contested_res,
+                                    grid_scent=grid.scent_trails,
                                 )
                                 return
                             # Fire TOPO_SIM + full culture snapshot at graduation
@@ -1528,6 +1594,9 @@ def run(config: Dict, resume_path: Optional[str] = None, headless: bool = False,
                         config        = config,
                         grid_walls    = grid.walls,
                         grid_resources = grid.resources,
+                        grid_shelter  = grid.shelter_spots,
+                        grid_contested = grid.contested_res,
+                        grid_scent    = grid.scent_trails,
                     )
                     slog(f"[step {step:,}] checkpoint → {ckpt_path}")
 

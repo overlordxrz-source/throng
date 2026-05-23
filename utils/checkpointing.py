@@ -29,7 +29,7 @@ import torch
 # ── Population state ↔ dict ───────────────────────────────────────────────────
 
 def _pop_to_dict(pop) -> Dict:
-    return {
+    d = {
         "positions":         np.array(pop.positions),
         "ages":              np.array(pop.ages),
         "alive":             np.array(pop.alive),
@@ -45,12 +45,18 @@ def _pop_to_dict(pop) -> Dict:
         "max_pop":           pop.max_pop,
         "next_lineage_id":   pop.next_lineage_id,
     }
+    if pop.memory_buffer is not None:
+        d["memory_buffer"] = np.array(pop.memory_buffer)
+    return d
 
 
 def _dict_to_pop(d: Dict):
     """Restore a PopulationState from its serialised dict (all numpy)."""
     from agents.population import PopulationState
     max_pop = d["max_pop"]
+    mem_buf = d.get("memory_buffer")
+    if mem_buf is not None:
+        mem_buf = mem_buf.astype(np.float32)
     return PopulationState(
         positions         = d["positions"],
         ages              = d["ages"],
@@ -64,6 +70,7 @@ def _dict_to_pop(d: Dict):
         signals           = d["signals"].astype(np.float32),
         nb_gain           = d.get("nb_gain", np.ones(max_pop, dtype=np.float32)),
         energy            = d.get("energy", np.ones(max_pop, dtype=np.float32)),
+        memory_buffer     = mem_buf,
         max_pop           = max_pop,
         next_lineage_id   = d["next_lineage_id"],
     )
@@ -85,6 +92,9 @@ def save_checkpoint(
     config:        Dict,
     grid_walls:    np.ndarray = None,
     grid_resources: np.ndarray = None,
+    grid_shelter:  np.ndarray = None,
+    grid_contested: np.ndarray = None,
+    grid_scent:    np.ndarray = None,
 ) -> Path:
     payload = {
         "step":          step,
@@ -102,6 +112,13 @@ def save_checkpoint(
         payload["grid_walls"] = np.array(grid_walls)
     if grid_resources is not None:
         payload["grid_resources"] = np.array(grid_resources)
+    # Phase 7: new grid layers
+    if grid_shelter is not None:
+        payload["grid_shelter"] = np.array(grid_shelter)
+    if grid_contested is not None:
+        payload["grid_contested"] = np.array(grid_contested)
+    if grid_scent is not None:
+        payload["grid_scent"] = np.array(grid_scent)
 
     ckpt_path = ckpt_dir / f"checkpoint_{step}.pkl"
     with open(ckpt_path, "wb") as f:
@@ -159,6 +176,9 @@ def load_checkpoint(path: str, blue_brain=None, red_brain=None) -> Dict:
         "grid_symbols":  payload["grid_symbols"],
         "grid_walls":    payload.get("grid_walls"),
         "grid_resources": payload.get("grid_resources"),
+        "grid_shelter":  payload.get("grid_shelter"),
+        "grid_contested": payload.get("grid_contested"),
+        "grid_scent":    payload.get("grid_scent"),
         "config":        payload["config"],
     }
 

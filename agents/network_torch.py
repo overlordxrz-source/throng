@@ -115,6 +115,8 @@ class AgentNetworkTorch(nn.Module):
         signal_gate:    bool = False,
         vocab_size:     int  = 64,
         gumbel_tau:     float = 0.5,
+        memory_slots:   int  = 0,
+        memory_slot_dim: int = 0,
     ) -> None:
         super().__init__()
         self.hidden_dim     = hidden_dim
@@ -129,6 +131,8 @@ class AgentNetworkTorch(nn.Module):
         self.signal_gate_enabled = signal_gate
         self.vocab_size     = vocab_size
         self.gumbel_tau     = gumbel_tau
+        self.memory_slots   = memory_slots
+        self.memory_slot_dim = memory_slot_dim
 
         # Signal gate — restores masked sensor dims from neighbour signals
         if signal_gate:
@@ -137,13 +141,18 @@ class AgentNetworkTorch(nn.Module):
             self.gate = None
 
         # Embedding layers — one per observation segment
-        # Phase 4: own_state expanded to 6 (added energy), pres expanded to 4 (added wall + resource)
+        # Phase 7: pres expanded to 7 (added shelter, contested, scent)
         self.emb_own  = nn.Linear(6,          token_dim)
         self.emb_nb   = nn.Linear(signal_dim,  token_dim)   # per neighbour
         self.emb_sym  = nn.Linear(symbol_dim,  token_dim)   # per symbol cell
-        self.emb_pres = nn.Linear(4,           token_dim)   # per cell: [blue, red, wall, resource]
+        self.emb_pres = nn.Linear(7,           token_dim)   # per cell: [blue, red, wall, resource, shelter, contested, scent]
         self.emb_sig  = nn.Linear(signal_dim,  token_dim)
         self.emb_mem  = nn.Linear(hidden_dim,  token_dim)
+        # Phase 7: episodic memory tokens
+        if memory_slots > 0:
+            self.emb_epi = nn.Linear(memory_slot_dim, token_dim)
+        else:
+            self.emb_epi = None
 
         # All max_layers blocks pre-allocated (depth gated at runtime)
         self.attn_blocks = nn.ModuleList([
@@ -202,8 +211,15 @@ class AgentNetworkTorch(nn.Module):
         own  = obs[:, c:c + 6];                                  c += 6
         nb   = obs[:, c:c + K * sd].view(N, K, sd);             c += K * sd
         syms = obs[:, c:c + W * syd].view(N, W, syd);           c += W * syd
-        pres = obs[:, c:c + W * 4].view(N, W, 4);               c += W * 4
+        pres = obs[:, c:c + W * 7].view(N, W, 7);               c += W * 7  # Phase 7: 7 env channels
         sig  = obs[:, c:c + sd];                                 c += sd
+        # Phase 7: episodic memory buffer
+        epi = None
+        if self.memory_slots > 0:
+            epi = obs[:, c:c + self.memory_slots * self.memory_slot_dim].view(
+                N, self.memory_slots, self.memory_slot_dim
+            )
+            c += self.memory_slots * self.memory_slot_dim
 
         # ── Within-lifetime Hebbian: scale incoming signals by per-agent gain ─
         if nb_gain is not None:
@@ -213,7 +229,7 @@ class AgentNetworkTorch(nn.Module):
         t_own  = self.emb_own(own).unsqueeze(1)                  # (N, 1, D)
         t_nb   = self.emb_nb(nb.reshape(N * K, sd)).view(N, K, self.token_dim)
         t_sym  = self.emb_sym(syms.reshape(N * W, syd)).view(N, W, self.token_dim)
-        t_pres = self.emb_pres(pres.reshape(N * W, 4)).view(N, W, self.token_dim)
+        t_pres = self.emb_pres(pres.reshape(N * W, 7)).view(N, W, self.token_dim)
         t_sig  = self.emb_sig(sig).unsqueeze(1)                  # (N, 1, D)
         t_mem  = self.emb_mem(carries).unsqueeze(1)              # (N, 1, D)
 
@@ -221,7 +237,13 @@ class AgentNetworkTorch(nn.Module):
         if self.gate is not None:
             t_own = self.gate(t_own, t_nb)
 
-        tokens = torch.cat([t_own, t_nb, t_sym, t_pres, t_sig, t_mem], dim=1)
+        token_list = [t_own, t_nb, t_sym, t_pres, t_sig, t_mem]
+        if epi is not None and self.emb_epi is not None:
+            t_epi = self.emb_epi(
+                epi.reshape(N * self.memory_slots, self.memory_slot_dim)
+            ).view(N, self.memory_slots, self.token_dim)
+            token_list.append(t_epi)
+        tokens = torch.cat(token_list, dim=1)
 
         # ── Variable-depth attention (break at n_layers) ────────────────────
         for i, block in enumerate(self.attn_blocks):
@@ -315,8 +337,14 @@ def compute_obs_dim_torch(config: dict) -> int:
     symd = config.get("symbol_dim", 8)
     r    = config["local_obs_radius"]
     W    = (2 * r + 1) ** 2
-    # Phase 4: own_state=6 (energy added), presence=4 (wall + resource added)
-    return 6 + K * sd + W * symd + W * 4 + sd
+    # Phase 7: env channels = 7 (blue_pres, red_pres, wall, resource, shelter, contested, scent)
+    env_ch = 7
+    base = 6 + K * sd + W * symd + W * env_ch + sd
+    # Phase 7: episodic memory buffer
+    mem_slots = int(config.get("memory_buffer_size", 0))
+    if mem_slots > 0 and config.get("memory_buffer_enabled", False):
+        base += mem_slots * (sd + 2)
+    return base
 
 
 # ── TorchBrain — the main interface for main.py ───────────────────────────────
@@ -332,12 +360,19 @@ class TorchBrain:
         self,
         config: dict,
         device: Optional[torch.device] = None,
+        hidden_dim: Optional[int] = None,
     ) -> None:
         self.device = device or DEVICE
         self.config = config
 
+        _hd = hidden_dim if hidden_dim is not None else config["agent_hidden_dim"]
+        _mem_slots = int(config.get("memory_buffer_size", 0))
+        _mem_slot_dim = 0
+        if _mem_slots > 0 and config.get("memory_buffer_enabled", False):
+            _mem_slot_dim = config["signal_dim"] + 2
+
         self.model = AgentNetworkTorch(
-            hidden_dim      = config["agent_hidden_dim"],
+            hidden_dim      = _hd,
             token_dim       = config["brain_token_dim"],
             n_heads         = config["brain_n_heads"],
             max_layers      = config["brain_max_layers"],
@@ -349,6 +384,8 @@ class TorchBrain:
             signal_gate     = bool(config.get("signal_gate_enabled", False)),
             vocab_size      = int(config.get("vocab_size", 64)),
             gumbel_tau      = float(config.get("gumbel_tau", 0.5)),
+            memory_slots    = _mem_slots,
+            memory_slot_dim = _mem_slot_dim,
         ).to(self.device)
 
         _policy_params = [

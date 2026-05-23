@@ -1,0 +1,151 @@
+# THRONG v2 — Phase 7: Rich World + Episodic Memory + Red Co-evolution
+#
+# Three architectural additions:
+# 1. Episodic memory buffer per agent (20 slots of signal+action+survival)
+# 2. Three new world objects: shelter spots, contested resources, scent trails
+# 3. Red co-evolution: reds get their own PPO policy (hidden_dim=128)
+#
+# USE: python main.py --config config_phase7.yaml --fresh
+
+grid_size: 128
+window_size: 1200
+
+population_size: 500
+red_population_size: 75
+min_population: 40
+min_red_population: 30
+
+# Curriculum
+curriculum_red_count: 6
+curriculum_blue_threshold: 80
+curriculum_sustain_steps: 2000
+
+max_age: 20000
+base_maturation_steps: 200
+
+# Brain architecture — 4L from birth
+n_layers: 4
+brain_max_layers: 6
+brain_token_dim: 128
+brain_n_heads: 4
+agent_hidden_dim: 256
+signal_dim: 32
+symbol_dim: 16
+
+neighbor_k: 6
+local_obs_radius: 2              # 5×5 patch
+
+# Theory of mind head
+tom_enabled: true
+tom_lr: 1.0e-4
+tom_reward_coef: 0.0            # ZERO artificial rewards in Phase 7
+tom_head_independent: true
+
+# Signal gate
+signal_gate_enabled: true
+signal_gate_mask_frac: 0.5
+
+symbol_decay: 0.993
+
+red_starvation_steps: 400
+red_spawn_step: 2000
+red_catch_radius: 0
+
+# ── Discrete token bottleneck (kept for network compatibility, but tau=0 disables sampling) ─
+vocab_size: 64
+gumbel_tau: 0.5
+
+# ── Anneal: diversity → crystallization ───────────────────────────────────────
+gumbel_tau_start: 0.5
+gumbel_tau_end: 0.5
+gumbel_tau_anneal_start: 20000
+gumbel_tau_anneal_end: 50000
+
+# ZERO signal entropy bonus — structure must arise from survival gradient
+signal_entropy_coef_start: 0.0
+signal_entropy_coef_end: 0.0
+signal_entropy_anneal_start: 20000
+signal_entropy_anneal_end: 50000
+
+# ── Procedural environment ────────────────────────────────────────────────────
+wall_density: 0.08
+resource_n_patches: 20
+resource_regen_rate: 0.005
+
+# ── Phase 7: New world objects ────────────────────────────────────────────────
+shelter_n_spots: 5              # shelter spots per map
+contested_n_nodes: 3           # contested resource nodes
+contested_yield_multiplier: 3.0 # 3× normal food, requires 2+ agents
+contested_min_harvesters: 2
+scent_decay_steps: 20          # scent trail fades over 20 steps
+scent_intensity: 0.8          # initial scent strength when red passes
+
+# ── Phase 7: Episodic memory ─────────────────────────────────────────────────
+memory_buffer_size: 20          # slots per agent (0 = disabled)
+memory_buffer_enabled: true
+
+# ── Phase 7: Red co-evolution ────────────────────────────────────────────────
+red_policy: true
+red_hidden_dim: 128             # half the blues' capacity (256→128)
+
+# ── Energy mechanics ─────────────────────────────────────────────────────────
+energy_decay: 0.001
+starvation_threshold: 0.05
+reward_starvation: -0.5
+reward_resource: 0.1
+
+# ── MAPPO ──────────────────────────────────────────────────────────────────────
+ppo_rollout_steps: 512
+ppo_epochs: 1
+ppo_minibatch_size: 4096
+ppo_warmup_steps: 15
+ppo_clip: 0.2
+ppo_lr: 3.0e-4
+ppo_gamma: 0.99
+ppo_gae_lam: 0.95
+ppo_value_coef: 0.25
+ppo_entropy_coef: 0.05
+action_entropy_coef: 0.05      # Explicit action diversity bonus
+ppo_max_grad_norm: 2.0
+
+# Rewards
+reward_blue_alive: 0.05
+reward_blue_caught: -1.0
+reward_blue_red_proximity: -0.01
+reward_red_catch: 1.0
+reward_red_starve_per_step: -0.01
+reward_move: 0.01
+
+# Observation constraints
+red_detection_radius: 0         # NO direct red detection beyond 5×5 patch
+resource_obs_noise: 0.2         # 20% Gaussian noise on resource observations
+
+brain_vote_interval: 5000
+brain_vote_survival_threshold: 0.55
+force_brain_layers: 4
+
+# ── Misc ──────────────────────────────────────────────────────────────────────
+steps_per_render: 32
+target_fps: 60
+dashboard_update_interval: 20.0
+
+log_dir: runs_large
+checkpoint_interval: 2000
+log_interval: 200
+
+mi_analysis_interval: 1000
+mi_window: 1000
+signal_cluster_k: 12
+
+# Signal corpus (offline language analysis)
+corpus_sample_frac: 0.08
+corpus_every_n_steps: 20
+
+# Within-lifetime Hebbian learning
+hebb_lr: 0.001
+
+# Alarm call analysis
+alarm_scout_range: 8
+alarm_min_group: 20
+
+exit_on_graduation: false

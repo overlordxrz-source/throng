@@ -25,6 +25,10 @@ class ToroidalGrid:
         self.symbols    = np.zeros((size, size, symbol_dim), dtype=np.float32)
         self.walls      = np.zeros((size, size), dtype=bool)
         self.resources  = np.zeros((size, size), dtype=np.float32)
+        # Phase 7: new world layers
+        self.shelter_spots    = np.zeros((size, size), dtype=bool)       # shelter locations
+        self.contested_res    = np.zeros((size, size), dtype=np.float32)  # contested resource nodes
+        self.scent_trails     = np.zeros((size, size), dtype=np.float32)  # red scent trails
 
     # ── Wrapping ─────────────────────────────────────────────────────────────
 
@@ -270,3 +274,137 @@ class ToroidalGrid:
         rows = cells[:, :, 0]
         cols = cells[:, :, 1]
         return self.resources[rows, cols].astype(np.float32)
+
+    # ── Phase 7: Shelter spots ────────────────────────────────────────────────
+
+    def generate_shelter_spots(
+        self,
+        rng:      np.random.Generator,
+        n_spots:  int = 5,
+        spot_radius: int = 2,
+    ) -> None:
+        """Place shelter zones: agents inside have doubled red detection radius."""
+        size = self.size
+        self.shelter_spots.fill(False)
+        for _ in range(n_spots):
+            cy, cx = rng.integers(0, size, size=2)
+            if self.walls[cy, cx]:
+                continue
+            dy = np.minimum(np.abs(np.arange(size) - cy), size - np.abs(np.arange(size) - cy))
+            dx = np.minimum(np.abs(np.arange(size) - cx), size - np.abs(np.arange(size) - cx))
+            dist = np.sqrt(dy[:, None] ** 2 + dx[None, :] ** 2)
+            self.shelter_spots |= dist <= spot_radius
+        self.shelter_spots[self.walls] = False
+
+    def get_local_shelter(
+        self,
+        positions: np.ndarray,
+        radius:    int = 1,
+    ) -> np.ndarray:
+        """Return (max_pop, W) bool — shelter presence in local window."""
+        dy, dx = np.mgrid[-radius:radius + 1, -radius:radius + 1]
+        offsets = np.stack([dy.ravel(), dx.ravel()], axis=1)
+        cells = (positions[:, None, :] + offsets[None, :, :]) % self.size
+        return self.shelter_spots[cells[:, :, 0], cells[:, :, 1]].astype(np.float32)
+
+    # ── Phase 7: Contested resource nodes ─────────────────────────────────────
+
+    def generate_contested_nodes(
+        self,
+        rng:       np.random.Generator,
+        n_nodes:   int = 3,
+        node_radius: int = 2,
+        node_value: float = 0.8,
+    ) -> None:
+        """Place contested resource patches that yield 3× food if 2+ agents harvest."""
+        size = self.size
+        self.contested_res.fill(0.0)
+        for _ in range(n_nodes):
+            cy, cx = rng.integers(0, size, size=2)
+            if self.walls[cy, cx]:
+                continue
+            dy = np.minimum(np.abs(np.arange(size) - cy), size - np.abs(np.arange(size) - cy))
+            dx = np.minimum(np.abs(np.arange(size) - cx), size - np.abs(np.arange(size) - cx))
+            dist = np.sqrt(dy[:, None] ** 2 + dx[None, :] ** 2)
+            blob = node_value * np.exp(-(dist ** 2) / (2 * (node_radius / 2.0) ** 2))
+            self.contested_res = np.maximum(self.contested_res, blob)
+        self.contested_res[self.walls] = 0.0
+        np.clip(self.contested_res, 0.0, 1.0, out=self.contested_res)
+
+    def get_local_contested(
+        self,
+        positions: np.ndarray,
+        radius:    int = 1,
+    ) -> np.ndarray:
+        """Return (max_pop, W) float — contested resource density in local window."""
+        dy, dx = np.mgrid[-radius:radius + 1, -radius:radius + 1]
+        offsets = np.stack([dy.ravel(), dx.ravel()], axis=1)
+        cells = (positions[:, None, :] + offsets[None, :, :]) % self.size
+        return self.contested_res[cells[:, :, 0], cells[:, :, 1]].astype(np.float32)
+
+    def consume_contested(
+        self,
+        positions: np.ndarray,
+        alive:     np.ndarray,
+        min_harvesters: int = 2,
+        yield_mult: float = 3.0,
+    ) -> np.ndarray:
+        """Return (max_pop,) float — energy from contested nodes. Requires min_harvesters on same node."""
+        energy_gained = np.zeros(positions.shape[0], dtype=np.float32)
+        idx = np.where(alive)[0]
+        if len(idx) == 0:
+            return energy_gained
+        pos = positions[idx]
+        # Count harvesters per contested cell
+        contested_mask = self.contested_res[pos[:, 0], pos[:, 1]] > 0.1
+        if not contested_mask.any():
+            return energy_gained
+        cidx = idx[contested_mask]
+        cpos = pos[contested_mask]
+        # For each unique cell, count how many alive agents are on it
+        unique_cells, inv = np.unique(cpos, axis=0, return_inverse=True)
+        counts = np.bincount(inv)
+        valid = counts >= min_harvesters
+        if not valid.any():
+            return energy_gained
+        # Give bonus to agents on valid contested cells
+        for i, cell in enumerate(unique_cells[valid]):
+            cell_mask = (cpos[:, 0] == cell[0]) & (cpos[:, 1] == cell[1])
+            agents_on_cell = cidx[cell_mask]
+            available = self.contested_res[cell[0], cell[1]]
+            consumed = np.minimum(available, 0.3 * yield_mult)
+            self.contested_res[cell[0], cell[1]] -= consumed
+            energy_gained[agents_on_cell] = consumed
+        np.clip(self.contested_res, 0.0, 1.0, out=self.contested_res)
+        return energy_gained
+
+    # ── Phase 7: Scent trails ─────────────────────────────────────────────────
+
+    def update_scent_trails(
+        self,
+        positions: np.ndarray,
+        alive:     np.ndarray,
+        intensity: float = 0.8,
+    ) -> None:
+        """Reds leave scent markers where they walk."""
+        idx = np.where(alive)[0]
+        if len(idx) == 0:
+            return
+        pos = positions[idx]
+        np.add.at(self.scent_trails, (pos[:, 0], pos[:, 1]), intensity)
+        np.clip(self.scent_trails, 0.0, 1.0, out=self.scent_trails)
+
+    def decay_scent_trails(self, decay: float = 0.95) -> None:
+        """Scent trails fade multiplicatively each step."""
+        self.scent_trails *= decay
+
+    def get_local_scent(
+        self,
+        positions: np.ndarray,
+        radius:    int = 1,
+    ) -> np.ndarray:
+        """Return (max_pop, W) float — scent intensity in local window."""
+        dy, dx = np.mgrid[-radius:radius + 1, -radius:radius + 1]
+        offsets = np.stack([dy.ravel(), dx.ravel()], axis=1)
+        cells = (positions[:, None, :] + offsets[None, :, :]) % self.size
+        return self.scent_trails[cells[:, :, 0], cells[:, :, 1]].astype(np.float32)
