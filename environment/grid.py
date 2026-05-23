@@ -149,6 +149,10 @@ class ToroidalGrid:
             walls |= rng.random((size, size)) < (density - _curr_d)
 
         # 4. Ensure open connectivity (flood-fill from center)
+        # Force center open so flood fill always has a valid seed; otherwise
+        # a wall at the center makes the algorithm mark every open cell as a
+        # pocket and the grid becomes ~100% walls.
+        walls[size // 2, size // 2] = False
         _open = ~walls
         _visited = np.zeros_like(_open, dtype=bool)
         _stack = [(size // 2, size // 2)]
