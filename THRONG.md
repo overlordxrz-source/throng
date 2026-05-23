@@ -16,41 +16,44 @@ The core hypothesis: **survival pressure, information asymmetry, and the need to
 
 ### Architecture
 
-- **Agent Brain**: Transformer-based Actor-Critic network (token_dim=32, n_heads=2, hidden_dim=64). Each agent has a recurrent carry (memory) that persists across steps. The network outputs action logits, a continuous signal vector, a symbol write vector, and a scalar value estimate.
+- **Agent Brain**: Transformer-based Actor-Critic network (token_dim=128, n_heads=4, hidden_dim=256). Each agent has a recurrent carry (256-dim) that persists across steps. The network outputs action logits, discrete signal tokens, symbol write vectors, dual cultural memory vectors, value estimates, and theory-of-mind predictions.
 
-- **Parameter Sharing (MAPPO)**: All agents on the same team share a single policy. There is one gradient-updated policy per team. This forces the population to develop a *common language* rather than idiosyncratic per-agent communication.
+- **Parameter Sharing (MAPPO)**: All agents on the same team share a single policy. One gradient-updated policy per team forces a *common language* rather than idiosyncratic per-agent communication.
 
-- **Continuous Signals**: Each agent emits a 16-dimensional float vector each step. Neighbours receive these vectors as input tokens. Signals are not pre-designed — they emerge purely from training.
+- **Discrete Vocab Communication**: Agents emit one of 256 discrete "words" each step, embedded into 32-dim continuous vectors. Neighbours receive these as input tokens. Vocabulary is not pre-designed — it emerges purely from training.
 
-- **Culture Layer**: A persistent symbol grid overlaid on the environment. Agents write tanh vectors to cells they occupy; symbols decay multiplicatively each step (rate 0.993). This creates a spatial memory that outlasts individual agents — a proto-culture.
+- **Dual Cultural Memory Grids**: Two persistent writable layers overlaid on the environment:
+  - **Fast grid** (decay 0.90) — recent danger, coordination traces
+  - **Slow grid** (decay 0.995) — stable landmarks, long-term knowledge
+  Agents deposit 16-dim tanh vectors; others read local patches. This is cumulative culture — knowledge outlives individuals.
 
-- **Brain Depth Evolution**: Brain depth (`n_layers`) starts at 2 and grows via population vote. When the population's survival rate drops below a threshold for sustained steps, the shared policy gains an additional attention layer. All 6 possible layers are pre-allocated at init; growth just activates the next block without weight reinitialisation.
+- **Episodic Memory Buffer**: Each agent stores 20 slots of (signal + action + survival) history, fed as tokens into the transformer.
+
+- **Theory-of-Mind Head**: Predicts each neighbour's next action from observed signals. Trained via cross-entropy against actual neighbour moves.
+
+- **Brain Depth Curriculum**: Starts at 4L, expands to 6L via curriculum triggers. All 6 layers pre-allocated; growth activates the next block without reinit.
 
 ### Environment
 
 - **Predator-Prey Dynamics**: Blue agents (prey) vs Red agents (predators). Blues die when caught by a red or when they exceed max age. Reds starve if they go too long without a catch.
 
-- **Partial Observability**: Blues can only detect reds within a radius of 8 cells. Beyond that radius, the red presence channel in their observation is zeroed out. Blues *outside* detection range must rely entirely on signals from neighbours who *can* see reds. This creates genuine **information asymmetry** — the core pressure for communication to become useful.
+- **Partial Observability**: Blues have zero direct red detection beyond their 5×5 patch. Reds are invisible unless literally adjacent or a neighbour signals about them. This forces genuine **information asymmetry** — the core pressure for communication.
 
-- **Toroidal Grid**: 96×96 toroidal space. Agents observe a 3×3 local window of symbols and presence, plus the signals of their 6 nearest neighbours.
+- **Toroidal Grid**: 128×128 toroidal space. Agents observe a 5×5 local window (25 cells) of: symbols, walls, resources, shelter, contested nodes, scent trails, blue/red presence, and dual cultural memory traces. Plus 6 nearest neighbour signals.
 
 ### Training
 
 - **Algorithm**: Multi-Agent PPO (MAPPO) with Generalised Advantage Estimation (GAE).
-- **Rollout**: 128 steps collected before each gradient update.
-- **Optimiser**: Adam + gradient clipping (max norm 0.5), learning rate 1e-4.
-- **Rewards**:
-  - Blue survival: +0.05/step
-  - Blue caught: −1.0
-  - Red catch: +1.0
-  - Red starvation: −0.01/step
+- **Rollout**: 512 steps collected before each gradient update.
+- **Optimiser**: Adam + gradient clipping (max norm 2.0), learning rate 1e-4.
+- **Reward**: Survival-only. `+1` if alive at step end, `−1` if dead. No shaped rewards. PPO learns to maximise expected lifetime.
+- **Curriculum**: Reds start at 6 agents. When blues sustain >80 for 2,000 steps, red floor graduates (6 → 15 → 30 → 75). This creates escalating pressure.
 
 ### Infrastructure
 
-- **PyTorch 2.12 + MPS backend** for neural networks and gradient computation. The forward pass and PPO update run on the M-series GPU via Metal Performance Shaders. Observations and rewards stay as NumPy arrays on CPU; only tensors cross the boundary to MPS.
-- **Full state checkpointing** every 2,000 steps: brain `state_dict` (PyTorch), recurrent carries, signal vectors, culture grid, and population state are all serialised. Any restart auto-resumes from the latest checkpoint, including legacy JAX checkpoints (brain weights reinitialise fresh if no torch state_dict is found).
-- **Background MI analysis**: Mutual information between signal dimensions and environmental features (resource density, neighbour count, distance to threat) is estimated continuously using k-NN regression.
-- **Science log**: Per-run log of PPO metrics, MI snapshots, brain growth events, and checkpoint paths.
+- **PyTorch 2.x + CUDA** (T4 on Kaggle). The forward pass and PPO update run on GPU. Observations and grid ops stay on CPU.
+- **Full state checkpointing** every 2,000 steps: brain weights, recurrent carries, all grid layers (symbols, walls, resources, shelter, contested, scent, cultural fast/slow), and population state.
+- **Metrics**: MI, compositionality (COMPOSE), chain depth, Granger causality, ToM accuracy, cultural entropy + lag correlation, alarm call delta.
 
 ---
 
@@ -128,26 +131,23 @@ The goal is not to replicate LLM capabilities, but to grow a qualitatively diffe
 
 ```
 throng/
-├── main.py                    # Simulation loop, MAPPO integration, checkpointing
-├── config.yaml                # All hyperparameters
-├── _bench_mps.py              # PyTorch MPS vs CPU benchmark
+├── main.py                      # CLI + simulation loop
+├── config_phase7.yaml           # All hyperparameters
 ├── agents/
-│   ├── network_torch.py       # AgentNetworkTorch (PyTorch) + TorchBrain wrapper
-│   ├── network.py             # Original Flax AgentNetwork (kept for reference)
-│   ├── population.py          # PopulationState, lifecycle helpers (JAX-free)
-│   ├── rl_torch.py            # PyTorch PPO update (GAE in numpy, loss on MPS)
-│   └── rl.py                  # Original JAX PPO (kept for reference)
+│   ├── network_torch.py         # AgentNetworkTorch (transformer) + TorchBrain wrapper
+│   ├── rl_torch.py              # PPO loss, ToM loss, MAPPO update
+│   └── population.py            # PopulationState — positions, energy, memory, etc.
 ├── environment/
-│   └── grid.py                # Toroidal grid, symbol culture layer, presence maps
+│   ├── grid.py                  # ToroidalGrid — all world layers (resources, walls, shelter, contested, scent, cultural fast/slow)
+│   └── resource.py              # Gaussian patch generation
 ├── communication/
-│   ├── channel.py             # Neighbour signal aggregation (k-NN, cosine sim)
-│   └── analysis.py            # Background MI estimation (sklearn k-NN regression)
+│   ├── channel.py               # Signal aggregation
+│   └── analysis.py              # MI, compositionality, culture, chain-depth metrics
 ├── utils/
-│   ├── checkpointing.py       # Full state save/load (torch state_dict, grid, step)
-│   └── logging.py             # RunLogger, science log
-└── visualization/
-    ├── renderer.py            # Pygame dark-space renderer
-    └── dashboard.py           # Matplotlib analytics dashboard
+│   ├── logging.py               # Structured JSON logs
+│   └── checkpointing.py         # Full state save/load
+└── README.md                    # Quick start guide
+└── THRONG.md                    # This research log
 ```
 
 ---
@@ -155,22 +155,21 @@ throng/
 ## Running
 
 ```bash
-# Fresh run
-python main.py --headless
+# Fresh run (recommended — obs_dim changes often require fresh start)
+python main.py --config config_phase7.yaml --headless --fresh
 
-# Auto-resumes from latest checkpoint (runs/ dir is scanned automatically)
-python main.py --headless
+# Resume from latest checkpoint
+python main.py --config config_phase7.yaml --resume runs/run_xxx/checkpoint_latest.pkl
 
-# Resume from specific checkpoint
-python main.py --resume runs/run_xxx/checkpoint_6000.pkl
+# With visualization
+python main.py --config config_phase7.yaml --fresh
 ```
 
 Checkpoints are saved every 2,000 steps. The latest is always symlinked as `checkpoint_latest.pkl` inside the run directory.
 
 ---
 
-*Stack: Python 3.14 · PyTorch 2.12 (MPS) · NumPy · SciPy · scikit-learn · Pygame*
-*(JAX 0.10.0 · Flax · Optax still installed but no longer used by main.py)*
+*Stack: Python 3.12 · PyTorch 2.x (CUDA) · NumPy · SciPy · scikit-learn · Pygame*
 
 ---
 
@@ -3177,3 +3176,83 @@ python main.py --config config_phase5.yaml --headless --fresh
 
 ### Hypothesis
 With genuinely degraded self-observation, agents have no choice but to use neighbor signals. The question is whether they can spontaneously develop referential content (e.g., "red north", "food east") or whether the channel remains empty and the population simply collapses.
+
+---
+
+## Phase 6 → Phase 7.5 — Rich World + Episodic Memory + Dual Cultural Memory (May 23, 2026)
+
+### What Changed (Chronological)
+
+**Phase 6 — Rich World (May 19)**
+- Shelter spots, contested resource nodes, scent trails added to environment
+- Red co-evolution: reds get their own PPO policy (hidden_dim=128, half of blues)
+- Signal gate: agents randomly mask 50% of their own state, forcing reliance on neighbor signals
+- Curriculum: red floor graduates 6 → 15 → 30 → 75 as blues prove survival
+
+**Phase 7 — Episodic Memory + Scale-up (May 21–22)**
+- Population: 200 → 500, Grid: 96 → 128, Token dim: 32 → 128, Hidden: 64 → 256
+- Signal dim: 16 → 32, Symbol dim: 8 → 16, Vocab: 256 discrete tokens
+- Episodic memory buffer: 20 slots per agent of (signal + action + survival)
+- Theory-of-Mind head: predicts each neighbor's action, trained cross-entropy
+- `head_signal` now outputs discrete vocab logits (256-way softmax) + token embedding lookup
+- `nb_gain` mechanism: agents who listened to neighbors and survived get amplified signal reception
+
+**Phase 7.5 — Dual Cultural Memory Grids (May 23)**
+- Replaced single `cultural_grid` with two layers:
+  - `cultural_fast` (decay 0.90) — recent danger, coordination traces
+  - `cultural_slow` (decay 0.995) — stable landmarks, long-term knowledge
+- Each agent now outputs TWO 16-dim cultural vectors via `head_culture_fast` and `head_culture_slow`
+- Both grids are read as local patches in the observation vector (+800 obs dims total)
+- obs_dim = **2,285** per agent
+
+### Bug Fixes During Phase 7.5 Integration
+
+1. **Forward unpack mismatch** — `TorchBrain.forward` and all call sites updated to handle 9/10 return values (added culture_fast/culture_slow).
+2. **Obs flatten bug** — `loc_culture` was 3D `(N, W, sym_dim)` but `np.concatenate` needed 2D. Added `.reshape(max_pop, -1)`.
+3. **Wall generation bug** — cellular automata could produce ~100% walls if center cell was wall. Flood-fill then marked all open cells as "pockets." Fix: force center cell open before flood-fill.
+
+### Current Run Status (May 23, 2026)
+
+- Run ID: `runs_large/run_20260523_181454`
+- Device: CUDA T4 (Kaggle)
+- Config: `config_phase7.yaml`
+- Step: ~2,000+ (in progress — running to 10k for verification)
+- Blues: 500, Reds: 6 (curriculum just spawned)
+
+**Early metrics:**
+- `NB_GAIN_SURV` spearman_r climbing: 1.113 → 1.358 → 1.675 → 1.833 (all ~1.0 = listening strongly selected)
+- `CULTURE` H=0.142 at step 1,005 — flat, but culture grids just started blank
+- `CHAIN_DEPTH` max=0 — no relay chains yet (expected early)
+- `TOM_ACC` not yet printed (first fires at PPO#1, step ~512)
+
+### Key Design Decisions
+
+**Why discrete tokens instead of continuous signals?**
+- Tokens force shared attractors via shared embedding table
+- Analyzable — we can label which token = "danger"
+- Evolution-stable: mutations flip meaning dramatically, creating selection pressure for consistency
+
+**Why dual cultural grids instead of one?**
+- Fast decay (0.90) = "red was here 5 steps ago" — danger coordination
+- Slow decay (0.995) = "this valley is safe" — landmarks persist ~200 steps
+- Mimics biological memory: hippocampus (fast) vs cortex (slow)
+
+**Why 16-dim culture vectors (same as symbols)?**
+- Shared `symbol_dim` means agents can reuse symbol embedding weights
+- Agents learn a unified "concept space" for graffiti, danger traces, and landmarks
+- If we want richer concepts, we bump `symbol_dim` to 32 or 64
+
+### Open Questions (for Phase 8 / JAX)
+
+1. **Signal bottleneck**: 256 tokens may be too small for complex propositions. JAX rewrite should test continuous 32-dim "brain wave" signals.
+2. **CPU bottleneck**: Simulation loop is ~85% of step time. JAX `@jit` can compile entire step to GPU kernel for 10× speedup.
+3. **Lying / deception**: Should agents be able to deposit misleading cultural traces? Would deception emerge naturally?
+4. **Tool use**: Add pick-up objects (spears, bait, drums) that agents communicate about.
+5. **Ghost memory**: When agents die, leave their final memory buffer in cultural_slow as a "warning sign."
+
+### Next Steps
+
+1. **Verify Phase 7.5** — let current run reach 10k steps, check cultural metrics, survival under red curriculum
+2. **JAX Rewrite** — move entire simulation to GPU via `jax.jit`. Target 10× speedup on same T4.
+3. **Richer signals** — continuous 32-dim vectors instead of discrete tokens. Let agents invent concepts we can't label.
+4. **Scale up** — 256×256 grid, 1000+ agents, once simulation is GPU-bound
