@@ -29,8 +29,9 @@ class ToroidalGrid:
         self.shelter_spots    = np.zeros((size, size), dtype=bool)       # shelter locations
         self.contested_res    = np.zeros((size, size), dtype=np.float32)  # contested resource nodes
         self.scent_trails     = np.zeros((size, size), dtype=np.float32)  # red scent trails
-        # Phase 7.5: cultural memory grid (shared knowledge — signals that correlated with survival)
-        self.cultural_grid    = np.zeros((size, size, symbol_dim), dtype=np.float32)
+        # Phase 7.5: dual cultural memory grids
+        self.cultural_fast    = np.zeros((size, size, symbol_dim), dtype=np.float32)  # recent danger / coordination
+        self.cultural_slow    = np.zeros((size, size, symbol_dim), dtype=np.float32)  # stable landmarks / long-term
 
     # ── Wrapping ─────────────────────────────────────────────────────────────
 
@@ -411,39 +412,68 @@ class ToroidalGrid:
         cells = (positions[:, None, :] + offsets[None, :, :]) % self.size
         return self.scent_trails[cells[:, :, 0], cells[:, :, 1]].astype(np.float32)
 
-    # ── Cultural memory grid (shared knowledge traces) ─────────────────────────
+    # ── Dual cultural memory grids (fast + slow) ─────────────────────────────
 
-    def write_culture(
+    def _write_culture_layer(
         self,
+        layer:     np.ndarray,
         positions: np.ndarray,
-        values:    np.ndarray,   # (max_pop, symbol_dim)
+        values:    np.ndarray,
         alive:     np.ndarray,
         intensity: float = 0.3,
     ) -> None:
-        """Agents deposit signal-like knowledge vectors where they survived."""
         idx = np.where(alive)[0]
         if len(idx) == 0:
             return
         pos = positions[idx]
-        # Blend new knowledge into existing cultural memory
-        np.add.at(self.cultural_grid, (pos[:, 0], pos[:, 1]), values[idx] * intensity)
-        # Clamp per-cell norm to avoid runaway growth
-        norms = np.linalg.norm(self.cultural_grid, axis=-1, keepdims=True)
+        np.add.at(layer, (pos[:, 0], pos[:, 1]), values[idx] * intensity)
+        norms = np.linalg.norm(layer, axis=-1, keepdims=True)
         mask = (norms > 2.0).squeeze(-1)
         if mask.any():
-            self.cultural_grid[mask] *= (2.0 / norms[mask])
+            layer[mask] *= (2.0 / norms[mask])
 
-    def decay_culture(self, decay: float = 0.97) -> None:
-        """Cultural memory fades so old lessons don't dominate forever."""
-        self.cultural_grid *= decay
+    def write_culture_fast(
+        self,
+        positions: np.ndarray,
+        values:    np.ndarray,
+        alive:     np.ndarray,
+        intensity: float = 0.3,
+    ) -> None:
+        """Agents deposit into fast-decay cultural memory (recent events, danger)."""
+        self._write_culture_layer(self.cultural_fast, positions, values, alive, intensity)
 
-    def get_local_culture(
+    def write_culture_slow(
+        self,
+        positions: np.ndarray,
+        values:    np.ndarray,
+        alive:     np.ndarray,
+        intensity: float = 0.3,
+    ) -> None:
+        """Agents deposit into slow-decay cultural memory (landmarks, long-term)."""
+        self._write_culture_layer(self.cultural_slow, positions, values, alive, intensity)
+
+    def decay_culture_fast(self, decay: float = 0.90) -> None:
+        self.cultural_fast *= decay
+
+    def decay_culture_slow(self, decay: float = 0.995) -> None:
+        self.cultural_slow *= decay
+
+    def get_local_culture_fast(
         self,
         positions: np.ndarray,
         radius:    int = 1,
     ) -> np.ndarray:
-        """Return (max_pop, W, symbol_dim) — cultural knowledge in local window."""
         dy, dx = np.mgrid[-radius:radius + 1, -radius:radius + 1]
         offsets = np.stack([dy.ravel(), dx.ravel()], axis=1)
         cells = (positions[:, None, :] + offsets[None, :, :]) % self.size
-        return self.cultural_grid[cells[:, :, 0], cells[:, :, 1]].astype(np.float32)
+        return self.cultural_fast[cells[:, :, 0], cells[:, :, 1]].astype(np.float32)
+
+    def get_local_culture_slow(
+        self,
+        positions: np.ndarray,
+        radius:    int = 1,
+    ) -> np.ndarray:
+        dy, dx = np.mgrid[-radius:radius + 1, -radius:radius + 1]
+        offsets = np.stack([dy.ravel(), dx.ravel()], axis=1)
+        cells = (positions[:, None, :] + offsets[None, :, :]) % self.size
+        return self.cultural_slow[cells[:, :, 0], cells[:, :, 1]].astype(np.float32)

@@ -117,8 +117,9 @@ def build_observations(
     loc_shelter   = grid.get_local_shelter(pop.positions, radius=obs_radius)     # (N, W)
     loc_contested = grid.get_local_contested(pop.positions, radius=obs_radius)   # (N, W)
     loc_scent     = grid.get_local_scent(pop.positions, radius=obs_radius)       # (N, W)
-    # Phase 7.5: cultural memory grid (shared knowledge traces)
-    loc_culture   = grid.get_local_culture(pop.positions, radius=obs_radius).reshape(max_pop, -1)  # (N, W*sym_dim)
+    # Phase 7.5: dual cultural memory grids (fast + slow)
+    loc_cult_fast = grid.get_local_culture_fast(pop.positions, radius=obs_radius).reshape(max_pop, -1)   # (N, W*sym_dim)
+    loc_cult_slow = grid.get_local_culture_slow(pop.positions, radius=obs_radius).reshape(max_pop, -1)   # (N, W*sym_dim)
     # Phase 7: concat presence + wall + resource + shelter + contested + scent (N, W*7)
     loc_env = np.concatenate([loc_pres, loc_wall, loc_res, loc_shelter, loc_contested, loc_scent], axis=1).astype(np.float32)
 
@@ -153,8 +154,9 @@ def build_observations(
     # Phase 7: append episodic memory buffer
     if pop.memory_buffer is not None:
         obs_parts.append(pop.memory_buffer.reshape(max_pop, -1))
-    # Phase 7.5: append local cultural memory patches
-    obs_parts.append(loc_culture)
+    # Phase 7.5: append dual cultural memory grids
+    obs_parts.append(loc_cult_fast)
+    obs_parts.append(loc_cult_slow)
 
     obs = np.concatenate(obs_parts, axis=1).astype(np.float32)
 
@@ -512,8 +514,9 @@ def run(config: Dict, resume_path: Optional[str] = None, headless: bool = False,
         grid.generate_resources(rng, n_patches=_res_patches)
         grid.generate_shelter_spots(rng, n_spots=_shelter_n)
         grid.generate_contested_nodes(rng, n_nodes=_contested_n)
-        # Phase 7.5: cultural grid starts blank (knowledge accumulates during simulation)
-        grid.cultural_grid.fill(0.0)
+        # Phase 7.5: dual cultural grids start blank (knowledge accumulates during simulation)
+        grid.cultural_fast.fill(0.0)
+        grid.cultural_slow.fill(0.0)
         print(f"[init] walls={int(grid.walls.sum())} cells  resources={grid.resources.sum():.1f} total  "
               f"shelter={int(grid.shelter_spots.sum())} cells  contested_nodes={int((grid.contested_res > 0.1).sum())} cells")
 
@@ -544,10 +547,14 @@ def run(config: Dict, resume_path: Optional[str] = None, headless: bool = False,
             grid.generate_contested_nodes(rng, n_nodes=_contested_n)
         if ckpt.get("grid_scent") is not None:
             grid.scent_trails = ckpt["grid_scent"]
-        if ckpt.get("grid_culture") is not None:
-            grid.cultural_grid = ckpt["grid_culture"]
+        if ckpt.get("grid_culture_fast") is not None:
+            grid.cultural_fast = ckpt["grid_culture_fast"]
         else:
-            grid.cultural_grid.fill(0.0)
+            grid.cultural_fast.fill(0.0)
+        if ckpt.get("grid_culture_slow") is not None:
+            grid.cultural_slow = ckpt["grid_culture_slow"]
+        else:
+            grid.cultural_slow.fill(0.0)
         print(f"  [resume] walls={int(grid.walls.sum())} cells  resources={grid.resources.sum():.1f} total  "
               f"shelter={int(grid.shelter_spots.sum())} cells  contested={(grid.contested_res > 0.1).sum()} cells")
         # Phase 4 backward compat: old checkpoints lack energy
@@ -738,7 +745,7 @@ def run(config: Dict, resume_path: Optional[str] = None, headless: bool = False,
                 # the policy on (b_carry_before, b_obs) so the gradient is
                 # computed under the same recurrent state the rollout used.
                 b_carry_before = blue_pop.carries.copy()
-                b_new_c, b_logits_np, b_sigs_np, b_sym_w_np, b_vals_np, b_tom_np, b_token_ids, b_cult_w_np = blue_brain.forward(
+                b_new_c, b_logits_np, b_sigs_np, b_sym_w_np, b_vals_np, b_tom_np, b_token_ids, b_cult_f_np, b_cult_s_np = blue_brain.forward(
                     blue_pop.carries, b_obs, blue_n_layers, blue_pop.nb_gain
                 )
                 blue_pop.carries = b_new_c
@@ -783,10 +790,13 @@ def run(config: Dict, resume_path: Optional[str] = None, headless: bool = False,
                 if withdrawal or _wd_active:
                     blue_pop.signals = np.zeros_like(b_sigs_np)
 
-                # Phase 7.5: blues deposit cultural knowledge (their symbol-write output)
+                # Phase 7.5: blues deposit into dual cultural memory grids
                 _cult_intensity = float(config.get("culture_intensity", 0.3))
-                grid.write_culture(
-                    blue_pop.positions, b_cult_w_np, blue_pop.alive, intensity=_cult_intensity
+                grid.write_culture_fast(
+                    blue_pop.positions, b_cult_f_np, blue_pop.alive, intensity=_cult_intensity
+                )
+                grid.write_culture_slow(
+                    blue_pop.positions, b_cult_s_np, blue_pop.alive, intensity=_cult_intensity
                 )
 
                 # Track red positions for culture-lag correlation
@@ -1019,15 +1029,18 @@ def run(config: Dict, resume_path: Optional[str] = None, headless: bool = False,
                         red_pop.positions, red_pop.alive, red_pop.team
                     )
                     r_obs = build_observations(red_pop, grid, bm2, rm2.astype(np.float32), config, step)
-                    r_new_c, r_logits_np, r_sigs_np, r_sym_w_np, r_vals_np, _, _, r_cult_w_np = red_brain.forward(
+                    r_new_c, r_logits_np, r_sigs_np, r_sym_w_np, r_vals_np, _, _, r_cult_f_np, r_cult_s_np = red_brain.forward(
                         red_pop.carries, r_obs, red_n_layers, red_pop.nb_gain
                     )
                     red_pop.carries = r_new_c
                     red_pop.signals = r_sigs_np
 
-                    # Phase 7.5: reds also deposit cultural knowledge
-                    grid.write_culture(
-                        red_pop.positions, r_cult_w_np, red_pop.alive, intensity=_cult_intensity
+                    # Phase 7.5: reds also deposit into dual cultural grids
+                    grid.write_culture_fast(
+                        red_pop.positions, r_cult_f_np, red_pop.alive, intensity=_cult_intensity
+                    )
+                    grid.write_culture_slow(
+                        red_pop.positions, r_cult_s_np, red_pop.alive, intensity=_cult_intensity
                     )
 
                     r_log_probs_all = r_logits_np - np.log(
@@ -1108,7 +1121,7 @@ def run(config: Dict, resume_path: Optional[str] = None, headless: bool = False,
                 # ── PPO update ────────────────────────────────────────────────
                 if blue_buf.full:
                     b_last_obs = build_observations(blue_pop, grid, blue_map, red_map, config, step)
-                    _, _, _, _, b_last_val_np, _, _, _ = blue_brain.forward(
+                    _, _, _, _, b_last_val_np, _, _, _, _ = blue_brain.forward(
                         blue_pop.carries, b_last_obs, blue_n_layers
                     )
                     b_last_val_np *= blue_pop.alive.astype(np.float32)
@@ -1162,7 +1175,7 @@ def run(config: Dict, resume_path: Optional[str] = None, headless: bool = False,
 
                 if red_buf is not None and red_buf.full and red_pop is not None:
                     r_last_obs = build_observations(red_pop, grid, blue_map, red_map, config, step)
-                    _, _, _, _, r_last_val_np, _, _, _ = red_brain.forward(
+                    _, _, _, _, r_last_val_np, _, _, _, _ = red_brain.forward(
                         red_pop.carries, r_last_obs, red_n_layers, red_pop.nb_gain
                     )
                     r_last_val_np *= red_pop.alive.astype(np.float32)
@@ -1253,9 +1266,11 @@ def run(config: Dict, resume_path: Optional[str] = None, headless: bool = False,
                 # Phase 7: decay scent trails
                 _scent_decay = float(config.get("scent_decay", 0.95))
                 grid.decay_scent_trails(decay=_scent_decay)
-                # Phase 7.5: decay cultural memory grid
-                _culture_decay = float(config.get("culture_decay", 0.97))
-                grid.decay_culture(decay=_culture_decay)
+                # Phase 7.5: decay dual cultural memory grids
+                _culture_fast_decay = float(config.get("culture_fast_decay", 0.90))
+                _culture_slow_decay = float(config.get("culture_slow_decay", 0.995))
+                grid.decay_culture_fast(decay=_culture_fast_decay)
+                grid.decay_culture_slow(decay=_culture_slow_decay)
                 grid.regenerate_resources(rng, step,
                     regen_rate=float(config.get("resource_regen_rate", 0.002)),
                     n_patches=int(config.get("resource_n_patches", 20)),
@@ -1304,7 +1319,8 @@ def run(config: Dict, resume_path: Optional[str] = None, headless: bool = False,
                                     grid_symbols=grid.symbols, config=config,
                                     grid_walls=grid.walls, grid_resources=grid.resources,
                                     grid_shelter=grid.shelter_spots, grid_contested=grid.contested_res,
-                                    grid_scent=grid.scent_trails, grid_culture=grid.cultural_grid,
+                                    grid_scent=grid.scent_trails,
+                                    grid_culture_fast=grid.cultural_fast, grid_culture_slow=grid.cultural_slow,
                                 )
                                 return
                             # Fire TOPO_SIM + full culture snapshot at graduation
@@ -1325,7 +1341,7 @@ def run(config: Dict, resume_path: Optional[str] = None, headless: bool = False,
                                         _gci  = _gcr * (2 * _grad_r + 1) + _gcc
                                         if _gci < _grad_W:
                                             _gsyn[:, _gps + _grad_W + _gci] = 1.0
-                                        _, _, _gsp, _, _, _, _ = blue_brain.forward(
+                                        _, _, _gsp, _, _, _, _, _, _ = blue_brain.forward(
                                             blue_pop.carries, _gsyn, blue_n_layers, blue_pop.nb_gain
                                         )
                                         _grad_sigs.append(_gsp[_grad_agent].copy())
@@ -1528,7 +1544,7 @@ def run(config: Dict, resume_path: Optional[str] = None, headless: bool = False,
                                 _cell_idx = _cell_r * (2 * _r + 1) + _cell_c
                                 if _cell_idx < _W:
                                     _syn[:, _pres_start + _W + _cell_idx] = 1.0
-                                _, _, _psig, _, _, _, _ = blue_brain.forward(
+                                _, _, _psig, _, _, _, _, _, _ = blue_brain.forward(
                                     blue_pop.carries, _syn, blue_n_layers, blue_pop.nb_gain
                                 )
                                 _probe_sigs.append(_psig[_probe_agent].copy())
@@ -1621,7 +1637,8 @@ def run(config: Dict, resume_path: Optional[str] = None, headless: bool = False,
                         grid_shelter  = grid.shelter_spots,
                         grid_contested = grid.contested_res,
                         grid_scent    = grid.scent_trails,
-                        grid_culture  = grid.cultural_grid,
+                        grid_culture_fast = grid.cultural_fast,
+                        grid_culture_slow = grid.cultural_slow,
                     )
                     slog(f"[step {step:,}] checkpoint → {ckpt_path}")
 
@@ -1639,7 +1656,7 @@ def run(config: Dict, resume_path: Optional[str] = None, headless: bool = False,
                         # Forward to get action logits
                         _d_net = blue_brain.model
                         _d_net.eval()
-                        _d_new_c, (_d_alog, _, _, _, _, _, _, _) = _d_net(_d_car_t, _d_obs_t, blue_n_layers)
+                        _d_new_c, (_d_alog, _, _, _, _, _, _, _, _, _) = _d_net(_d_car_t, _d_obs_t, blue_n_layers)
                         # Compute policy gradient: grad of log-prob of chosen action w.r.t. obs
                         _d_probs = torch.softmax(_d_alog, dim=-1)
                         # Movement-only: sum prob of movement actions (0-3), exclude STAY

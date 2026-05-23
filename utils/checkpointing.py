@@ -95,7 +95,8 @@ def save_checkpoint(
     grid_shelter:  np.ndarray = None,
     grid_contested: np.ndarray = None,
     grid_scent:    np.ndarray = None,
-    grid_culture:  np.ndarray = None,
+    grid_culture_fast: np.ndarray = None,
+    grid_culture_slow: np.ndarray = None,
 ) -> Path:
     payload = {
         "step":          step,
@@ -120,8 +121,10 @@ def save_checkpoint(
         payload["grid_contested"] = np.array(grid_contested)
     if grid_scent is not None:
         payload["grid_scent"] = np.array(grid_scent)
-    if grid_culture is not None:
-        payload["grid_culture"] = np.array(grid_culture)
+    if grid_culture_fast is not None:
+        payload["grid_culture_fast"] = np.array(grid_culture_fast)
+    if grid_culture_slow is not None:
+        payload["grid_culture_slow"] = np.array(grid_culture_slow)
 
     ckpt_path = ckpt_dir / f"checkpoint_{step}.pkl"
     with open(ckpt_path, "wb") as f:
@@ -182,7 +185,8 @@ def load_checkpoint(path: str, blue_brain=None, red_brain=None) -> Dict:
         "grid_shelter":  payload.get("grid_shelter"),
         "grid_contested": payload.get("grid_contested"),
         "grid_scent":    payload.get("grid_scent"),
-        "grid_culture":  payload.get("grid_culture"),
+        "grid_culture_fast": payload.get("grid_culture_fast"),
+        "grid_culture_slow": payload.get("grid_culture_slow"),
         "config":        payload["config"],
     }
 

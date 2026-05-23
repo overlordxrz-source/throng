@@ -88,9 +88,10 @@ memory_buffer_enabled: true
 red_policy: true
 red_hidden_dim: 128             # half the blues' capacity (256→128)
 
-# ── Phase 7.5: Cultural memory grid ──────────────────────────────────────────
-culture_decay: 0.97             # multiplicative fade per step
-culture_intensity: 0.3          # how strongly agents write to shared memory
+# ── Phase 7.5: Dual cultural memory grids ───────────────────────────────────
+culture_fast_decay: 0.90         # fast-decay layer: recent danger / coordination
+culture_slow_decay: 0.995        # slow-decay layer: stable landmarks / long-term memory
+culture_intensity: 0.3           # how strongly agents write to shared memory
 
 # ── Energy mechanics ─────────────────────────────────────────────────────────
 energy_decay: 0.001
