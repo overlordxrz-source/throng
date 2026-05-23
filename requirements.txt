@@ -14,8 +14,9 @@ wandb>=0.16.0
 # pygame>=2.5.0
 # matplotlib>=3.8.0
 
-# Legacy JAX dependencies — not used in Phase 4/5
-# jax>=0.4.23
-# jaxlib>=0.4.23
-# flax>=0.7.5
-# optax>=0.1.7
+# Phase 8: JAX rewrite
+jax>=0.4.23
+jaxlib>=0.4.23
+flax>=0.7.5
+optax>=0.1.7
+orbax-checkpoint>=0.5.0
