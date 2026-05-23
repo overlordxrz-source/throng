@@ -118,7 +118,7 @@ def build_observations(
     loc_contested = grid.get_local_contested(pop.positions, radius=obs_radius)   # (N, W)
     loc_scent     = grid.get_local_scent(pop.positions, radius=obs_radius)       # (N, W)
     # Phase 7.5: cultural memory grid (shared knowledge traces)
-    loc_culture   = grid.get_local_culture(pop.positions, radius=obs_radius)     # (N, W*sym_dim)
+    loc_culture   = grid.get_local_culture(pop.positions, radius=obs_radius).reshape(max_pop, -1)  # (N, W*sym_dim)
     # Phase 7: concat presence + wall + resource + shelter + contested + scent (N, W*7)
     loc_env = np.concatenate([loc_pres, loc_wall, loc_res, loc_shelter, loc_contested, loc_scent], axis=1).astype(np.float32)
 
