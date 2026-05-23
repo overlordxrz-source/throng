@@ -223,9 +223,9 @@ class AgentNetworkTorch(nn.Module):
                 N, self.memory_slots, self.memory_slot_dim
             )
             c += self.memory_slots * self.memory_slot_dim
-        # Phase 7.5: cultural memory grid (local knowledge patches)
-        cult = obs[:, c:c + W * syd].view(N, W, syd)
-        c += W * syd
+        # Phase 7.5: dual cultural memory grids (fast + slow)
+        cult_fast = obs[:, c:c + W * syd].view(N, W, syd);   c += W * syd
+        cult_slow = obs[:, c:c + W * syd].view(N, W, syd);   c += W * syd
 
         # ── Within-lifetime Hebbian: scale incoming signals by per-agent gain ─
         if nb_gain is not None:
