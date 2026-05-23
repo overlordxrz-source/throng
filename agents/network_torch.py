@@ -415,9 +415,9 @@ class TorchBrain:
         obs:      np.ndarray,   # (N, obs_dim)    float32
         n_layers: int,
         nb_gain:  Optional[np.ndarray] = None,  # (N,) float32 per-agent signal gain
-    ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         """
-        Returns (new_carries, action_logits, signal_out, symbol_write, values, tom_logits, token_ids)
+        Returns (new_carries, action_logits, signal_out, symbol_write, values, tom_logits, token_ids, culture_write)
         all as float32 numpy arrays.  tom_logits shape: (N, K, 5). token_ids: (N,) int64 or -1.
         """
         c_t = torch.tensor(carries, dtype=torch.float32, device=self.device)
@@ -425,7 +425,7 @@ class TorchBrain:
         g_t = (torch.tensor(nb_gain, dtype=torch.float32, device=self.device)
                if nb_gain is not None else None)
 
-        new_c, (logits, sigs, syms, vals, tom_log, token_ids, _sig_logits) = self.model(c_t, o_t, n_layers, g_t)
+        new_c, (logits, sigs, syms, vals, tom_log, token_ids, _sig_logits, cult_w) = self.model(c_t, o_t, n_layers, g_t)
 
         return (
             new_c.cpu().numpy(),
@@ -435,6 +435,7 @@ class TorchBrain:
             vals.cpu().numpy(),
             tom_log.cpu().numpy(),
             token_ids.cpu().numpy() if token_ids is not None else np.full(carries.shape[0], -1, dtype=np.int64),
+            cult_w.cpu().numpy(),
         )
 
     # ------------------------------------------------------------------
