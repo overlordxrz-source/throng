@@ -97,7 +97,7 @@ reward_resource: 0.1
 # ── MAPPO ──────────────────────────────────────────────────────────────────────
 ppo_rollout_steps: 512
 ppo_epochs: 1
-ppo_minibatch_size: 4096
+ppo_minibatch_size: 2048
 ppo_warmup_steps: 15
 ppo_clip: 0.2
 ppo_lr: 3.0e-4
