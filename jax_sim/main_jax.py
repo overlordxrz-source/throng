@@ -29,14 +29,15 @@ from jax_sim.population_jax import (
 )
 from jax_sim.network_jax import AgentNetworkJax
 from jax_sim.rl_jax import compute_gae, ppo_loss, create_optimizer, ppo_update
+from agents.network_torch import compute_obs_dim_torch
 
 
 # ── Config defaults ─────────────────────────────────────────────────────────
 
 DEFAULT_CONFIG = {
     "grid_size": 128,
-    "max_pop": 500,
-    "max_pop_red": 75,
+    "population_size": 500,
+    "red_population_size": 75,
     "neighbor_k": 6,
     "local_obs_radius": 2,
     "signal_dim": 32,
@@ -66,12 +67,20 @@ DEFAULT_CONFIG = {
     "n_resource_patches": 8,
     "n_shelter_spots": 5,
     "n_contested_nodes": 3,
-    "red_detection_radius": 0,  # 0 = no direct detection
+    "red_detection_radius": 0,
     "max_age": 500,
     "energy_decay": 0.001,
     "starvation_threshold": 0.05,
     "tom_reward_coef": 0.002,
+    "puzzle_enabled": False,
 }
+
+def _normalize_config(cfg: Dict) -> Dict:
+    """Map PyTorch config names to JAX config names."""
+    cfg = dict(cfg)
+    cfg.setdefault("max_pop", cfg.get("population_size", 500))
+    cfg.setdefault("max_pop_red", cfg.get("red_population_size", 75))
+    return cfg
 
 
 # ── Observation builder (JAX) ──────────────────────────────────────────────
@@ -157,6 +166,7 @@ def make_sim_step(config: Dict, model: AgentNetworkJax, params: Dict):
     sig_d = config["signal_dim"]
     hidden_d = config["hidden_dim"]
 
+    @jax.jit
     def sim_step(carry, step_key):
         """
         carry = (grid, blue_pop, red_pop, blue_carries, red_carries)
@@ -301,6 +311,8 @@ def run_simulation(
     Run full JAX simulation.
     Returns: (final_params, metrics_history)
     """
+    config = _normalize_config(config)
+
     key = jax.random.PRNGKey(seed)
     keys = jax.random.split(key, 10)
 
@@ -339,8 +351,10 @@ def run_simulation(
         memory_slots=config.get("memory_slots", 0),
     )
 
-    # Dummy input for init
-    dummy_obs = jnp.zeros((1, 1000))  # placeholder; real obs_dim computed at runtime
+    # Compute exact obs_dim and init model
+    obs_dim = compute_obs_dim_torch(config)
+    print(f"[JAX] obs_dim = {obs_dim}")
+    dummy_obs = jnp.zeros((1, obs_dim))
     dummy_carry = jnp.zeros((1, hidden_d))
     params = model.init(keys[3], dummy_carry, dummy_obs, n_layers)
 
