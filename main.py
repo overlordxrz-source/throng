@@ -1351,7 +1351,7 @@ def run(config: Dict, resume_path: Optional[str] = None, headless: bool = False,
                         red_pop.signals[_curr_red_floor:] = 0.0
                     _curriculum_active = True
                     red_buf = RolloutBuffer(config["ppo_rollout_steps"], max_pop_r, obs_dim,
-                                            hidden_dim=_hd)
+                                            hidden_dim=_red_hd)
                     slog(f"[step {step:,}] *** RED PREDATORS SPAWNED — "
                          f"curriculum count={int(red_pop.alive.sum())} ***")
 
