@@ -29,6 +29,8 @@ class ToroidalGrid:
         self.shelter_spots    = np.zeros((size, size), dtype=bool)       # shelter locations
         self.contested_res    = np.zeros((size, size), dtype=np.float32)  # contested resource nodes
         self.scent_trails     = np.zeros((size, size), dtype=np.float32)  # red scent trails
+        # Phase 7.5: cultural memory grid (shared knowledge — signals that correlated with survival)
+        self.cultural_grid    = np.zeros((size, size, symbol_dim), dtype=np.float32)
 
     # ── Wrapping ─────────────────────────────────────────────────────────────
 
@@ -408,3 +410,40 @@ class ToroidalGrid:
         offsets = np.stack([dy.ravel(), dx.ravel()], axis=1)
         cells = (positions[:, None, :] + offsets[None, :, :]) % self.size
         return self.scent_trails[cells[:, :, 0], cells[:, :, 1]].astype(np.float32)
+
+    # ── Cultural memory grid (shared knowledge traces) ─────────────────────────
+
+    def write_culture(
+        self,
+        positions: np.ndarray,
+        values:    np.ndarray,   # (max_pop, symbol_dim)
+        alive:     np.ndarray,
+        intensity: float = 0.3,
+    ) -> None:
+        """Agents deposit signal-like knowledge vectors where they survived."""
+        idx = np.where(alive)[0]
+        if len(idx) == 0:
+            return
+        pos = positions[idx]
+        # Blend new knowledge into existing cultural memory
+        np.add.at(self.cultural_grid, (pos[:, 0], pos[:, 1]), values[idx] * intensity)
+        # Clamp per-cell norm to avoid runaway growth
+        norms = np.linalg.norm(self.cultural_grid, axis=-1, keepdims=True)
+        mask = (norms > 2.0).squeeze(-1)
+        if mask.any():
+            self.cultural_grid[mask] *= (2.0 / norms[mask])
+
+    def decay_culture(self, decay: float = 0.97) -> None:
+        """Cultural memory fades so old lessons don't dominate forever."""
+        self.cultural_grid *= decay
+
+    def get_local_culture(
+        self,
+        positions: np.ndarray,
+        radius:    int = 1,
+    ) -> np.ndarray:
+        """Return (max_pop, W, symbol_dim) — cultural knowledge in local window."""
+        dy, dx = np.mgrid[-radius:radius + 1, -radius:radius + 1]
+        offsets = np.stack([dy.ravel(), dx.ravel()], axis=1)
+        cells = (positions[:, None, :] + offsets[None, :, :]) % self.size
+        return self.cultural_grid[cells[:, :, 0], cells[:, :, 1]].astype(np.float32)

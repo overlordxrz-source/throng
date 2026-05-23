@@ -169,6 +169,8 @@ class AgentNetworkTorch(nn.Module):
         self.token_embed = nn.Embedding(vocab_size, signal_dim)
         self.head_symbol = nn.Linear(token_dim, symbol_dim)
         self.head_value  = nn.Linear(token_dim, 1)
+        # Phase 7.5: cultural memory write head (what knowledge to deposit)
+        self.head_culture = nn.Linear(token_dim, symbol_dim)
 
         # Theory-of-mind head: predicts each neighbour's action from
         # this agent's carry (world model) + received neighbour signals.
@@ -220,6 +222,9 @@ class AgentNetworkTorch(nn.Module):
                 N, self.memory_slots, self.memory_slot_dim
             )
             c += self.memory_slots * self.memory_slot_dim
+        # Phase 7.5: cultural memory grid (local knowledge patches)
+        cult = obs[:, c:c + W * syd].view(N, W, syd)
+        c += W * syd
 
         # ── Within-lifetime Hebbian: scale incoming signals by per-agent gain ─
         if nb_gain is not None:
@@ -232,12 +237,13 @@ class AgentNetworkTorch(nn.Module):
         t_pres = self.emb_pres(pres.reshape(N * W, 7)).view(N, W, self.token_dim)
         t_sig  = self.emb_sig(sig).unsqueeze(1)                  # (N, 1, D)
         t_mem  = self.emb_mem(carries).unsqueeze(1)              # (N, 1, D)
+        t_cult = self.emb_sym(cult.reshape(N * W, syd)).view(N, W, self.token_dim)
 
         # ── Signal gate: restore masked own-state from neighbour signals ───
         if self.gate is not None:
             t_own = self.gate(t_own, t_nb)
 
-        token_list = [t_own, t_nb, t_sym, t_pres, t_sig, t_mem]
+        token_list = [t_own, t_nb, t_sym, t_pres, t_sig, t_mem, t_cult]
         if epi is not None and self.emb_epi is not None:
             t_epi = self.emb_epi(
                 epi.reshape(N * self.memory_slots, self.memory_slot_dim)
@@ -257,6 +263,7 @@ class AgentNetworkTorch(nn.Module):
         # ── Output heads ────────────────────────────────────────────────────
         action_logits = self.head_action(readout)                 # (N, 5)
         symbol_write  = torch.tanh(self.head_symbol(readout))     # (N, sym_dim)
+        culture_write = torch.tanh(self.head_culture(readout))    # (N, sym_dim)
         values        = self.head_value(readout).squeeze(-1)      # (N,)
 
         # ── Theory-of-mind head ───────────────────────────────────────────────
@@ -282,10 +289,10 @@ class AgentNetworkTorch(nn.Module):
             token_ids = signal_logits.argmax(dim=-1)              # (N,)
             signal_out = self.token_embed(token_ids)                # (N, signal_dim)
             # Also return token IDs for logging/analysis
-            return new_carries, (action_logits, signal_out, symbol_write, values, tom_logits, token_ids, None)
+            return new_carries, (action_logits, signal_out, symbol_write, values, tom_logits, token_ids, None, culture_write)
 
         # During training: return signal_logits as 7th element for signal entropy bonus
-        return new_carries, (action_logits, signal_out, symbol_write, values, tom_logits, None, signal_logits)
+        return new_carries, (action_logits, signal_out, symbol_write, values, tom_logits, None, signal_logits, culture_write)
 
 
 # ── Layer-entropy introspection ───────────────────────────────────────────────
@@ -311,7 +318,7 @@ def layer_entropy_torch(
            if nb_gain is not None else None)
     with torch.no_grad():
         for li in range(1, n_layers + 1):
-            _, (logits_i, sigs_i, _, _, _, _, _) = model(c_t, o_t, li, g_t)
+            _, (logits_i, sigs_i, _, _, _, _, _, _) = model(c_t, o_t, li, g_t)
             ln = logits_i.cpu().numpy()
             sn = sigs_i.cpu().numpy()
 
@@ -344,6 +351,8 @@ def compute_obs_dim_torch(config: dict) -> int:
     mem_slots = int(config.get("memory_buffer_size", 0))
     if mem_slots > 0 and config.get("memory_buffer_enabled", False):
         base += mem_slots * (sd + 2)
+    # Phase 7.5: cultural memory grid (local knowledge patches, same dim as symbols)
+    base += W * symd
     return base
 
 

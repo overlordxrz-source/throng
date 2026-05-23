@@ -70,7 +70,7 @@ def _ppo_loss_batch(
 
     # Real carries from rollout (stateful PPO replay): the policy is
     # evaluated under the same recurrent context that produced the action.
-    _, (logits, _, _, values, _, _, sig_logits) = brain.model(carries, obs, n_layers)
+    _, (logits, _, _, values, _, _, sig_logits, _) = brain.model(carries, obs, n_layers)
 
     log_probs_all = F.log_softmax(logits, dim=-1)               # (B, 5)
     act_lp        = log_probs_all[torch.arange(B, device=device), actions]
@@ -132,7 +132,7 @@ def _tom_loss_batch(
     the recurrent context built up over previous steps.
     """
     B      = obs.shape[0]
-    _, (_, _, _, _, tom_logits, _, _) = brain.model(carries, obs, n_layers)
+    _, (_, _, _, _, tom_logits, _, _, _) = brain.model(carries, obs, n_layers)
     # tom_logits: (B, K, 5)
     K = tom_logits.shape[1]
     loss = F.cross_entropy(
