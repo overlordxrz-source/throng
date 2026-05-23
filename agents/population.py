@@ -48,7 +48,7 @@ def create_population(
     team_id:   int = 0,
 ) -> PopulationState:
     max_pop  = config["population_size"] if team_id == 0 else config["red_population_size"]
-    hidden   = config["agent_hidden_dim"]
+    hidden   = config["agent_hidden_dim"] if team_id == 0 else config.get("red_hidden_dim", config["agent_hidden_dim"])
     sig_dim  = config["signal_dim"]
     n_layers = int(config.get("n_layers", 2))
 
