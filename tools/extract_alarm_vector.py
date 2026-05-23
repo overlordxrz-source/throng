@@ -16,7 +16,7 @@ def main(corpus_path, out_path="alarm_vector.json"):
             if 150001 <= r["step"] <= 157201:
                 records.append(r)
 
-    signals = np.array([r["signal"] for r in records])  # (N, 32)
+    signals = np.array([r["sig"] for r in records])  # (N, 32)
     kmeans = KMeans(n_clusters=8, random_state=42, n_init=10).fit(signals)
     labels = kmeans.labels_
     centroids = kmeans.cluster_centers_
@@ -29,7 +29,7 @@ def main(corpus_path, out_path="alarm_vector.json"):
     for cid in range(8):
         mask = labels == cid
         n = mask.sum()
-        scout_pct = sum(1 for i in range(len(records)) if mask[i] and records[i].get("is_scout", False)) / max(n,1) * 100
+        scout_pct = sum(1 for i in range(len(records)) if mask[i] and records[i].get("scout", False)) / max(n,1) * 100
         avg_red = np.mean([records[i]["red_dist"] for i in range(len(records)) if mask[i]])
         actions = [records[i]["action"] for i in range(len(records)) if mask[i]]
         dom_act = max(set(actions), key=actions.count) if actions else "?"
@@ -44,14 +44,16 @@ def main(corpus_path, out_path="alarm_vector.json"):
     print(f"Centroid (32-dim): {centroids[alarm_cid].round(4).tolist()}")
 
     # Survival rate for blind agents receiving similar signal
-    blind_mask = np.array([not r.get("is_scout", False) for r in records])
+    blind_mask = np.array([not r.get("scout", False) for r in records])
     blind_signals = signals[blind_mask]
-    blind_surv = np.array([r.get("survived", 0) for r in records])[blind_mask]
+    # Proxy for survival: did they flee? (action != STAY=4)
+    flee_actions = {"N":0, "S":1, "E":2, "W":3}
+    blind_fled = np.array([r["action"] in flee_actions.values() for r in records])[blind_mask]
     dists = np.linalg.norm(blind_signals - centroids[alarm_cid], axis=1)
     close = dists < np.percentile(dists, 20)  # bottom 20% distance
     far = dists > np.percentile(dists, 80)    # top 20% distance
-    print(f"\nBlind agents near alarm vector: survival = {blind_surv[close].mean():.3f} (n={close.sum()})")
-    print(f"Blind agents far from alarm vector: survival = {blind_surv[far].mean():.3f} (n={far.sum()})")
+    print(f"\nBlind agents near alarm vector: flee rate = {blind_fled[close].mean():.3f} (n={close.sum()})")
+    print(f"Blind agents far from alarm vector: flee rate = {blind_fled[far].mean():.3f} (n={far.sum()})")
 
     with open(out_path, "w") as f:
         json.dump({
@@ -59,8 +61,8 @@ def main(corpus_path, out_path="alarm_vector.json"):
             "centroid": centroids[alarm_cid].tolist(),
             "centroid_rounded": [round(x,4) for x in centroids[alarm_cid].tolist()],
             "n_cluster": int((labels==alarm_cid).sum()),
-            "blind_near_survival": float(blind_surv[close].mean()),
-            "blind_far_survival": float(blind_surv[far].mean()),
+            "blind_near_flee_rate": float(blind_fled[close].mean()),
+            "blind_far_flee_rate": float(blind_fled[far].mean()),
         }, f, indent=2)
     print(f"\nSaved to {out_path}")
 
