@@ -108,6 +108,44 @@ Key observations so far:
 
 ---
 
+## Phase 8: JAX Rewrite (In Progress)
+
+**Status:** Core simulation runs on Kaggle P100. PyTorch code is frozen; all new development targets `jax_sim/`.
+
+### What Works
+- `jax_sim/main_jax.py` — full simulation loop with `lax.scan` inner rollout, Python outer loop
+- `jax_sim/rl_jax.py` — PPO loss with GAE, `jax.remat` for memory, NaN protection
+- `jax_sim/grid_jax.py` — immutable `GridState` with `.replace()` updates
+- `jax_sim/population_jax.py` — immutable `PopState` with agent lifecycle
+- Action sampling via `jax.vmap(random.categorical)` (JIT-safe)
+- Resource respawning (0.5% cells/step) to maintain survival pressure
+- Reward variance: `0.02 * energy` + `0.1 * resource_gathered` for non-zero gradients
+
+### Architecture Decisions
+- **Outer loop = Python `for`** — avoids OOM from materializing all param states across updates
+- **Inner rollout = `lax.scan`** — JIT-compiled, fast, but `remat` doubles compute for memory
+- **Params through carry** — `jax.lax.stop_gradient` on params during rollout prevents stale closure capture
+- **T4-fast mode removed** — now runs full `agent_hidden_dim=256, n_layers=4` on P100
+
+### Known Issues
+| Issue | Severity | Notes |
+|---|---|---|
+| Compilation time ~5-10 min on first run | Medium | XLA compiles 256×4 transformer × 500 agents; amortizes over long runs |
+| No red PPO update yet | Medium | Reds act with shared policy; only blues get `ppo_update` |
+| No MI / compositionality logging | Medium | `communication/analysis.py` not ported; WandB only logs PPO metrics |
+| No checkpointing / resume | Low | `orbax-checkpoint` installed but not wired |
+| Speed ~15 min for 20 updates on T4 | Medium | P100 expected ~2× faster; `pmap` for T4×2 not yet implemented |
+
+### Short-Term Roadmap (JAX)
+1. **Red PPO policy** — separate network + optimizer for predators
+2. **WandB metrics** — log population, MI, culture entropy each update
+3. **Checkpointing** — `orbax` save every N updates for resume
+4. **Distillation + Mind-Meld** — port `distill_population` and mind-meld to JAX
+5. **Puzzle mechanics** — port lock-and-key cooperative puzzle
+6. **Speed optimization** — `jax.pmap` for T4×2, or reduce to 128 hidden for faster compile
+
+---
+
 ## Long-Term Vision
 
 The path from here to general intelligence:
@@ -146,6 +184,11 @@ throng/
 ├── utils/
 │   ├── logging.py               # Structured JSON logs
 │   └── checkpointing.py         # Full state save/load
+├── jax_sim/                     # JAX rewrite (Phase 8, WIP)
+│   ├── main_jax.py              # JAX simulation loop
+│   ├── rl_jax.py                # PPO loss, GAE, Optax optimizer
+│   ├── grid_jax.py              # Immutable GridState
+│   └── population_jax.py        # Immutable PopState
 └── README.md                    # Quick start guide
 └── THRONG.md                    # This research log
 ```
@@ -169,7 +212,7 @@ Checkpoints are saved every 2,000 steps. The latest is always symlinked as `chec
 
 ---
 
-*Stack: Python 3.12 · PyTorch 2.x (CUDA) · NumPy · SciPy · scikit-learn · Pygame*
+*Stack: Python 3.12 · JAX + Flax + Optax + orbax (Phase 8, active) · PyTorch 2.x (legacy/frozen) · NumPy · SciPy · scikit-learn · Pygame*
 
 ---
 
@@ -302,7 +345,55 @@ Three simultaneous events — treat as a coordinated measurement event:
 
 **What was done this session:**
 
-The entire neural network and PPO training stack was migrated from JAX/Flax/Optax to **PyTorch 2.12 with MPS backend**. This resolves the CPU-only limitation and was Priority 1 blocking everything else.
+The entire neural network and PPO training stack was migrated from JAX/Flax/Optax to **PyTorch 2.12 with MPS backend**. This resolves the CPU-only     11 
+     12 print("[Kaggle] JAX test...")
+---> 13 final_params, metrics = run_simulation(cfg, seed=42, n_steps=128)
+     14 print("[Kaggle] МИНА! Сега пусни за 100k стъпки.")
+
+/kaggle/working/throng/jax_sim/main_jax.py in run_simulation(config, seed, n_steps)
+    405 
+    406     init_carry = (grid, b_pop, r_pop, b_carries, r_carries, params, opt_state)
+--> 407     final_carry, all_metrics = lax.scan(rollout_and_update, init_carry, update_keys)
+    408 
+    409     _, _, _, _, _, final_params, final_opt_state = final_carry
+
+    [... skipping hidden 10 frame]
+
+/kaggle/working/throng/jax_sim/main_jax.py in rollout_and_update(carry, update_key)
+    385 
+    386         init_carry = (grid, b_pop, r_pop, b_carries, r_carries)
+--> 387         final_carry, rollout_data = lax.scan(sim_step_fn, init_carry, step_keys)
+    388 
+    389         # Unpack
+
+    [... skipping hidden 23 frame]
+
+/kaggle/working/throng/jax_sim/main_jax.py in sim_step(carry, step_key)
+    195         # ── Forward passes ──────────────────────────────────────
+    196         b_new_c, b_outs = model.apply(params, b_carries, b_obs, config["n_layers"])
+--> 197         r_new_c, r_outs = model.apply(params, r_carries, r_obs, config["n_layers"])
+    198 
+    199         b_action_logits, b_signal_logits, b_sym_w, b_vals, b_tom, _, _, b_cult_f, b_cult_s = b_outs
+
+    [... skipping hidden 6 frame]
+
+/kaggle/working/throng/jax_sim/network_jax.py in __call__(self, carries, obs, n_layers, nb_gain)
+    103             mem = None
+    104 
+--> 105         loc_cult_fast = obs[:, idx:idx + W * sym_d].reshape(N, W, sym_d)
+    106         idx += W * sym_d
+    107         loc_cult_slow = obs[:, idx:idx + W * sym_d].reshape(N, W, sym_d)
+
+    [... skipping hidden 2 frame]
+
+/usr/local/lib/python3.12/dist-packages/jax/_src/numpy/array_methods.py in _compute_newshape(arr, newshape)
+    475     if (all(isinstance(d, int) for d in (*arr.shape, *newshape)) and
+    476         arr.size != math.prod(newshape)):
+--> 477       raise TypeError(f"cannot reshape array of shape {arr.shape} (size {arr.size}) "
+    478                       f"into shape {orig_newshape} (size {math.prod(newshape)})")
+    479   return tuple(-core.divide_shape_sizes(arr.shape, newshape)
+
+TypeError: cannot reshape array of shape (75, 120) (size 9000) into shape (75, 25, 16) (size 30000) limitation and was Priority 1 blocking everything else.
 
 **Architecture changes:**
 - `agents/network_torch.py` — `AgentNetworkTorch` mirrors the Flax architecture exactly: GRU carry per agent, variable-depth transformer (1–6 layers, pre-allocated), multi-head attention on tokenised observation, signal/symbol/value output heads. `TorchBrain` wrapper provides a **numpy-in / numpy-out** interface so the environment loop requires zero changes.
