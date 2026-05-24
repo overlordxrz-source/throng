@@ -99,8 +99,12 @@ def ppo_loss(
     pg_loss2 = clipped_ratio * advantages
     pg_loss = -jnp.minimum(pg_loss1, pg_loss2)
 
-    # Value loss (MSE)
-    vf_loss = jnp.square(values_pred - returns)
+    # Value loss (clipped, standard PPO)
+    old_values = returns - advantages  # approximate old values
+    vf_clipped = old_values + jnp.clip(values_pred - old_values, -clip_eps, clip_eps)
+    vf_loss1 = jnp.square(vf_clipped - returns)
+    vf_loss2 = jnp.square(values_pred - returns)
+    vf_loss = jnp.maximum(vf_loss1, vf_loss2)
 
     # Entropy bonus
     action_probs = jax.nn.softmax(action_logits, axis=-1)
@@ -128,13 +132,17 @@ def ppo_loss(
 
     total_loss = loss_pg + vf_coef * loss_vf + loss_ent + loss_sig_ent
 
+    # NaN protection: if any NaN, zero out loss to prevent param corruption
+    has_nan = jnp.isnan(total_loss) | jnp.isnan(loss_pg) | jnp.isnan(loss_vf)
+    total_loss = jnp.where(has_nan, 0.0, total_loss)
+
     # Metrics returned as JAX arrays (can't call float() inside JIT)
     metrics = {
-        "ppo_pg_loss":  loss_pg,
-        "ppo_vf_loss":  loss_vf,
-        "ppo_entropy":  entropy.sum() / denom,
-        "ppo_clip_frac": jnp.mean(jnp.abs(ratio - 1.0) > clip_eps),
-        "signal_entropy": signal_entropy.sum() / denom,
+        "ppo_pg_loss":  jnp.where(has_nan, 0.0, loss_pg),
+        "ppo_vf_loss":  jnp.where(has_nan, 0.0, loss_vf),
+        "ppo_entropy":  jnp.where(has_nan, 0.0, entropy.sum() / denom),
+        "ppo_clip_frac": jnp.where(has_nan, 0.0, jnp.mean(jnp.abs(ratio - 1.0) > clip_eps)),
+        "signal_entropy": jnp.where(has_nan, 0.0, signal_entropy.sum() / denom),
     }
 
     return total_loss, metrics
@@ -176,6 +184,8 @@ def ppo_update(
     adv_mean = advantages.mean()
     adv_std = advantages.std() + 1e-8
     advantages = (advantages - adv_mean) / adv_std
+    # Clip advantages to prevent gradient explosion
+    advantages = jnp.clip(advantages, -10.0, 10.0)
 
     # Loss + grad
     grad_fn = jax.value_and_grad(ppo_loss, has_aux=True)
