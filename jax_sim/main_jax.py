@@ -384,18 +384,6 @@ def run_simulation(
     has_nan_params = any(bool(jnp.isnan(p).any()) for p in flat_params)
     print(f"[DEBUG] Params NaN after init: {has_nan_params}")
 
-    # Test forward pass (non-JIT) with real observations
-    test_obs = build_observations_jax(b_pop, grid, blue_map, red_map, config, step=0)
-    print(f"[DEBUG] Test obs NaN: {bool(jnp.isnan(test_obs).any())}, shape: {test_obs.shape}")
-    test_carry = jnp.zeros((max_pop, hidden_d))
-    test_out = model.apply(params, test_carry, test_obs, n_layers)
-    test_action_logits = test_out[0]
-    test_values = test_out[3]
-    print(f"[DEBUG] Test action_logits NaN: {bool(jnp.isnan(test_action_logits).any())}")
-    print(f"[DEBUG] Test values NaN: {bool(jnp.isnan(test_values).any())}")
-    print(f"[DEBUG] Test action_logits max: {float(jnp.max(jnp.abs(test_action_logits))):.4f}")
-    print(f"[DEBUG] Test values max: {float(jnp.max(jnp.abs(test_values))):.4f}")
-
     # ── Init optimizer ──────────────────────────────────────
     optimizer = create_optimizer(config["ppo_lr"], config["ppo_max_grad_norm"])
     opt_state = optimizer.init(params)
