@@ -379,6 +379,23 @@ def run_simulation(
     dummy_carry = jnp.zeros((1, hidden_d))
     params = model.init(keys[3], dummy_carry, dummy_obs, n_layers)
 
+    # ── NaN debug after init ────────────────────────────────
+    flat_params = jax.tree_util.tree_leaves(params)
+    has_nan_params = any(bool(jnp.isnan(p).any()) for p in flat_params)
+    print(f"[DEBUG] Params NaN after init: {has_nan_params}")
+
+    # Test forward pass (non-JIT) with real observations
+    test_obs = build_observations_jax(b_pop, grid, blue_map, red_map, config, step=0)
+    print(f"[DEBUG] Test obs NaN: {bool(jnp.isnan(test_obs).any())}, shape: {test_obs.shape}")
+    test_carry = jnp.zeros((max_pop, hidden_d))
+    test_out = model.apply(params, test_carry, test_obs, n_layers)
+    test_action_logits = test_out[0]
+    test_values = test_out[3]
+    print(f"[DEBUG] Test action_logits NaN: {bool(jnp.isnan(test_action_logits).any())}")
+    print(f"[DEBUG] Test values NaN: {bool(jnp.isnan(test_values).any())}")
+    print(f"[DEBUG] Test action_logits max: {float(jnp.max(jnp.abs(test_action_logits))):.4f}")
+    print(f"[DEBUG] Test values max: {float(jnp.max(jnp.abs(test_values))):.4f}")
+
     # ── Init optimizer ──────────────────────────────────────
     optimizer = create_optimizer(config["ppo_lr"], config["ppo_max_grad_norm"])
     opt_state = optimizer.init(params)
@@ -406,12 +423,27 @@ def run_simulation(
         final_carry, rollout_data = lax.scan(sim_step_fn, init_carry, step_keys)
         grid, b_pop, r_pop, b_carries, r_carries, params = final_carry
 
+        # ── NaN debug after rollout ─────────────────────────────
+        b_batch = rollout_data["blue"]
+        has_nan_obs = bool(jnp.isnan(b_batch["obs"]).any())
+        has_nan_vals = bool(jnp.isnan(b_batch["values"]).any())
+        has_nan_logp = bool(jnp.isnan(b_batch["log_probs"]).any())
+        has_nan_rew = bool(jnp.isnan(b_batch["rewards"]).any())
+        if ui == 0:
+            print(f"[DEBUG] Rollout data NaN: obs={has_nan_obs} vals={has_nan_vals} logp={has_nan_logp} rew={has_nan_rew}")
+
         # PPO update (not JIT — Python loop)
         b_batch = rollout_data["blue"]
         params, opt_state, metrics = ppo_update(
             params, opt_state, optimizer, model.apply,
             b_batch, n_layers, update_key,
         )
+
+        # ── NaN debug after PPO update ──────────────────────────
+        if ui == 0:
+            flat_p = jax.tree_util.tree_leaves(params)
+            has_nan_params_after = any(bool(jnp.isnan(p).any()) for p in flat_p)
+            print(f"[DEBUG] Params NaN after PPO update: {has_nan_params_after}")
 
         # Convert metrics to Python floats for logging
         metrics_py = {k: float(v) for k, v in metrics.items()}
