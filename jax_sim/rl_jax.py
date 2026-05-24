@@ -34,7 +34,9 @@ def compute_gae(
         return (adv, values[t]), adv
 
     # Scan backwards
-    init = (jnp.zeros(N), jnp.zeros(N))
+    # Bootstrap from last predicted value for non-terminal states (not 0)
+    bootstrap_vals = jnp.where(dones[-1], 0.0, values[-1])
+    init = (jnp.zeros(N), bootstrap_vals)
     _, advantages = lax.scan(_step, init, jnp.arange(T - 1, -1, -1))
     advantages = advantages[::-1]  # reverse back to (T, N)
 
