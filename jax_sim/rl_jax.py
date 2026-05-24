@@ -177,6 +177,9 @@ def ppo_update(
     batch: Dict[str, jnp.ndarray],
     n_layers: int,
     key: jax.Array,
+    clip_eps: float = 0.2,
+    vf_coef: float = 0.5,
+    ent_coef: float = 0.01,
 ) -> Tuple[Dict, Any, Dict]:
     """
     Single gradient update step.
@@ -200,11 +203,12 @@ def ppo_update(
     # Clip advantages to prevent gradient explosion
     advantages = jnp.clip(advantages, -10.0, 10.0)
 
+    grad_fn = jax.value_and_grad(ppo_loss, has_aux=True)
     (loss, metrics), grads = grad_fn(
-        params, apply_fn, mb_obs, mb_actions, mb_old_log_probs,
-        mb_advantages, mb_returns, carries, n_layers,
+        params, apply_fn, obs, actions, old_log_probs,
+        advantages, returns, carries, n_layers,
         clip_eps, vf_coef, ent_coef,
-        alive=mb_alive,
+        alive=alive,
     )
 
     # Apply gradients
