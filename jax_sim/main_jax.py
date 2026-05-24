@@ -329,13 +329,6 @@ def run_simulation(
     """
     config = _normalize_config(config)
 
-    # T4 fast mode: reduce model size for faster compilation
-    # Comment out these 4 lines for full model after testing
-    config["agent_hidden_dim"] = 128
-    config["brain_n_heads"] = 4
-    config["n_layers"] = 2
-    print(f"[JAX] T4-fast mode: hidden={config['agent_hidden_dim']}, layers={config['n_layers']}")
-
     key = jax.random.PRNGKey(seed)
     keys = jax.random.split(key, 10)
 
