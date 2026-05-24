@@ -79,6 +79,7 @@ class AgentNetworkJax(nn.Module):
             tom_logits, token_ids, signal_probs, culture_fast, culture_slow
         )
         """
+        jax.debug.print("[NET] carries NaN={n} inf={i} max={m}", n=jnp.isnan(carries).any(), i=jnp.isinf(carries).any(), m=jnp.max(jnp.abs(carries)))
         N = obs.shape[0]
         d = self.hidden_dim
         sym_d = self.symbol_dim
