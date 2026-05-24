@@ -63,26 +63,23 @@ def ppo_loss(
     """
     T, N = obs.shape[:2]
 
-    # Forward pass all timesteps with gradient checkpointing
-    @jax.remat
-    def _forward_step(carry_t, inp_t):
-        c, o = carry_t, inp_t
-        new_c, outs = apply_fn(params, c, o, n_layers)
-        return new_c, outs
+    # Forward pass: model expects (N, ...) but batch is (T, N, ...)
+    # Flatten time+agent dims, call model, reshape back
+    obs_flat = obs.reshape(-1, obs.shape[-1])          # (T*N, obs_dim)
+    carries_flat = carries.reshape(-1, carries.shape[-1])  # (T*N, hidden_dim)
 
-    init_carries = carries[0]  # (N, hidden_dim)
-    final_carries, outputs = lax.scan(_forward_step, init_carries, obs)
+    new_carries_flat, outputs_flat = apply_fn(params, carries_flat, obs_flat, n_layers)
 
-    # Unpack outputs
-    action_logits = outputs[0]      # (T, N, 5)
-    signal_logits = outputs[1]      # (T, N, vocab_size)
-    symbol_write = outputs[2]       # (T, N, sym_dim)
-    values_pred = outputs[3]        # (T, N)
-    tom_logits = outputs[4]         # (T, N, K, 5)
-    token_ids = outputs[5]         # (T, N)
-    signal_probs = outputs[6]      # (T, N, vocab_size)
-    culture_fast = outputs[7]      # (T, N, sym_dim)
-    culture_slow = outputs[8]      # (T, N, sym_dim)
+    # Reshape outputs back to (T, N, ...)
+    action_logits = outputs_flat[0].reshape(T, N, -1)      # (T, N, 5)
+    signal_logits = outputs_flat[1].reshape(T, N, -1)     # (T, N, vocab_size)
+    symbol_write = outputs_flat[2].reshape(T, N, -1)      # (T, N, sym_dim)
+    values_pred = outputs_flat[3].reshape(T, N)            # (T, N)
+    tom_logits = outputs_flat[4].reshape(T, N, -1)         # (T, N, K*5) — unused
+    token_ids = outputs_flat[5].reshape(T, N)            # (T, N)
+    signal_probs = outputs_flat[6].reshape(T, N, -1)     # (T, N, vocab_size)
+    culture_fast = outputs_flat[7].reshape(T, N, -1)      # (T, N, W*sym_d) — unused
+    culture_slow = outputs_flat[8].reshape(T, N, -1)      # (T, N, W*sym_d) — unused
 
     # Action log probs
     action_log_probs = jax.nn.log_softmax(action_logits, axis=-1)
