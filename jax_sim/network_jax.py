@@ -126,7 +126,7 @@ class AgentNetworkJax(nn.Module):
 
         x = jnp.concatenate(tokens, axis=1)  # (N, T, d)
         T = x.shape[1]
-        jax.debug.print("[NET] T={t} max_seq={ms}", t=T, ms=self.max_seq_len)
+        jax.debug.print("[NET] T={t}", t=T)
 
         # Add positional encoding
         pos_ids = jnp.arange(T)
