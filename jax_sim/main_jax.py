@@ -225,10 +225,10 @@ def make_sim_step(config: Dict, model: AgentNetworkJax):
         b_pop = b_pop.replace(energy=b_pop.energy + b_energy_gain)
 
         # ── Resource respawning ─────────────────────────────────
-        # Randomly respawn resources so agents don't all starve
+        # Sparse respawn to maintain pressure (agents must compete)
         res_key = jax.random.split(step_key)[0]
-        spawn_mask = jax.random.bernoulli(res_key, 0.02, (gs, gs))
-        new_res = grid.resources + spawn_mask.astype(jnp.float32) * 0.3
+        spawn_mask = jax.random.bernoulli(res_key, 0.005, (gs, gs))
+        new_res = grid.resources + spawn_mask.astype(jnp.float32) * 0.2
         grid = grid.replace(resources=jnp.clip(new_res, 0.0, 1.0))
 
         # ── Energy decay ────────────────────────────────────────
@@ -264,8 +264,13 @@ def make_sim_step(config: Dict, model: AgentNetworkJax):
         )
 
         # ── Rewards ─────────────────────────────────────────────
+        # Base alive reward + energy bonus (creates variance for learning)
         b_rew = jnp.where(b_pop.alive, float(config.get("reward_blue_alive", 0.05)), 0.0)
+        b_rew = b_rew + 0.02 * b_pop.energy  # higher energy = more reward
         b_rew = b_rew + b_catch_pen
+        # Resource gathering reward (only if agent actually gathered something)
+        b_rew = b_rew + 0.1 * b_energy_gain
+        # Red reward
         r_rew = jnp.where(r_pop.alive, float(config.get("reward_red_catch", 1.0)), 0.0) * r_catch_rew
 
         # ── Write symbols / culture ─────────────────────────────
