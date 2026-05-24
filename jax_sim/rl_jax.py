@@ -136,6 +136,13 @@ def ppo_loss(
     has_nan = jnp.isnan(total_loss) | jnp.isnan(loss_pg) | jnp.isnan(loss_vf)
     total_loss = jnp.where(has_nan, 0.0, total_loss)
 
+    # NaN debug: check individual components
+    nan_action_logits = jnp.isnan(action_logits).any()
+    nan_values_pred = jnp.isnan(values_pred).any()
+    nan_old_log_probs = jnp.isnan(old_log_probs).any()
+    nan_advantages = jnp.isnan(advantages).any()
+    nan_ratio = jnp.isnan(ratio).any()
+
     # Metrics returned as JAX arrays (can't call float() inside JIT)
     metrics = {
         "ppo_pg_loss":  jnp.where(has_nan, 0.0, loss_pg),
@@ -143,6 +150,12 @@ def ppo_loss(
         "ppo_entropy":  jnp.where(has_nan, 0.0, entropy.sum() / denom),
         "ppo_clip_frac": jnp.where(has_nan, 0.0, jnp.mean(jnp.abs(ratio - 1.0) > clip_eps)),
         "signal_entropy": jnp.where(has_nan, 0.0, signal_entropy.sum() / denom),
+        "has_nan": has_nan.astype(jnp.float32),
+        "nan_action_logits": nan_action_logits.astype(jnp.float32),
+        "nan_values_pred": nan_values_pred.astype(jnp.float32),
+        "nan_old_log_probs": nan_old_log_probs.astype(jnp.float32),
+        "nan_advantages": nan_advantages.astype(jnp.float32),
+        "nan_ratio": nan_ratio.astype(jnp.float32),
     }
 
     return total_loss, metrics

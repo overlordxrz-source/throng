@@ -419,8 +419,15 @@ def run_simulation(
 
         if (ui + 1) % 10 == 0 or ui == 0:
             alive_count = int(b_pop.alive.sum())
+            nan_dbg = f"has_nan={metrics_py.get('has_nan', 0):.0f}"
+            if metrics_py.get('has_nan', 0) > 0.5:
+                nan_dbg += (f" aL={metrics_py.get('nan_action_logits',0):.0f}"
+                           f" vP={metrics_py.get('nan_values_pred',0):.0f}"
+                           f" oL={metrics_py.get('nan_old_log_probs',0):.0f}"
+                           f" adv={metrics_py.get('nan_advantages',0):.0f}"
+                           f" ratio={metrics_py.get('nan_ratio',0):.0f}")
             print(f"  PPO#{ui+1} pop={alive_count} pg={metrics_py['ppo_pg_loss']:.4f} "
-                  f"vf={metrics_py['ppo_vf_loss']:.4f} ent={metrics_py['ppo_entropy']:.4f}")
+                  f"vf={metrics_py['ppo_vf_loss']:.4f} ent={metrics_py['ppo_entropy']:.4f} {nan_dbg}")
 
     return params, {"metrics": all_metrics}
 
