@@ -195,7 +195,6 @@ def make_sim_step(config: Dict, model: AgentNetworkJax):
         # ── Observations ────────────────────────────────────────
         b_obs = build_observations_jax(b_pop, grid, blue_map, red_map, config, 0)
         r_obs = build_observations_jax(r_pop, grid, blue_map, red_map, config, 0)
-        jax.debug.print("[SIM] b_obs NaN={n} max={m}", n=jnp.isnan(b_obs).any(), m=jnp.max(jnp.abs(b_obs)))
 
         # ── Forward passes ──────────────────────────────────────
         b_new_c, b_outs = model.apply(params, b_carries, b_obs, config["n_layers"])
@@ -203,8 +202,6 @@ def make_sim_step(config: Dict, model: AgentNetworkJax):
 
         b_action_logits, b_signal_logits, b_sym_w, b_vals, b_tom, _, _, b_cult_f, b_cult_s = b_outs
         r_action_logits, r_signal_logits, r_sym_w, r_vals, r_tom, _, _, r_cult_f, r_cult_s = r_outs
-        jax.debug.print("[SIM] b_logits NaN={n} max={m}", n=jnp.isnan(b_action_logits).any(), m=jnp.max(jnp.abs(b_action_logits)))
-        jax.debug.print("[SIM] b_vals NaN={n} max={m}", n=jnp.isnan(b_vals).any(), m=jnp.max(jnp.abs(b_vals)))
 
         # ── Sample actions (vmapped, JIT-safe) ──────────────────
         b_action_keys = jax.random.split(key_act, b_pop.max_pop)
@@ -319,7 +316,6 @@ def make_sim_step(config: Dict, model: AgentNetworkJax):
         }
 
         new_carry = (grid, b_pop, r_pop, b_new_c, r_new_c, params)
-        jax.debug.print("[SIM] end pos NaN={n} energy NaN={e}", n=jnp.isnan(b_pop.positions).any(), e=jnp.isnan(b_pop.energy).any())
         return new_carry, {"blue": b_rollout, "red": r_rollout}
 
     return sim_step
