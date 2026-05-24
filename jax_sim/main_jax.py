@@ -217,7 +217,8 @@ def make_sim_step(config: Dict, model: AgentNetworkJax, params: Dict):
 
         # ── Resource consumption ────────────────────────────────
         b_energy_gain, new_res = consume_resources(
-            b_pop.positions, b_pop.alive, grid.resources, decay=config["resource_decay"]
+            b_pop.positions, b_pop.alive, grid.resources,
+            decay=float(config.get("resource_decay", 0.05))
         )
         grid = grid.replace(resources=new_res)
         b_pop = b_pop.replace(energy=b_pop.energy + b_energy_gain)
