@@ -196,12 +196,21 @@ def ppo_update(
 
     # Compute GAE
     advantages, returns = compute_gae(rewards, values, dones)
+
+    # Debug: print statistics before normalization
+    print(f"  [DEBUG] rewards mean={float(rewards.mean()):.4f} std={float(rewards.std()):.4f} min={float(rewards.min()):.4f} max={float(rewards.max()):.4f}")
+    print(f"  [DEBUG] values  mean={float(values.mean()):.4f} std={float(values.std()):.4f} min={float(values.min()):.4f} max={float(values.max()):.4f}")
+    print(f"  [DEBUG] adv raw mean={float(advantages.mean()):.4f} std={float(advantages.std()):.4f} min={float(advantages.min()):.4f} max={float(advantages.max()):.4f}")
+    print(f"  [DEBUG] returns mean={float(returns.mean()):.4f} std={float(returns.std()):.4f} min={float(returns.min()):.4f} max={float(returns.max()):.4f}")
+
     # Normalize advantages
     adv_mean = advantages.mean()
     adv_std = advantages.std() + 1e-8
     advantages = (advantages - adv_mean) / adv_std
     # Clip advantages to prevent gradient explosion
     advantages = jnp.clip(advantages, -10.0, 10.0)
+
+    print(f"  [DEBUG] adv norm mean={float(advantages.mean()):.4f} std={float(advantages.std()):.4f} min={float(advantages.min()):.4f} max={float(advantages.max()):.4f}")
 
     grad_fn = jax.value_and_grad(ppo_loss, has_aux=True)
     (loss, metrics), grads = grad_fn(
