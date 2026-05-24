@@ -107,15 +107,21 @@ class AgentNetworkJax(nn.Module):
         loc_cult_slow = obs[:, idx:idx + W * sym_d].reshape(N, W, sym_d)
 
         # Embed tokens
-        tokens = [self.emb_own(own_state)[:, None, :]]  # (N, 1, d)
-        tokens.append(self.emb_nb(nb_sigs))            # (N, K, d)
-        tokens.append(self.emb_sym(loc_sym))            # (N, W, d)
-        tokens.append(self.emb_env(loc_env))           # (N, W, d)
-        tokens.append(self.emb_sig(own_sig)[:, None, :])  # (N, 1, d)
+        t1 = self.emb_own(own_state)[:, None, :]  # (N, 1, d)
+        t2 = self.emb_nb(nb_sigs)                 # (N, K, d)
+        t3 = self.emb_sym(loc_sym)                # (N, W, d)
+        t4 = self.emb_env(loc_env)                # (N, W, d)
+        t5 = self.emb_sig(own_sig)[:, None, :]    # (N, 1, d)
+        tokens = [t1, t2, t3, t4, t5]
         if mem is not None:
-            tokens.append(self.emb_mem(mem))             # (N, mem_slots, d)
+            tokens.append(self.emb_mem(mem))      # (N, mem_slots, d)
         tokens.append(self.emb_cult(loc_cult_fast))     # (N, W, d)
         tokens.append(self.emb_cult(loc_cult_slow))    # (N, W, d)
+        jax.debug.print("[NET] emb_own NaN={n}", n=jnp.isnan(t1).any())
+        jax.debug.print("[NET] emb_nb NaN={n}", n=jnp.isnan(t2).any())
+        jax.debug.print("[NET] emb_sym NaN={n}", n=jnp.isnan(t3).any())
+        jax.debug.print("[NET] emb_env NaN={n}", n=jnp.isnan(t4).any())
+        jax.debug.print("[NET] emb_sig NaN={n}", n=jnp.isnan(t5).any())
 
         x = jnp.concatenate(tokens, axis=1)  # (N, T, d)
         T = x.shape[1]
@@ -126,13 +132,16 @@ class AgentNetworkJax(nn.Module):
 
         # Carry fusion: add carry as a global bias to all tokens
         x = x + carries[:, None, :]  # (N, T, d)
+        jax.debug.print("[NET] after_fusion NaN={n}", n=jnp.isnan(x).any())
 
         # Transformer blocks (only first n_layers are active)
         for i in range(n_layers):
             x = self.blocks[i](x)
+            jax.debug.print("[NET] after_block{i} NaN={n}", i=i, n=jnp.isnan(x).any())
 
         # Pool across tokens for global representation
         pooled = x.mean(axis=1)  # (N, d)
+        jax.debug.print("[NET] pooled NaN={n}", n=jnp.isnan(pooled).any())
 
         # Update carries with pooled representation
         new_carries = 0.9 * carries + 0.1 * pooled  # soft update
@@ -142,6 +151,8 @@ class AgentNetworkJax(nn.Module):
         signal_logits = self.head_signal(pooled)            # (N, vocab_size)
         symbol_write = self.head_symbol(pooled)              # (N, sym_d)
         values = self.head_value(pooled).squeeze(-1)        # (N,)
+        jax.debug.print("[NET] action_logits NaN={n}", n=jnp.isnan(action_logits).any())
+        jax.debug.print("[NET] values NaN={n}", n=jnp.isnan(values).any())
         tom_logits = self.head_tom(pooled)[:, None, :]     # (N, 1, 5) — simplified; real version needs K
         tom_logits = jnp.broadcast_to(tom_logits, (N, K, 5))  # (N, K, 5)
         culture_fast = self.head_culture_fast(pooled)       # (N, sym_d)
