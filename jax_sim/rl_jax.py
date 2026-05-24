@@ -63,7 +63,8 @@ def ppo_loss(
     """
     T, N = obs.shape[:2]
 
-    # Forward pass all timesteps
+    # Forward pass all timesteps with gradient checkpointing
+    @jax.remat
     def _forward_step(carry_t, inp_t):
         c, o = carry_t, inp_t
         new_c, outs = apply_fn(params, c, o, n_layers)
