@@ -127,12 +127,13 @@ def ppo_loss(
 
     total_loss = loss_pg + vf_coef * loss_vf + loss_ent + loss_sig_ent
 
+    # Metrics returned as JAX arrays (can't call float() inside JIT)
     metrics = {
-        "ppo_pg_loss":  float(loss_pg),
-        "ppo_vf_loss":  float(loss_vf),
-        "ppo_entropy":  float(entropy.sum() / denom),
-        "ppo_clip_frac": float(jnp.mean(jnp.abs(ratio - 1.0) > clip_eps)),
-        "signal_entropy": float(signal_entropy.sum() / denom),
+        "ppo_pg_loss":  loss_pg,
+        "ppo_vf_loss":  loss_vf,
+        "ppo_entropy":  entropy.sum() / denom,
+        "ppo_clip_frac": jnp.mean(jnp.abs(ratio - 1.0) > clip_eps),
+        "signal_entropy": signal_entropy.sum() / denom,
     }
 
     return total_loss, metrics
@@ -187,5 +188,5 @@ def ppo_update(
     updates, new_opt_state = optimizer.update(grads, opt_state, params)
     new_params = optax.apply_updates(params, updates)
 
-    metrics["total_loss"] = float(loss)
+    metrics["total_loss"] = loss
     return new_params, new_opt_state, metrics
