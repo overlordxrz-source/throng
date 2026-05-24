@@ -165,8 +165,9 @@ def build_observations_jax(
 
 # ── Single simulation step (for scan) ──────────────────────────────────────
 
-def make_sim_step(config: Dict, model: AgentNetworkJax, params: Dict):
-    """Factory: returns a jittable step function."""
+def make_sim_step(config: Dict, model: AgentNetworkJax):
+    """Factory: returns a jittable step function.
+    Params are passed through carry to avoid stale closure capture."""
     gs = config["grid_size"]
     K = config["neighbor_k"]
     r = config["local_obs_radius"]
@@ -177,10 +178,12 @@ def make_sim_step(config: Dict, model: AgentNetworkJax, params: Dict):
     @jax.jit
     def sim_step(carry, step_key):
         """
-        carry = (grid, blue_pop, red_pop, blue_carries, red_carries)
+        carry = (grid, blue_pop, red_pop, blue_carries, red_carries, params)
         Returns: new_carry, rollout_data
         """
-        grid, b_pop, r_pop, b_carries, r_carries = carry
+        grid, b_pop, r_pop, b_carries, r_carries, params = carry
+        # Don't backprop through params during rollout
+        params = jax.tree.map(jax.lax.stop_gradient, params)
         key_obs, key_act = jax.random.split(step_key)
 
         # ── Build presence maps ─────────────────────────────────
@@ -307,7 +310,7 @@ def make_sim_step(config: Dict, model: AgentNetworkJax, params: Dict):
             "carries": r_carries,
         }
 
-        new_carry = (grid, b_pop, r_pop, b_new_c, r_new_c)
+        new_carry = (grid, b_pop, r_pop, b_new_c, r_new_c, params)
         return new_carry, {"blue": b_rollout, "red": r_rollout}
 
     return sim_step
@@ -392,18 +395,18 @@ def run_simulation(
     n_updates = n_steps // T
     update_keys = jax.random.split(keys[4], n_updates)
 
-    # JIT the inner rollout
-    sim_step_fn = make_sim_step(config, model, params)
+    # JIT the inner rollout (params flow through carry, not closure)
+    sim_step_fn = make_sim_step(config, model)
 
     all_metrics = []
     for ui in range(n_updates):
         update_key = update_keys[ui]
         step_keys = jax.random.split(update_key, T)
 
-        # Rollout (JIT compiled via lax.scan inside make_sim_step)
-        init_carry = (grid, b_pop, r_pop, b_carries, r_carries)
+        # Rollout (JIT compiled via lax.scan, params passed through carry)
+        init_carry = (grid, b_pop, r_pop, b_carries, r_carries, params)
         final_carry, rollout_data = lax.scan(sim_step_fn, init_carry, step_keys)
-        grid, b_pop, r_pop, b_carries, r_carries = final_carry
+        grid, b_pop, r_pop, b_carries, r_carries, params = final_carry
 
         # PPO update (not JIT — Python loop)
         b_batch = rollout_data["blue"]
