@@ -57,9 +57,10 @@ DEFAULT_CONFIG = {
     "ppo_vf_coef": 0.25,
     "ppo_entropy_coef": 0.05,
     "ppo_max_grad_norm": 2.0,
-    "reward_blue_survive": 1.0,
+    "reward_blue_alive": 0.05,
     "reward_blue_caught": -1.0,
     "reward_red_catch": 1.0,
+    "reward_red_starve_per_step": -0.01,
     "resource_decay": 0.05,
     "symbol_decay": 0.993,
     "culture_fast_decay": 0.90,
@@ -256,9 +257,9 @@ def make_sim_step(config: Dict, model: AgentNetworkJax, params: Dict):
         )
 
         # ── Rewards ─────────────────────────────────────────────
-        b_rew = jnp.where(b_pop.alive, config["reward_blue_survive"], 0.0)
+        b_rew = jnp.where(b_pop.alive, float(config.get("reward_blue_alive", 0.05)), 0.0)
         b_rew = b_rew + b_catch_pen
-        r_rew = jnp.where(r_pop.alive, config["reward_red_catch"], 0.0) * r_catch_rew
+        r_rew = jnp.where(r_pop.alive, float(config.get("reward_red_catch", 1.0)), 0.0) * r_catch_rew
 
         # ── Write symbols / culture ─────────────────────────────
         grid = grid.replace(
