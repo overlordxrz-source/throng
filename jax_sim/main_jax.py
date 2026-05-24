@@ -343,7 +343,7 @@ def run_simulation(
     )
     r_pop = init_population(
         max_pop_red, hidden_d, config["signal_dim"], gs, team_id=1,
-        key=keys[2], n_agents=6, memory_slots=0,
+        key=keys[2], n_agents=6, memory_slots=config.get("memory_slots", 0),
     )
 
     # ── Init model ──────────────────────────────────────────
