@@ -376,41 +376,41 @@ def run_simulation(
     r_carries = jnp.zeros((max_pop_red, hidden_d))
 
     # ── Training loop ───────────────────────────────────────
-    metrics_history = []
+    # Python loop for update cycles (avoids OOM from saving all param states)
+    # Only the inner rollout uses lax.scan
+    n_updates = n_steps // T
+    update_keys = jax.random.split(keys[4], n_updates)
 
-    def rollout_and_update(carry, update_key):
-        """One rollout + PPO update cycle."""
-        grid, b_pop, r_pop, b_carries, r_carries, params, opt_state = carry
+    # JIT the inner rollout
+    sim_step_fn = make_sim_step(config, model, params)
 
+    all_metrics = []
+    for ui in range(n_updates):
+        update_key = update_keys[ui]
         step_keys = jax.random.split(update_key, T)
-        sim_step_fn = make_sim_step(config, model, params)
 
+        # Rollout (JIT compiled via lax.scan inside make_sim_step)
         init_carry = (grid, b_pop, r_pop, b_carries, r_carries)
         final_carry, rollout_data = lax.scan(sim_step_fn, init_carry, step_keys)
-
-        # Unpack
         grid, b_pop, r_pop, b_carries, r_carries = final_carry
 
-        # PPO update for blues
+        # PPO update (not JIT — Python loop)
         b_batch = rollout_data["blue"]
         params, opt_state, metrics = ppo_update(
             params, opt_state, optimizer, model.apply,
             b_batch, n_layers, update_key,
         )
-        metrics_history.append(metrics)
 
-        return (grid, b_pop, r_pop, b_carries, r_carries, params, opt_state), metrics
+        # Convert metrics to Python floats for logging
+        metrics_py = {k: float(v) for k, v in metrics.items()}
+        all_metrics.append(metrics_py)
 
-    # Run updates
-    n_updates = n_steps // T
-    update_keys = jax.random.split(keys[4], n_updates)
+        if (ui + 1) % 10 == 0 or ui == 0:
+            alive_count = int(b_pop.alive.sum())
+            print(f"  PPO#{ui+1} pop={alive_count} pg={metrics_py['ppo_pg_loss']:.4f} "
+                  f"vf={metrics_py['ppo_vf_loss']:.4f} ent={metrics_py['ppo_entropy']:.4f}")
 
-    init_carry = (grid, b_pop, r_pop, b_carries, r_carries, params, opt_state)
-    final_carry, all_metrics = lax.scan(rollout_and_update, init_carry, update_keys)
-
-    _, _, _, _, _, final_params, final_opt_state = final_carry
-
-    return final_params, {"metrics": all_metrics}
+    return params, {"metrics": all_metrics}
 
 
 # ── CLI entry ──────────────────────────────────────────────────────────────
