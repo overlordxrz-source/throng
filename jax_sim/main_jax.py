@@ -200,14 +200,11 @@ def make_sim_step(config: Dict, model: AgentNetworkJax, params: Dict):
         b_action_logits, b_signal_logits, b_sym_w, b_vals, b_tom, _, _, b_cult_f, b_cult_s = b_outs
         r_action_logits, r_signal_logits, r_sym_w, r_vals, r_tom, _, _, r_cult_f, r_cult_s = r_outs
 
-        # ── Sample actions ──────────────────────────────────────
-        b_action_keys = jax.random.split(key_obs, b_pop.max_pop)
-        b_actions = jnp.array([
-            jax.random.categorical(k, logits) for k, logits in zip(b_action_keys, b_action_logits)
-        ])
-        r_actions = jnp.array([
-            jax.random.categorical(k, logits) for k, logits in zip(b_action_keys, r_action_logits)
-        ])
+        # ── Sample actions (vmapped, JIT-safe) ──────────────────
+        b_action_keys = jax.random.split(key_act, b_pop.max_pop)
+        r_action_keys = jax.random.split(key_act, r_pop.max_pop)
+        b_actions = jax.vmap(jax.random.categorical)(b_action_keys, b_action_logits)
+        r_actions = jax.vmap(jax.random.categorical)(r_action_keys, r_action_logits)
 
         # ── Movement ────────────────────────────────────────────
         b_new_pos = apply_moves(b_pop.positions, b_actions, b_pop.alive, gs, grid.walls)
@@ -223,6 +220,13 @@ def make_sim_step(config: Dict, model: AgentNetworkJax, params: Dict):
         )
         grid = grid.replace(resources=new_res)
         b_pop = b_pop.replace(energy=b_pop.energy + b_energy_gain)
+
+        # ── Resource respawning ─────────────────────────────────
+        # Randomly respawn resources so agents don't all starve
+        res_key = jax.random.split(step_key)[0]
+        spawn_mask = jax.random.bernoulli(res_key, 0.02, (gs, gs))
+        new_res = grid.resources + spawn_mask.astype(jnp.float32) * 0.3
+        grid = grid.replace(resources=jnp.clip(new_res, 0.0, 1.0))
 
         # ── Energy decay ────────────────────────────────────────
         b_pop = b_pop.replace(energy=jnp.clip(b_pop.energy - config["energy_decay"], 0.0, 1.0))
