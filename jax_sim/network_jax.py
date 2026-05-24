@@ -126,13 +126,19 @@ class AgentNetworkJax(nn.Module):
 
         x = jnp.concatenate(tokens, axis=1)  # (N, T, d)
         T = x.shape[1]
+        jax.debug.print("[NET] T={t} max_seq={ms}", t=T, ms=self.max_seq_len)
 
         # Add positional encoding
         pos_ids = jnp.arange(T)
-        x = x + self.pos_enc(pos_ids)[None, :, :]  # (N, T, d)
+        pos_emb = self.pos_enc(pos_ids)[None, :, :]
+        jax.debug.print("[NET] pos_emb NaN={n}", n=jnp.isnan(pos_emb).any())
+        x = x + pos_emb  # (N, T, d)
+        jax.debug.print("[NET] after_pos NaN={n}", n=jnp.isnan(x).any())
 
         # Carry fusion: add carry as a global bias to all tokens
-        x = x + carries[:, None, :]  # (N, T, d)
+        carry_broadcast = carries[:, None, :]
+        jax.debug.print("[NET] carry_broadcast NaN={n}", n=jnp.isnan(carry_broadcast).any())
+        x = x + carry_broadcast  # (N, T, d)
         jax.debug.print("[NET] after_fusion NaN={n}", n=jnp.isnan(x).any())
 
         # Transformer blocks (only first n_layers are active)
