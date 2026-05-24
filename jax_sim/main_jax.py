@@ -42,11 +42,12 @@ DEFAULT_CONFIG = {
     "local_obs_radius": 2,
     "signal_dim": 32,
     "symbol_dim": 16,
-    "hidden_dim": 256,
-    "n_heads": 4,
+    "agent_hidden_dim": 256,
+    "brain_n_heads": 4,
     "n_layers": 4,
-    "vocab_size": 256,
-    "memory_slots": 20,
+    "brain_token_dim": 128,
+    "vocab_size": 64,
+    "memory_buffer_size": 20,
     "ppo_rollout_steps": 512,
     "ppo_epochs": 1,
     "ppo_clip": 0.2,
@@ -80,6 +81,12 @@ def _normalize_config(cfg: Dict) -> Dict:
     cfg = dict(cfg)
     cfg.setdefault("max_pop", cfg.get("population_size", 500))
     cfg.setdefault("max_pop_red", cfg.get("red_population_size", 75))
+    cfg.setdefault("hidden_dim", cfg.get("agent_hidden_dim", 256))
+    cfg.setdefault("n_heads", cfg.get("brain_n_heads", 4))
+    cfg.setdefault("n_layers", cfg.get("n_layers", 4))
+    cfg.setdefault("vocab_size", cfg.get("vocab_size", 64))
+    cfg.setdefault("memory_slots", cfg.get("memory_buffer_size", 20))
+    cfg.setdefault("ppo_rollout_steps", cfg.get("ppo_rollout_steps", 512))
     return cfg
 
 
