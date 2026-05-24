@@ -200,12 +200,11 @@ def ppo_update(
     # Clip advantages to prevent gradient explosion
     advantages = jnp.clip(advantages, -10.0, 10.0)
 
-    # Loss + grad
-    grad_fn = jax.value_and_grad(ppo_loss, has_aux=True)
     (loss, metrics), grads = grad_fn(
-        params, apply_fn, obs, actions, old_log_probs,
-        advantages, returns, carries, n_layers,
-        alive=alive,
+        params, apply_fn, mb_obs, mb_actions, mb_old_log_probs,
+        mb_advantages, mb_returns, carries, n_layers,
+        clip_eps, vf_coef, ent_coef,
+        alive=mb_alive,
     )
 
     # Apply gradients
