@@ -48,6 +48,20 @@ class GridState:
          gs.cultural_fast, gs.cultural_slow, gs.puzzle_grid) = children
         return gs
 
+    def replace(self, **kwargs):
+        """Immutable update: return new GridState with replaced fields."""
+        gs = GridState(self.size, self.symbol_dim)
+        gs.symbols = kwargs.get("symbols", self.symbols)
+        gs.walls = kwargs.get("walls", self.walls)
+        gs.resources = kwargs.get("resources", self.resources)
+        gs.shelter_spots = kwargs.get("shelter_spots", self.shelter_spots)
+        gs.contested_res = kwargs.get("contested_res", self.contested_res)
+        gs.scent_trails = kwargs.get("scent_trails", self.scent_trails)
+        gs.cultural_fast = kwargs.get("cultural_fast", self.cultural_fast)
+        gs.cultural_slow = kwargs.get("cultural_slow", self.cultural_slow)
+        gs.puzzle_grid = kwargs.get("puzzle_grid", self.puzzle_grid)
+        return gs
+
 jax.tree_util.register_pytree_node(
     GridState,
     lambda gs: gs.tree_flatten(),

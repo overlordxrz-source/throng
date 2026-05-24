@@ -90,6 +90,29 @@ class PopState:
             pop.memory_buffer = None
         return pop
 
+    def replace(self, **kwargs):
+        """Immutable update: return new PopState with replaced fields."""
+        pop = PopState.__new__(PopState)
+        pop.max_pop = self.max_pop
+        pop.hidden_dim = self.hidden_dim
+        pop.signal_dim = self.signal_dim
+        pop.memory_slots = self.memory_slots
+        pop.positions = kwargs.get("positions", self.positions)
+        pop.ages = kwargs.get("ages", self.ages)
+        pop.alive = kwargs.get("alive", self.alive)
+        pop.energy = kwargs.get("energy", self.energy)
+        pop.team = kwargs.get("team", self.team)
+        pop.n_layers = kwargs.get("n_layers", self.n_layers)
+        pop.carries = kwargs.get("carries", self.carries)
+        pop.signals = kwargs.get("signals", self.signals)
+        pop.nb_gain = kwargs.get("nb_gain", self.nb_gain)
+        pop.offspring_count = kwargs.get("offspring_count", self.offspring_count)
+        pop.steps_since_catch = kwargs.get("steps_since_catch", self.steps_since_catch)
+        pop.lineage_ids = kwargs.get("lineage_ids", self.lineage_ids)
+        pop.next_lineage_id = kwargs.get("next_lineage_id", self.next_lineage_id)
+        pop.memory_buffer = kwargs.get("memory_buffer", self.memory_buffer)
+        return pop
+
 
 jax.tree_util.register_pytree_node(
     PopState,
