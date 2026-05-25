@@ -60,7 +60,7 @@ def ppo_loss(
     old_log_probs: jnp.ndarray, # (T, N)
     advantages: jnp.ndarray,    # (T, N)
     returns: jnp.ndarray,       # (T, N)
-    carries: jnp.ndarray,       # (T+1, N, hidden_dim)
+    carries: jnp.ndarray,       # (T, N, hidden_dim) — exact historical carries from rollout
     n_layers: int,
     old_values: jnp.ndarray,     # (T, N) for value clipping
     clip_eps: float = 0.2,
@@ -69,20 +69,20 @@ def ppo_loss(
     alive: jnp.ndarray = None,  # (T, N) bool-ish
 ) -> Tuple[jnp.ndarray, Dict]:
     """
-    Clean PPO loss (policy + value + entropy).
+    PPO loss evaluated with exact historical carries per timestep.
+    Using updated params but the same recurrent state that generated the rollout.
     Returns (loss_scalar, metrics_dict).
     """
     T, N = obs.shape[:2]
 
-    # Forward pass all timesteps
+    # Evaluate each timestep with its exact historical carry (ignore new_carry output)
     @jax.remat
-    def _forward_step(carry_t, inp_t):
-        c, o = jax.lax.stop_gradient(carry_t), inp_t
-        new_c, outs = apply_fn(params, c, o, n_layers, detach_value=True)
-        return new_c, outs
+    def _eval_step(t, _):
+        c = jax.lax.stop_gradient(carries[t])
+        _, outs = apply_fn(params, c, obs[t], n_layers, detach_value=False)
+        return t + 1, outs
 
-    init_carries = carries[0]
-    _, outputs = lax.scan(_forward_step, init_carries, obs)
+    _, outputs = lax.scan(_eval_step, 0, None, length=T)
 
     # Unpack outputs
     action_logits = outputs[0]      # (T, N, 5)
@@ -104,11 +104,11 @@ def ppo_loss(
     surr2 = clipped_ratio * advantages
     pg_loss = -jnp.minimum(surr1, surr2)
 
-    # Value loss with clipping (standard PPO, use minimum to prevent overshoot)
+    # Value loss with clipping (standard PPO: maximum limits large critic changes)
     v_pred_clipped = old_values + jnp.clip(values_pred - old_values, -clip_eps, clip_eps)
     v_loss1 = jnp.square(values_pred - returns)
     v_loss2 = jnp.square(v_pred_clipped - returns)
-    vf_loss = jnp.minimum(v_loss1, v_loss2)
+    vf_loss = jnp.maximum(v_loss1, v_loss2)
 
     # Entropy bonus
     action_probs = jax.nn.softmax(action_logits, axis=-1)
@@ -131,20 +131,11 @@ def ppo_loss(
 
     total_loss = loss_pg + vf_coef * loss_vf + loss_ent
 
-    # NaN protection
-    has_nan = jnp.isnan(total_loss) | jnp.isnan(loss_pg) | jnp.isnan(loss_vf)
-    total_loss = jnp.where(has_nan, 0.0, total_loss)
-
     metrics = {
-        "ppo_pg_loss":  jnp.where(has_nan, 0.0, loss_pg),
-        "ppo_vf_loss":  jnp.where(has_nan, 0.0, loss_vf),
-        "ppo_entropy":  jnp.where(has_nan, 0.0, entropy.sum() / denom),
-        "ppo_clip_frac": jnp.where(has_nan, 0.0, jnp.mean(jnp.abs(ratio - 1.0) > clip_eps)),
-        "has_nan": has_nan.astype(jnp.float32),
-        "nan_action_logits": jnp.isnan(action_logits).any().astype(jnp.float32),
-        "nan_values_pred": jnp.isnan(values_pred).any().astype(jnp.float32),
-        "nan_ratio": jnp.isnan(ratio).any().astype(jnp.float32),
-        "nan_advantages": jnp.isnan(advantages).any().astype(jnp.float32),
+        "ppo_pg_loss":  loss_pg,
+        "ppo_vf_loss":  loss_vf,
+        "ppo_entropy":  entropy.sum() / denom,
+        "ppo_clip_frac": jnp.mean(jnp.abs(ratio - 1.0) > clip_eps),
     }
 
     return total_loss, metrics
