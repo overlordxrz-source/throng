@@ -106,7 +106,7 @@ def ppo_loss(
 
     # Value loss: Huber (smooth L1) instead of MSE to prevent gradient explosion
     # from large errors while still being quadratic near the target.
-    delta = 1.0
+    delta = 0.5
     err = jnp.abs(values_pred - returns)
     vf_loss = jnp.where(err < delta, 0.5 * jnp.square(err), delta * (err - 0.5 * delta))
 
