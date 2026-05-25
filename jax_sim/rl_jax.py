@@ -265,5 +265,14 @@ def ppo_update(
     updates, new_opt_state = optimizer.update(grads, opt_state, params)
     new_params = optax.apply_updates(params, updates)
 
+    # Debug: value head bias after update
+    for path, p in jax.tree_util.tree_flatten_with_path(new_params)[0]:
+        path_str = "/".join(str(p.key) for p in path)
+        if "head_value" in path_str and "bias" in path_str:
+            new_bias = float(p.mean())
+            if old_bias is not None:
+                print(f"    [DEBUG] value_bias_new={new_bias:.6f} delta={new_bias - old_bias:+.6f}")
+            break
+
     metrics["total_loss"] = loss
     return new_params, new_opt_state, metrics
