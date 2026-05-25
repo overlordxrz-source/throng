@@ -70,6 +70,7 @@ class AgentNetworkJax(nn.Module):
         obs: jnp.ndarray,       # (N, obs_dim)
         n_layers: int,
         nb_gain: Optional[jnp.ndarray] = None,
+        detach_value: bool = False,
     ) -> Tuple[jnp.ndarray, Tuple]:
         """
         Forward pass.
@@ -138,11 +139,14 @@ class AgentNetworkJax(nn.Module):
         # Update carries with pooled representation
         new_carries = 0.9 * carries + 0.1 * pooled  # soft update
 
+        # Detach pooled for value head so value gradients don't corrupt shared representation
+        value_input = jax.lax.stop_gradient(pooled) if detach_value else pooled
+
         # Output heads
         action_logits = self.head_action(pooled)           # (N, 5)
         signal_logits = self.head_signal(pooled)            # (N, vocab_size)
         symbol_write = self.head_symbol(pooled)              # (N, sym_d)
-        values = self.head_value(pooled).squeeze(-1)        # (N,)
+        values = self.head_value(value_input).squeeze(-1)  # (N,)
         tom_logits = self.head_tom(pooled)[:, None, :]     # (N, 1, 5) — simplified; real version needs K
         tom_logits = jnp.broadcast_to(tom_logits, (N, K, 5))  # (N, K, 5)
         culture_fast = self.head_culture_fast(pooled)       # (N, sym_d)

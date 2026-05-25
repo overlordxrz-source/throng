@@ -71,7 +71,7 @@ def ppo_loss(
     @jax.remat
     def _forward_step(carry_t, inp_t):
         c, o = jax.lax.stop_gradient(carry_t), inp_t
-        new_c, outs = apply_fn(params, c, o, n_layers)
+        new_c, outs = apply_fn(params, c, o, n_layers, detach_value=True)
         return new_c, outs
 
     init_carries = carries[0]  # (N, hidden_dim)
