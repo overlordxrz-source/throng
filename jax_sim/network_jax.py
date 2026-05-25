@@ -146,7 +146,7 @@ class AgentNetworkJax(nn.Module):
         action_logits = self.head_action(pooled) / 2.0   # (N, 5)  temperature=2.0 for exploration
         signal_logits = self.head_signal(pooled)            # (N, vocab_size)
         symbol_write = self.head_symbol(pooled)              # (N, sym_d)
-        values = jnp.clip(self.head_value(value_input).squeeze(-1), 0.0, 20.0)  # (N,)  clamp to prevent explosion
+        values = self.head_value(value_input).squeeze(-1)  # (N,)  no clamp — pure returns prevent explosion
         tom_logits = self.head_tom(pooled)[:, None, :]     # (N, 1, 5) — simplified; real version needs K
         tom_logits = jnp.broadcast_to(tom_logits, (N, K, 5))  # (N, K, 5)
         culture_fast = self.head_culture_fast(pooled)       # (N, sym_d)

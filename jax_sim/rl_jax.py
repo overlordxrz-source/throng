@@ -25,24 +25,30 @@ def compute_gae(
     lam:   float = 0.95,
 ) -> Tuple[jnp.ndarray, jnp.ndarray]:
     """
-    Generalized Advantage Estimation.
+    Pure discounted returns + advantage = returns - values.
+    NO bootstrapping from predicted values to break feedback loop.
+    For short rollouts (32 steps) this is standard and stable.
     Returns (advantages, returns) both (T, N).
     """
     T, N = rewards.shape
 
-    def _step(carry, t):
-        next_adv, next_val = carry
-        delta = rewards[t] + gamma * next_val * (1.0 - dones[t]) - values[t]
-        adv = delta + gamma * lam * (1.0 - dones[t]) * next_adv
-        return (adv, values[t]), adv
+    # Compute pure discounted returns independent of value predictions
+    def _returns_step(carry, t):
+        ret = rewards[t] + gamma * carry * (1.0 - dones[t])
+        return ret, ret
 
-    # bootstrap from last predicted value for non-terminal states
-    bootstrap_vals = jnp.where(dones[-1], 0.0, values[-1])
-    init = (jnp.zeros(N), bootstrap_vals)
-    _, advantages = lax.scan(_step, init, jnp.arange(T - 1, -1, -1))
-    advantages = advantages[::-1]  # reverse back to (T, N)
+    _, returns = lax.scan(_returns_step, jnp.zeros(N), jnp.arange(T - 1, -1, -1))
+    returns = returns[::-1]  # (T, N)
 
-    returns = advantages + values
+    # Advantages = returns - predicted values
+    advantages = returns - values
+
+    # Normalize advantages only (values learn raw returns scale)
+    adv_mean = jnp.mean(advantages)
+    adv_std = jnp.std(advantages) + 1e-8
+    advantages = (advantages - adv_mean) / adv_std
+    advantages = jnp.clip(advantages, -10.0, 10.0)
+
     return advantages, returns
 
 
@@ -175,12 +181,6 @@ def ppo_update(
 
     # Compute GAE
     advantages, returns = compute_gae(rewards, values, dones)
-
-    # Normalize advantages
-    adv_mean = advantages.mean()
-    adv_std = advantages.std() + 1e-8
-    advantages = (advantages - adv_mean) / adv_std
-    advantages = jnp.clip(advantages, -10.0, 10.0)
 
     # Debug
     print(f"  [DEBUG] rewards mean={float(rewards.mean()):.4f} std={float(rewards.std()):.4f}")
