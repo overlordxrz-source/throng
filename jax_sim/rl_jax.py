@@ -246,7 +246,15 @@ def ppo_update(
     total_grad_norm = jnp.sqrt(sum(jnp.sum(g**2) for g in jax.tree_util.tree_leaves(grads)))
     print(f"    [DEBUG] grad_norms total={float(total_grad_norm):.4f} vf={float(vf_grad_norm):.4f} act={float(act_grad_norm):.4f}")
 
-    # Debug: value head bias gradient direction
+    # Debug: value head bias before/after update
+    old_bias = None
+    for path, p in jax.tree_util.tree_flatten_with_path(params)[0]:
+        path_str = "/".join(str(p.key) for p in path)
+        if "head_value" in path_str and "bias" in path_str:
+            old_bias = float(p.mean())
+            print(f"    [DEBUG] value_bias_old={old_bias:.6f}")
+            break
+
     for path, g in jax.tree_util.tree_flatten_with_path(grads)[0]:
         path_str = "/".join(str(p.key) for p in path)
         if "head_value" in path_str and "bias" in path_str:
