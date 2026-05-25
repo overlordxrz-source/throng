@@ -62,6 +62,7 @@ def ppo_loss(
     returns: jnp.ndarray,       # (T, N)
     carries: jnp.ndarray,       # (T+1, N, hidden_dim)
     n_layers: int,
+    old_values: jnp.ndarray,     # (T, N) for value clipping
     clip_eps: float = 0.2,
     vf_coef: float = 0.25,
     ent_coef: float = 0.05,
@@ -103,8 +104,11 @@ def ppo_loss(
     surr2 = clipped_ratio * advantages
     pg_loss = -jnp.minimum(surr1, surr2)
 
-    # Value loss: plain MSE
-    vf_loss = jnp.square(values_pred - returns)
+    # Value loss with clipping (standard PPO, use minimum to prevent overshoot)
+    v_pred_clipped = old_values + jnp.clip(values_pred - old_values, -clip_eps, clip_eps)
+    v_loss1 = jnp.square(values_pred - returns)
+    v_loss2 = jnp.square(v_pred_clipped - returns)
+    vf_loss = jnp.minimum(v_loss1, v_loss2)
 
     # Entropy bonus
     action_probs = jax.nn.softmax(action_logits, axis=-1)
@@ -188,10 +192,12 @@ def ppo_update(
     print(f"  [DEBUG] adv     mean={float(advantages.mean()):.4f} std={float(advantages.std()):.4f}")
     print(f"  [DEBUG] returns mean={float(returns.mean()):.4f} std={float(returns.std()):.4f}")
 
+    old_values = batch["values"]  # (T, N)
     grad_fn = jax.value_and_grad(ppo_loss, has_aux=True)
     (loss, metrics), grads = grad_fn(
         params, apply_fn, obs, actions, old_log_probs,
         advantages, returns, carries, n_layers,
+        old_values,
         clip_eps, vf_coef, ent_coef,
         alive=alive,
     )

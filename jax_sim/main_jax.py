@@ -439,6 +439,9 @@ def run_simulation(
         params, opt_state, metrics = ppo_update(
             params, opt_state, optimizer, model.apply,
             b_batch, n_layers, update_key,
+            clip_eps=config.get("ppo_clip_eps", 0.2),
+            vf_coef=config.get("ppo_value_coef", 0.25),
+            ent_coef=config.get("ppo_entropy_coef", 0.01),
         )
 
         # ── NaN debug after PPO update ──────────────────────────
