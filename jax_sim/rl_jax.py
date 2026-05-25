@@ -160,6 +160,7 @@ def ppo_loss(
         "nan_old_log_probs": nan_old_log_probs.astype(jnp.float32),
         "nan_advantages": nan_advantages.astype(jnp.float32),
         "nan_ratio": nan_ratio.astype(jnp.float32),
+        "_values_pred": values_pred,  # for debugging: compare with rollout values
     }
 
     return total_loss, metrics
@@ -223,6 +224,25 @@ def ppo_update(
         clip_eps, vf_coef, ent_coef,
         alive=alive,
     )
+
+    # Debug: compare ppo_loss forward pass values with rollout values
+    values_pred = metrics["_values_pred"]
+    val_diff = float(jnp.abs(values_pred - values).max())
+    print(f"    [DEBUG] ppo_loss values_pred mean={float(values_pred.mean()):.4f} rollout values mean={float(values.mean()):.4f} max_diff={val_diff:.4f}")
+
+    # Debug: inspect gradient norms for value and action heads
+    def _head_grad_norm(grads_tree, head_name):
+        norms = []
+        for path, g in jax.tree_util.tree_flatten_with_path(grads_tree)[0]:
+            path_str = "/".join(str(p.key) for p in path)
+            if head_name in path_str:
+                norms.append(jnp.sum(g**2))
+        return jnp.sqrt(jnp.sum(jnp.array(norms))) if norms else jnp.array(0.0)
+
+    vf_grad_norm = _head_grad_norm(grads, "head_value")
+    act_grad_norm = _head_grad_norm(grads, "head_action")
+    total_grad_norm = jnp.sqrt(sum(jnp.sum(g**2) for g in jax.tree_util.tree_leaves(grads)))
+    print(f"    [DEBUG] grad_norms total={float(total_grad_norm):.4f} vf={float(vf_grad_norm):.4f} act={float(act_grad_norm):.4f}")
 
     # Apply gradients
     updates, new_opt_state = optimizer.update(grads, opt_state, params)
