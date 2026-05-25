@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 jax_sim/rl_jax.py — PPO loss + GAE + value/grad functions (pure JAX).
 
@@ -7,8 +9,6 @@ All functions are jittable.  The update step uses Optax.
 import os
 os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2")
 os.environ.setdefault("XLA_FLAGS", "--xla_gpu_autotune_level=0")
-
-from __future__ import annotations
 
 import jax
 import jax.numpy as jnp

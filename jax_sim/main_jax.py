@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 jax_sim/main_jax.py — Full simulation loop with jax.lax.scan.
 
@@ -13,8 +15,6 @@ Everything inside scan is @jit-compiled to a single XLA kernel.
 import os
 os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2")  # suppress INFO/WARN
 os.environ.setdefault("XLA_FLAGS", "--xla_gpu_autotune_level=0")  # disable autotune spam
-
-from __future__ import annotations
 
 import jax
 import jax.numpy as jnp
