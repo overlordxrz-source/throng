@@ -433,8 +433,13 @@ def run_simulation(
             has_nan_params_after = any(bool(jnp.isnan(p).any()) for p in flat_p)
             print(f"[DEBUG] Params NaN after PPO update: {has_nan_params_after}")
 
-        # Convert metrics to Python floats for logging
-        metrics_py = {k: float(v) for k, v in metrics.items()}
+        # Convert metrics to Python floats for logging (skip non-scalars)
+        metrics_py = {}
+        for k, v in metrics.items():
+            try:
+                metrics_py[k] = float(v)
+            except (TypeError, ValueError):
+                pass  # skip non-scalar arrays
         all_metrics.append(metrics_py)
 
         if (ui + 1) % 10 == 0 or ui == 0:

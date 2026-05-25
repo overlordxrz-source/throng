@@ -66,9 +66,11 @@ def ppo_loss(
     T, N = obs.shape[:2]
 
     # Forward pass all timesteps with gradient checkpointing
+    # NOTE: stop_gradient through carry_t to prevent exploding BPTT gradients
+    # from corrupting the shared policy/value backbone.
     @jax.remat
     def _forward_step(carry_t, inp_t):
-        c, o = carry_t, inp_t
+        c, o = jax.lax.stop_gradient(carry_t), inp_t
         new_c, outs = apply_fn(params, c, o, n_layers)
         return new_c, outs
 
@@ -158,7 +160,6 @@ def ppo_loss(
         "nan_old_log_probs": nan_old_log_probs.astype(jnp.float32),
         "nan_advantages": nan_advantages.astype(jnp.float32),
         "nan_ratio": nan_ratio.astype(jnp.float32),
-        "_values_pred": values_pred,  # for debugging: compare with rollout values
     }
 
     return total_loss, metrics
@@ -222,11 +223,6 @@ def ppo_update(
         clip_eps, vf_coef, ent_coef,
         alive=alive,
     )
-
-    # Debug: compare ppo_loss forward pass values with rollout values
-    values_pred = metrics["_values_pred"]
-    val_diff = float(jnp.abs(values_pred - values).max())
-    print(f"    [DEBUG] ppo_loss values_pred mean={float(values_pred.mean()):.4f} rollout values mean={float(values.mean()):.4f} max_diff={val_diff:.4f}")
 
     # Apply gradients
     updates, new_opt_state = optimizer.update(grads, opt_state, params)
