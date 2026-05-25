@@ -86,6 +86,11 @@ def ppo_loss(
     culture_fast = outputs[7]      # (T, N, sym_dim)
     culture_slow = outputs[8]      # (T, N, sym_dim)
 
+    # Debug: compare with rollout values (passed as old_values proxy)
+    old_values_approx = returns - advantages
+    val_diff = jnp.abs(values_pred - old_values_approx).max()
+    print(f"    [DEBUG] ppo_loss values_pred mean={float(values_pred.mean()):.4f} old_values mean={float(old_values_approx.mean()):.4f} max_diff={float(val_diff):.4f}")
+
     # Action log probs
     action_log_probs = jax.nn.log_softmax(action_logits, axis=-1)
     log_probs_taken = jnp.take_along_axis(
