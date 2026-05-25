@@ -30,21 +30,23 @@ def compute_gae(
     """
     T, N = rewards.shape
 
-    def _step(carry, t):
-        next_adv, next_val = carry
-        # If done, bootstrap from 0 (episode end)
-        delta = rewards[t] + gamma * next_val * (1.0 - dones[t]) - values[t]
-        adv = delta + gamma * lam * (1.0 - dones[t]) * next_adv
-        return (adv, values[t]), adv
+    # Compute pure discounted returns (independent of value predictions)
+    # This prevents value bootstrap feedback loop
+    def _returns_step(carry, t):
+        ret = rewards[t] + gamma * carry * (1.0 - dones[t])
+        return ret, ret
 
-    # Scan backwards
-    # For short rollouts, don't bootstrap — compute pure discounted returns
-    # This prevents value explosion from self-reinforcing bootstrap loop
-    init = (jnp.zeros(N), jnp.zeros(N))
-    _, advantages = lax.scan(_step, init, jnp.arange(T - 1, -1, -1))
-    advantages = advantages[::-1]  # reverse back to (T, N)
+    _, returns = lax.scan(_returns_step, jnp.zeros(N), jnp.arange(T - 1, -1, -1))
+    returns = returns[::-1]  # (T, N)
 
-    returns = advantages + values
+    # Advantages = returns - predicted values
+    advantages = returns - values
+
+    # Normalize advantages (but NOT returns — values must learn raw scale)
+    adv_mean = jnp.mean(advantages)
+    adv_std = jnp.std(advantages) + 1e-8
+    advantages = (advantages - adv_mean) / adv_std
+
     return advantages, returns
 
 
