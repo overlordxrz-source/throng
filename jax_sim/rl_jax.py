@@ -86,11 +86,6 @@ def ppo_loss(
     culture_fast = outputs[7]      # (T, N, sym_dim)
     culture_slow = outputs[8]      # (T, N, sym_dim)
 
-    # Debug: compare with rollout values (passed as old_values proxy)
-    old_values_approx = returns - advantages
-    val_diff = jnp.abs(values_pred - old_values_approx).max()
-    print(f"    [DEBUG] ppo_loss values_pred mean={float(values_pred.mean()):.4f} old_values mean={float(old_values_approx.mean()):.4f} max_diff={float(val_diff):.4f}")
-
     # Action log probs
     action_log_probs = jax.nn.log_softmax(action_logits, axis=-1)
     log_probs_taken = jnp.take_along_axis(
@@ -163,6 +158,7 @@ def ppo_loss(
         "nan_old_log_probs": nan_old_log_probs.astype(jnp.float32),
         "nan_advantages": nan_advantages.astype(jnp.float32),
         "nan_ratio": nan_ratio.astype(jnp.float32),
+        "_values_pred": values_pred,  # for debugging: compare with rollout values
     }
 
     return total_loss, metrics
@@ -226,6 +222,11 @@ def ppo_update(
         clip_eps, vf_coef, ent_coef,
         alive=alive,
     )
+
+    # Debug: compare ppo_loss forward pass values with rollout values
+    values_pred = metrics["_values_pred"]
+    val_diff = float(jnp.abs(values_pred - values).max())
+    print(f"    [DEBUG] ppo_loss values_pred mean={float(values_pred.mean()):.4f} rollout values mean={float(values.mean()):.4f} max_diff={val_diff:.4f}")
 
     # Apply gradients
     updates, new_opt_state = optimizer.update(grads, opt_state, params)
