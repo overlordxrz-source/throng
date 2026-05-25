@@ -79,7 +79,7 @@ def ppo_loss(
     @jax.remat
     def _eval_step(t, _):
         c = jax.lax.stop_gradient(carries[t])
-        _, outs = apply_fn(params, c, obs[t], n_layers, detach_value=False)
+        _, outs = apply_fn(params, c, obs[t], n_layers, detach_value=True)
         return t + 1, outs
 
     _, outputs = lax.scan(_eval_step, 0, None, length=T)
