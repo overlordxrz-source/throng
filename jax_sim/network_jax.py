@@ -143,7 +143,7 @@ class AgentNetworkJax(nn.Module):
         value_input = jax.lax.stop_gradient(pooled) if detach_value else pooled
 
         # Output heads
-        action_logits = self.head_action(pooled)           # (N, 5)
+        action_logits = self.head_action(pooled) / 2.0   # (N, 5)  temperature=2.0 for exploration
         signal_logits = self.head_signal(pooled)            # (N, vocab_size)
         symbol_write = self.head_symbol(pooled)              # (N, sym_d)
         values = jnp.clip(self.head_value(value_input).squeeze(-1), 0.0, 20.0)  # (N,)  clamp to prevent explosion
