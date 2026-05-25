@@ -384,6 +384,16 @@ def run_simulation(
     has_nan_params = any(bool(jnp.isnan(p).any()) for p in flat_params)
     print(f"[DEBUG] Params NaN after init: {has_nan_params}")
 
+    # ── Debug: inspect initial action logits / entropy ──────
+    test_carry = jnp.zeros((1, hidden_d))
+    test_obs = jnp.zeros((1, obs_dim))
+    _, test_outs = model.apply(params, test_carry, test_obs, n_layers)
+    test_logits = test_outs[0]  # action_logits
+    test_probs = jax.nn.softmax(test_logits, axis=-1)
+    test_entropy = -jnp.sum(test_probs * jnp.log(test_probs + 1e-10), axis=-1)
+    print(f"[DEBUG] Init action_logits mean={float(test_logits.mean()):.4f} std={float(test_logits.std()):.4f}")
+    print(f"[DEBUG] Init entropy mean={float(test_entropy.mean()):.4f} (expected ~1.6 for uniform 5-action)")
+
     # ── Init optimizer ──────────────────────────────────────
     optimizer = create_optimizer(config["ppo_lr"], config["ppo_max_grad_norm"])
     opt_state = optimizer.init(params)
