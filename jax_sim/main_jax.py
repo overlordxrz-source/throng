@@ -55,7 +55,7 @@ DEFAULT_CONFIG = {
     "ppo_rollout_steps": 512,
     "ppo_epochs": 1,
     "ppo_clip": 0.2,
-    "ppo_lr": 3e-4,
+    "ppo_lr": 1e-4,
     "ppo_gamma": 0.99,
     "ppo_gae_lam": 0.95,
     "ppo_vf_coef": 0.25,
