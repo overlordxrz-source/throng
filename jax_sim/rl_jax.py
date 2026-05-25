@@ -109,12 +109,8 @@ def ppo_loss(
     pg_loss2 = clipped_ratio * advantages
     pg_loss = -jnp.minimum(pg_loss1, pg_loss2)
 
-    # Value loss (clipped, standard PPO)
-    old_values = returns - advantages  # approximate old values from GAE
-    vf_clipped = old_values + jnp.clip(values_pred - old_values, -clip_eps, clip_eps)
-    vf_loss1 = jnp.square(vf_clipped - returns)
-    vf_loss2 = jnp.square(values_pred - returns)
-    vf_loss = 0.5 * jnp.minimum(vf_loss1, vf_loss2)
+    # Value loss: plain MSE (value clipping breaks with decoupled GAE)
+    vf_loss = jnp.square(values_pred - returns)
 
     # Entropy bonus
     action_probs = jax.nn.softmax(action_logits, axis=-1)
