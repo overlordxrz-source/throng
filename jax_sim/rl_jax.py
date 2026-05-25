@@ -104,11 +104,11 @@ def ppo_loss(
     surr2 = clipped_ratio * advantages
     pg_loss = -jnp.minimum(surr1, surr2)
 
-    # Value loss with clipping (standard PPO: maximum limits large critic changes)
-    v_pred_clipped = old_values + jnp.clip(values_pred - old_values, -clip_eps, clip_eps)
-    v_loss1 = jnp.square(values_pred - returns)
-    v_loss2 = jnp.square(v_pred_clipped - returns)
-    vf_loss = jnp.maximum(v_loss1, v_loss2)
+    # Value loss: Huber (smooth L1) instead of MSE to prevent gradient explosion
+    # from large errors while still being quadratic near the target.
+    delta = 1.0
+    err = jnp.abs(values_pred - returns)
+    vf_loss = jnp.where(err < delta, 0.5 * jnp.square(err), delta * (err - 0.5 * delta))
 
     # Entropy bonus
     action_probs = jax.nn.softmax(action_logits, axis=-1)
