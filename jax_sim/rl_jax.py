@@ -228,8 +228,9 @@ def ppo_update(
     flat_values = flatten(values)
     flat_alive = flatten(alive)
 
-    # Minibatch loop
-    minibatch_size = 2048
+    # Minibatch loop (reduced to 512 to fit in Kaggle T4's 15GB VRAM)
+    # At 2048, the transformer backward pass workspace requires 15.5 GB!
+    minibatch_size = 512
     perms = jax.random.permutation(key, M)
     
     all_metrics = []
