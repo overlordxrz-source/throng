@@ -135,13 +135,20 @@ Key observations so far:
 | No MI / compositionality logging | High | `communication/analysis.py` not ported |
 | No checkpointing / resume | High | `orbax-checkpoint` installed but not wired |
 
-### Short-Term Roadmap (JAX)
-1. **Red PPO policy** — Instantiate a separate network+optimizer for the `red` team (or share backbone with separate heads) and run a second `ppo_update` for the predators. This is required to maintain the co-evolutionary arms race.
-2. **Analysis Pipeline Port** — Wire the CPU-offloaded JAX rollouts back into the `SignalCorpusWriter`. This will append to `signal_corpus.jsonl` allowing the existing offline `tools/decode_signals.py` to seamlessly track language emergence (MI, Granger, Topo Sim) on JAX runs.
-3. **Orbax Checkpointing** — Save `params`, `opt_state`, `grid`, and populations every N updates so that 100k+ step Kaggle runs can be resumed if the kernel dies.
-4. **JAX pmap Multi-GPU** — Use `jax.pmap` to shard the environment or minibatches across multiple GPUs (e.g., Kaggle T4x2) to drastically increase steps-per-second.
-5. **Puzzle mechanics** — Port the lock-and-key cooperative puzzle generation and reward logic into `grid_jax.py` and `main_jax.py`.
-6. **Distillation + Mind-Meld** — Port `distill_population` and mind-meld to JAX.
+### Short-Term Roadmap (JAX) - COMPLETED
+1. ✅ **Red PPO policy** — Separate network+optimizer for the `red` team.
+2. ✅ **Analysis Pipeline Port** — Wired JAX rollouts into the `SignalCorpusWriter`.
+3. ✅ **Orbax Checkpointing** — Implemented state saving and resume.
+4. ✅ **JAX pmap Multi-GPU** — Environment rollout sharding across multiple GPUs.
+5. ✅ **Puzzle mechanics** — Ported lock-and-key cooperative puzzles.
+6. ✅ **Distillation + Mind-Meld** — Ported evolutionary mechanisms to JAX.
+
+### Phase 9: Scale, Architecture, and World Expansion
+1. **Transformer Backbone Update** — Enhance the `AgentNetworkJax` to use a deeper, causal multi-agent Transformer that supports complex attention over variable numbers of neighbors.
+2. **Targeted Communication** — Replace the mean-pool of neighbor signals with multi-head attention, allowing agents to selectively listen and "address" messages.
+3. **Dynamic Geography & Biomes** — Introduce varying terrain types, dynamic weather that affects visibility/signals, and moving obstacles.
+4. **Hierarchical RL** — Split the policy into a high-level goal selector (macroscopic strategy) and low-level motor controller (movement, gathering).
+5. **Crafting and Construction** — Allow combinations of resources to construct persistent structures (e.g. traps, walls, bridges) to alter the grid topology permanently.
 
 ---
 

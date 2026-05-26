@@ -248,7 +248,44 @@ def update_memory_buffer(
     new_entry = new_entry.at[:, sig_dim + 1].set(alive.astype(jnp.float32))
 
     new_buffer = shifted.at[:, 0].set(new_entry)
-    # Zero out dead agents' memory
     new_buffer = jnp.where(alive[:, None, None], new_buffer, 0.0)
 
     return pop.replace(memory_buffer=new_buffer)
+
+
+def apply_mind_meld(
+    pop: PopState,
+    grid_size: int,
+    radius: int = 1,
+    rate: float = 0.1,
+    direction: str = "older_to_younger",
+) -> PopState:
+    """
+    Agents within `radius` blend their carries.
+    """
+    pos = pop.positions
+    diff = jnp.abs(pos[:, None, :] - pos[None, :, :])
+    diff = jnp.minimum(diff, grid_size - diff)
+    dist = jnp.max(diff, axis=-1)  # Chebyshev
+    
+    alive_mask = pop.alive[:, None] & pop.alive[None, :]
+    adj = (dist <= radius) & alive_mask
+    adj = adj.at[jnp.diag_indices(pop.max_pop)].set(False)
+    
+    if direction == "older_to_younger":
+        # adj[i, j] True if j is adjacent to i and j is older than i (so i learns from j)
+        older_mask = pop.ages[None, :] > pop.ages[:, None]
+        adj = adj & older_mask
+        
+    n_nb = jnp.sum(adj, axis=1, keepdims=True)
+    has_nb = n_nb > 0
+    
+    nb_carries = jnp.dot(adj.astype(jnp.float32), pop.carries) / jnp.maximum(n_nb, 1.0)
+    
+    new_carries = jnp.where(
+        has_nb,
+        (1.0 - rate) * pop.carries + rate * nb_carries,
+        pop.carries
+    )
+    
+    return pop.replace(carries=new_carries)
