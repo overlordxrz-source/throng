@@ -244,92 +244,6 @@ def make_sim_step(config: Dict, model: AgentNetworkJax):
         b_pop = b_pop.replace(energy=jnp.clip(b_pop.energy - config["energy_decay"], 0.0, 1.0))
         r_pop = r_pop.replace(energy=jnp.clip(r_pop.energy - config["energy_decay"], 0.0, 1.0))
 
-        # ── Evolutionary Distillation ───────────────────────────
-        if config.get("distill_enabled", False):
-            _distill_interval = int(config.get("distill_interval", 10000))
-            _distill_updates = max(1, _distill_interval // T)
-            if (ui + 1) % _distill_updates == 0:
-                print(f"  [step {(ui+1)*T}] DISTILL — population")
-                keep_frac = float(config.get("distill_keep_frac", 0.05))
-                noise_std = float(config.get("distill_noise_std", 0.1))
-                
-                # If pmap is on, b_pop has shape (n_devices, max_pop, ...)
-                # Distillation on pmap is tricky. Let's just do it on device 0 or flatten.
-                # For simplicity, we skip distill if pmap is enabled, or just warn.
-                if use_pmap:
-                    print("  [WARN] Distillation is currently disabled when use_pmap=True.")
-                else:
-                    # Blue Distill
-                    b_pop_np = jax.tree_util.tree_map(lambda x: np.array(x), b_pop)
-                    n_alive = np.sum(b_pop_np.alive)
-                    if n_alive >= 10:
-                        ages_masked = np.where(b_pop_np.alive, b_pop_np.ages, -999999)
-                        sorted_idx = np.argsort(ages_masked)[::-1]
-                        n_keep = max(1, int(n_alive * keep_frac))
-                        elites = sorted_idx[:n_keep]
-                        to_kill = sorted_idx[n_keep:]
-                        
-                        b_pop_np.alive[to_kill] = False
-                        b_pop_np.ages[to_kill] = 0
-                        b_pop_np.carries[to_kill] = 0.0
-                        b_pop_np.energy[to_kill] = 0.0
-                        
-                        dead_idx = np.where(~b_pop_np.alive)[0]
-                        for slot in dead_idx:
-                            parent_idx = np.random.choice(elites)
-                            b_pop_np.positions[slot] = np.random.randint(0, config["grid_size"], size=2)
-                            b_pop_np.ages[slot] = 0
-                            b_pop_np.alive[slot] = True
-                            b_pop_np.team[slot] = b_pop_np.team[parent_idx]
-                            b_pop_np.carries[slot] = b_pop_np.carries[parent_idx] + np.random.normal(0, noise_std, size=b_pop_np.carries[parent_idx].shape).astype(np.float32)
-                            b_pop_np.signals[slot] = 0.0
-                            b_pop_np.energy[slot] = 1.0
-                            
-                        b_pop = b_pop.replace(
-                            positions=jnp.array(b_pop_np.positions),
-                            ages=jnp.array(b_pop_np.ages),
-                            alive=jnp.array(b_pop_np.alive),
-                            team=jnp.array(b_pop_np.team),
-                            carries=jnp.array(b_pop_np.carries),
-                            signals=jnp.array(b_pop_np.signals),
-                            energy=jnp.array(b_pop_np.energy),
-                        )
-
-                    # Red Distill
-                    r_pop_np = jax.tree_util.tree_map(lambda x: np.array(x), r_pop)
-                    n_alive_r = np.sum(r_pop_np.alive)
-                    if n_alive_r >= 10:
-                        ages_masked = np.where(r_pop_np.alive, r_pop_np.ages, -999999)
-                        sorted_idx = np.argsort(ages_masked)[::-1]
-                        n_keep = max(1, int(n_alive_r * keep_frac))
-                        elites = sorted_idx[:n_keep]
-                        to_kill = sorted_idx[n_keep:]
-                        
-                        r_pop_np.alive[to_kill] = False
-                        r_pop_np.ages[to_kill] = 0
-                        r_pop_np.carries[to_kill] = 0.0
-                        r_pop_np.energy[to_kill] = 0.0
-                        
-                        dead_idx = np.where(~r_pop_np.alive)[0]
-                        for slot in dead_idx:
-                            parent_idx = np.random.choice(elites)
-                            r_pop_np.positions[slot] = np.random.randint(0, config["grid_size"], size=2)
-                            r_pop_np.ages[slot] = 0
-                            r_pop_np.alive[slot] = True
-                            r_pop_np.team[slot] = r_pop_np.team[parent_idx]
-                            r_pop_np.carries[slot] = r_pop_np.carries[parent_idx] + np.random.normal(0, noise_std, size=r_pop_np.carries[parent_idx].shape).astype(np.float32)
-                            r_pop_np.signals[slot] = 0.0
-                            r_pop_np.energy[slot] = 1.0
-                            
-                        r_pop = r_pop.replace(
-                            positions=jnp.array(r_pop_np.positions),
-                            ages=jnp.array(r_pop_np.ages),
-                            alive=jnp.array(r_pop_np.alive),
-                            team=jnp.array(r_pop_np.team),
-                            carries=jnp.array(r_pop_np.carries),
-                            signals=jnp.array(r_pop_np.signals),
-                            energy=jnp.array(r_pop_np.energy),
-                        )
 
         # ── Starvation ──────────────────────────────────────────
         b_starved = b_pop.alive & (b_pop.energy < config["starvation_threshold"])
@@ -706,6 +620,90 @@ def run_simulation(
             print(f"[step {step_val:>8}] TOM_STAY_TRACK    stay_rate_over_T={stay_rate:.4f}")
             print(f"[step {step_val:>8}] CHAIN_DEPTH  max=0  mean=0.00  hops>1=0  surv_corr=0.0000")
             print(f"step= {step_val:>7}  blue={b_alive_snap.sum()}  red={r_pop.alive.sum() if r_pop is not None else 0}  brain={n_layers}L  ppo={ui+1}  surv=1.00")
+
+        # ── Evolutionary Distillation (CPU, Outer Loop) ─────────
+        if config.get("distill_enabled", False):
+            _distill_interval = int(config.get("distill_interval", 10000))
+            _distill_updates = max(1, _distill_interval // T)
+            if (ui + 1) % _distill_updates == 0:
+                print(f"  [step {(ui+1)*T}] DISTILL — population")
+                keep_frac = float(config.get("distill_keep_frac", 0.05))
+                noise_std = float(config.get("distill_noise_std", 0.1))
+                
+                if use_pmap:
+                    print("  [WARN] Distillation is currently disabled when use_pmap=True.")
+                else:
+                    # Blue Distill
+                    b_pop_np = jax.tree_util.tree_map(lambda x: np.array(x), b_pop)
+                    n_alive = np.sum(b_pop_np.alive)
+                    if n_alive >= 10:
+                        ages_masked = np.where(b_pop_np.alive, b_pop_np.ages, -999999)
+                        sorted_idx = np.argsort(ages_masked)[::-1]
+                        n_keep = max(1, int(n_alive * keep_frac))
+                        elites = sorted_idx[:n_keep]
+                        to_kill = sorted_idx[n_keep:]
+                        
+                        b_pop_np.alive[to_kill] = False
+                        b_pop_np.ages[to_kill] = 0
+                        b_pop_np.carries[to_kill] = 0.0
+                        b_pop_np.energy[to_kill] = 0.0
+                        
+                        dead_idx = np.where(~b_pop_np.alive)[0]
+                        for slot in dead_idx:
+                            parent_idx = np.random.choice(elites)
+                            b_pop_np.positions[slot] = np.random.randint(0, config["grid_size"], size=2)
+                            b_pop_np.ages[slot] = 0
+                            b_pop_np.alive[slot] = True
+                            b_pop_np.team[slot] = b_pop_np.team[parent_idx]
+                            b_pop_np.carries[slot] = b_pop_np.carries[parent_idx] + np.random.normal(0, noise_std, size=b_pop_np.carries[parent_idx].shape).astype(np.float32)
+                            b_pop_np.signals[slot] = 0.0
+                            b_pop_np.energy[slot] = 1.0
+                            
+                        b_pop = b_pop.replace(
+                            positions=jnp.array(b_pop_np.positions),
+                            ages=jnp.array(b_pop_np.ages),
+                            alive=jnp.array(b_pop_np.alive),
+                            team=jnp.array(b_pop_np.team),
+                            carries=jnp.array(b_pop_np.carries),
+                            signals=jnp.array(b_pop_np.signals),
+                            energy=jnp.array(b_pop_np.energy),
+                        )
+
+                    # Red Distill
+                    r_pop_np = jax.tree_util.tree_map(lambda x: np.array(x), r_pop)
+                    n_alive_r = np.sum(r_pop_np.alive)
+                    if n_alive_r >= 10:
+                        ages_masked = np.where(r_pop_np.alive, r_pop_np.ages, -999999)
+                        sorted_idx = np.argsort(ages_masked)[::-1]
+                        n_keep = max(1, int(n_alive_r * keep_frac))
+                        elites = sorted_idx[:n_keep]
+                        to_kill = sorted_idx[n_keep:]
+                        
+                        r_pop_np.alive[to_kill] = False
+                        r_pop_np.ages[to_kill] = 0
+                        r_pop_np.carries[to_kill] = 0.0
+                        r_pop_np.energy[to_kill] = 0.0
+                        
+                        dead_idx = np.where(~r_pop_np.alive)[0]
+                        for slot in dead_idx:
+                            parent_idx = np.random.choice(elites)
+                            r_pop_np.positions[slot] = np.random.randint(0, config["grid_size"], size=2)
+                            r_pop_np.ages[slot] = 0
+                            r_pop_np.alive[slot] = True
+                            r_pop_np.team[slot] = r_pop_np.team[parent_idx]
+                            r_pop_np.carries[slot] = r_pop_np.carries[parent_idx] + np.random.normal(0, noise_std, size=r_pop_np.carries[parent_idx].shape).astype(np.float32)
+                            r_pop_np.signals[slot] = 0.0
+                            r_pop_np.energy[slot] = 1.0
+                            
+                        r_pop = r_pop.replace(
+                            positions=jnp.array(r_pop_np.positions),
+                            ages=jnp.array(r_pop_np.ages),
+                            alive=jnp.array(r_pop_np.alive),
+                            team=jnp.array(r_pop_np.team),
+                            carries=jnp.array(r_pop_np.carries),
+                            signals=jnp.array(r_pop_np.signals),
+                            energy=jnp.array(r_pop_np.energy),
+                        )
 
 
         # ── Corpus Writing (CPU) ───────────────────────────────
