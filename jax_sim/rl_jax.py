@@ -110,12 +110,12 @@ def ppo_loss(
     err = jnp.abs(values_pred - returns)
     vf_loss = jnp.where(err < delta, 0.5 * jnp.square(err), delta * (err - 0.5 * delta))
 
-    # Entropy bonus with floor to prevent deterministic policy collapse
+    # Entropy bonus
     action_probs = jax.nn.softmax(action_logits, axis=-1)
     entropy = -jnp.sum(action_probs * jnp.log(action_probs + 1e-10), axis=-1)
-    # Entropy floor: penalize dropping below 0.5 (for 5 actions, this keeps some exploration)
-    min_entropy = 0.5
-    entropy_penalty = jnp.where(entropy < min_entropy, 2.0 * jnp.square(entropy - min_entropy), 0.0)
+    
+    # L2 penalty on logits to prevent vanishing entropy gradients when deterministic
+    logit_penalty = 0.01 * jnp.mean(jnp.square(action_logits), axis=-1)
 
     # Mask dead agents
     if alive is not None:
@@ -123,7 +123,7 @@ def ppo_loss(
         pg_loss = pg_loss * mask
         vf_loss = vf_loss * mask
         entropy = entropy * mask
-        entropy_penalty = entropy_penalty * mask
+        logit_penalty = logit_penalty * mask
         denom = mask.sum() + 1e-8
     else:
         denom = float(T * N)
@@ -133,14 +133,14 @@ def ppo_loss(
     loss_vf = vf_loss.sum() / denom
     loss_ent = -ent_coef * entropy.sum() / denom
 
-    loss_ent_penalty = entropy_penalty.sum() / denom
-    total_loss = loss_pg + vf_coef * loss_vf + loss_ent + loss_ent_penalty
+    loss_logit_penalty = logit_penalty.sum() / denom
+    total_loss = loss_pg + vf_coef * loss_vf + loss_ent + loss_logit_penalty
 
     metrics = {
         "ppo_pg_loss":  loss_pg,
         "ppo_vf_loss":  loss_vf,
         "ppo_entropy":  entropy.sum() / denom,
-        "ppo_ent_penalty": loss_ent_penalty,
+        "ppo_logit_pen": loss_logit_penalty,
         "ppo_clip_frac": jnp.mean(jnp.abs(ratio - 1.0) > clip_eps),
     }
 

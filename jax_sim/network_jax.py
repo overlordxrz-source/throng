@@ -56,6 +56,7 @@ class AgentNetworkJax(nn.Module):
         ]
 
         # Output heads
+        self.final_norm = nn.LayerNorm()
         self.head_action = nn.Dense(5)           # 5 actions
         self.head_signal = nn.Dense(self.vocab_size)  # discrete vocab
         self.head_symbol = nn.Dense(sym_d)       # symbol write
@@ -135,6 +136,7 @@ class AgentNetworkJax(nn.Module):
 
         # Pool across tokens for global representation
         pooled = x.mean(axis=1)  # (N, d)
+        pooled = self.final_norm(pooled)
 
         # Update carries with pooled representation
         new_carries = 0.9 * carries + 0.1 * pooled  # soft update
