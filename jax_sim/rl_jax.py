@@ -79,7 +79,7 @@ def ppo_loss(
     @jax.remat
     def _eval_step(t, _):
         c = jax.lax.stop_gradient(carries[t])
-        _, outs = apply_fn(params, c, obs[t], n_layers, detach_value=True)
+        _, outs = apply_fn(params, c, obs[t], n_layers, detach_value=False)
         return t + 1, outs
 
     _, outputs = lax.scan(_eval_step, 0, None, length=T)
@@ -104,11 +104,16 @@ def ppo_loss(
     surr2 = clipped_ratio * advantages
     pg_loss = -jnp.minimum(surr1, surr2)
 
-    # Value loss: Huber (smooth L1) instead of MSE to prevent gradient explosion
-    # from large errors while still being quadratic near the target.
-    delta = 0.5
+    # Value loss with PPO clipping to safely allow backbone learning
+    v_clipped = old_values + jnp.clip(values_pred - old_values, -clip_eps, clip_eps)
     err = jnp.abs(values_pred - returns)
-    vf_loss = jnp.where(err < delta, 0.5 * jnp.square(err), delta * (err - 0.5 * delta))
+    err_clipped = jnp.abs(v_clipped - returns)
+    
+    delta = 0.5
+    def vf_huber(e):
+        return jnp.where(e < delta, 0.5 * jnp.square(e), delta * (e - 0.5 * delta))
+        
+    vf_loss = jnp.maximum(vf_huber(err), vf_huber(err_clipped))
 
     # Entropy bonus
     action_probs = jax.nn.softmax(action_logits, axis=-1)
