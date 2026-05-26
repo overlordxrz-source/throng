@@ -12,8 +12,10 @@ window_size: 1200
 
 population_size: 500
 red_population_size: 75
-min_population: 40
-min_red_population: 30
+min_population: 200
+min_red_population: 15
+repro_energy_thresh: 0.80        # agent must have 80% energy to self-clone
+repro_energy_cost: 0.40          # cloning costs 40% of parent energy
 
 # Curriculum
 curriculum_red_count: 6

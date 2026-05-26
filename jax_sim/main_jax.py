@@ -33,7 +33,8 @@ from jax_sim.grid_jax import (
 )
 from communication.analysis import SignalCorpusWriter
 from jax_sim.population_jax import (
-    PopState, init_population, kill_agents, update_memory_buffer, apply_mind_meld
+    PopState, init_population, kill_agents, update_memory_buffer, apply_mind_meld,
+    apply_auto_reproduce
 )
 from jax_sim.network_jax import AgentNetworkJax
 from jax_sim.rl_jax import compute_gae, ppo_loss, create_optimizer, ppo_update
@@ -260,6 +261,26 @@ def make_sim_step(config: Dict, model: AgentNetworkJax):
         r_old = r_pop.alive & (r_pop.ages >= config["max_age"])
         b_pop = kill_agents(b_pop, b_old)
         r_pop = kill_agents(r_pop, r_old)
+
+        # ── Reproduction ────────────────────────────────────────
+        # Blue: enforce a floor of min_population and allow high-energy cloning
+        repro_key, step_key = jax.random.split(step_key)
+        b_min_pop = int(config.get("min_population", 200))
+        b_pop = apply_auto_reproduce(
+            b_pop, repro_key, gs,
+            min_pop=b_min_pop,
+            energy_thresh=float(config.get("repro_energy_thresh", 0.8)),
+            energy_cost=float(config.get("repro_energy_cost", 0.4)),
+        )
+        # Red: enforce a floor so the predator threat never goes permanently extinct
+        repro_key_r, step_key = jax.random.split(step_key)
+        r_min_pop = int(config.get("min_red_population", 10))
+        r_pop = apply_auto_reproduce(
+            r_pop, repro_key_r, gs,
+            min_pop=r_min_pop,
+            energy_thresh=float(config.get("repro_energy_thresh", 0.8)),
+            energy_cost=float(config.get("repro_energy_cost", 0.4)),
+        )
 
         # ── Mind-Melding ─────────────────────────────────────────
         if config.get("mind_meld_enabled", False):

@@ -169,61 +169,111 @@ def kill_agents(pop: PopState, mask: jnp.ndarray) -> PopState:
     )
 
 
-def spawn_offspring(
-    pop: PopState,
-    parent_idx: jnp.ndarray,  # (n_offspring,) int32
-    grid_size: int,
-    key: jax.Array,
+def apply_auto_reproduce(
+    pop: PopState, 
+    key: jax.Array, 
+    grid_size: int, 
+    min_pop: int, 
+    energy_thresh: float = 0.8,
+    energy_cost: float = 0.4
 ) -> PopState:
     """
-    Spawn new agents into dead slots, cloning parent's carry + memory.
-    parent_idx[i] = parent for i-th offspring.
+    JAX-compatible reproduction with static shapes.
+    1. Enforces min_pop by cloning random alive agents.
+    2. Allows agents with energy >= energy_thresh to clone themselves.
     """
-    n_offspring = parent_idx.shape[0]
-    # Find dead slots
+    n = pop.max_pop
+    alive_count = jnp.sum(pop.alive)
+    
+    # 1. Parents who reproduce due to high energy
+    energy_repro_mask = pop.alive & (pop.energy >= energy_thresh)
+    
+    # 2. How many shortfall to reach min_pop?
+    shortfall = jnp.maximum(0, min_pop - alive_count)
+    
+    key, k1, k2, k3, k4 = jax.random.split(key, 5)
+    
+    # Safe random parent sampling for shortfall
+    parent_weights = jnp.where(pop.alive, 1.0, 0.0)
+    safe_parent_weights = jnp.where(jnp.sum(parent_weights) > 0, parent_weights, jnp.ones(n))
+    shortfall_parents = jax.random.choice(k1, jnp.arange(n), shape=(n,), p=safe_parent_weights)
+    
+    # Map which dead slots get a spawn
     dead_mask = ~pop.alive
-    dead_idx = jnp.where(dead_mask, size=n_offspring, fill_value=-1)[0]
-
-    # Random positions
-    key_y, key_x = jax.random.split(key)
-    new_pos_y = jax.random.randint(key_y, (n_offspring,), 0, grid_size)
-    new_pos_x = jax.random.randint(key_x, (n_offspring,), 0, grid_size)
-    new_positions = jnp.stack([new_pos_y, new_pos_x], axis=1)
-
-    # Clone parent state
-    parent_carries = pop.carries[parent_idx]
-    parent_signals = pop.signals[parent_idx]
-    parent_teams = pop.team[parent_idx]
-    parent_layers = pop.n_layers[parent_idx]
-
-    # Update population
-    new_alive = pop.alive.at[dead_idx].set(True)
-    new_positions_arr = pop.positions.at[dead_idx].set(new_positions)
-    new_ages = pop.ages.at[dead_idx].set(0)
-    new_energy = pop.energy.at[dead_idx].set(1.0)
-    new_teams = pop.team.at[dead_idx].set(parent_teams)
-    new_layers = pop.n_layers.at[dead_idx].set(parent_layers)
-    new_carries = pop.carries.at[dead_idx].set(parent_carries)
-    new_signals = pop.signals.at[dead_idx].set(parent_signals)
-    new_nb_gain = pop.nb_gain.at[dead_idx].set(1.0)
-
+    
+    # Assign a random priority to dead slots to pick which ones get resurrected
+    dead_prio = jax.random.uniform(k2, (n,))
+    dead_prio = jnp.where(dead_mask, dead_prio, -1.0)
+    sorted_dead_idx = jnp.argsort(dead_prio)[::-1]
+    
+    num_energy_repro = jnp.sum(energy_repro_mask)
+    total_spawns = jnp.minimum(shortfall + num_energy_repro, jnp.sum(dead_mask))
+    
+    # Boolean mask of size (n,) indicating which elements in sorted_dead_idx are activated
+    activated_ranks_mask = jnp.arange(n) < total_spawns
+    
+    # Inverse map to see which actual slots (0..n-1) are activated
+    activate_mask = jnp.zeros(n, dtype=bool)
+    activate_mask = activate_mask.at[sorted_dead_idx].set(activated_ranks_mask)
+    activate_mask = activate_mask & dead_mask
+    
+    # Extract indices of energy parents and push them to the front (since valid >= 0, invalid = -1)
+    energy_parents = jnp.where(energy_repro_mask, jnp.arange(n), -1)
+    energy_parents_sorted = jnp.sort(energy_parents)[::-1]
+    
+    # Assign parents for each rank
+    ranks = jnp.arange(n)
+    parent_for_rank = jnp.where(
+        ranks < shortfall, 
+        shortfall_parents, 
+        energy_parents_sorted[jnp.clip(ranks - shortfall, 0, n-1)]
+    )
+    
+    # Map assigned parents back to the activated dead slots
+    assigned_parents = jnp.zeros(n, dtype=jnp.int32)
+    assigned_parents = assigned_parents.at[sorted_dead_idx].set(parent_for_rank)
+    
+    # Clone logic
+    new_pos_y = jax.random.randint(k3, (n,), 0, grid_size)
+    new_pos_x = jax.random.randint(k4, (n,), 0, grid_size)
+    new_pos = jnp.stack([new_pos_y, new_pos_x], axis=1)
+    
+    parent_carries = pop.carries[assigned_parents]
+    parent_signals = pop.signals[assigned_parents]
+    parent_teams = pop.team[assigned_parents]
+    parent_layers = pop.n_layers[assigned_parents]
+    
+    new_alive = jnp.where(activate_mask, True, pop.alive)
+    new_positions = jnp.where(activate_mask[:, None], new_pos, pop.positions)
+    new_ages = jnp.where(activate_mask, 0, pop.ages)
+    
+    # Energy updates: new agents get 1.0, reproducing agents lose energy_cost
+    new_energy = jnp.where(activate_mask, 1.0, pop.energy)
+    new_energy = jnp.where(energy_repro_mask & ~activate_mask, new_energy - energy_cost, new_energy)
+    
+    new_teams = jnp.where(activate_mask, parent_teams, pop.team)
+    new_layers = jnp.where(activate_mask, parent_layers, pop.n_layers)
+    new_carries = jnp.where(activate_mask[:, None], parent_carries, pop.carries)
+    new_signals = jnp.where(activate_mask[:, None], parent_signals, pop.signals)
+    new_nb_gain = jnp.where(activate_mask, 1.0, pop.nb_gain)
+    
     pop = pop.replace(
         alive=new_alive,
-        positions=new_positions_arr,
+        positions=new_positions,
         ages=new_ages,
         energy=new_energy,
         team=new_teams,
         n_layers=new_layers,
         carries=new_carries,
         signals=new_signals,
-        nb_gain=new_nb_gain,
+        nb_gain=new_nb_gain
     )
-
+    
     if pop.memory_buffer is not None:
-        parent_mem = pop.memory_buffer[parent_idx]
-        new_mem = pop.memory_buffer.at[dead_idx].set(parent_mem)
+        parent_mem = pop.memory_buffer[assigned_parents]
+        new_mem = jnp.where(activate_mask[:, None, None], parent_mem, pop.memory_buffer)
         pop = pop.replace(memory_buffer=new_mem)
-
+        
     return pop
 
 
