@@ -13,6 +13,7 @@ os.environ.setdefault("XLA_FLAGS", "--xla_gpu_autotune_level=0")
 import jax
 import jax.numpy as jnp
 from jax import lax
+import numpy as np
 import optax
 import functools
 from typing import Dict, Tuple, Any
@@ -191,6 +192,7 @@ def ppo_update(
 ) -> Tuple[Dict, Any, Dict]:
     """
     Single gradient update step using minibatches.
+    Offloads rollout data to CPU; only one minibatch lives on GPU at a time.
     Returns (new_params, new_opt_state, metrics).
     """
     obs = batch["obs"]
@@ -211,55 +213,66 @@ def ppo_update(
     print(f"  [DEBUG] adv     mean={float(advantages.mean()):.4f} std={float(advantages.std()):.4f}")
     print(f"  [DEBUG] returns mean={float(returns.mean()):.4f} std={float(returns.std()):.4f}")
 
-    # Flatten arrays
+    # Flatten (T, N, ...) -> (M, ...) and move to CPU (numpy) to free GPU VRAM.
+    # The full rollout obs alone is ~2.3GB on GPU — must be freed before backward pass.
     T, N = obs.shape[:2]
     M = T * N
 
-    def flatten(x):
+    def flatten_to_cpu(x):
         if x is None: return None
-        return x.reshape((M,) + x.shape[2:])
+        return np.asarray(x.reshape((M,) + x.shape[2:]))
 
-    flat_obs = flatten(obs)
-    flat_actions = flatten(actions)
-    flat_log_probs = flatten(old_log_probs)
-    flat_adv = flatten(advantages)
-    flat_ret = flatten(returns)
-    flat_carries = flatten(carries)
-    flat_values = flatten(values)
-    flat_alive = flatten(alive)
+    flat_obs = flatten_to_cpu(obs)
+    flat_actions = flatten_to_cpu(actions)
+    flat_log_probs = flatten_to_cpu(old_log_probs)
+    flat_adv = flatten_to_cpu(advantages)
+    flat_ret = flatten_to_cpu(returns)
+    flat_carries = flatten_to_cpu(carries)
+    flat_values = flatten_to_cpu(values)
+    flat_alive = flatten_to_cpu(alive)
 
-    # Minibatch loop (reduced to 512 to fit in Kaggle T4's 15GB VRAM)
-    # At 2048, the transformer backward pass workspace requires 15.5 GB!
+    # Delete GPU references so XLA can reclaim VRAM
+    del obs, actions, old_log_probs, advantages, returns, carries, values, alive
+    del batch
+
+    # Shuffle on CPU (no GPU allocation for permutation array)
+    rng = np.random.RandomState(int(jax.random.randint(key, (), 0, 2**31)))
+    perm = rng.permutation(M)
+
+    # Minibatch loop — GPU only holds params + opt_state + one minibatch + backward workspace
     minibatch_size = 512
-    perms = jax.random.permutation(key, M)
-    
-    all_metrics = []
+    n_minibatches = M // minibatch_size
+
+    # Accumulate metrics as Python floats (not 500 JAX scalar dicts)
+    metric_sums = {}
     final_grads = None
 
-    for i in range(0, M, minibatch_size):
-        idx = perms[i:i+minibatch_size]
-        
-        mb_obs = flat_obs[idx]
-        mb_act = flat_actions[idx]
-        mb_lp = flat_log_probs[idx]
-        mb_adv = flat_adv[idx]
-        mb_ret = flat_ret[idx]
-        mb_c = flat_carries[idx]
-        mb_v = flat_values[idx]
-        mb_al = flat_alive[idx] if flat_alive is not None else None
-        
+    for i in range(n_minibatches):
+        idx = perm[i * minibatch_size : (i + 1) * minibatch_size]
+
+        # Transfer just this minibatch to GPU
+        mb_obs = jnp.array(flat_obs[idx])
+        mb_act = jnp.array(flat_actions[idx])
+        mb_lp = jnp.array(flat_log_probs[idx])
+        mb_adv = jnp.array(flat_adv[idx])
+        mb_ret = jnp.array(flat_ret[idx])
+        mb_c = jnp.array(flat_carries[idx])
+        mb_v = jnp.array(flat_values[idx])
+        mb_al = jnp.array(flat_alive[idx]) if flat_alive is not None else None
+
         params, opt_state, mb_mets, grads = _minibatch_step(
             params, opt_state, apply_fn, optimizer,
             mb_obs, mb_act, mb_lp, mb_adv, mb_ret, mb_c,
             n_layers, mb_v, clip_eps, vf_coef, ent_coef, mb_al
         )
-        all_metrics.append(mb_mets)
+
+        # Accumulate as Python floats to avoid holding 500 JAX arrays
+        for k, v in mb_mets.items():
+            metric_sums[k] = metric_sums.get(k, 0.0) + float(v)
         final_grads = grads
 
     # Average metrics
-    metrics = {}
-    for k in all_metrics[0].keys():
-        metrics[k] = jnp.mean(jnp.array([m[k] for m in all_metrics]))
+    metrics = {k: v / n_minibatches for k, v in metric_sums.items()}
 
     # Debug: gradient norms (using the last minibatch's gradients)
     def _head_grad_norm(grads_tree, head_name):
