@@ -21,6 +21,8 @@ repro_energy_cost: 0.40          # cloning costs 40% of parent energy
 curriculum_red_count: 6
 curriculum_blue_threshold: 80
 curriculum_sustain_steps: 2000
+curriculum_survival_threshold: 0.80   # blue survival rate to advance red floor
+curriculum_sustain_updates: 5         # consecutive PPO updates above threshold
 
 max_age: 20000
 base_maturation_steps: 200

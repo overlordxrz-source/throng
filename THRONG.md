@@ -3347,9 +3347,63 @@ With genuinely degraded self-observation, agents have no choice but to use neigh
 4. **Tool use**: Add pick-up objects (spears, bait, drums) that agents communicate about.
 5. **Ghost memory**: When agents die, leave their final memory buffer in cultural_slow as a "warning sign."
 
-### Next Steps
+### May 27 Session — JAX PPO Stabilization + Auto-Reproduction
 
-1. **Verify Phase 7.5** — let current run reach 10k steps, check cultural metrics, survival under red curriculum
-2. **JAX Rewrite** — move entire simulation to GPU via `jax.jit`. Target 10× speedup on same T4.
-3. **Richer signals** — continuous 32-dim vectors instead of discrete tokens. Let agents invent concepts we can't label.
-4. **Scale up** — 256×256 grid, 1000+ agents, once simulation is GPU-bound
+**PPO Stability (Post-Other-Agent Fixes)**
+
+After another agent's fixes, training is numerically stable:
+- No NaNs, no value explosion
+- Entropy stable at ~1.57 (near uniform ln(5)=1.61)
+- Policy gradients active (`act_grad_norm` ~0.3)
+- Value head learns global mean monotonically: 0.0 → 0.2 → 0.4 → 0.6 → 0.8
+
+**Value Underfitting Diagnosis**
+
+Root cause identified: `head_value` uses **zero initialization** (`kernel_init=nn.initializers.zeros, bias_init=nn.initializers.zeros`).
+- At init, all values are exactly 0 → `std=0.0000`
+- During training, only the **bias** learns (global mean), explaining the monotonic mean increase
+- Weights receive weak gradients and stay near zero, so value predictions remain near-identical across all states (`std ~0.0005`)
+- `vf_grad_norm` (~0.07) is ~5× smaller than `act_grad_norm` (~0.30) because the dead weights barely contribute
+
+This is a safe but slow configuration. The value head will eventually develop state-dependent variance, but it requires many updates.
+
+**Fix options:**
+1. Change value head init to `nn.initializers.normal(0.1)` — gives immediate state-dependent capacity. Safe because value clipping + lr=1e-4 + grad clipping already prevent explosion.
+2. Increase `vf_coef` from 0.25 → 0.5 — amplifies value gradients to grow weights faster from zero.
+3. Keep zero init and wait longer — stable but inefficient.
+
+**New Mechanics Implemented**
+
+1. **Auto-Reproduction (`apply_auto_reproduce`)**
+   - Replaced old `spawn_offspring` with `apply_auto_reproduce` in `population_jax.py`
+   - Two modes:
+     - **Floor enforcement**: if population drops below `min_pop`, clone random alive agents into dead slots
+     - **High-energy cloning**: agents with `energy >= repro_energy_thresh` (0.8) can self-clone, paying `repro_energy_cost` (0.4)
+   - JAX-compatible with static shapes, uses `jax.random.choice` and boolean masks
+
+2. **Distillation Refactor**
+   - Removed old distillation logic from inner simulation loop (`main_jax.py` step loop)
+   - Moved to outer PPO training loop, running every `distill_interval` steps
+   - Operates on CPU with `np.array` conversions; disabled when `use_pmap=True`
+
+3. **Config Updates (`config_phase7.yaml`)**
+   - `min_population`: 40 → 200
+   - `min_red_population`: 30 → 15
+   - Added `repro_energy_thresh: 0.80`
+   - Added `repro_energy_cost: 0.40`
+
+**Current Training Output (Kaggle, ~2500 steps)**
+
+```
+step=    2048  blue=498  red=75  brain=4L  ppo=4  surv=1.00
+  PPO#4 pop=498 pg=-0.0085 vf=1.4090 ent=1.5734 has_nan=0
+  values mean=0.8289 std=0.0007  returns mean=4.4543 std=2.7238
+```
+
+**Next Steps**
+
+1. **Test value head init fix** — change `kernel_init=nn.initializers.normal(0.1)` and verify `values std` grows within 5-10 PPO updates
+2. **Verify Phase 7.5** — let current run reach 10k steps, check cultural metrics, survival under red curriculum
+3. **JAX Rewrite** — move entire simulation to GPU via `jax.jit`. Target 10× speedup on same T4.
+4. **Richer signals** — continuous 32-dim vectors instead of discrete tokens. Let agents invent concepts we can't label.
+5. **Scale up** — 256×256 grid, 1000+ agents, once simulation is GPU-bound

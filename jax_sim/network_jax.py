@@ -60,7 +60,7 @@ class AgentNetworkJax(nn.Module):
         self.head_action = nn.Dense(5)           # 5 actions
         self.head_signal = nn.Dense(self.vocab_size)  # discrete vocab
         self.head_symbol = nn.Dense(sym_d)       # symbol write
-        self.head_value = nn.Dense(1, kernel_init=nn.initializers.zeros, bias_init=nn.initializers.zeros)  # zero init for stable value learning
+        self.head_value = nn.Dense(1, kernel_init=nn.initializers.normal(0.01), bias_init=nn.initializers.zeros)  # zero init for stable value learning
         self.head_tom = nn.Dense(5)             # Theory-of-Mind per neighbour
         self.head_culture_fast = nn.Dense(sym_d)
         self.head_culture_slow = nn.Dense(sym_d)

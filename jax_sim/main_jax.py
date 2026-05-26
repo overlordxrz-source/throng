@@ -272,15 +272,7 @@ def make_sim_step(config: Dict, model: AgentNetworkJax):
             energy_thresh=float(config.get("repro_energy_thresh", 0.8)),
             energy_cost=float(config.get("repro_energy_cost", 0.4)),
         )
-        # Red: enforce a floor so the predator threat never goes permanently extinct
-        repro_key_r, step_key = jax.random.split(step_key)
-        r_min_pop = int(config.get("min_red_population", 10))
-        r_pop = apply_auto_reproduce(
-            r_pop, repro_key_r, gs,
-            min_pop=r_min_pop,
-            energy_thresh=float(config.get("repro_energy_thresh", 0.8)),
-            energy_cost=float(config.get("repro_energy_cost", 0.4)),
-        )
+        # Red reproduction is handled outside the JIT loop by the curriculum system
 
         # ── Mind-Melding ─────────────────────────────────────────
         if config.get("mind_meld_enabled", False):
@@ -460,6 +452,15 @@ def run_simulation(
     # Compute exact obs_dim and init model
     obs_dim = compute_obs_dim_torch(config)
     print(f"[JAX] obs_dim = {obs_dim}")
+
+    # ── Red curriculum state ─────────────────────────────────
+    red_curriculum_stages = [6, 15, 30, 75]
+    red_curriculum_idx = 0
+    red_sustain_count = 0
+    red_sustain_threshold = float(config.get("curriculum_survival_threshold", 0.80))
+    red_sustain_needed = int(config.get("curriculum_sustain_updates", 5))
+    print(f"[CURRICULUM] Red stages: {red_curriculum_stages}, start={red_curriculum_stages[0]}")
+
     dummy_obs = jnp.zeros((1, obs_dim))
     dummy_carry = jnp.zeros((1, hidden_d))
     b_params = model.init(keys[3], dummy_carry, dummy_obs, n_layers)
@@ -581,6 +582,28 @@ def run_simulation(
         has_nan_rew = bool(jnp.isnan(b_batch["rewards"]).any())
         if ui == 0:
             print(f"[DEBUG] Rollout data NaN: obs={has_nan_obs} vals={has_nan_vals} logp={has_nan_logp} rew={has_nan_rew}")
+
+        # ── Red Curriculum Advancement ───────────────────────────
+        if red_curriculum_idx < len(red_curriculum_stages) - 1:
+            if surv_rate >= red_sustain_threshold:
+                red_sustain_count += 1
+                if red_sustain_count >= red_sustain_needed:
+                    red_curriculum_idx += 1
+                    red_sustain_count = 0
+                    print(f"[CURRICULUM] Red floor advanced to {red_curriculum_stages[red_curriculum_idx]}")
+            else:
+                red_sustain_count = 0
+
+        # Apply red reproduction at curriculum floor (outside JIT)
+        if r_pop is not None:
+            red_floor = red_curriculum_stages[red_curriculum_idx]
+            repro_key_r, loop_key = jax.random.split(loop_key)
+            r_pop = apply_auto_reproduce(
+                r_pop, repro_key_r, gs,
+                min_pop=red_floor,
+                energy_thresh=float(config.get("repro_energy_thresh", 0.8)),
+                energy_cost=float(config.get("repro_energy_cost", 0.4)),
+            )
 
         # PPO update (not JIT — Python loop)
         print("  [DEBUG] --- Blue PPO Update ---")
