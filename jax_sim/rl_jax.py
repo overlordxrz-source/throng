@@ -74,6 +74,10 @@ def ppo_loss(
     Returns (loss_scalar, metrics_dict).
     """
     T, N = obs.shape[:2]
+    
+    # Explicitly stop gradients on massive inputs to prevent XLA from allocating 
+    # multi-GB workspace buffers for their cotangents during lax.scan backward pass.
+    obs = jax.lax.stop_gradient(obs)
 
     # Evaluate each timestep with its exact historical carry (ignore new_carry output)
     @jax.remat
