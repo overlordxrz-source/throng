@@ -14,6 +14,7 @@ import jax
 import jax.numpy as jnp
 from jax import lax
 import optax
+import functools
 from typing import Dict, Tuple, Any
 
 
@@ -55,42 +56,36 @@ def compute_gae(
 def ppo_loss(
     params: Dict,
     apply_fn: Any,  # model.apply
-    obs: jnp.ndarray,          # (T, N, obs_dim)
-    actions: jnp.ndarray,      # (T, N) int
-    old_log_probs: jnp.ndarray, # (T, N)
-    advantages: jnp.ndarray,    # (T, N)
-    returns: jnp.ndarray,       # (T, N)
-    carries: jnp.ndarray,       # (T, N, hidden_dim) — exact historical carries from rollout
+    obs: jnp.ndarray,          # (M, obs_dim)
+    actions: jnp.ndarray,      # (M,) int
+    old_log_probs: jnp.ndarray, # (M,)
+    advantages: jnp.ndarray,    # (M,)
+    returns: jnp.ndarray,       # (M,)
+    carries: jnp.ndarray,       # (M, hidden_dim) — exact historical carries from rollout
     n_layers: int,
-    old_values: jnp.ndarray,     # (T, N) for value clipping
+    old_values: jnp.ndarray,     # (M,) for value clipping
     clip_eps: float = 0.2,
     vf_coef: float = 0.25,
     ent_coef: float = 0.05,
-    alive: jnp.ndarray = None,  # (T, N) bool-ish
+    alive: jnp.ndarray = None,  # (M,) bool-ish
 ) -> Tuple[jnp.ndarray, Dict]:
     """
     PPO loss evaluated with exact historical carries per timestep.
     Using updated params but the same recurrent state that generated the rollout.
     Returns (loss_scalar, metrics_dict).
     """
-    T, N = obs.shape[:2]
-    
-    # Explicitly stop gradients on massive inputs to prevent XLA from allocating 
-    # multi-GB workspace buffers for their cotangents during lax.scan backward pass.
+    M = obs.shape[0]
+
+    # Explicitly stop gradients on inputs
     obs = jax.lax.stop_gradient(obs)
+    carries = jax.lax.stop_gradient(carries)
 
-    # Evaluate each timestep with its exact historical carry (ignore new_carry output)
-    @jax.remat
-    def _eval_step(t, _):
-        c = jax.lax.stop_gradient(carries[t])
-        _, outs = apply_fn(params, c, obs[t], n_layers, detach_value=False)
-        return t + 1, outs
-
-    _, outputs = lax.scan(_eval_step, 0, None, length=T)
+    # Evaluate minibatch directly (no scan needed because samples are independent)
+    _, outs = apply_fn(params, carries, obs, n_layers, detach_value=False)
 
     # Unpack outputs
-    action_logits = outputs[0]      # (T, N, 5)
-    values_pred = outputs[3]        # (T, N)
+    action_logits = outs[0]      # (M, 5)
+    values_pred = outs[3]        # (M,)
 
     # Action log probs
     action_log_probs = jax.nn.log_softmax(action_logits, axis=-1)
@@ -135,7 +130,7 @@ def ppo_loss(
         logit_penalty = logit_penalty * mask
         denom = mask.sum() + 1e-8
     else:
-        denom = float(T * N)
+        denom = float(M)
 
     # Aggregate
     loss_pg = pg_loss.sum() / denom
@@ -164,6 +159,24 @@ def create_optimizer(lr: float = 3e-4, max_grad_norm: float = 2.0) -> optax.Grad
     )
 
 
+@functools.partial(jax.jit, static_argnames=("apply_fn", "optimizer", "n_layers"))
+def _minibatch_step(
+    params, opt_state, apply_fn, optimizer,
+    obs, actions, old_log_probs, advantages, returns, carries,
+    n_layers, old_values, clip_eps, vf_coef, ent_coef, alive
+):
+    grad_fn = jax.value_and_grad(ppo_loss, has_aux=True)
+    (loss, metrics), grads = grad_fn(
+        params, apply_fn, obs, actions, old_log_probs,
+        advantages, returns, carries, n_layers,
+        old_values, clip_eps, vf_coef, ent_coef, alive=alive
+    )
+    updates, new_opt_state = optimizer.update(grads, opt_state, params)
+    new_params = optax.apply_updates(params, updates)
+    metrics["total_loss"] = loss
+    return new_params, new_opt_state, metrics, grads
+
+
 def ppo_update(
     params: Dict,
     opt_state: Any,
@@ -177,7 +190,7 @@ def ppo_update(
     ent_coef: float = 0.01,
 ) -> Tuple[Dict, Any, Dict]:
     """
-    Single gradient update step.
+    Single gradient update step using minibatches.
     Returns (new_params, new_opt_state, metrics).
     """
     obs = batch["obs"]
@@ -189,7 +202,7 @@ def ppo_update(
     carries = batch["carries"]
     alive = batch.get("alive")
 
-    # Compute GAE
+    # Compute GAE (requires T, N shape)
     advantages, returns = compute_gae(rewards, values, dones)
 
     # Debug
@@ -198,17 +211,56 @@ def ppo_update(
     print(f"  [DEBUG] adv     mean={float(advantages.mean()):.4f} std={float(advantages.std()):.4f}")
     print(f"  [DEBUG] returns mean={float(returns.mean()):.4f} std={float(returns.std()):.4f}")
 
-    old_values = batch["values"]  # (T, N)
-    grad_fn = jax.value_and_grad(ppo_loss, has_aux=True)
-    (loss, metrics), grads = grad_fn(
-        params, apply_fn, obs, actions, old_log_probs,
-        advantages, returns, carries, n_layers,
-        old_values,
-        clip_eps, vf_coef, ent_coef,
-        alive=alive,
-    )
+    # Flatten arrays
+    T, N = obs.shape[:2]
+    M = T * N
 
-    # Debug: gradient norms
+    def flatten(x):
+        if x is None: return None
+        return x.reshape((M,) + x.shape[2:])
+
+    flat_obs = flatten(obs)
+    flat_actions = flatten(actions)
+    flat_log_probs = flatten(old_log_probs)
+    flat_adv = flatten(advantages)
+    flat_ret = flatten(returns)
+    flat_carries = flatten(carries)
+    flat_values = flatten(values)
+    flat_alive = flatten(alive)
+
+    # Minibatch loop
+    minibatch_size = 2048
+    perms = jax.random.permutation(key, M)
+    
+    all_metrics = []
+    final_grads = None
+
+    for i in range(0, M, minibatch_size):
+        idx = perms[i:i+minibatch_size]
+        
+        mb_obs = flat_obs[idx]
+        mb_act = flat_actions[idx]
+        mb_lp = flat_log_probs[idx]
+        mb_adv = flat_adv[idx]
+        mb_ret = flat_ret[idx]
+        mb_c = flat_carries[idx]
+        mb_v = flat_values[idx]
+        mb_al = flat_alive[idx] if flat_alive is not None else None
+        
+        params, opt_state, mb_mets, grads = _minibatch_step(
+            params, opt_state, apply_fn, optimizer,
+            mb_obs, mb_act, mb_lp, mb_adv, mb_ret, mb_c,
+            n_layers, mb_v, clip_eps, vf_coef, ent_coef, mb_al
+        )
+        all_metrics.append(mb_mets)
+        final_grads = grads
+
+    # Average metrics
+    metrics = {}
+    for k in all_metrics[0].keys():
+        metrics[k] = jnp.mean(jnp.array([m[k] for m in all_metrics]))
+
+    # Debug: gradient norms (using the last minibatch's gradients)
     def _head_grad_norm(grads_tree, head_name):
         norms = []
         for path, g in jax.tree_util.tree_flatten_with_path(grads_tree)[0]:
@@ -217,14 +269,10 @@ def ppo_update(
                 norms.append(jnp.sum(g**2))
         return jnp.sqrt(jnp.sum(jnp.array(norms))) if norms else jnp.array(0.0)
 
-    vf_grad_norm = _head_grad_norm(grads, "head_value")
-    act_grad_norm = _head_grad_norm(grads, "head_action")
-    total_grad_norm = jnp.sqrt(sum(jnp.sum(g**2) for g in jax.tree_util.tree_leaves(grads)))
-    print(f"    [DEBUG] grad_norms total={float(total_grad_norm):.4f} vf={float(vf_grad_norm):.4f} act={float(act_grad_norm):.4f}")
+    if final_grads is not None:
+        vf_grad_norm = _head_grad_norm(final_grads, "head_value")
+        act_grad_norm = _head_grad_norm(final_grads, "head_action")
+        total_grad_norm = jnp.sqrt(sum(jnp.sum(g**2) for g in jax.tree_util.tree_leaves(final_grads)))
+        print(f"    [DEBUG] grad_norms (last mb) total={float(total_grad_norm):.4f} vf={float(vf_grad_norm):.4f} act={float(act_grad_norm):.4f}")
 
-    # Apply gradients
-    updates, new_opt_state = optimizer.update(grads, opt_state, params)
-    new_params = optax.apply_updates(params, updates)
-
-    metrics["total_loss"] = loss
-    return new_params, new_opt_state, metrics
+    return params, opt_state, metrics
