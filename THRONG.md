@@ -110,11 +110,11 @@ Key observations so far:
 
 ## Phase 8: JAX Rewrite (In Progress)
 
-**Status:** Core simulation runs on Kaggle P100. PyTorch code is frozen; all new development targets `jax_sim/`.
+**Status:** Core simulation runs stably on Kaggle T4/P100 GPUs. The PyTorch code is frozen; all new development targets `jax_sim/`. The initial `XlaRuntimeError: RESOURCE_EXHAUSTED` OOM issues have been fully resolved by implementing proper PPO minibatches and aggressive CPU offloading.
 
 ### What Works
 - `jax_sim/main_jax.py` — full simulation loop with `lax.scan` inner rollout, Python outer loop
-- `jax_sim/rl_jax.py` — PPO loss with GAE, `jax.remat` for memory, NaN protection
+- `jax_sim/rl_jax.py` — PPO loss with GAE, proper `2048` → `512` minibatches, and CPU-offloading of rollout buffers to fit inside 15GB VRAM
 - `jax_sim/grid_jax.py` — immutable `GridState` with `.replace()` updates
 - `jax_sim/population_jax.py` — immutable `PopState` with agent lifecycle
 - Action sampling via `jax.vmap(random.categorical)` (JIT-safe)
@@ -124,25 +124,24 @@ Key observations so far:
 ### Architecture Decisions
 - **Outer loop = Python `for`** — avoids OOM from materializing all param states across updates
 - **Inner rollout = `lax.scan`** — JIT-compiled, fast, but `remat` doubles compute for memory
-- **Params through carry** — `jax.lax.stop_gradient` on params during rollout prevents stale closure capture
-- **T4-fast mode removed** — now runs full `agent_hidden_dim=256, n_layers=4` on P100
+- **CPU Offloading during PPO** — The full 256k-sample rollout (2.3GB+ array) is transferred to CPU (numpy) before the backward pass. Only one 512-sample minibatch lives on the GPU at a time alongside the transformer backward pass workspace.
+- **T4-fast mode removed** — now runs full `agent_hidden_dim=256, n_layers=4` successfully on 15GB T4s thanks to the memory fixes.
 
 ### Known Issues
 | Issue | Severity | Notes |
 |---|---|---|
 | Compilation time ~5-10 min on first run | Medium | XLA compiles 256×4 transformer × 500 agents; amortizes over long runs |
-| No red PPO update yet | Medium | Reds act with shared policy; only blues get `ppo_update` |
-| No MI / compositionality logging | Medium | `communication/analysis.py` not ported; WandB only logs PPO metrics |
-| No checkpointing / resume | Low | `orbax-checkpoint` installed but not wired |
-| Speed ~15 min for 20 updates on T4 | Medium | P100 expected ~2× faster; `pmap` for T4×2 not yet implemented |
+| No red PPO update yet | High | Reds act with shared policy; only blues get `ppo_update` |
+| No MI / compositionality logging | High | `communication/analysis.py` not ported |
+| No checkpointing / resume | High | `orbax-checkpoint` installed but not wired |
 
 ### Short-Term Roadmap (JAX)
-1. **Red PPO policy** — separate network + optimizer for predators
-2. **WandB metrics** — log population, MI, culture entropy each update
-3. **Checkpointing** — `orbax` save every N updates for resume
-4. **Distillation + Mind-Meld** — port `distill_population` and mind-meld to JAX
-5. **Puzzle mechanics** — port lock-and-key cooperative puzzle
-6. **Speed optimization** — `jax.pmap` for T4×2, or reduce to 128 hidden for faster compile
+1. **Red PPO policy** — Instantiate a separate network+optimizer for the `red` team (or share backbone with separate heads) and run a second `ppo_update` for the predators. This is required to maintain the co-evolutionary arms race.
+2. **Analysis Pipeline Port** — Wire the CPU-offloaded JAX rollouts back into the `SignalCorpusWriter`. This will append to `signal_corpus.jsonl` allowing the existing offline `tools/decode_signals.py` to seamlessly track language emergence (MI, Granger, Topo Sim) on JAX runs.
+3. **Orbax Checkpointing** — Save `params`, `opt_state`, `grid`, and populations every N updates so that 100k+ step Kaggle runs can be resumed if the kernel dies.
+4. **JAX pmap Multi-GPU** — Use `jax.pmap` to shard the environment or minibatches across multiple GPUs (e.g., Kaggle T4x2) to drastically increase steps-per-second.
+5. **Puzzle mechanics** — Port the lock-and-key cooperative puzzle generation and reward logic into `grid_jax.py` and `main_jax.py`.
+6. **Distillation + Mind-Meld** — Port `distill_population` and mind-meld to JAX.
 
 ---
 
