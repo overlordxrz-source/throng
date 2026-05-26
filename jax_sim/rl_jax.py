@@ -236,7 +236,7 @@ def ppo_update(
     del batch
 
     # Shuffle on CPU (no GPU allocation for permutation array)
-    rng = np.random.RandomState(int(jax.random.randint(key, (), 0, 2**31)))
+    rng = np.random.RandomState(int(jax.random.bits(key, dtype=jnp.uint32)))
     perm = rng.permutation(M)
 
     # Minibatch loop — GPU only holds params + opt_state + one minibatch + backward workspace
