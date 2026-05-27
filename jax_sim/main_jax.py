@@ -618,13 +618,22 @@ def run_simulation(
         print(f"[JAX] Restored params from step {latest}. Population starts fresh.")
     
     # ── Training loop ───────────────────────────────────────
-    # Python loop for update cycles (avoids OOM from saving all param states)
-    # Only the inner rollout uses lax.scan
     n_updates = n_steps // T
     update_keys = jax.random.split(keys[4], n_updates)
 
-    # JIT or PMAP the inner rollout
-    sim_step_fn = make_sim_step(config, model)
+    # ── Brain vote state ────────────────────────────────────
+    brain_max_layers_val = int(config.get("brain_max_layers", 6))
+    brain_vote_interval_updates = max(1, int(config.get("brain_vote_interval", 5000)) // T)
+    brain_vote_threshold = float(config.get("brain_vote_survival_threshold", 0.55))
+    brain_low_surv_streak = 0
+    brain_low_surv_needed = int(config.get("curriculum_sustain_updates", 5))
+
+    def _rebuild_sim_step(cur_n_layers):
+        cfg_copy = dict(config)
+        cfg_copy["n_layers"] = cur_n_layers
+        return make_sim_step(cfg_copy, model)
+
+    sim_step_fn = _rebuild_sim_step(n_layers)
     if use_pmap:
         # in_axes: step_keys(0), grid(0), b_pop(0), r_pop(0), b_carries(0), r_carries(0), b_params(None), r_params(None)
         # But wait, sim_step_fn signature is: (carry, xs) -> (carry, ys)
@@ -673,8 +682,21 @@ def run_simulation(
         if ui == 0:
             print(f"[DEBUG] Rollout data NaN: obs={has_nan_obs} vals={has_nan_vals} logp={has_nan_logp} rew={has_nan_rew}")
 
-        # ── Red Curriculum Advancement ───────────────────────────
+        # ── Red Curriculum Advancement + Brain Vote ──────────────
         surv_rate = float(b_pop.alive.sum()) / float(max_pop)
+
+        # Brain vote: when survival is consistently low, agents need more capacity
+        if (ui + 1) % brain_vote_interval_updates == 0:
+            if surv_rate < brain_vote_threshold:
+                brain_low_surv_streak += 1
+                if brain_low_surv_streak >= brain_low_surv_needed and n_layers < brain_max_layers_val:
+                    n_layers += 1
+                    brain_low_surv_streak = 0
+                    print(f"[BRAIN VOTE] surv={surv_rate:.2f} < {brain_vote_threshold} — expanding to {n_layers}L (recompiling)")
+                    sim_step_fn = _rebuild_sim_step(n_layers)
+            else:
+                brain_low_surv_streak = 0
+
         if red_curriculum_idx < len(red_curriculum_stages) - 1:
             if surv_rate >= red_sustain_threshold:
                 red_sustain_count += 1
@@ -809,7 +831,7 @@ def run_simulation(
             print(f"  Values:  mean={val_mean:.4f} | VF_loss={vf_loss:.4f} | Clip={clip_frac:.3f}")
             print(f"  Reward:  mean={rew_mean:.4f} | Entropy: {ent_val:.4f}")
             print(f"  Signals: {unique_signals} unique | NB_GAIN↔surv: {sp_r:.3f}")
-            print(f"  Curriculum: red_floor={red_curriculum_stages[red_curriculum_idx]} sustain={red_sustain_count}/{red_sustain_needed}")
+            print(f"  Curriculum: red_floor={red_curriculum_stages[red_curriculum_idx]} sustain={red_sustain_count}/{red_sustain_needed} | brain={n_layers}L")
             print(f"{'='*70}\n")
 
         # ── Evolutionary Distillation (CPU, Outer Loop) ─────────
