@@ -1007,6 +1007,24 @@ def run_simulation(
                 pass  # skip non-scalar arrays
         all_metrics.append(metrics_py)
 
+        # ── Checkpoint ────────────────────────────────────────────
+        ckpt_interval_steps = int(config.get("checkpoint_interval", 2000))
+        ckpt_interval_updates = max(1, ckpt_interval_steps // T)
+        if (ui + 1) % ckpt_interval_updates == 0:
+            ckpt_state = {
+                "b_params": b_params,
+                "r_params": r_params,
+                "b_opt_state": b_opt_state,
+                "r_opt_state": r_opt_state,
+                "grid": grid,
+                "b_pop": b_pop,
+                "r_pop": r_pop,
+                "b_carries": b_carries,
+                "r_carries": r_carries,
+            }
+            ckpt_mngr.save(ui + 1, args=ocp.args.StandardSave(ckpt_state))
+            ckpt_mngr.wait_until_finished()
+
         if (ui + 1) % 10 == 0 or ui == 0:
             alive_count = int(b_pop.alive.sum())
             nan_dbg = f"has_nan={metrics_py.get('has_nan', 0):.0f}"
