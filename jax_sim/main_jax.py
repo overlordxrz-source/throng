@@ -608,30 +608,14 @@ def run_simulation(
     # ── Restore Checkpoint ──────────────────────────────────
     start_update = 0
     if ckpt_mngr.latest_step() is not None:
-        print(f"[JAX] Resuming from checkpoint {ckpt_mngr.latest_step()}...")
-        # We restore into abstract trees to avoid copying dicts directly
-        abstract_tree = {
-            "b_params": b_params,
-            "r_params": r_params,
-            "b_opt_state": b_opt_state,
-            "r_opt_state": r_opt_state,
-            "grid": grid,
-            "b_pop": b_pop,
-            "r_pop": r_pop,
-            "b_carries": b_carries,
-            "r_carries": r_carries,
-        }
-        restored = ckpt_mngr.restore(ckpt_mngr.latest_step(), args=ocp.args.StandardRestore(abstract_tree))
+        latest = ckpt_mngr.latest_step()
+        print(f"[JAX] Resuming from checkpoint step {latest}...")
+        abstract_tree = {"b_params": b_params, "r_params": r_params}
+        restored = ckpt_mngr.restore(latest, items=abstract_tree)
         b_params = restored["b_params"]
         r_params = restored["r_params"]
-        b_opt_state = restored["b_opt_state"]
-        r_opt_state = restored["r_opt_state"]
-        grid = restored["grid"]
-        b_pop = restored["b_pop"]
-        r_pop = restored["r_pop"]
-        b_carries = restored["b_carries"]
-        r_carries = restored["r_carries"]
-        start_update = ckpt_mngr.latest_step()
+        start_update = latest
+        print(f"[JAX] Restored params from step {latest}. Population starts fresh.")
     
     # ── Training loop ───────────────────────────────────────
     # Python loop for update cycles (avoids OOM from saving all param states)
@@ -1007,23 +991,17 @@ def run_simulation(
                 pass  # skip non-scalar arrays
         all_metrics.append(metrics_py)
 
-        # ── Checkpoint ────────────────────────────────────────────
+        # ── Checkpoint (params + opt states only — avoids custom pytree issues) ─
         ckpt_interval_steps = int(config.get("checkpoint_interval", 2000))
         ckpt_interval_updates = max(1, ckpt_interval_steps // T)
         if (ui + 1) % ckpt_interval_updates == 0:
             ckpt_state = {
                 "b_params": b_params,
                 "r_params": r_params,
-                "b_opt_state": b_opt_state,
-                "r_opt_state": r_opt_state,
-                "grid": grid,
-                "b_pop": b_pop,
-                "r_pop": r_pop,
-                "b_carries": b_carries,
-                "r_carries": r_carries,
             }
-            ckpt_mngr.save(ui + 1, args=ocp.args.StandardSave(ckpt_state))
+            ckpt_mngr.save(ui + 1, items=ckpt_state)
             ckpt_mngr.wait_until_finished()
+            print(f"  [CKPT] Saved step {(ui+1)*T}")
 
         if (ui + 1) % 10 == 0 or ui == 0:
             alive_count = int(b_pop.alive.sum())
