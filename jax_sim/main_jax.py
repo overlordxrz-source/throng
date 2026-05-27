@@ -256,6 +256,13 @@ def make_sim_step(config: Dict, model: AgentNetworkJax):
         b_action_logits, b_signal_logits, b_sym_w, b_vals, b_tom, _, _, b_cult_f, b_cult_s = b_outs
         r_action_logits, r_signal_logits, r_sym_w, r_vals, r_tom, _, _, r_cult_f, r_cult_s = r_outs
 
+        # ── Write signals back to population (critical: this is what neighbours receive) ──
+        # signal_probs is (N, vocab_size=64); take first sig_d=32 dims as the broadcast vector
+        b_new_sigs = jax.nn.softmax(b_signal_logits, axis=-1)[:, :sig_d]
+        b_pop = b_pop.replace(signals=jnp.where(b_pop.alive[:, None], b_new_sigs, 0.0))
+        r_new_sigs = jax.nn.softmax(r_signal_logits, axis=-1)[:, :sig_d]
+        r_pop = r_pop.replace(signals=jnp.where(r_pop.alive[:, None], r_new_sigs, 0.0))
+
         # ── Sample actions ──────────────────────────────────────
         b_action_keys = jax.random.split(key_act, b_pop.max_pop)
         r_action_keys = jax.random.split(key_act, r_pop.max_pop)
