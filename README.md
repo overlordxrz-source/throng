@@ -6,46 +6,58 @@ rewards, no pre-programmed behaviours. Agents learn to survive, communicate, and
 collective memory through natural selection pressure.
 
 **Current Phase:** 7.5 — Dual Cultural Memory Grids + Red Co-evolution  
-**Framework:** PyTorch (JAX rewrite planned)  
-**Obs Dim:** 2,285 per agent  
-**Device:** CUDA (T4 on Kaggle)
+**Framework:** JAX + Flax (fully JIT-compiled simulation)  
+**Obs Dim:** 2,310 per agent  
+**Device:** GPU (T4 on Kaggle)
 
 ---
 
 ## Quick Start
 
+### JAX Simulation (current — recommended)
+
 ```bash
 # 1. Install dependencies
+pip install jax[cuda12] flax optax pyyaml wandb
+
+# 2. Run from Python
+from jax_sim.main_jax import run_simulation
+import yaml
+with open("config_phase7.yaml") as f:
+    cfg = yaml.safe_load(f)
+final_params, metrics = run_simulation(cfg, seed=42, n_steps=1_000_000)
+```
+
+### Legacy PyTorch (still available)
+
+```bash
 pip install -r requirements.txt
-
-# 2. Fresh run (recommended — obs_dim changes often)
 python main.py --config config_phase7.yaml --headless --fresh
-
-# 3. Resume from checkpoint
-python main.py --config config_phase7.yaml --resume runs/run_XXX/checkpoint_latest.pkl
-
-# 4. With visualization (pygame window)
-python main.py --config config_phase7.yaml --fresh
-
-# 5. Analyze a finished run
-python main.py --analyze runs/run_XXX/
 ```
 
 ### Kaggle Notebook (recommended for long runs)
 
 ```python
 # Cell 1 — setup
-import os
-os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
-import pathlib
-repo = "/kaggle/working/throng"
-if not pathlib.Path(f"{repo}/.git").exists():
-    !git clone https://github.com/overlordxrz-source/throng.git {repo}
-%cd {repo}
+!git clone https://github.com/overlordxrz-source/throng.git /kaggle/working/throng 2>/dev/null || true
+%cd /kaggle/working/throng
+!git reset --hard
 !git pull origin master
+!pip install -q jax[cuda12] flax optax pyyaml wandb
 
 # Cell 2 — run
-!python main.py --config config_phase7.yaml --headless --fresh
+import sys
+sys.path.insert(0, "/kaggle/working/throng")
+import yaml
+from jax_sim.main_jax import run_simulation
+
+with open("/kaggle/working/throng/config_phase7.yaml", "r") as f:
+    cfg = yaml.safe_load(f)
+cfg["ppo_minibatch_size"] = 512  # prevent P100 OOM
+cfg["use_pmap"] = False          # single GPU mode
+
+total_steps = 1_000_000
+final_params, metrics = run_simulation(cfg, seed=42, n_steps=total_steps)
 ```
 
 ---
@@ -115,21 +127,22 @@ Every step, the agent receives a flat observation vector (2,285 numbers) split i
 
 ```
 throng/
-├── main.py                      # CLI + simulation loop
 ├── config_phase7.yaml           # All hyperparameters
-├── environment/
-│   ├── grid.py                  # ToroidalGrid — all world layers
-│   └── resource.py              # Gaussian patch generation
-├── agents/
-│   ├── network_torch.py         # AgentNetworkTorch (transformer) + TorchBrain wrapper
-│   ├── rl_torch.py              # PPO loss, ToM loss, MAPPO update
-│   └── population.py            # PopulationState — positions, energy, memory, etc.
+├── jax_sim/                     # ★ Active — JAX implementation
+│   ├── main_jax.py              # Simulation loop + rollout (full @jax.jit via lax.scan)
+│   ├── network_jax.py           # AgentNetworkJax (Flax transformer)
+│   ├── rl_jax.py                # PPO loss, GAE, minibatch updates
+│   ├── grid_jax.py              # Grid state, obs building, puzzle mechanics
+│   └── population_jax.py        # PopState, reproduction, mind-meld
+├── main.py                      # Legacy PyTorch CLI
+├── environment/                 # Legacy PyTorch grid
+├── agents/                      # Legacy PyTorch network + RL
 ├── communication/
 │   ├── channel.py               # Signal aggregation
 │   └── analysis.py              # MI, compositionality, culture metrics
 ├── utils/
 │   ├── logging.py               # Structured JSON logs
-│   └── checkpointing.py         # Full state save/load (grids, brains, pops)
+│   └── checkpointing.py         # Full state save/load
 └── README.md                    # You are here
 ```
 
@@ -186,6 +199,11 @@ All parameters live in `config_phase7.yaml`. Key knobs:
 | `culture_slow_decay` | How fast landmarks fade | 0.995 |
 | `ppo_rollout_steps` | Steps between PPO updates | 512 |
 | `ppo_minibatch_size` | GPU batch size for PPO | 2048 |
+| `min_population` | Blue population floor (auto-respawn) | 200 |
+| `repro_energy_thresh` | Energy needed to self-clone | 0.80 |
+| `repro_energy_cost` | Energy cost of cloning | 0.40 |
+| `curriculum_survival_threshold` | Blue survival rate to advance red stage | 0.80 |
+| `curriculum_sustain_updates` | Consecutive PPO updates above threshold | 5 |
 
 ---
 
@@ -206,46 +224,46 @@ All parameters live in `config_phase7.yaml`. Key knobs:
 
 ### 🔄 In Progress
 
-- [ ] Longer runs (10k+ steps) to verify cultural memory emergence
-- [ ] Signal-to-survival correlation tracking
+- [ ] First successful long run on Kaggle (1M+ steps) with JAX
+- [ ] Measure actual steps/sec on T4
+- [ ] Verify cultural memory emergence and signal-to-survival correlation
 
-### 🎯 Next: JAX Rewrite (Phase 8)
+### ✅ Completed: JAX Rewrite
 
-**Why:** Current PyTorch simulation is CPU-bound. The transformer forward is only
-~15% of step time; the rest is Python grid ops, observation building, and movement.
+The entire simulation is now JAX-native. Key facts:
+- **`sim_step`** decorated with `@jax.jit`, executed via `jax.lax.scan` — one compiled XLA program
+- **Everything inside JIT**: obs building, forward pass, movement, wall collision, resource consumption, energy decay, reproduction, mind-meld, catch detection, puzzles, rewards, culture writes/decay
+- **Outside JIT** (intentional): red curriculum reproduction (dynamic `min_pop`), PPO gradient updates (own JIT), telemetry
+- Red curriculum stages: `[6, 15, 30, 75]` — advances when blues sustain ≥80% survival
 
-**Goal:** Move entire simulation to GPU via JAX `@jit`. Expected **10× speedup**.
+### 🎯 Next
 
-**What changes:**
-- `torch` → `jax` + `flax`
-- Entire simulation step compiled to single GPU kernel
-- Richer signal space: continuous 32-dim vectors instead of discrete tokens
-- Agents speak in "brain waves" we decode later — no 256-token bottleneck
-- Potentially larger worlds (256×256) and populations (2000+)
+- **Richer signals** — continuous 32-dim vectors instead of discrete tokens
+- **Scale up** — 256×256 grid, 1000+ agents, once performance is confirmed
+- **Deception / tool use** — can agents learn to lie or use objects?
 
 ---
 
 ## GPU Notes
 
-Current target: **CUDA T4** (Kaggle free tier). The model is small enough that
-GPU utilization stays ~20% — the bottleneck is the Python simulation loop.
+Current target: **T4 GPU** (Kaggle free tier). With the JAX rewrite, the entire
+simulation step is compiled to a single XLA kernel — no Python loop bottleneck.
 
 For JAX GPU install:
 ```bash
-pip install --upgrade "jax[cuda12_pip]" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
+pip install jax[cuda12] flax optax
 ```
 
 ---
 
 ## Checkpoints
 
-Saved every 2,000 steps as `checkpoint_{step}.pkl` under `runs/run_XXX/`.
-Contains: grid layers, agent populations, brain weights, config, step count.
+**JAX:** Saved via Orbax every N updates to `runs/main_run/checkpoints/`.
+Contains: grid state, both populations, both param trees, optimizer states, carries.
+Automatically resumes from latest checkpoint on restart.
 
+**Legacy PyTorch:** Saved as `checkpoint_{step}.pkl` under `runs/run_XXX/`.
 Resume: `python main.py --resume runs/run_XXX/checkpoint_latest.pkl`
-
-**Note:** `obs_dim` changes require `--fresh` (can't load old checkpoints).
-This happens whenever we add new observation channels.
 
 ---
 

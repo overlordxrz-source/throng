@@ -3402,8 +3402,48 @@ step=    2048  blue=498  red=75  brain=4L  ppo=4  surv=1.00
 
 **Next Steps**
 
-1. **Test value head init fix** — change `kernel_init=nn.initializers.normal(0.1)` and verify `values std` grows within 5-10 PPO updates
+1. ~~**Test value head init fix**~~ — DONE. Changed to `nn.initializers.normal(0.01)` in `network_jax.py`
 2. **Verify Phase 7.5** — let current run reach 10k steps, check cultural metrics, survival under red curriculum
-3. **JAX Rewrite** — move entire simulation to GPU via `jax.jit`. Target 10× speedup on same T4.
+3. ~~**JAX Rewrite**~~ — CONFIRMED DONE. See JIT analysis below.
 4. **Richer signals** — continuous 32-dim vectors instead of discrete tokens. Let agents invent concepts we can't label.
 5. **Scale up** — 256×256 grid, 1000+ agents, once simulation is GPU-bound
+
+### May 27 Session (cont.) — Fixes Applied + JIT Analysis
+
+**Fixes Applied**
+
+1. **Value head init** (`network_jax.py`): Changed `kernel_init=nn.initializers.zeros` → `nn.initializers.normal(0.01)` on `head_value`. This gives the value head immediate state-dependent capacity instead of learning from dead-zero weights.
+
+2. **Red curriculum system** (`main_jax.py` + `config_phase7.yaml`):
+   - Reds now start at **6** and graduate through stages: `[6, 15, 30, 75]`
+   - Advancement requires blue survival rate ≥ 80% for 5 consecutive PPO updates
+   - Red `apply_auto_reproduce` runs **outside JIT** in the outer loop so `min_pop` can change dynamically
+   - Config keys added: `curriculum_survival_threshold: 0.80`, `curriculum_sustain_updates: 5`
+
+3. **Bug fix**: `surv_rate` was used before assignment in the red curriculum block → added `surv_rate = float(b_pop.alive.sum()) / float(max_pop)` before the check
+
+**JIT Compilation Analysis (for Cam)**
+
+The `sim_step` function in `main_jax.py` is decorated with `@jax.jit` and executed via `jax.lax.scan` over T timesteps. This means the **entire rollout** is a single compiled XLA program on GPU:
+
+| Component | Inside JIT? |
+|-----------|------------|
+| Observation building (`build_observations_jax`) | ✅ Yes |
+| Neural net forward pass (`model.apply`) | ✅ Yes |
+| Action sampling (`jax.random.categorical`) | ✅ Yes |
+| Movement + wall collision (`apply_moves`) | ✅ Yes |
+| Resource consumption + respawn | ✅ Yes |
+| Energy decay, starvation, max-age death | ✅ Yes |
+| Blue reproduction (`apply_auto_reproduce`) | ✅ Yes |
+| Mind-melding (`apply_mind_meld`) | ✅ Yes |
+| Catch detection (`apply_catches`) | ✅ Yes |
+| Puzzle logic | ✅ Yes |
+| Reward calculation | ✅ Yes |
+| Symbol/culture writes + decay | ✅ Yes |
+| Red reproduction (curriculum) | ❌ Outside (intentional — dynamic min_pop) |
+| PPO gradient updates | ❌ Outside (own JIT via `_minibatch_step`) |
+| Telemetry, checkpointing, distillation | ❌ Outside (CPU) |
+
+**Architecture is already at target**: full env step inside one `jax.jit`. The 10× speedup goal should be realized. No timing instrumentation exists yet — need a successful run to measure actual steps/sec.
+
+**Current Status**: Run deploying on Kaggle with all fixes at commit `682d625`. Previous runs crashed on the `surv_rate` NameError (now fixed).
