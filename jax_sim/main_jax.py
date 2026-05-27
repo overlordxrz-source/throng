@@ -683,44 +683,8 @@ def run_simulation(
         if ui == 0:
             print(f"[DEBUG] Rollout data NaN: obs={has_nan_obs} vals={has_nan_vals} logp={has_nan_logp} rew={has_nan_rew}")
 
-        # ── Red Curriculum Advancement + Brain Vote ──────────────
+        # ── Red Curriculum Advancement ────────────────────────────
         surv_rate = float(b_pop.alive.sum()) / float(max_pop)
-
-        # Track capacity metrics for brain vote
-        _bv_ent = float(b_metrics.get('ppo_entropy', 0)) if isinstance(b_metrics, dict) else 0
-        _bv_vf = float(b_metrics.get('ppo_vf_loss', 0)) if isinstance(b_metrics, dict) else 0
-        brain_ent_history.append(_bv_ent)
-        brain_vf_history.append(_bv_vf)
-        b_signals_snap = np.array(jax.device_get(b_pop.signals))
-        b_alive_snap = np.array(jax.device_get(b_pop.alive))
-        _bv_sig_uniq = int(len(np.unique(b_signals_snap[b_alive_snap], axis=0))) if b_alive_snap.any() else 0
-        brain_sig_diversity_history.append(_bv_sig_uniq)
-
-        # Capacity-based brain vote: agents expand when they've saturated their
-        # communication bandwidth but still can't model the world
-        if (ui + 1) % brain_vote_interval_updates == 0 and len(brain_ent_history) >= brain_vote_window:
-            w = brain_vote_window
-            ent_window = brain_ent_history[-w:]
-            vf_window = brain_vf_history[-w:]
-            sig_window = brain_sig_diversity_history[-w:]
-
-            ent_std = float(np.std(ent_window))
-            ent_mean = float(np.mean(ent_window))
-            vf_mean = float(np.mean(vf_window))
-            sig_mean = float(np.mean(sig_window))
-            sig_std = float(np.std(sig_window))
-
-            ent_plateaued = ent_std < 0.05
-            sig_plateaued = sig_std < 2.0
-            vf_struggling = vf_mean > 0.1
-            under_pressure = surv_rate < float(config.get("brain_vote_survival_threshold", 0.55))
-
-            if ent_plateaued and sig_plateaued and vf_struggling and under_pressure and n_layers < brain_max_layers_val:
-                n_layers += 1
-                print(f"[BRAIN VOTE] Capacity saturated → {n_layers}L | ent_std={ent_std:.3f} sig_div={sig_mean:.0f}±{sig_std:.1f} vf={vf_mean:.3f} surv={surv_rate:.2f}")
-                sim_step_fn = _rebuild_sim_step(n_layers)
-            elif (ui + 1) % (brain_vote_interval_updates * 5) == 0:
-                print(f"[BRAIN CHECK] {n_layers}L | ent_std={ent_std:.3f} sig_div={sig_mean:.0f} vf={vf_mean:.3f} surv={surv_rate:.2f}")
 
         if red_curriculum_idx < len(red_curriculum_stages) - 1:
             if surv_rate >= red_sustain_threshold:
@@ -769,6 +733,39 @@ def run_simulation(
             gamma=float(config.get("ppo_gamma", 0.99)),
             lam=float(config.get("ppo_gae_lam", 0.95)),
         )
+
+        # ── Brain Vote (capacity-based, runs after PPO) ──────────
+        _bv_ent = float(b_metrics.get('ppo_entropy', 0)) if isinstance(b_metrics, dict) else 0
+        _bv_vf = float(b_metrics.get('ppo_vf_loss', 0)) if isinstance(b_metrics, dict) else 0
+        brain_ent_history.append(_bv_ent)
+        brain_vf_history.append(_bv_vf)
+        b_signals_snap = np.array(jax.device_get(b_pop.signals))
+        b_alive_snap = np.array(jax.device_get(b_pop.alive))
+        _bv_sig_uniq = int(len(np.unique(b_signals_snap[b_alive_snap], axis=0))) if b_alive_snap.any() else 0
+        brain_sig_diversity_history.append(_bv_sig_uniq)
+
+        if (ui + 1) % brain_vote_interval_updates == 0 and len(brain_ent_history) >= brain_vote_window:
+            w = brain_vote_window
+            ent_window = brain_ent_history[-w:]
+            vf_window = brain_vf_history[-w:]
+            sig_window = brain_sig_diversity_history[-w:]
+
+            ent_std = float(np.std(ent_window))
+            vf_mean = float(np.mean(vf_window))
+            sig_mean = float(np.mean(sig_window))
+            sig_std = float(np.std(sig_window))
+
+            ent_plateaued = ent_std < 0.05
+            sig_plateaued = sig_std < 2.0
+            vf_struggling = vf_mean > 0.1
+            under_pressure = surv_rate < float(config.get("brain_vote_survival_threshold", 0.55))
+
+            if ent_plateaued and sig_plateaued and vf_struggling and under_pressure and n_layers < brain_max_layers_val:
+                n_layers += 1
+                print(f"[BRAIN VOTE] Capacity saturated → {n_layers}L | ent_std={ent_std:.3f} sig_div={sig_mean:.0f}±{sig_std:.1f} vf={vf_mean:.3f} surv={surv_rate:.2f}")
+                sim_step_fn = _rebuild_sim_step(n_layers)
+            elif (ui + 1) % (brain_vote_interval_updates * 5) == 0:
+                print(f"[BRAIN CHECK] {n_layers}L | ent_std={ent_std:.3f} sig_div={sig_mean:.0f} vf={vf_mean:.3f} surv={surv_rate:.2f}")
 
         # ── NaN debug after PPO update ──────────────────────────
         if ui == 0:
