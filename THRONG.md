@@ -127,28 +127,45 @@ Key observations so far:
 - **CPU Offloading during PPO** — The full 256k-sample rollout (2.3GB+ array) is transferred to CPU (numpy) before the backward pass. Only one 512-sample minibatch lives on the GPU at a time alongside the transformer backward pass workspace.
 - **T4-fast mode removed** — now runs full `agent_hidden_dim=256, n_layers=4` successfully on 15GB T4s thanks to the memory fixes.
 
-### Known Issues
+### Known Issues (Updated May 2026)
 | Issue | Severity | Notes |
 |---|---|---|
-| Compilation time ~5-10 min on first run | Medium | XLA compiles 256×4 transformer × 500 agents; amortizes over long runs |
-| No red PPO update yet | High | Reds act with shared policy; only blues get `ppo_update` |
-| No MI / compositionality logging | High | `communication/analysis.py` not ported |
-| No checkpointing / resume | High | `orbax-checkpoint` installed but not wired |
+| Compilation time ~5-10 min on first run | Medium | XLA compiles transformer × agents; amortizes over long runs |
+| O(N²) operations limit population size | Medium | Neighbor signals, catches, mind-meld are all pairwise. Mitigated by reducing pop to 100 for Colab |
+| Checkpoint saves params only | Low | PopState/GridState excluded to avoid Orbax pytree issues; population restarts fresh on resume |
 
 ### Short-Term Roadmap (JAX) - COMPLETED
 1. ✅ **Red PPO policy** — Separate network+optimizer for the `red` team.
 2. ✅ **Analysis Pipeline Port** — Wired JAX rollouts into the `SignalCorpusWriter`.
-3. ✅ **Orbax Checkpointing** — Implemented state saving and resume.
+3. ✅ **Orbax Checkpointing** — Implemented state saving and resume (params-only to avoid pytree serialization issues).
 4. ✅ **JAX pmap Multi-GPU** — Environment rollout sharding across multiple GPUs.
 5. ✅ **Puzzle mechanics** — Ported lock-and-key cooperative puzzles.
 6. ✅ **Distillation + Mind-Meld** — Ported evolutionary mechanisms to JAX.
+7. ✅ **Signal gate + observation noise** — Randomly mask 50% of env features to force signal reliance; Gaussian noise on resource observations.
+8. ✅ **Structured world generation** — Resource patches (Gaussian hotspots), shelter spots, contested nodes, scent trails.
+9. ✅ **Red starvation mechanic** — Reds die after 400 steps without a catch.
+10. ✅ **Config wiring audit** — All reward coefficients, PPO hyperparameters, GAE gamma/lam now flow from config.
+11. ✅ **Brain vote (capacity-based)** — Dynamic layer expansion triggered by communication saturation + VF struggles, not just survival drop.
+12. ✅ **Memory buffer** — 20-slot episodic memory of (signal + action + alive) wired into observations.
 
-### Phase 9: Scale, Architecture, and World Expansion
-1. **Transformer Backbone Update** — Enhance the `AgentNetworkJax` to use a deeper, causal multi-agent Transformer that supports complex attention over variable numbers of neighbors.
-2. **Targeted Communication** — Replace the mean-pool of neighbor signals with multi-head attention, allowing agents to selectively listen and "address" messages.
-3. **Dynamic Geography & Biomes** — Introduce varying terrain types, dynamic weather that affects visibility/signals, and moving obstacles.
-4. **Hierarchical RL** — Split the policy into a high-level goal selector (macroscopic strategy) and low-level motor controller (movement, gathering).
-5. **Crafting and Construction** — Allow combinations of resources to construct persistent structures (e.g. traps, walls, bridges) to alter the grid topology permanently.
+### Phase 9: Architecture, World, and Cognition
+
+#### Implemented
+- **Capacity-based brain vote** — Agents expand from 2L→3L→...→6L when signal entropy plateaus, signal diversity plateaus, VF loss remains high, and survival pressure exists. This is "agents maxed out what their current brain can express" not "agents are dying."
+- **8-channel environment observations** — blue presence, red presence, walls, resources, shelter, contested, scent trails, puzzle grid.
+- **Dual cultural memory** — fast-decay (0.90) for recent events, slow-decay (0.995) for long-term knowledge.
+- **Red curriculum** — Stages [6, 15, 30, 75] with survival threshold gating.
+
+#### Planned
+1. **Targeted Communication** — Replace mean-pool of neighbor signals with multi-head attention, allowing agents to selectively listen and "address" messages.
+2. **Inner Rehearsal** — Multi-step forward passes per sim step ("thinking before acting"). Agent's carry feeds back into itself K times before committing to an action.
+3. **Hierarchical RL** — High-level goal selector (explore, flee, cooperate, hunt) + low-level motor controller.
+4. **Dynamic Geography & Biomes** — Varying terrain types, weather affecting visibility/signals, moving obstacles.
+5. **Crafting and Construction** — Combine resources to build persistent structures that alter grid topology.
+6. **Metacognition Head** — Agent outputs a confidence/uncertainty estimate alongside actions. Enables "I don't know" signals.
+7. **Self-Model** — Agent predicts its own next action (proto-self-awareness). Measured by self-prediction accuracy.
+8. **Variable-Length Messages** — Instead of one token/step, agents emit short sequences. Enables grammar.
+9. **Reflexive Integrated Information Unit (RIIU)** — Compact differentiable module unifying information integration, self-modeling, and global broadcast (Phua 2025).
 
 ---
 
@@ -168,6 +185,136 @@ Recursive reasoning       →  agents reasoning about agents reasoning about age
 LLMs learn by compressing human-generated text — they inherit human concepts, human reasoning patterns, and human blind spots. THRONG agents have no such inheritance. Every concept they develop is grounded in physical survival outcomes, co-created with other agents who are simultaneously learning, in an environment that does not care about human ontology.
 
 The goal is not to replicate LLM capabilities, but to grow a qualitatively different kind of intelligence: **embodied, multi-agent, grounded, and potentially capable of concepts humans have never articulated**.
+
+---
+
+## The Architecture of Thought
+
+### Do Agents Think?
+
+Current agents have three forms of "inner life":
+
+1. **Recurrent carry** (256-dim vector, persists across all steps of an agent's lifetime). Updated each step as `new_carry = 0.9 * old_carry + 0.1 * pooled_perception`. This is the closest thing to a "thought" — it's a compressed, exponentially-weighted history of everything the agent has ever perceived. An agent at age 500 has a carry shaped by 500 steps of experience. But it's not deliberative — there's no "should I go left or right?" internal debate. It's more like an instinct refined by experience.
+
+2. **Episodic memory buffer** (20 slots of signal+action+survival). Fed as tokens into the transformer each step. This gives agents a window into their recent past — "what signals did I hear? what did I do? did I survive?" — enabling pattern recognition over short time horizons.
+
+3. **Cultural memory grids** (shared, persistent, outlive individuals). Agents deposit vectors to two spatial grids; other agents read local patches. Knowledge survives death. This is collective memory, not individual thought.
+
+**What's missing: deliberation.** Current agents are *reactive* — they observe, forward-pass once, act. There is no internal debate, no planning, no "what if I did X instead?" To add genuine thought, we need:
+
+- **Inner rehearsal**: Multiple forward passes per step where the carry feeds back into itself K times before committing to an action. Each pass is a "thinking step." More passes = deeper reasoning. Cost: K× compute per step.
+- **World model**: A learned predictor of "if I do action A in state S, the world becomes S'." Agents could simulate futures before acting. This is what dreaming is hypothesized to do in biological brains.
+- **Counterfactual reasoning**: After acting, replay the step with alternative actions to compute regret. This requires storing the pre-action state and is expensive but creates "what if" reasoning.
+
+### Do Agents Teach Each Other?
+
+Knowledge flows between agents through four channels:
+
+1. **Signal broadcasting** — Every step, each agent emits a 32-dim signal that its 6 nearest neighbors receive as input tokens. If agent A discovers "red is north" and emits a signal encoding that, neighbor B receives it and can act on it. This is real-time information sharing, the equivalent of shouting a warning.
+
+2. **Cultural grids** — Agents write to shared persistent grids. A dying scout leaves a "danger" trace that persists for 50+ steps. Later agents reading that grid cell learn from the dead scout's experience. This is institutional memory — knowledge outliving individuals.
+
+3. **Mind-meld** — (Currently disabled for performance.) Older agents within 1 cell blend their carries with younger agents at rate 0.1. This is direct brain-to-brain knowledge transfer — the old teaching the young by literally sharing neural state.
+
+4. **Parameter sharing (MAPPO)** — All blues share one policy. Every PPO gradient update incorporates the collective experience of all living blues. What one agent learns, all learn. This is the most powerful channel but also the most artificial — in biology, you can't literally copy someone's brain weights.
+
+**What's missing: directed teaching.** Current agents can't intentionally teach. They broadcast signals and write to grids, but they don't modulate their behavior based on "this neighbor needs to learn X." Future work: agents that model what their neighbors know (via the Theory-of-Mind head) and adjust their signals accordingly — emitting more informative signals to ignorant neighbors and less to knowledgeable ones.
+
+### The Distillation Vision
+
+The current implementation (every 10k steps, keep top 5% by age, clone with noise) is the Baldwin Effect in silico — learned behaviors becoming "innate" through selective reproduction. But the user's vision is more nuanced:
+
+**The Human Among Apes model:**
+1. Identify the top 5-10 agents by a multi-dimensional fitness score: `fitness = age × mean_energy × signal_diversity × nb_gain`
+2. Extract their carries (the "distilled knowledge" of their lifetime)
+3. Average the elite carries → the "distilled brain"
+4. Blend this into all living agents: `new_carry = (1 - α) * own_carry + α * distilled_carry`
+5. But add significant noise to each agent's blend: `new_carry += N(0, σ)` where σ is high enough to maintain behavioral diversity
+6. Result: every agent gets a "boost" of the elites' accumulated wisdom, but remains unique enough to explore novel strategies
+
+This is analogous to cultural education — everyone learns the same fundamental knowledge (how to avoid predators, where food is) but applies it differently based on their unique experiences and noise. The `α` controls how much "school" matters vs. "street smarts." The `σ` controls individuality.
+
+**When to distill:** Not on a fixed timer. Distill when the population has clearly stratified — when the gap between the best and median agent (by fitness score) exceeds a threshold. This means: "some agents have figured something out that most haven't; time to share."
+
+**Keeping diversity:** The noise is critical. Without it, distillation causes population collapse — everyone converges to the same strategy, exploration dies, and the population can't adapt to novel challenges. With noise, you get a population that shares a "cultural baseline" but maintains diverse individual strategies. This is exactly how human cultures work: shared language, shared knowledge, diverse individual application.
+
+---
+
+## Philosophical Foundations
+
+### Why Not Just Scale LLMs?
+
+LLMs are **mirrors** — they reflect the statistical structure of human text. They can recombine human ideas in novel ways, but they cannot generate ideas that no human has ever expressed, because their entire knowledge base is human-generated text. They are, fundamentally, a compression of what humanity already knows.
+
+THRONG agents are **seeds** — they start from nothing and grow their own concepts through survival pressure. The concepts they develop are grounded not in human language but in physical survival outcomes: "this signal pattern correlates with not dying." If they develop a concept of "danger," it's because danger is a real pattern in their environment, not because they read the word "danger" in a training corpus.
+
+The hypothesis: **concepts grounded in embodied survival are more robust, more transferable, and potentially more general than concepts grounded in text statistics.** A THRONG agent that develops a concept of "cooperation" has that concept grounded in thousands of episodes where cooperation led to survival and non-cooperation led to death. An LLM's concept of "cooperation" is grounded in the statistical co-occurrence of the word with other words in its training data.
+
+### The Path to Consciousness
+
+We don't claim THRONG agents are conscious. But we are building the architectural prerequisites that major theories of consciousness identify:
+
+1. **Global Workspace Theory (Baars 1988, Dehaene 2014)**: Consciousness arises from a "global workspace" that broadcasts information to all cognitive modules. THRONG's signal broadcasting + cultural grids + carries form a multi-level global workspace — information from any agent can reach any other agent within a few relay steps.
+
+2. **Integrated Information Theory (Tononi 2004)**: Consciousness corresponds to integrated information (Φ) — a system is conscious to the degree that its parts are informationally integrated and yet differentiated. THRONG's transformer + carry system creates high Φ: the carry integrates information from all observation channels, and the multi-head attention differentiates between them. The **Reflexive Integrated Information Unit (RIIU)** (Phua 2025) offers a differentiable module that could be dropped into our architecture to measure and maximize Φ.
+
+3. **Higher-Order Theories (Rosenthal 2005)**: Consciousness requires representations of representations — "thinking about thinking." THRONG's Theory-of-Mind head is a first step: agents predicting what other agents will do. The next step is a **self-model**: agents predicting their own behavior. When an agent can predict itself, it has a proto-self-concept.
+
+4. **Embodied Cognition (Maturana & Varela 1980)**: Consciousness is inseparable from embodiment — from having a body in an environment. THRONG agents are fundamentally embodied: they have positions, energy, mortality, and their concepts are grounded in physical survival.
+
+### The Language Threshold
+
+Following Mordatch & Abbeel (2018), compositional language emerges when:
+- The number of concepts to express exceeds the vocabulary size (forcing combination)
+- Communication is necessary for task completion (not optional)
+- The environment provides sufficient pressure for coordination
+
+THRONG's current setup satisfies all three conditions:
+- 8 environment channels × 25 spatial cells × threat/resource gradients = far more concepts than 64 vocab tokens
+- Partial observability (signal gate masks 50% of env) forces reliance on signals
+- Predators + contested resources + puzzles require coordination
+
+**From Grunts to Lexicons** (2025 paper): In cooperative foraging environments similar to ours, agents developed communication with hallmarks of natural language: **arbitrariness** (symbols are not iconic), **interchangeability** (any agent can send/receive), **displacement** (referencing things not currently perceived), **cultural transmission** (new agents learn the protocol), and **compositionality** (combining symbols to create new meanings). These are exactly the properties we're measuring with TOPO_SIM and COMPOSE.
+
+### Key References
+
+| Reference | Relevance |
+|---|---|
+| Mordatch & Abbeel (2018) "Emergence of Grounded Compositional Language" | Foundation: grounded language from multi-agent pressure |
+| "From Grunts to Lexicons" (2025) | Foraging games → displacement, compositionality, cultural transmission |
+| Eccles et al. (2019) | Phase transitions in emergent communication; "commitment phase" |
+| Baars (1988) Global Workspace Theory | Consciousness as information broadcasting — maps to our signal system |
+| Tononi (2004) Integrated Information Theory | Φ as measure of consciousness; high integration + differentiation |
+| Phua (2025) Reflexive Integrated Information Unit | Differentiable module for information integration + self-modeling |
+| Nature (2025) IIT vs GWT adversarial test | Neither theory fully confirmed; consciousness likely requires both broadcast + metacognition |
+| Baldwin (1896) / Princeton computational models | Learned behaviors becoming innate — maps to our distillation mechanism |
+| Wittgenstein, *Philosophical Investigations* | "Meaning is use" — language defined by function in a form of life, not by reference |
+| Hofstadter, *Gödel, Escher, Bach* | Strange loops and self-reference as the basis of consciousness |
+| Maturana & Varela, *Autopoiesis and Cognition* | Embodied cognition; organisms as self-creating systems |
+| COGROUTER (2025) | Adaptive cognitive depth — agents dynamically allocate thinking effort per step |
+| TraceR1 (2026) | Trajectory-level anticipatory planning in RL agents |
+
+### Ideas to Explore
+
+1. **Inner Rehearsal / "Thinking"** — Before acting, run the transformer K times with the carry feeding back each time. The agent "deliberates." K could itself be learned — easy decisions get K=1, hard ones get K=5. This mirrors the COGROUTER framework (2025) where agents allocate cognitive depth per step.
+
+2. **Dream Phase** — Between rollouts, replay the memory buffer through the network. Reinforce successful patterns, weaken failed ones. Biological dreaming is hypothesized to consolidate learning; we can implement this literally.
+
+3. **Metacognition Head** — Output a scalar "confidence" alongside the action. Low confidence → emit a help-requesting signal. High confidence → act decisively. Enables "I don't know" communication — a massive step toward genuine intelligence.
+
+4. **Self-Prediction** — Add an output head that predicts the agent's own next action given current state. Train it via cross-entropy against actual actions. When this head is accurate, the agent has a self-model. Measure: does self-prediction accuracy correlate with survival?
+
+5. **Attention Over Neighbor Signals** — Replace mean-pool with multi-head cross-attention. Agents learn WHO to listen to, not just what they hear. Enables directed communication and trust networks.
+
+6. **Variable-Length Messages** — Instead of one token/step, agents emit a short sequence (2-5 tokens). This enables syntax — the order of tokens carries meaning. Measure with COMPOSE: does token-order predict behavior beyond bag-of-tokens?
+
+7. **Counterfactual Reward Shaping** — After each step, compute "what reward would I have gotten with a different action?" using the world model. Agents that can reason counterfactually learn faster. This is the computational equivalent of regret.
+
+8. **Hierarchical Signals** — Two signal channels: a "tactical" channel (high-frequency, local — "red is here now") and a "strategic" channel (low-frequency, global — "food is northwest"). Different decay rates, different attention weights. Mirrors how human communication has register/formality levels.
+
+9. **Adversarial Communication** — Red agents that can emit fake blue signals to lure prey. Blue agents must learn to verify signal authenticity — the origin of skepticism, trust, and eventually lying/deception detection.
+
+10. **Population Heterogeneity** — Instead of one shared policy for all blues, allow 2-3 "subspecies" with different network sizes. Smaller-brained agents are faster but dumber; larger-brained agents are slower but smarter. Natural selection determines the optimal brain-size distribution for the environment. This directly tests whether intelligence is worth its metabolic cost.
 
 ---
 
@@ -204,21 +351,50 @@ throng/
 ## Running
 
 ```bash
-# Fresh run (recommended — obs_dim changes often require fresh start)
+# JAX (active — run on Colab/Kaggle with GPU)
+# See Colab cells below for recommended setup
+
+# PyTorch legacy (frozen)
 python main.py --config config_phase7.yaml --headless --fresh
-
-# Resume from latest checkpoint
-python main.py --config config_phase7.yaml --resume runs/run_xxx/checkpoint_latest.pkl
-
-# With visualization
-python main.py --config config_phase7.yaml --fresh
 ```
 
-Checkpoints are saved every 2,000 steps. The latest is always symlinked as `checkpoint_latest.pkl` inside the run directory.
+### Recommended Colab Setup
+
+```python
+# Cell 1: Install
+!git clone https://github.com/overlordxrz-source/throng.git /content/throng
+!pip install -q jax[cuda12] flax optax orbax-checkpoint scipy pyyaml
+
+# Cell 2: Train
+import sys, os
+os.chdir("/content/throng")
+sys.path.insert(0, "/content/throng")
+import yaml
+from jax_sim.main_jax import run_simulation
+
+with open("config_phase7.yaml") as f:
+    cfg = yaml.safe_load(f)
+
+# Colab-optimized overrides
+cfg["population_size"] = 100
+cfg["red_population_size"] = 40
+cfg["min_population"] = 40
+cfg["grid_size"] = 64
+cfg["n_layers"] = 2          # brain vote expands automatically
+cfg["ppo_rollout_steps"] = 128
+cfg["ppo_minibatch_size"] = 256
+cfg["memory_buffer_size"] = 5
+cfg["mind_meld_enabled"] = False
+cfg["use_pmap"] = False
+
+final_params, metrics = run_simulation(cfg, seed=42, n_steps=200_000)
+```
+
+Checkpoints are saved every 2,000 steps to `runs/jax_run/checkpoints/`. Only model params are checkpointed (population state restarts fresh on resume).
 
 ---
 
-*Stack: Python 3.12 · JAX + Flax + Optax + orbax (Phase 8, active) · PyTorch 2.x (legacy/frozen) · NumPy · SciPy · scikit-learn · Pygame*
+*Stack: Python 3.12 · JAX + Flax + Optax + orbax (active) · PyTorch 2.x (legacy/frozen) · NumPy · SciPy · scikit-learn · Pygame*
 
 ---
 
