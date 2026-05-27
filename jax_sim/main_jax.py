@@ -553,6 +553,7 @@ def run_simulation(
     else:
         sim_step_mapped = None
 
+    loop_key = keys[5]
     all_metrics = []
     for ui in range(start_update, n_updates):
         update_key = update_keys[ui]
