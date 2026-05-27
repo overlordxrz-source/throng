@@ -189,6 +189,9 @@ def ppo_update(
     clip_eps: float = 0.2,
     vf_coef: float = 0.5,
     ent_coef: float = 0.01,
+    minibatch_size: int = 512,
+    gamma: float = 0.99,
+    lam: float = 0.95,
 ) -> Tuple[Dict, Any, Dict]:
     """
     Single gradient update step using minibatches.
@@ -204,8 +207,7 @@ def ppo_update(
     carries = batch["carries"]
     alive = batch.get("alive")
 
-    # Compute GAE (requires T, N shape)
-    advantages, returns = compute_gae(rewards, values, dones)
+    advantages, returns = compute_gae(rewards, values, dones, gamma=gamma, lam=lam)
 
     # Debug
     print(f"  [DEBUG] rewards mean={float(rewards.mean()):.4f} std={float(rewards.std()):.4f}")
@@ -240,7 +242,9 @@ def ppo_update(
     perm = rng.permutation(M)
 
     # Minibatch loop — GPU only holds params + opt_state + one minibatch + backward workspace
-    minibatch_size = 512
+    minibatch_size = int(minibatch_size)
+    if minibatch_size <= 0:
+        raise ValueError(f"ppo_minibatch_size must be positive, got {minibatch_size}")
     n_minibatches = M // minibatch_size
 
     # Accumulate metrics as Python floats (not 500 JAX scalar dicts)

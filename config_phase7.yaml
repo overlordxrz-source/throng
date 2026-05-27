@@ -129,11 +129,12 @@ ppo_epochs: 1
 ppo_minibatch_size: 2048
 ppo_warmup_steps: 15
 ppo_clip: 0.2
+ppo_clip_eps: 0.2
 ppo_lr: 3.0e-4
 ppo_gamma: 0.99
 ppo_gae_lam: 0.95
 ppo_value_coef: 0.1
-ppo_entropy_coef: 0.5
+ppo_entropy_coef: 0.02
 action_entropy_coef: 0.05      # Explicit action diversity bonus
 ppo_max_grad_norm: 2.0
 

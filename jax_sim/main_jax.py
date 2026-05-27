@@ -29,7 +29,9 @@ import yaml
 from jax_sim.grid_jax import (
     GridState, wrap, apply_moves, consume_resources, apply_catches,
     write_to_grid, decay_grid, get_local_patches, get_neighbour_signals,
-    generate_puzzle_nodes, update_puzzle_grid, decay_puzzle_timeout, check_puzzle_solved
+    generate_puzzle_nodes, update_puzzle_grid, decay_puzzle_timeout, check_puzzle_solved,
+    generate_resource_patches, generate_shelter_spots, generate_contested_nodes,
+    update_scent_trails,
 )
 from communication.analysis import SignalCorpusWriter
 from jax_sim.population_jax import (
@@ -109,8 +111,13 @@ def build_observations_jax(
     red_map: jnp.ndarray,
     config: Dict,
     step: int,
+    key: jnp.ndarray = None,
 ) -> jnp.ndarray:
-    """Build flat observation vector for all agents."""
+    """Build flat observation vector for all agents.
+    
+    When key is provided, applies signal gate (random env masking)
+    and observation noise on resources.
+    """
     gs = config["grid_size"]
     K = config["neighbor_k"]
     r = config["local_obs_radius"]
@@ -119,23 +126,20 @@ def build_observations_jax(
     W = (2 * r + 1) ** 2
     N = pop.max_pop
 
-    # Normalize features
     norm_age = pop.ages.astype(jnp.float32) / float(config["max_age"])
     norm_x = pop.positions[:, 0].astype(jnp.float32) / gs
     norm_y = pop.positions[:, 1].astype(jnp.float32) / gs
     energy = pop.energy
     nl_norm = pop.n_layers.astype(jnp.float32) / 6.0
-    mat_frac = jnp.zeros(N, dtype=jnp.float32)  # simplified
+    mat_frac = jnp.zeros(N, dtype=jnp.float32)
 
     own_state = jnp.stack([norm_age, mat_frac, energy, nl_norm, norm_x, norm_y], axis=1)
 
-    # Neighbour signals
     nb_sigs = get_neighbour_signals(
         pop.positions, pop.signals, pop.alive, K, gs,
     )  # (N, K, sig_d)
 
-    # Local patches
-    loc_sym = get_local_patches(grid.symbols, pop.positions, r, gs)  # (N, W, sym_d)
+    loc_sym = get_local_patches(grid.symbols, pop.positions, r, gs)
     loc_pres = jnp.concatenate([
         get_local_patches(blue_map.astype(jnp.float32), pop.positions, r, gs)[..., None],
         get_local_patches(red_map.astype(jnp.float32), pop.positions, r, gs)[..., None],
@@ -145,19 +149,35 @@ def build_observations_jax(
     loc_shelter = get_local_patches(grid.shelter_spots.astype(jnp.float32), pop.positions, r, gs)[..., None]
     loc_contested = get_local_patches(grid.contested_res, pop.positions, r, gs)[..., None]
     loc_scent = get_local_patches(grid.scent_trails, pop.positions, r, gs)[..., None]
+    loc_puzzle = get_local_patches(grid.puzzle_grid, pop.positions, r, gs)[..., None]
 
-    loc_env = jnp.concatenate([loc_pres, loc_wall, loc_res, loc_shelter, loc_contested, loc_scent], axis=-1)
+    # 8 env channels: blue_pres, red_pres, wall, resource, shelter, contested, scent, puzzle
+    loc_env = jnp.concatenate([
+        loc_pres, loc_wall, loc_res, loc_shelter, loc_contested, loc_scent, loc_puzzle
+    ], axis=-1)  # (N, W, 8)
 
-    # Cultural memory
+    # Observation noise on resource channel (index 3 in loc_env)
+    if key is not None:
+        k_noise, k_gate = jax.random.split(key)
+        noise_std = float(config.get("resource_obs_noise", 0.0))
+        if noise_std > 0:
+            res_noise = jax.random.normal(k_noise, loc_res.shape) * noise_std
+            loc_env = loc_env.at[:, :, 3].add(res_noise.squeeze(-1))
+
+        # Signal gate: randomly mask a fraction of env features per agent
+        gate_frac = float(config.get("signal_gate_mask_frac", 0.0))
+        if config.get("signal_gate_enabled", False) and gate_frac > 0:
+            gate_mask = jax.random.bernoulli(k_gate, 1.0 - gate_frac, loc_env.shape)
+            loc_env = loc_env * gate_mask
+
     loc_cult_fast = get_local_patches(grid.cultural_fast, pop.positions, r, gs)
     loc_cult_slow = get_local_patches(grid.cultural_slow, pop.positions, r, gs)
 
-    # Assemble
     parts = [
         own_state,                          # (N, 6)
         nb_sigs.reshape(N, -1),            # (N, K*sig_d)
         loc_sym.reshape(N, -1),             # (N, W*sym_d)
-        loc_env.reshape(N, -1),             # (N, W*6)
+        loc_env.reshape(N, -1),             # (N, W*8)
         pop.signals,                        # (N, sig_d)
     ]
 
@@ -184,6 +204,30 @@ def make_sim_step(config: Dict, model: AgentNetworkJax):
     sig_d = config["signal_dim"]
     hidden_d = config["hidden_dim"]
 
+    # Pre-extract config values for JIT closure
+    _reward_blue_alive = float(config.get("reward_blue_alive", 0.05))
+    _reward_blue_caught = float(config.get("reward_blue_caught", -1.0))
+    _reward_move = float(config.get("reward_move", 0.01))
+    _reward_resource = float(config.get("reward_resource", 0.1))
+    _reward_red_catch = float(config.get("reward_red_catch", 1.0))
+    _reward_red_starve = float(config.get("reward_red_starve_per_step", -0.01))
+    _puzzle_reward = float(config.get("puzzle_reward", 5.0))
+    _energy_decay = float(config["energy_decay"])
+    _starv_thresh = float(config["starvation_threshold"])
+    _max_age = int(config["max_age"])
+    _min_pop_blue = int(config.get("min_population", 200))
+    _repro_energy_thresh = float(config.get("repro_energy_thresh", 0.8))
+    _repro_energy_cost = float(config.get("repro_energy_cost", 0.4))
+    _mind_meld = config.get("mind_meld_enabled", False)
+    _mm_radius = int(config.get("mind_meld_radius", 1))
+    _mm_rate = float(config.get("mind_meld_rate", 0.1))
+    _mm_dir = config.get("mind_meld_direction", "older_to_younger")
+    _scent_intensity = float(config.get("scent_intensity", 0.8))
+    _scent_decay_steps = int(config.get("scent_decay_steps", 20))
+    _red_starvation_steps = int(config.get("red_starvation_steps", 400))
+    _contested_min_harv = int(config.get("contested_min_harvesters", 2))
+    _n_layers = config["n_layers"]
+
     @jax.jit
     def sim_step(carry, step_key):
         """
@@ -191,10 +235,9 @@ def make_sim_step(config: Dict, model: AgentNetworkJax):
         Returns: new_carry, rollout_data
         """
         grid, b_pop, r_pop, b_carries, r_carries, b_params, r_params = carry
-        # Don't backprop through params during rollout
         b_params_sg = jax.tree.map(jax.lax.stop_gradient, b_params)
         r_params_sg = jax.tree.map(jax.lax.stop_gradient, r_params)
-        key_obs, key_act = jax.random.split(step_key)
+        key_obs, key_act, key_b_obs, key_r_obs, key_misc = jax.random.split(step_key, 5)
 
         # ── Build presence maps ─────────────────────────────────
         blue_map = jnp.zeros((gs, gs), dtype=jnp.bool_)
@@ -202,29 +245,45 @@ def make_sim_step(config: Dict, model: AgentNetworkJax):
         red_map = jnp.zeros((gs, gs), dtype=jnp.bool_)
         red_map = red_map.at[r_pop.positions[:, 0], r_pop.positions[:, 1]].set(r_pop.alive)
 
-        # ── Observations ────────────────────────────────────────
-        b_obs = build_observations_jax(b_pop, grid, blue_map, red_map, config, 0)
-        r_obs = build_observations_jax(r_pop, grid, blue_map, red_map, config, 0)
+        # ── Observations (with signal gate + noise) ─────────────
+        b_obs = build_observations_jax(b_pop, grid, blue_map, red_map, config, 0, key=key_b_obs)
+        r_obs = build_observations_jax(r_pop, grid, blue_map, red_map, config, 0, key=key_r_obs)
 
         # ── Forward passes ──────────────────────────────────────
-        b_new_c, b_outs = model.apply(b_params_sg, b_carries, b_obs, config["n_layers"])
-        r_new_c, r_outs = model.apply(r_params_sg, r_carries, r_obs, config["n_layers"])
+        b_new_c, b_outs = model.apply(b_params_sg, b_carries, b_obs, _n_layers)
+        r_new_c, r_outs = model.apply(r_params_sg, r_carries, r_obs, _n_layers)
 
         b_action_logits, b_signal_logits, b_sym_w, b_vals, b_tom, _, _, b_cult_f, b_cult_s = b_outs
         r_action_logits, r_signal_logits, r_sym_w, r_vals, r_tom, _, _, r_cult_f, r_cult_s = r_outs
 
-        # ── Sample actions (vmapped, JIT-safe) ──────────────────
+        # ── Sample actions ──────────────────────────────────────
         b_action_keys = jax.random.split(key_act, b_pop.max_pop)
         r_action_keys = jax.random.split(key_act, r_pop.max_pop)
         b_actions = jax.vmap(jax.random.categorical)(b_action_keys, b_action_logits)
         r_actions = jax.vmap(jax.random.categorical)(r_action_keys, r_action_logits)
 
+        # ── Update episodic memory buffer ───────────────────────
+        b_nb_flat = b_obs[:, 6 : 6 + K * sig_d]
+        b_mean_nb_sig = b_nb_flat.reshape(b_pop.max_pop, K, sig_d).mean(axis=1)
+        b_pop = update_memory_buffer(b_pop, b_mean_nb_sig, b_actions, b_pop.alive)
+
+        r_nb_flat = r_obs[:, 6 : 6 + K * sig_d]
+        r_mean_nb_sig = r_nb_flat.reshape(r_pop.max_pop, K, sig_d).mean(axis=1)
+        r_pop = update_memory_buffer(r_pop, r_mean_nb_sig, r_actions, r_pop.alive)
+
         # ── Movement ────────────────────────────────────────────
         b_new_pos = apply_moves(b_pop.positions, b_actions, b_pop.alive, gs, grid.walls)
         r_new_pos = apply_moves(r_pop.positions, r_actions, r_pop.alive, gs, grid.walls)
-
+        b_moved = (b_new_pos != b_pop.positions).any(axis=-1) & b_pop.alive
         b_pop = b_pop.replace(positions=b_new_pos)
         r_pop = r_pop.replace(positions=r_new_pos)
+
+        # ── Scent trails (reds deposit scent) ───────────────────
+        new_scent = update_scent_trails(
+            grid.scent_trails, r_pop.positions, r_pop.alive,
+            intensity=_scent_intensity, decay_steps=_scent_decay_steps,
+        )
+        grid = grid.replace(scent_trails=new_scent)
 
         # ── Resource consumption ────────────────────────────────
         b_energy_gain, new_res = consume_resources(
@@ -234,21 +293,33 @@ def make_sim_step(config: Dict, model: AgentNetworkJax):
         grid = grid.replace(resources=new_res)
         b_pop = b_pop.replace(energy=b_pop.energy + b_energy_gain)
 
+        # ── Contested resource bonus (requires 2+ agents) ──────
+        agent_count = jnp.zeros((gs, gs), dtype=jnp.float32)
+        agent_count = agent_count.at[b_pop.positions[:, 0], b_pop.positions[:, 1]].add(
+            b_pop.alive.astype(jnp.float32)
+        )
+        contested_bonus_map = (agent_count >= _contested_min_harv) & (grid.contested_res > 0)
+        contested_at_agent = (
+            contested_bonus_map[b_pop.positions[:, 0], b_pop.positions[:, 1]]
+            & b_pop.alive
+        )
+        contested_gain = jnp.where(contested_at_agent, 0.1, 0.0)
+        b_pop = b_pop.replace(energy=jnp.clip(b_pop.energy + contested_gain, 0.0, 1.0))
+
         # ── Resource respawning ─────────────────────────────────
-        # Sparse respawn to maintain pressure (agents must compete)
-        res_key = jax.random.split(step_key)[0]
-        spawn_mask = jax.random.bernoulli(res_key, 0.005, (gs, gs))
+        res_key = jax.random.split(key_misc)[0]
+        regen_rate = float(config.get("resource_regen_rate", 0.005))
+        spawn_mask = jax.random.bernoulli(res_key, regen_rate, (gs, gs))
         new_res = grid.resources + spawn_mask.astype(jnp.float32) * 0.2
         grid = grid.replace(resources=jnp.clip(new_res, 0.0, 1.0))
 
         # ── Energy decay ────────────────────────────────────────
-        b_pop = b_pop.replace(energy=jnp.clip(b_pop.energy - config["energy_decay"], 0.0, 1.0))
-        r_pop = r_pop.replace(energy=jnp.clip(r_pop.energy - config["energy_decay"], 0.0, 1.0))
-
+        b_pop = b_pop.replace(energy=jnp.clip(b_pop.energy - _energy_decay, 0.0, 1.0))
+        r_pop = r_pop.replace(energy=jnp.clip(r_pop.energy - _energy_decay, 0.0, 1.0))
 
         # ── Starvation ──────────────────────────────────────────
-        b_starved = b_pop.alive & (b_pop.energy < config["starvation_threshold"])
-        r_starved = r_pop.alive & (r_pop.energy < config["starvation_threshold"])
+        b_starved = b_pop.alive & (b_pop.energy < _starv_thresh)
+        r_starved = r_pop.alive & (r_pop.energy < _starv_thresh)
         b_pop = kill_agents(b_pop, b_starved)
         r_pop = kill_agents(r_pop, r_starved)
 
@@ -257,43 +328,50 @@ def make_sim_step(config: Dict, model: AgentNetworkJax):
         r_pop = r_pop.replace(ages=r_pop.ages + 1)
 
         # ── Max age death ───────────────────────────────────────
-        b_old = b_pop.alive & (b_pop.ages >= config["max_age"])
-        r_old = r_pop.alive & (r_pop.ages >= config["max_age"])
+        b_old = b_pop.alive & (b_pop.ages >= _max_age)
+        r_old = r_pop.alive & (r_pop.ages >= _max_age)
         b_pop = kill_agents(b_pop, b_old)
         r_pop = kill_agents(r_pop, r_old)
 
         # ── Reproduction ────────────────────────────────────────
-        # Blue: enforce a floor of min_population and allow high-energy cloning
-        repro_key, step_key = jax.random.split(step_key)
-        b_min_pop = int(config.get("min_population", 200))
+        repro_key, step_key2 = jax.random.split(step_key)
         b_pop = apply_auto_reproduce(
             b_pop, repro_key, gs,
-            min_pop=b_min_pop,
-            energy_thresh=float(config.get("repro_energy_thresh", 0.8)),
-            energy_cost=float(config.get("repro_energy_cost", 0.4)),
+            min_pop=_min_pop_blue,
+            energy_thresh=_repro_energy_thresh,
+            energy_cost=_repro_energy_cost,
         )
-        # Red reproduction is handled outside the JIT loop by the curriculum system
 
         # ── Mind-Melding ─────────────────────────────────────────
-        if config.get("mind_meld_enabled", False):
+        if _mind_meld:
             b_pop = apply_mind_meld(
-                b_pop, gs, 
-                radius=int(config.get("mind_meld_radius", 1)),
-                rate=float(config.get("mind_meld_rate", 0.1)),
-                direction=config.get("mind_meld_direction", "older_to_younger")
+                b_pop, gs, radius=_mm_radius, rate=_mm_rate, direction=_mm_dir,
             )
 
         # ── Catch detection ─────────────────────────────────────
-        b_new_alive, r_catch_rew, b_catch_pen, _ = apply_catches(
+        b_new_alive, r_catch_rew, b_catch_pen, caught_b = apply_catches(
             b_pop.positions, b_pop.alive,
             r_pop.positions, r_pop.alive,
             gs, catch_radius=1,
         )
+        # Shelter protection: blues on shelter spots can't be caught
+        on_shelter = grid.shelter_spots[b_pop.positions[:, 0], b_pop.positions[:, 1]]
+        sheltered_catch = caught_b & on_shelter
+        b_new_alive = b_new_alive | sheltered_catch
+        b_catch_pen = jnp.where(sheltered_catch, 0.0, b_catch_pen)
+
         b_pop = b_pop.replace(alive=b_new_alive)
-        # Zero carries for caught blues
         b_pop = b_pop.replace(
             carries=jnp.where(~b_new_alive[:, None], 0.0, b_pop.carries)
         )
+
+        # ── Red starvation tracking ─────────────────────────────
+        r_caught_any = r_catch_rew > 0
+        new_steps_since = jnp.where(r_caught_any, 0, r_pop.steps_since_catch + 1)
+        new_steps_since = jnp.where(r_pop.alive, new_steps_since, 0)
+        r_pop = r_pop.replace(steps_since_catch=new_steps_since)
+        r_starved_hunt = r_pop.alive & (r_pop.steps_since_catch >= _red_starvation_steps)
+        r_pop = kill_agents(r_pop, r_starved_hunt)
 
         # ── Puzzle logic ────────────────────────────────────────
         p_act, p_cool = decay_puzzle_timeout(grid.puzzle_active, grid.puzzle_cooldown)
@@ -304,17 +382,17 @@ def make_sim_step(config: Dict, model: AgentNetworkJax):
         grid = grid.replace(puzzle_active=p_act, puzzle_cooldown=p_cool, puzzle_grid=p_grid)
         b_pop = b_pop.replace(energy=jnp.clip(b_pop.energy + p_rew * 0.5, 0.0, 1.0))
 
-        # ── Rewards ─────────────────────────────────────────────
-        # Base alive reward + energy bonus (creates variance for learning)
-        b_rew = jnp.where(b_pop.alive, float(config.get("reward_blue_alive", 0.05)), 0.0)
-        b_rew = b_rew + 0.02 * b_pop.energy  # higher energy = more reward
-        b_rew = b_rew + b_catch_pen
-        # Resource gathering reward (only if agent actually gathered something)
-        b_rew = b_rew + 0.1 * b_energy_gain
-        # Puzzle reward
-        b_rew = b_rew + p_rew * 1.0
-        # Red reward
-        r_rew = jnp.where(r_pop.alive, float(config.get("reward_red_catch", 1.0)), 0.0) * r_catch_rew
+        # ── Rewards (all from config) ───────────────────────────
+        b_rew = jnp.where(b_pop.alive, _reward_blue_alive, 0.0)
+        b_rew = b_rew + 0.02 * b_pop.energy
+        b_rew = b_rew + b_catch_pen * jnp.abs(_reward_blue_caught)
+        b_rew = b_rew + _reward_resource * b_energy_gain
+        b_rew = b_rew + _reward_move * b_moved.astype(jnp.float32)
+        b_rew = b_rew + _puzzle_reward * p_rew
+        b_rew = b_rew + contested_gain * 0.5
+
+        r_rew = _reward_red_catch * r_catch_rew
+        r_rew = r_rew + jnp.where(r_pop.alive, _reward_red_starve, 0.0)
 
         # ── Write symbols / culture ─────────────────────────────
         grid = grid.replace(
@@ -412,19 +490,44 @@ def run_simulation(
 
     # ── Init grid ─────────────────────────────────────────────
     grid = GridState(gs, symbol_dim=config["symbol_dim"])
-    # Simple wall generation (random)
     wall_mask = jax.random.bernoulli(keys[0], config.get("wall_density", 0.08), (gs, gs))
     
+    # Resource patches (structured hotspots, not uniform drizzle)
+    k_res, k_shelter, k_contest, k_puzzle = jax.random.split(keys[9], 4)
+    resources = generate_resource_patches(
+        k_res, gs,
+        n_patches=int(config.get("resource_n_patches", 20)),
+        patch_radius=5.0,
+    )
+    
+    # Shelter spots (safe zones)
+    shelter = generate_shelter_spots(
+        k_shelter, gs,
+        n_spots=int(config.get("shelter_n_spots", 5)),
+        radius=2,
+    )
+    
+    # Contested nodes (require cooperation to harvest)
+    contested = generate_contested_nodes(
+        k_contest, gs,
+        n_nodes=int(config.get("contested_n_nodes", 3)),
+        yield_mult=float(config.get("contested_yield_multiplier", 3.0)),
+        radius=2,
+    )
+    
     # Puzzle init
-    p_nodes, p_act, p_cool = generate_puzzle_nodes(keys[9], n_nodes=3, grid_size=gs)
+    p_nodes, p_act, p_cool = generate_puzzle_nodes(k_puzzle, n_nodes=3, grid_size=gs)
     p_grid = update_puzzle_grid(gs, p_nodes, p_act)
     
     grid = grid.replace(
         walls=wall_mask,
+        resources=resources,
+        shelter_spots=shelter,
+        contested_res=contested,
         puzzle_nodes=p_nodes,
         puzzle_active=p_act,
         puzzle_cooldown=p_cool,
-        puzzle_grid=p_grid
+        puzzle_grid=p_grid,
     )
 
     # ── Init populations ────────────────────────────────────
@@ -554,6 +657,8 @@ def run_simulation(
         sim_step_mapped = None
 
     loop_key = keys[5]
+    _t_start = __import__('time').time()
+    _t_last = _t_start
     all_metrics = []
     for ui in range(start_update, n_updates):
         update_key = update_keys[ui]
@@ -613,9 +718,12 @@ def run_simulation(
         b_params, b_opt_state, b_metrics = ppo_update(
             b_params, b_opt_state, b_optimizer, model.apply,
             b_batch, n_layers, update_key,
-            clip_eps=config.get("ppo_clip_eps", 0.2),
-            vf_coef=config.get("ppo_value_coef", 0.25),
-            ent_coef=config.get("ppo_entropy_coef", 0.01),
+            clip_eps=float(config.get("ppo_clip_eps", config.get("ppo_clip", 0.2))),
+            vf_coef=float(config.get("ppo_value_coef", 0.25)),
+            ent_coef=float(config.get("ppo_entropy_coef", 0.02)),
+            minibatch_size=int(config.get("ppo_minibatch_size", 512)),
+            gamma=float(config.get("ppo_gamma", 0.99)),
+            lam=float(config.get("ppo_gae_lam", 0.95)),
         )
 
         print("  [DEBUG] --- Red PPO Update ---")
@@ -623,9 +731,12 @@ def run_simulation(
         r_params, r_opt_state, r_metrics = ppo_update(
             r_params, r_opt_state, r_optimizer, model.apply,
             r_batch, n_layers, update_key,
-            clip_eps=config.get("ppo_clip_eps", 0.2),
-            vf_coef=config.get("ppo_value_coef", 0.25),
-            ent_coef=config.get("ppo_entropy_coef", 0.01),
+            clip_eps=float(config.get("ppo_clip_eps", config.get("ppo_clip", 0.2))),
+            vf_coef=float(config.get("ppo_value_coef", 0.25)),
+            ent_coef=float(config.get("ppo_entropy_coef", 0.02)),
+            minibatch_size=int(config.get("ppo_minibatch_size", 512)),
+            gamma=float(config.get("ppo_gamma", 0.99)),
+            lam=float(config.get("ppo_gae_lam", 0.95)),
         )
 
         # ── NaN debug after PPO update ──────────────────────────
@@ -634,38 +745,88 @@ def run_simulation(
             has_nan_params_after = any(bool(jnp.isnan(p).any()) for p in flat_p)
             print(f"[DEBUG] Params NaN after PPO update: {has_nan_params_after}")
 
-        # ── Legacy Telemetry Prints ─────────────────────────────
+        # ── Telemetry ─────────────────────────────────────────────
         step_val = (ui + 1) * T
-        if step_val % 200 == 0 or T >= 200:  # Print if we cross 200 steps or T is large
-            b_pop_np = jax.device_get(b_pop)
-            b_alive_snap = b_pop_np.alive
-            b_ages_snap = b_pop_np.ages.astype(np.float32)
-            b_nb_gain_snap = b_pop_np.nb_gain
+        _t_now = __import__('time').time()
+        
+        if step_val % 512 == 0 or T >= 512:
+            # Timing
+            elapsed = _t_now - _t_last
+            steps_sec = T / max(elapsed, 1e-6)
+            _t_last = _t_now
             
+            # Pull rollout data to CPU
             b_act_all = np.array(rollout_data["blue"]["actions"])
             b_alive_all = np.array(rollout_data["blue"]["alive"]).astype(bool)
+            b_rew_all = np.array(rollout_data["blue"]["rewards"])
+            b_energy_all = np.array(rollout_data["blue"]["energy"])
+            b_vals_all = np.array(rollout_data["blue"]["values"])
             
-            # TOM_STAY_TRACK
-            stay_mask = (b_act_all == 0) & b_alive_all
-            n_alive_over_time = b_alive_all.sum()
-            stay_rate = stay_mask.sum() / max(1, n_alive_over_time)
+            # Population snapshot
+            b_pop_np = jax.device_get(b_pop)
+            b_alive_now = int(b_pop_np.alive.sum())
+            r_alive_now = int(r_pop.alive.sum()) if r_pop is not None else 0
             
-            # NB_GAIN_SURV
-            sp_r, sp_p = float('nan'), float('nan')
-            mean_gain, std_gain = 1.0, 0.0
-            if b_alive_snap.sum() > 10:
-                from scipy.stats import spearmanr
-                _nb_g = b_nb_gain_snap[b_alive_snap]
-                _ages = b_ages_snap[b_alive_snap]
-                if _nb_g.std() > 1e-6:
-                    sp_r, sp_p = spearmanr(_nb_g, _ages)
-                mean_gain = float(_nb_g.mean())
-                std_gain = float(_nb_g.std())
+            # Action distribution (N=stay, S, E, W, stay=0)
+            alive_actions = b_act_all[b_alive_all]
+            if len(alive_actions) > 0:
+                act_counts = np.bincount(alive_actions, minlength=5)
+                act_pct = act_counts / act_counts.sum() * 100
+                act_str = f"N={act_pct[1]:.0f}% S={act_pct[2]:.0f}% E={act_pct[3]:.0f}% W={act_pct[4]:.0f}% Stay={act_pct[0]:.0f}%"
+            else:
+                act_str = "no alive agents"
             
-            print(f"[step {step_val:>8}] NB_GAIN_SURV  spearman_r={sp_r:.4f}  p={sp_p:.4f}  mean_gain={mean_gain:.3f}  std_gain={std_gain:.3f}")
-            print(f"[step {step_val:>8}] TOM_STAY_TRACK    stay_rate_over_T={stay_rate:.4f}")
-            print(f"[step {step_val:>8}] CHAIN_DEPTH  max=0  mean=0.00  hops>1=0  surv_corr=0.0000")
-            print(f"step= {step_val:>7}  blue={b_alive_snap.sum()}  red={r_pop.alive.sum() if r_pop is not None else 0}  brain={n_layers}L  ppo={ui+1}  surv=1.00")
+            # Energy stats
+            alive_mask_final = b_pop_np.alive
+            if alive_mask_final.sum() > 0:
+                alive_energy = b_pop_np.energy[alive_mask_final]
+                e_mean, e_std = float(alive_energy.mean()), float(alive_energy.std())
+                alive_ages = b_pop_np.ages[alive_mask_final].astype(float)
+                age_mean, age_max = float(alive_ages.mean()), float(alive_ages.max())
+            else:
+                e_mean, e_std, age_mean, age_max = 0, 0, 0, 0
+            
+            # Value accuracy (is value head learning?)
+            val_mean = float(b_vals_all[b_alive_all].mean()) if b_alive_all.any() else 0
+            ret_mean = float(b_metrics.get("returns_mean", 0)) if isinstance(b_metrics, dict) else 0
+            
+            # Signal diversity (unique signals broadcast)
+            b_signals_np = np.array(b_pop_np.signals)
+            if alive_mask_final.sum() > 0:
+                unique_signals = len(np.unique(b_signals_np[alive_mask_final]))
+            else:
+                unique_signals = 0
+            
+            # Reward breakdown
+            rew_alive = b_rew_all[b_alive_all]
+            rew_mean = float(rew_alive.mean()) if len(rew_alive) > 0 else 0
+            
+            # NB_GAIN correlation
+            sp_r = float('nan')
+            b_nb_gain_snap = b_pop_np.nb_gain
+            if alive_mask_final.sum() > 10:
+                try:
+                    from scipy.stats import spearmanr
+                    _nb_g = b_nb_gain_snap[alive_mask_final]
+                    _ages = b_pop_np.ages[alive_mask_final].astype(float)
+                    if _nb_g.std() > 1e-6:
+                        sp_r, _ = spearmanr(_nb_g, _ages)
+                except Exception:
+                    pass
+            
+            # Print concise dashboard
+            print(f"\n{'='*70}")
+            print(f"[step {step_val:>7}] {steps_sec:.0f} steps/sec | blue={b_alive_now} red={r_alive_now} | ppo={ui+1}")
+            print(f"  Actions: {act_str}")
+            print(f"  Energy:  mean={e_mean:.3f} std={e_std:.3f} | Age: mean={age_mean:.0f} max={age_max:.0f}")
+            vf_loss = float(b_metrics.get('ppo_vf_loss', 0)) if isinstance(b_metrics, dict) else 0
+            ent_val = float(b_metrics.get('ppo_entropy', 0)) if isinstance(b_metrics, dict) else 0
+            clip_frac = float(b_metrics.get('ppo_clip_frac', 0)) if isinstance(b_metrics, dict) else 0
+            print(f"  Values:  mean={val_mean:.4f} | VF_loss={vf_loss:.4f} | Clip={clip_frac:.3f}")
+            print(f"  Reward:  mean={rew_mean:.4f} | Entropy: {ent_val:.4f}")
+            print(f"  Signals: {unique_signals} unique | NB_GAIN↔surv: {sp_r:.3f}")
+            print(f"  Curriculum: red_floor={red_curriculum_stages[red_curriculum_idx]} sustain={red_sustain_count}/{red_sustain_needed}")
+            print(f"{'='*70}\n")
 
         # ── Evolutionary Distillation (CPU, Outer Loop) ─────────
         if config.get("distill_enabled", False):
@@ -762,14 +923,9 @@ def run_simulation(
         r_pos_all = np.array(rollout_data["red"]["positions"])
         r_alive_all = np.array(rollout_data["red"]["alive"])
 
-        # loc_env is the 4th block in b_obs. Let's find its index to extract local_resource.
-        # own_state: 6
-        # nb_sigs: K*sig_d (e.g. 6*16 = 96)
-        # loc_sym: W*sym_d (e.g. 25*16 = 400)
-        # loc_env: W*6 (e.g. 25*6 = 150)
-        # Central cell of W=25 is index 12. loc_env features: walls, resources, shelter, contested, scent, blue_map/red_map
+        # loc_env is the 4th block in b_obs (8 channels: blue, red, wall, resource, shelter, contested, scent, puzzle)
         idx_offset = 6 + (config["neighbor_k"] * config["signal_dim"]) + (25 * config["symbol_dim"])
-        idx_resource = idx_offset + (12 * 6) + 1  # 12th cell, 2nd feature (index 1 is resources)
+        idx_resource = idx_offset + (12 * 8) + 3  # 12th cell (center of 5x5), channel 3 = resource
 
         start_step = ui * T
         for t in range(T):

@@ -91,7 +91,7 @@ class AgentNetworkJax(nn.Module):
         own_state = obs[:, :6]
         nb_sigs = obs[:, 6:6 + K * self.signal_dim].reshape(N, K, self.signal_dim)
         loc_sym = obs[:, 6 + K * self.signal_dim:6 + K * self.signal_dim + W * sym_d].reshape(N, W, sym_d)
-        env_ch = 7
+        env_ch = 8
         loc_env = obs[:, 6 + K * self.signal_dim + W * sym_d:6 + K * self.signal_dim + W * sym_d + W * env_ch].reshape(N, W, env_ch)
         own_sig = obs[:, 6 + K * self.signal_dim + W * sym_d + W * env_ch:6 + K * self.signal_dim + W * sym_d + W * env_ch + self.signal_dim]
 

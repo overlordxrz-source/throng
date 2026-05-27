@@ -77,6 +77,89 @@ jax.tree_util.register_pytree_node(
 )
 
 
+# ── World generation (called once at init, not JIT) ──────────────────────
+
+def generate_resource_patches(
+    key: jnp.ndarray,
+    grid_size: int,
+    n_patches: int = 20,
+    patch_radius: float = 5.0,
+) -> jnp.ndarray:
+    """Generate Gaussian resource patches on the toroidal grid."""
+    resources = jnp.zeros((grid_size, grid_size), dtype=jnp.float32)
+    keys = jax.random.split(key, n_patches)
+    y_coords, x_coords = jnp.meshgrid(
+        jnp.arange(grid_size), jnp.arange(grid_size), indexing='ij'
+    )
+    for i in range(n_patches):
+        cy, cx = jax.random.randint(keys[i], (2,), 0, grid_size)
+        dy = jnp.minimum(jnp.abs(y_coords - cy), grid_size - jnp.abs(y_coords - cy))
+        dx = jnp.minimum(jnp.abs(x_coords - cx), grid_size - jnp.abs(x_coords - cx))
+        patch = jnp.exp(-(dy**2 + dx**2) / (2.0 * patch_radius**2))
+        resources = resources + patch
+    return jnp.clip(resources, 0.0, 1.0)
+
+
+def generate_shelter_spots(
+    key: jnp.ndarray,
+    grid_size: int,
+    n_spots: int = 5,
+    radius: int = 2,
+) -> jnp.ndarray:
+    """Place shelter zones where blues are protected from red catches."""
+    shelter = jnp.zeros((grid_size, grid_size), dtype=jnp.bool_)
+    keys = jax.random.split(key, n_spots)
+    y_coords, x_coords = jnp.meshgrid(
+        jnp.arange(grid_size), jnp.arange(grid_size), indexing='ij'
+    )
+    for i in range(n_spots):
+        cy, cx = jax.random.randint(keys[i], (2,), 0, grid_size)
+        dy = jnp.minimum(jnp.abs(y_coords - cy), grid_size - jnp.abs(y_coords - cy))
+        dx = jnp.minimum(jnp.abs(x_coords - cx), grid_size - jnp.abs(x_coords - cx))
+        dist = jnp.maximum(dy, dx)
+        shelter = shelter | (dist <= radius)
+    return shelter
+
+
+def generate_contested_nodes(
+    key: jnp.ndarray,
+    grid_size: int,
+    n_nodes: int = 3,
+    yield_mult: float = 3.0,
+    radius: int = 2,
+) -> jnp.ndarray:
+    """Place high-yield contested resource nodes (require 2+ agents to harvest)."""
+    contested = jnp.zeros((grid_size, grid_size), dtype=jnp.float32)
+    keys = jax.random.split(key, n_nodes)
+    y_coords, x_coords = jnp.meshgrid(
+        jnp.arange(grid_size), jnp.arange(grid_size), indexing='ij'
+    )
+    for i in range(n_nodes):
+        cy, cx = jax.random.randint(keys[i], (2,), 0, grid_size)
+        dy = jnp.minimum(jnp.abs(y_coords - cy), grid_size - jnp.abs(y_coords - cy))
+        dx = jnp.minimum(jnp.abs(x_coords - cx), grid_size - jnp.abs(x_coords - cx))
+        dist = jnp.maximum(dy, dx)
+        contested = jnp.where(dist <= radius, yield_mult, contested)
+    return contested
+
+
+def update_scent_trails(
+    scent_trails: jnp.ndarray,
+    r_positions: jnp.ndarray,
+    r_alive: jnp.ndarray,
+    intensity: float = 0.8,
+    decay_steps: int = 20,
+) -> jnp.ndarray:
+    """Reds deposit scent; trails decay over time."""
+    decay_rate = 1.0 / max(decay_steps, 1)
+    new_scent = scent_trails * (1.0 - decay_rate)
+    alive_f = r_alive.astype(jnp.float32)
+    new_scent = new_scent.at[r_positions[:, 0], r_positions[:, 1]].add(
+        intensity * alive_f
+    )
+    return jnp.clip(new_scent, 0.0, 1.0)
+
+
 # ── Toroidal helpers ─────────────────────────────────────────────────────────
 
 def wrap(pos: jnp.ndarray, size: int) -> jnp.ndarray:

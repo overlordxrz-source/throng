@@ -347,8 +347,8 @@ def compute_obs_dim_torch(config: dict) -> int:
     symd = config.get("symbol_dim", 8)
     r    = config["local_obs_radius"]
     W    = (2 * r + 1) ** 2
-    # Phase 7: env channels = 7 (blue_pres, red_pres, wall, resource, shelter, contested, scent)
-    env_ch = 7
+    # Phase 8: env channels = 8 (blue_pres, red_pres, wall, resource, shelter, contested, scent, puzzle)
+    env_ch = 8
     base = 6 + K * sd + W * symd + W * env_ch + sd
     # Phase 7: episodic memory buffer
     mem_slots = int(config.get("memory_buffer_size", 0))
@@ -356,9 +356,6 @@ def compute_obs_dim_torch(config: dict) -> int:
         base += mem_slots * (sd + 2)
     # Phase 7.5: dual cultural memory grids (fast + slow)
     base += W * symd * 2
-    # Phase 7.5d: puzzle observation
-    if config.get("puzzle_enabled", False):
-        base += W  # puzzle_grid is scalar per cell
     return base
 
 
