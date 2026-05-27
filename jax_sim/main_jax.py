@@ -584,6 +584,7 @@ def run_simulation(
             print(f"[DEBUG] Rollout data NaN: obs={has_nan_obs} vals={has_nan_vals} logp={has_nan_logp} rew={has_nan_rew}")
 
         # ── Red Curriculum Advancement ───────────────────────────
+        surv_rate = float(b_pop.alive.sum()) / float(max_pop)
         if red_curriculum_idx < len(red_curriculum_stages) - 1:
             if surv_rate >= red_sustain_threshold:
                 red_sustain_count += 1
