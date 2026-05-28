@@ -43,6 +43,8 @@ from jax_sim.network_jax import (
     AUX_HEAD_KEYS,
     ensure_aux_head_params,
     init_agent_params,
+    params_apply_variables,
+    sanitize_agent_params,
 )
 from jax_sim.rl_jax import compute_gae, ppo_loss, create_optimizer, ppo_update, auxiliary_update
 from agents.network_torch import compute_obs_dim_torch
@@ -601,20 +603,40 @@ def run_simulation(
 
     dummy_obs = jnp.zeros((1, obs_dim))
     dummy_carry = jnp.zeros((1, hidden_d))
-    b_params = init_agent_params(model, keys[3], dummy_carry, dummy_obs, n_layers)
-    r_params = init_agent_params(model, keys[5], dummy_carry, dummy_obs, n_layers)
+    b_params = sanitize_agent_params(
+        init_agent_params(model, keys[3], dummy_carry, dummy_obs, n_layers)
+    )
+    r_params = sanitize_agent_params(
+        init_agent_params(model, keys[5], dummy_carry, dummy_obs, n_layers)
+    )
     from flax.core import unfreeze as _unfreeze_params
     _bp = _unfreeze_params(b_params)
     _emb_ok = "kernel" in _bp.get("emb_own", {})
+    _aux_ok = all(k in _bp for k in AUX_HEAD_KEYS)
+    try:
+        model.apply(params_apply_variables(b_params), dummy_carry, dummy_obs, n_layers)
+        _apply_ok = True
+    except Exception as _apply_err:
+        _apply_ok = False
+        print(f"[DEBUG] apply smoke-test FAILED: {_apply_err}")
     print(
-        f"[DEBUG] Params OK: emb_own={_emb_ok} | "
-        f"aux_heads={all(k in _bp for k in AUX_HEAD_KEYS)}"
+        f"[DEBUG] Params OK: emb_own={_emb_ok} | aux_heads={_aux_ok} | apply={_apply_ok}"
     )
+    if not (_emb_ok and _aux_ok and _apply_ok):
+        raise RuntimeError(
+            "Parameter init failed — delete runs/jax_run/checkpoints and restart runtime"
+        )
 
     # ── Auxiliary heads apply function (forward dynamics + self-prediction) ──
     import functools as _functools
-    b_aux_apply_fn = _functools.partial(model.apply, method=model.auxiliary_heads)
-    r_aux_apply_fn = b_aux_apply_fn   # same architecture, different params passed at call time
+    def _aux_apply_fn(params, carry_t, action_oh):
+        return model.apply(
+            params_apply_variables(params), carry_t, action_oh,
+            method=model.auxiliary_heads,
+        )
+
+    b_aux_apply_fn = _aux_apply_fn
+    r_aux_apply_fn = _aux_apply_fn
 
     # ── NaN debug after init ────────────────────────────────
     flat_params = jax.tree_util.tree_leaves(b_params)
@@ -635,7 +657,9 @@ def run_simulation(
     # ── Debug: inspect initial action logits / entropy ──────
     test_carry = jnp.zeros((1, hidden_d))
     test_obs = jnp.zeros((1, obs_dim))
-    _, test_outs = model.apply(b_params, test_carry, test_obs, n_layers)
+    _, test_outs = model.apply(
+        params_apply_variables(b_params), test_carry, test_obs, n_layers
+    )
     test_logits = test_outs[0]  # action_logits
     test_probs = jax.nn.softmax(test_logits, axis=-1)
     test_entropy = -jnp.sum(test_probs * jnp.log(test_probs + 1e-10), axis=-1)
@@ -659,8 +683,12 @@ def run_simulation(
         print(f"[JAX] Resuming from checkpoint step {latest}...")
         abstract_tree = {"b_params": b_params, "r_params": r_params}
         restored = ckpt_mngr.restore(latest, items=abstract_tree)
-        b_params = ensure_aux_head_params(model, restored["b_params"], keys[3], hidden_d)
-        r_params = ensure_aux_head_params(model, restored["r_params"], keys[5], hidden_d)
+        b_params = sanitize_agent_params(
+            ensure_aux_head_params(model, restored["b_params"], keys[3], hidden_d)
+        )
+        r_params = sanitize_agent_params(
+            ensure_aux_head_params(model, restored["r_params"], keys[5], hidden_d)
+        )
         start_update = latest
         print(f"[JAX] Restored params from step {latest}. Population starts fresh.")
     

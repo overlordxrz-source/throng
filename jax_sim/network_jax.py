@@ -169,6 +169,11 @@ class AgentNetworkJax(nn.Module):
         token_ids = jnp.argmax(signal_logits, axis=-1)      # (N,)
         signal_probs = jax.nn.softmax(signal_logits, axis=-1)  # (N, vocab_size)
 
+        # Register auxiliary-head params in the same init as __call__ (Flax idiom).
+        if self.is_initializing():
+            _action_oh = jnp.zeros((N, 5), dtype=obs.dtype)
+            self.auxiliary_heads(carries, _action_oh)
+
         return new_carries, (
             action_logits, signal_logits, symbol_write, values,
             tom_logits, token_ids, signal_probs, culture_fast, culture_slow,
@@ -221,25 +226,41 @@ def init_agent_params(
     n_layers: int,
 ) -> Any:
     """
-    Initialize full parameter tree including auxiliary heads.
+    Initialize full parameter tree (main + auxiliary heads).
 
-    Flax only allocates params for modules visited on the init path.
-    ``model.init(..., __call__)`` never touches head_fwd_* / head_self_pred,
-    so a second init via ``method=auxiliary_heads`` is required and merged.
+    Auxiliary heads are touched inside ``__call__`` when ``is_initializing()``.
     """
-    k_main, k_aux = jax.random.split(rng)
-    params_main = model.init(k_main, carry, obs, n_layers)["params"]
-    action_oh = jnp.zeros((carry.shape[0], 5), dtype=jnp.float32)
-    params_aux = model.init(
-        k_aux, carry, action_oh, method=model.auxiliary_heads
-    )["params"]
-    # Only copy aux-head keys — a full dict merge can overwrite main weights with
-    # empty Flax scopes for modules that setup() defines but auxiliary_heads skips.
-    merged = unfreeze(params_main)
-    aux_flat = unfreeze(params_aux)
-    for k in AUX_HEAD_KEYS:
-        merged[k] = aux_flat[k]
-    return freeze(merged)
+    return sanitize_agent_params(model.init(rng, carry, obs, n_layers)["params"])
+
+
+def params_apply_variables(params: Any) -> dict:
+    """Wrap a params PyTree for ``Module.apply`` (explicit params collection)."""
+    return {"params": params}
+
+
+def sanitize_agent_params(params: Any) -> Any:
+    """
+    Fix param trees corrupted by merging full Flax variable dicts.
+
+    A mistaken merge can leave an empty top-level ``params`` collection next to
+    real module keys (``emb_own``, …). ``apply`` then uses the empty collection
+    and raises ScopeCollectionNotFound even though ``emb_own`` looks fine in a
+    flat dict inspection.
+    """
+    flat = unfreeze(params)
+    if "params" not in flat or not isinstance(flat["params"], dict):
+        return params
+    inner = flat["params"]
+    if inner and ("emb_own" in inner or "head_action" in inner):
+        merged = dict(inner)
+        for k in AUX_HEAD_KEYS:
+            if k in flat and k not in merged:
+                merged[k] = flat[k]
+        return freeze(merged)
+    if not inner:
+        cleaned = {k: v for k, v in flat.items() if k != "params"}
+        return freeze(cleaned)
+    return params
 
 
 def ensure_aux_head_params(
@@ -257,11 +278,12 @@ def ensure_aux_head_params(
     aux_only = model.init(
         rng, carry, action_oh, method=model.auxiliary_heads
     )["params"]
+    aux_flat = unfreeze(aux_only)
     for k in AUX_HEAD_KEYS:
         if k not in flat:
-            flat[k] = unfreeze(aux_only)[k]
+            flat[k] = aux_flat[k]
     print("[JAX] Merged fresh auxiliary-head params into restored checkpoint")
-    return freeze(flat)
+    return sanitize_agent_params(freeze(flat))
 
 
 class TransformerBlock(nn.Module):
