@@ -65,6 +65,10 @@ class AgentNetworkJax(nn.Module):
         self.head_culture_fast = nn.Dense(sym_d)
         self.head_culture_slow = nn.Dense(sym_d)
 
+        # Forward dynamics head: predicts carry_{t+1} from carry_t + action_onehot
+        self.head_fwd_1 = nn.Dense(self.hidden_dim * 4)
+        self.head_fwd_2 = nn.Dense(self.hidden_dim)
+
     def __call__(
         self,
         carries: jnp.ndarray,   # (N, hidden_dim)
@@ -162,6 +166,20 @@ class AgentNetworkJax(nn.Module):
             action_logits, signal_logits, symbol_write, values,
             tom_logits, token_ids, signal_probs, culture_fast, culture_slow,
         )
+
+    def forward_dynamics(
+        self,
+        carry_t: jnp.ndarray,    # (N, hidden_dim)
+        action_oh: jnp.ndarray,  # (N, 5)
+    ) -> jnp.ndarray:
+        """
+        Predict carry_{t+1} from carry_t + action_onehot.
+        Used for the forward dynamics auxiliary loss.
+        IMPORTANT: caller must stop_gradient the target carry_{t+1}.
+        """
+        inp = jnp.concatenate([carry_t, action_oh], axis=-1)  # (N, hidden_dim + 5)
+        h = nn.relu(self.head_fwd_1(inp))                      # (N, hidden_dim * 4)
+        return self.head_fwd_2(h)                               # (N, hidden_dim)
 
 
 class TransformerBlock(nn.Module):

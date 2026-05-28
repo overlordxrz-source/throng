@@ -294,3 +294,79 @@ def ppo_update(
         print(f"    [DEBUG] grad_norms (last mb) total={float(total_grad_norm):.4f} vf={float(vf_grad_norm):.4f} act={float(act_grad_norm):.4f}")
 
     return params, opt_state, metrics
+
+
+# ── Forward Dynamics Auxiliary Loss ───────────────────────────────────────────
+
+@functools.partial(jax.jit, static_argnames=("fwd_apply_fn", "optimizer", "fwd_coef"))
+def _fwd_minibatch_step(
+    params, opt_state, fwd_apply_fn, optimizer,
+    carry_t, action_oh, carry_tp1, alive_mask, fwd_coef,
+):
+    """Single minibatch gradient step for the forward dynamics auxiliary loss."""
+    def loss_fn(p):
+        carry_pred = fwd_apply_fn(p, carry_t, action_oh)
+        # CRITICAL: stop_gradient on target — without this, the model trivially
+        # learns carry_pred = 0.9 * carry_t (the decay coefficient) and reports
+        # a low loss while learning nothing about environment dynamics.
+        target = jax.lax.stop_gradient(carry_tp1)
+        err = jnp.square(carry_pred - target).mean(axis=-1)   # (M,)
+        loss = (err * alive_mask).sum() / (alive_mask.sum() + 1e-8)
+        return fwd_coef * loss, loss
+
+    (_, raw_loss), grads = jax.value_and_grad(loss_fn, has_aux=True)(params)
+    updates, new_opt_state = optimizer.update(grads, opt_state, params)
+    new_params = optax.apply_updates(params, updates)
+    return new_params, new_opt_state, raw_loss
+
+
+def fwd_dynamics_update(
+    params,
+    opt_state,
+    optimizer,
+    fwd_apply_fn,
+    carries_np,       # (T, N, hidden_dim) numpy — full rollout carries
+    actions_np,       # (T, N) numpy int — full rollout actions
+    alive_np,         # (T, N) numpy float, or None
+    key: jax.Array,
+    minibatch_size: int = 1024,
+    fwd_coef: float = 0.05,
+) -> Tuple[Dict, Any, float]:
+    """
+    Compute forward dynamics loss using sequential (carry_t, action_t) → carry_{t+1} pairs.
+    Returns updated (params, opt_state, avg_fwd_loss).
+    """
+    T, N, hidden_dim = carries_np.shape
+
+    # Build consecutive (t, t+1) pairs — these preserve temporal structure
+    carry_t   = carries_np[:-1].reshape((T - 1) * N, hidden_dim)
+    carry_tp1 = carries_np[1:].reshape((T - 1) * N, hidden_dim)
+    action_t  = actions_np[:-1].reshape((T - 1) * N)
+    action_oh = np.eye(5, dtype=np.float32)[action_t]   # ((T-1)*N, 5)
+
+    if alive_np is not None:
+        alive_t = alive_np[:-1].reshape((T - 1) * N).astype(np.float32)
+    else:
+        alive_t = np.ones((T - 1) * N, dtype=np.float32)
+
+    M = carry_t.shape[0]
+    rng  = np.random.RandomState(int(jax.random.bits(key, dtype=jnp.uint32)))
+    perm = rng.permutation(M)
+
+    n_mb = max(1, M // minibatch_size)
+    fwd_loss_sum = 0.0
+
+    for i in range(n_mb):
+        idx    = perm[i * minibatch_size : (i + 1) * minibatch_size]
+        mb_ct  = jnp.array(carry_t[idx])
+        mb_tp1 = jnp.array(carry_tp1[idx])
+        mb_ao  = jnp.array(action_oh[idx])
+        mb_al  = jnp.array(alive_t[idx])
+
+        params, opt_state, mb_loss = _fwd_minibatch_step(
+            params, opt_state, fwd_apply_fn, optimizer,
+            mb_ct, mb_ao, mb_tp1, mb_al, fwd_coef,
+        )
+        fwd_loss_sum += float(mb_loss)
+
+    return params, opt_state, fwd_loss_sum / n_mb

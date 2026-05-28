@@ -39,7 +39,7 @@ from jax_sim.population_jax import (
     apply_auto_reproduce
 )
 from jax_sim.network_jax import AgentNetworkJax
-from jax_sim.rl_jax import compute_gae, ppo_loss, create_optimizer, ppo_update
+from jax_sim.rl_jax import compute_gae, ppo_loss, create_optimizer, ppo_update, fwd_dynamics_update
 from agents.network_torch import compute_obs_dim_torch
 
 
@@ -576,6 +576,11 @@ def run_simulation(
     b_params = model.init(keys[3], dummy_carry, dummy_obs, n_layers)
     r_params = model.init(keys[5], dummy_carry, dummy_obs, n_layers)
 
+    # ── Forward dynamics apply functions (bound to model instance) ──
+    import functools as _functools
+    b_fwd_apply_fn = _functools.partial(model.apply, method=model.forward_dynamics)
+    r_fwd_apply_fn = b_fwd_apply_fn   # same architecture, different params
+
     # ── NaN debug after init ────────────────────────────────
     flat_params = jax.tree_util.tree_leaves(b_params)
     has_nan_params = any(bool(jnp.isnan(p).any()) for p in flat_params)
@@ -715,31 +720,56 @@ def run_simulation(
             )
 
         # PPO update (not JIT — Python loop)
+        _fwd_coef = float(config.get("fwd_coef", 0.05))
+        _fwd_mb   = int(config.get("ppo_minibatch_size", 512))
+
         print("  [DEBUG] --- Blue PPO Update ---")
         b_batch = rollout_data["blue"]
+        # Save carries on CPU before ppo_update deletes them (needed for fwd dynamics)
+        _b_carries_np = np.asarray(b_batch["carries"])
+        _b_actions_np = np.asarray(b_batch["actions"])
+        _b_alive_np   = np.asarray(b_batch["alive"]) if "alive" in b_batch else None
         b_params, b_opt_state, b_metrics = ppo_update(
             b_params, b_opt_state, b_optimizer, model.apply,
             b_batch, n_layers, update_key,
             clip_eps=float(config.get("ppo_clip_eps", config.get("ppo_clip", 0.2))),
             vf_coef=float(config.get("ppo_value_coef", 0.25)),
             ent_coef=float(config.get("ppo_entropy_coef", 0.02)),
-            minibatch_size=int(config.get("ppo_minibatch_size", 512)),
+            minibatch_size=_fwd_mb,
             gamma=float(config.get("ppo_gamma", 0.99)),
             lam=float(config.get("ppo_gae_lam", 0.95)),
         )
+        # Forward dynamics auxiliary loss for blue
+        fwd_key, update_key = jax.random.split(update_key)
+        b_params, b_opt_state, b_fwd_loss = fwd_dynamics_update(
+            b_params, b_opt_state, b_optimizer, b_fwd_apply_fn,
+            _b_carries_np, _b_actions_np, _b_alive_np,
+            fwd_key, minibatch_size=_fwd_mb, fwd_coef=_fwd_coef,
+        )
+        b_metrics["fwd_loss"] = b_fwd_loss
 
         print("  [DEBUG] --- Red PPO Update ---")
         r_batch = rollout_data["red"]
+        _r_carries_np = np.asarray(r_batch["carries"])
+        _r_actions_np = np.asarray(r_batch["actions"])
+        _r_alive_np   = np.asarray(r_batch["alive"]) if "alive" in r_batch else None
         r_params, r_opt_state, r_metrics = ppo_update(
             r_params, r_opt_state, r_optimizer, model.apply,
             r_batch, n_layers, update_key,
             clip_eps=float(config.get("ppo_clip_eps", config.get("ppo_clip", 0.2))),
             vf_coef=float(config.get("ppo_value_coef", 0.25)),
             ent_coef=float(config.get("ppo_entropy_coef", 0.02)),
-            minibatch_size=int(config.get("ppo_minibatch_size", 512)),
+            minibatch_size=_fwd_mb,
             gamma=float(config.get("ppo_gamma", 0.99)),
             lam=float(config.get("ppo_gae_lam", 0.95)),
         )
+        fwd_key, update_key = jax.random.split(update_key)
+        r_params, r_opt_state, r_fwd_loss = fwd_dynamics_update(
+            r_params, r_opt_state, r_optimizer, r_fwd_apply_fn,
+            _r_carries_np, _r_actions_np, _r_alive_np,
+            fwd_key, minibatch_size=_fwd_mb, fwd_coef=_fwd_coef,
+        )
+        r_metrics["fwd_loss"] = r_fwd_loss
 
         # ── Brain Vote (capacity-based, runs after PPO) ──────────
         _bv_ent = float(b_metrics.get('ppo_entropy', 0)) if isinstance(b_metrics, dict) else 0
@@ -857,8 +887,10 @@ def run_simulation(
             vf_loss = float(b_metrics.get('ppo_vf_loss', 0)) if isinstance(b_metrics, dict) else 0
             ent_val = float(b_metrics.get('ppo_entropy', 0)) if isinstance(b_metrics, dict) else 0
             clip_frac = float(b_metrics.get('ppo_clip_frac', 0)) if isinstance(b_metrics, dict) else 0
+            fwd_loss_val = float(b_metrics.get('fwd_loss', float('nan'))) if isinstance(b_metrics, dict) else float('nan')
             print(f"  Values:  mean={val_mean:.4f} | VF_loss={vf_loss:.4f} | Clip={clip_frac:.3f}")
             print(f"  Reward:  mean={rew_mean:.4f} | Entropy: {ent_val:.4f}")
+            print(f"  FwdDyn:  loss={fwd_loss_val:.4f} (target: ~0.05-0.10 when learned)")
             print(f"  Signals: {unique_signals} unique | NB_GAIN↔surv: {sp_r:.3f}")
             print(f"  Curriculum: red_floor={red_curriculum_stages[red_curriculum_idx]} sustain={red_sustain_count}/{red_sustain_needed} | brain={n_layers}L")
             print(f"{'='*70}\n")
