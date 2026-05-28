@@ -38,7 +38,12 @@ from jax_sim.population_jax import (
     PopState, init_population, kill_agents, update_memory_buffer, apply_mind_meld,
     apply_auto_reproduce
 )
-from jax_sim.network_jax import AgentNetworkJax
+from jax_sim.network_jax import (
+    AgentNetworkJax,
+    AUX_HEAD_KEYS,
+    ensure_aux_head_params,
+    init_agent_params,
+)
 from jax_sim.rl_jax import compute_gae, ppo_loss, create_optimizer, ppo_update, auxiliary_update
 from agents.network_torch import compute_obs_dim_torch
 
@@ -563,6 +568,29 @@ def run_simulation(
     obs_dim = compute_obs_dim_torch(config)
     print(f"[JAX] obs_dim = {obs_dim}")
 
+    # Verify the interpreter loaded this repo (not a stale clone / wrong cwd).
+    import inspect as _inspect
+    from jax_sim import rl_jax as _rl_jax_mod
+    _main_path = _inspect.getfile(run_simulation)
+    _repo_root = os.path.dirname(os.path.dirname(_main_path))
+    try:
+        import subprocess as _subprocess
+        _git_sha = _subprocess.check_output(
+            ["git", "rev-parse", "--short", "HEAD"],
+            cwd=_repo_root,
+            stderr=_subprocess.DEVNULL,
+        ).decode().strip()
+    except Exception:
+        _git_sha = "unknown"
+    if hasattr(_rl_jax_mod, "auxiliary_update"):
+        _phase9 = "ON (AuxLoss line on dashboard)"
+    elif hasattr(_rl_jax_mod, "fwd_dynamics_update"):
+        _phase9 = "PARTIAL (FwdDyn only — pull 8e09f6a+ for self-pred)"
+    else:
+        _phase9 = "OFF — git pull required"
+    print(f"[JAX] code: {_main_path}")
+    print(f"[JAX] git={_git_sha} | Phase9 auxiliary: {_phase9}")
+
     # ── Red curriculum state ─────────────────────────────────
     red_curriculum_stages = [6, 15, 30, 75]
     red_curriculum_idx = 0
@@ -573,8 +601,10 @@ def run_simulation(
 
     dummy_obs = jnp.zeros((1, obs_dim))
     dummy_carry = jnp.zeros((1, hidden_d))
-    b_params = model.init(keys[3], dummy_carry, dummy_obs, n_layers)
-    r_params = model.init(keys[5], dummy_carry, dummy_obs, n_layers)
+    b_params = init_agent_params(model, keys[3], dummy_carry, dummy_obs, n_layers)
+    r_params = init_agent_params(model, keys[5], dummy_carry, dummy_obs, n_layers)
+    from flax.core import unfreeze as _unfreeze_params
+    print(f"[DEBUG] Aux head params present: {all(k in _unfreeze_params(b_params) for k in AUX_HEAD_KEYS)}")
 
     # ── Auxiliary heads apply function (forward dynamics + self-prediction) ──
     import functools as _functools
@@ -624,8 +654,8 @@ def run_simulation(
         print(f"[JAX] Resuming from checkpoint step {latest}...")
         abstract_tree = {"b_params": b_params, "r_params": r_params}
         restored = ckpt_mngr.restore(latest, items=abstract_tree)
-        b_params = restored["b_params"]
-        r_params = restored["r_params"]
+        b_params = ensure_aux_head_params(model, restored["b_params"], keys[3], hidden_d)
+        r_params = ensure_aux_head_params(model, restored["r_params"], keys[5], hidden_d)
         start_update = latest
         print(f"[JAX] Restored params from step {latest}. Population starts fresh.")
     

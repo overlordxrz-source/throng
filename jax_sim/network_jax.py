@@ -16,7 +16,11 @@ from __future__ import annotations
 import jax
 import jax.numpy as jnp
 from flax import linen as nn
-from typing import Optional, Tuple
+from flax.core import freeze, unfreeze
+from typing import Any, Optional, Tuple
+
+# Params created only in auxiliary_heads (not touched by __call__ during init).
+AUX_HEAD_KEYS = ("head_fwd_1", "head_fwd_2", "head_self_pred")
 
 
 class AgentNetworkJax(nn.Module):
@@ -207,6 +211,51 @@ class AgentNetworkJax(nn.Module):
         self_pred_logits = self.head_self_pred(carry_t)
 
         return carry_pred, self_pred_logits
+
+
+def init_agent_params(
+    model: AgentNetworkJax,
+    rng: jax.Array,
+    carry: jnp.ndarray,
+    obs: jnp.ndarray,
+    n_layers: int,
+) -> Any:
+    """
+    Initialize full parameter tree including auxiliary heads.
+
+    Flax only allocates params for modules visited on the init path.
+    ``model.init(..., __call__)`` never touches head_fwd_* / head_self_pred,
+    so a second init via ``method=auxiliary_heads`` is required and merged.
+    """
+    k_main, k_aux = jax.random.split(rng)
+    params_main = model.init(k_main, carry, obs, n_layers)["params"]
+    action_oh = jnp.zeros((carry.shape[0], 5), dtype=jnp.float32)
+    params_aux = model.init(
+        k_aux, carry, action_oh, method=model.auxiliary_heads
+    )["params"]
+    return freeze({**unfreeze(params_main), **unfreeze(params_aux)})
+
+
+def ensure_aux_head_params(
+    model: AgentNetworkJax,
+    params: Any,
+    rng: jax.Array,
+    hidden_dim: int,
+) -> Any:
+    """Fill missing auxiliary-head params when resuming an older checkpoint."""
+    flat = unfreeze(params)
+    if all(k in flat for k in AUX_HEAD_KEYS):
+        return params
+    carry = jnp.zeros((1, hidden_dim))
+    action_oh = jnp.zeros((1, 5), dtype=jnp.float32)
+    aux_only = model.init(
+        rng, carry, action_oh, method=model.auxiliary_heads
+    )["params"]
+    for k in AUX_HEAD_KEYS:
+        if k not in flat:
+            flat[k] = unfreeze(aux_only)[k]
+    print("[JAX] Merged fresh auxiliary-head params into restored checkpoint")
+    return freeze(flat)
 
 
 class TransformerBlock(nn.Module):
