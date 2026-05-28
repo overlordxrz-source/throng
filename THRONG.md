@@ -3623,3 +3623,183 @@ The `sim_step` function in `main_jax.py` is decorated with `@jax.jit` and execut
 **Architecture is already at target**: full env step inside one `jax.jit`. The 10× speedup goal should be realized. No timing instrumentation exists yet — need a successful run to measure actual steps/sec.
 
 **Current Status**: Run deploying on Kaggle with all fixes at commit `682d625`. Previous runs crashed on the `surv_rate` NameError (now fixed).
+
+---
+
+## May 28, 2026 — The Throats Open: Signal Channel Confirmed Live + Forward Dynamics Inflection
+
+### TL;DR
+
+- **The critical bug is fixed.** Until yesterday, agents were computing signal logits but never *writing them back* to `PopState.signals`. Neighbours were receiving zero-vectors for ~130k cumulative steps across all prior runs. **No emergent communication was actually possible.** Three lines of code in `sim_step` now propagate the softmaxed signal logits into the population state every step.
+- **The channel is live.** Current Colab run (commit `82a1c7f`+) shows `Signals: ~3000 unique` consistently from step 512 onward — agents are now broadcasting *something different from silence*, and that something varies across the population.
+- **External review (another agent) flagged a real architectural gap**: our "Inner Rehearsal" plan (loop the carry K times) deepens processing of the *current* observation but does **not** simulate the future. True deliberation requires a **Forward Dynamics Model**. This is accepted; the roadmap is now reorganised into Phase 9.1 / 9.2 / 9.3.
+- **Now-known limitation**: 3000 unique signals from a 100-agent population is *high entropy, not yet a vocabulary*. Vocabulary formation requires the diversity number to *drop* (while survival holds) as agents converge on shared attractors. We need a clustering metric to detect this transition.
+
+### Current Run Snapshot (Colab T4, fresh checkpoints, commit `82a1c7f`)
+
+```
+[step    5120] 2 steps/sec | blue=100 red=75 | ppo=40
+  Actions: N=15% S=30% E=15% W=27% Stay=14%
+  Energy:  mean=0.622 std=0.101 | Age: mean=62 max=345
+  Values:  mean=1.6022 | VF_loss=0.8093 | Clip=0.044
+  Reward:  mean=0.1037 | Entropy: 1.5030
+  Signals: 3135 unique | NB_GAIN↔surv: nan
+  Curriculum: red_floor=75 sustain=0/5 | brain=2L
+```
+
+Reading this:
+- **`Signals: 3135 unique`** out of ~100 alive agents → high signal-vector diversity. Agents are emitting non-trivial broadcasts. (Before the fix, this was `1` for hundreds of thousands of steps.)
+- **Curriculum advanced 6 → 15 → 30 → 75 in ~2k steps** — the previous bottleneck was a fake difficulty (no comms made survival easy), so blues hit 80%+ trivially. Now sustain is stuck at 0/5 at floor=75 because reds are at full pressure.
+- **Red entropy collapsed early** (PPO#1 red_ent=1.40 → PPO#10 red_ent=0.55) — predators specialised fast on a chase strategy. They are reading the open channel too.
+- **VF_loss ~0.7–0.8 and not yet falling** at 100% blue survival → the critic isn't well-calibrated; values mean is climbing (0.62 → 2.27) which is expected during initial warm-up, but blues haven't faced real pressure yet because red learning rate is causing reds to thrash.
+- **NB_GAIN↔surv: nan** → there isn't yet enough death variance to compute a meaningful "did listening to neighbours predict surviving?" correlation. This is the most important number we need to watch; when reds actually start catching blues and listening becomes selectively advantageous, this should swing positive.
+
+### The DEBUG Block Explained
+
+The `[DEBUG]` lines before the first `[step 512]` summary are a built-in **sanity panel** that runs on the very first rollout-and-update cycle (`debug_nan.py` + the manual prints in `main_jax.py`). They exist so a failing run dies *visibly* on the first PPO step instead of after an hour of NaNs propagating silently.
+
+What they're checking:
+
+| Line | What it verifies |
+|------|------------------|
+| `Params NaN after init: False` | Flax initialisation didn't produce NaN weights. |
+| `Init action_logits mean / std` | The freshly-initialised actor head emits reasonable logits (≈ 0 mean, modest std). If `std > 5` we'd see immediate one-hot policies. |
+| `Init entropy mean=1.5153 (expected ~1.6 for uniform 5-action)` | At init, the policy should be ~uniform over 5 actions → `ln(5)=1.609`. We're at 1.52, which means slight initial bias — fine. |
+| `Rollout data NaN: obs=False vals=False logp=False rew=False` | Confirms the JIT-compiled `lax.scan` rollout produced no NaNs across all 128/512 inner steps. |
+| `rewards / values / adv / returns mean & std` | Per-team scalar audit of the PPO inputs. Crucial: `adv std=1.0000` means GAE normalised correctly, `returns mean` should be a reasonable expected-discounted-future. |
+| `grad_norms total=... vf=... act=...` | After backward pass on the last minibatch. We want `total < grad_clip_norm` (currently 2.0) and `vf` and `act` both nonzero. |
+| `Params NaN after PPO update: False` | If we just dumped 2.4 of gradient on the network, did anything explode? |
+
+Once the first PPO update completes cleanly, the panel keeps running every minibatch (you see it repeating before every dashboard block) so you can spot the *moment* of a numerical event. It's "the canary in the coal mine."
+
+### What the Run Is Telling Us Right Now
+
+1. **Communication infrastructure: ✅** Signals propagate. Vocabulary diversity is high. Reds are also broadcasting (red signals are computed and written via the same fix).
+2. **Communication semantics: ❓** 3000 unique signals = no compression. A real vocabulary needs *attractor states* — clusters of similar signal-vectors that map to shared meanings. We currently lack a metric for this.
+3. **Pressure: ⚠️ Just starting.** Until reds reliably catch blues, there is no selection pressure that favours *informative* signals over arbitrary ones. The early collapse of red entropy is a hopeful sign.
+4. **Brain vote: 🟡 Idle.** Capacity-based vote requires (a) signal entropy plateau + (b) signal-diversity plateau + (c) VF struggling + (d) survival under threshold. Survival is at 100% so (d) is off. Once reds start catching, conditions should align.
+
+### External Review (Other-Agent) — Synthesis
+
+A separate model reviewed the roadmap and made one sharp architectural point worth integrating verbatim:
+
+> "If an agent just passes its internal state through its transformer multiple times, it is 'thinking deeper' about its current observation. It is not simulating the future. To achieve true Ha & Schmidhuber-style 'dreaming' or deliberation, your roadmap needs to explicitly decouple the environment simulator from the policy."
+
+This is correct. The fix in our roadmap: **separate iterative refinement (loop the carry) from forward simulation (predict next observation given action)**. They are different cognitive operations and produce different capabilities.
+
+Where the critique under-credits us:
+- We already have a **Theory-of-Mind head** that predicts neighbour actions. That is a forward dynamics model *over other agents' policies* — a partial proto-world-model.
+- The **recurrent carry** is already an integrative latent state, and the **dual cultural grids** already function as an externalised global workspace.
+- We already do **observation noise + signal gate** so the agent can't trivially memorise its own perception — this is the kind of bottleneck that incentivises *learning* a dynamics model rather than reading one off.
+
+But the critique's core engineering recommendation — **add an explicit `Forward Dynamics` head and an auxiliary prediction loss** — is right. Recent literature confirms this is the dominant 2025–2026 trend in multi-agent emergent communication:
+
+- **MAMBA** (Egorov & Shpilman, 2022) — multi-agent Dreamer with local world models + communication.
+- **CoDreamer** (Toledo, 2024) — GNN-conditioned latent dynamics for joint imagination.
+- **MAG** (Wu et al., 2023) — multi-step world-model error correction in MARL.
+- **DMAWM / Disentangled Multi-Agent World Models** (2025, OpenReview) — factorised latent dynamics enabling fully decentralised execution.
+- **MetaMind** (2026, arxiv 2603.00808) — `Forward Dynamics: ˜b_{t+1} = D_φ(b_t, a_t, g)` over agent **belief** states, with a Meta-ToM inverse-inference module. This is exactly the architectural shape our ToM head is half of.
+- **Decentralized Collective World Model for Emergent Communication and Coordination** (Taniguchi et al., arxiv 2504.03353, 2025) — integrates a world model with the *communication channel itself* and uses contrastive learning to align messages across agents. The result: emergent symbols whose contents are forced to be *predictive about environment state*. **This is the single most relevant prior work to THRONG that we have not yet integrated.**
+
+### Phase 9 Roadmap — Revised
+
+Replacing the flat "Phase 9 Planned" list with a layered three-stage plan, in order of cost/risk:
+
+#### Phase 9.1 — Self-Model + Metacognition (cheap, low-risk)
+- **Self-prediction head** — `head_self_action(h_t) → action_logits`, trained via cross-entropy against the *actually sampled* action `a_t`. No new env mechanic, just one extra output + one extra loss term (~5% compute).
+  - *Falsifiable signal of "proto-self":* per-agent self-prediction accuracy should exceed chance (20% for 5 actions) and correlate with survival.
+- **Confidence head** — `head_confidence(h_t) → scalar ∈ [0,1]`, trained via "predicted action == sampled action" indicator. High confidence → act decisively. Low confidence → emit a help-signal token? (Plug into signal head as a learned gate.)
+- **Mind-meld gating** — only blend carries when *both* agents have high confidence on the same predicted state. Removes the current "always teach" behaviour and aligns with "teaching when you actually know something."
+
+#### Phase 9.2 — Forward Dynamics Head (medium cost)
+- **One new head**: `head_fwd(h_t, a_t) → predicted_local_obs_{t+1}` (predicting the 5×5 local patch + own_energy + nearest-neighbour-presence after taking action `a_t`).
+- **Auxiliary loss**: MSE between predicted and actual `obs_{t+1}`. Coefficient starts at `0.05`, ramps to `0.2` over 50k steps.
+- **Critical extension (THRONG-specific)**: the dynamics head's input should include **pooled neighbour signals**. This *forces* the signal channel to carry information that reduces forward-prediction error. The signal becomes load-bearing for prediction, which is a much sharper selection pressure than survival alone.
+- **Falsifiable signal**: mutual information between `mean(neighbour_signals)` and `fwd_pred_error` should be measurable and positive. Removing neighbour signals from `head_fwd` (ablation) should *increase* prediction error. If it doesn't, signals are still cosmetic.
+
+#### Phase 9.3 — Dreamer / Imagination Loop (high cost, gated on 9.2 working)
+- Once `head_fwd` is reliable, use it for **counterfactual rollout** at inference time: for each candidate action, hallucinate the next 2–3 obs, score with the critic, pick the action with the best imagined return.
+- This is a *fixed* tree (5 actions × depth K), so JIT-compiles cleanly.
+- Replaces the current "argmax over `head_action`" with "argmax over `vf(imagined_next_state | action)`" — true deliberation.
+
+#### Phase 9.4 — Re-evaluate Other Ideas
+After 9.1–9.3 are confirmed, revisit:
+- Attention over neighbour signals (replace mean-pool).
+- Variable-length messages (multi-token broadcasts).
+- Adversarial reds (reds learn to mimic blue signals).
+- Hierarchical RL (high-level goal + low-level motor) — **deprioritised**: redundant with carry + value head.
+- Crafting/construction — **deprioritised**: high engineering cost, weak hypothesis for emergence.
+
+### Distillation Update
+
+Current implementation already runs distillation every `distill_interval` steps (we see `[step 9984] DISTILL — population` in the dashboard). The "human among apes" model described above is the *target*; what we have is closer to "noise-added cloning." Concrete improvements queued behind 9.1:
+
+1. Multi-dim fitness: `age × mean_energy × signal_diversity × nb_gain` (currently age-only).
+2. Distill onto carries, not just params (transfer learned latent, not architectural knowledge).
+3. Trigger on *stratification*, not interval (distill when top-vs-median fitness gap > threshold).
+4. Maintain diversity with per-blend Gaussian noise on the carry blend.
+
+### Metrics to Add to Dashboard
+
+The current `Signals: N unique` is necessary but insufficient. Proposed additions:
+
+| Metric | Definition | What it tells us |
+|--------|-----------|------------------|
+| **Signal clusters (k-means)** | Run mini-batch k-means(k=16) on alive agents' signal vectors; report (a) effective cluster count, (b) cluster-purity over a 1k-step window. | When this drops from "16 ≈ random" toward 3–8 stable clusters, a vocabulary is forming. |
+| **Signal–context MI** | MI of each signal dim against `nearest_red_dist`, `local_resource`, `own_energy` over the last 10k samples. | Re-enables our Phase 4 decoder analysis on continuous vectors. |
+| **Self-prediction accuracy** | % of steps where `argmax(head_self_action) == sampled_action`. | Proto-self-model strength. |
+| **Forward-dynamics MSE** | MSE of `head_fwd` predictions on a holdout 5% of the rollout. | World-model quality. |
+| **Signal–dynamics MI ablation Δ** | `MSE(head_fwd | signals zeroed) − MSE(head_fwd | signals on)`. | If positive, signals are load-bearing for prediction — i.e. they encode genuine predictive information about the world. **This is the single sharpest test of whether communication is real.** |
+| **Cluster occupancy entropy** | Entropy of the k-means cluster occupancy histogram. | Distinguishes "uniform use of all clusters" (proto-Zipfian) from "monoculture" (collapse). |
+
+The `Signals: 3168 unique` number we currently print is morally `≈ N_alive` and should be retired in favour of the cluster metric. Implementation: small k-means in `np` after the dashboard block, every `dashboard_interval` updates. Cost: trivial (~5 ms on CPU at N=100, d=32).
+
+### Updated Key References
+
+Adding to the table (Section "Philosophical Foundations"):
+
+| Reference | Relevance |
+|---|---|
+| Ha & Schmidhuber (2018), "World Models" | Original separation of dynamics model from policy; the case for imagination-based RL. |
+| Hafner et al. (2020–2023), "Dreamer / DreamerV3" | Latent world model + critic on imagined trajectories — direct template for Phase 9.3. |
+| Egorov & Shpilman (2022), MAMBA | Multi-agent Dreamer with communication channels — most direct precedent. |
+| Toledo (2024), CoDreamer | GNN-conditioned shared world models for cooperative imagination. |
+| Wu et al. (2023), MAG | Mitigating multi-step prediction error in multi-agent dynamics — likely necessary for our case. |
+| Taniguchi et al. (2025), Decentralized Collective World Model | **Direct prior for our novel "signal-conditioned dynamics" — contrastive alignment of emergent symbols.** |
+| MetaMind (2026, arxiv 2603.00808) | Goal-conditioned forward dynamics + Meta-ToM inverse inference. Mirrors our ToM-head + (planned) self-model. |
+| Schmidhuber (2010), "Formal Theory of Creativity, Fun, and Intrinsic Motivation" | Prediction error as intrinsic reward — alternative to survival-only training; queued for 9.4. |
+
+### Honest Status of "What's Working"
+
+- ✅ JAX simulation runs end-to-end at 2 steps/sec on free Colab T4 (suboptimal but stable).
+- ✅ Signal propagation: fixed and confirmed.
+- ✅ Brain vote: capacity-based logic deployed, not yet triggered (no plateau yet).
+- ✅ Curriculum: stages [6, 15, 30, 75] traverse correctly with the threshold gate.
+- ✅ Checkpointing: Orbax legacy API, params-only — survives restart.
+- ✅ Distillation: runs on interval, takes effect on population.
+- ⚠️ **NB_GAIN↔surv = nan**: not enough death variance yet. Will resolve when reds catch blues.
+- ⚠️ **No signal compression yet**: vocabulary not forming because (a) reds haven't applied enough pressure, (b) signals are not load-bearing for any task other than reward (which is sparse). Phase 9.2's signal-conditioned dynamics is the direct fix.
+- ⚠️ **VF underfitting persists** in absolute terms (loss 0.7–0.8) — the value head got better init (normal(0.01)) but the targets themselves are noisy because predation events are rare. Should self-resolve as curriculum applies pressure.
+- ❌ **No deliberation**: agents are still reactive. Phase 9.1–9.3 is the explicit fix.
+- ❌ **No verified compositionality**: COMPOSE returns nan because there's no displaced reference yet. Will populate once reds force "red+direction" signals.
+
+### What I'm Watching On the Next Run
+
+1. Does `Signals: N unique` *decrease* below ~N_alive over the next 100k steps? → Compression / vocabulary attractor.
+2. Does survival drop below 90% at `red_floor=75`? → Real pressure.
+3. Does `NB_GAIN↔surv` produce a non-nan, positive number? → Listening is selectively advantageous.
+4. Does brain-vote actually trigger and expand to 3L? → Capacity is being saturated.
+5. Does Red entropy stabilise below 1.0? → Reds are committing to a strategy, not thrashing.
+
+### What's Next, Practically
+
+**Do not write new code yet.** Let the current run go to ≥100k steps and prove the channel actually selects for *some* function (the diversity number should shift). Then in order:
+
+1. Add the k-means signal-cluster metric (low-risk, observational only).
+2. Add `head_self_action` + self-prediction loss (Phase 9.1, ~1 day of work).
+3. Add `head_fwd` + signal-conditioned forward dynamics loss (Phase 9.2, ~2 days of work).
+4. If 9.2 produces a non-zero signal–dynamics-MI ablation Δ, build the Dreamer loop (9.3).
+
+If 9.2 shows that signals do **not** improve `head_fwd` accuracy even after 500k steps of joint training, then the environment lacks information asymmetry sufficient to make communication useful, and we need to make red detection *strictly* signal-dependent (currently it's still possible to see reds in the 5×5 patch). That would be a hard pivot back to Phase 5's "force communication" path.
+
+— *appended 2026-05-28*

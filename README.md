@@ -1,125 +1,214 @@
-# THRONG v2 — Emergent Communication & Cultural Memory
+# THRONG — Emergent Communication & Cumulative Culture from Survival Pressure
 
-THRONG is a multi-agent artificial life simulation where populations of neural agents
-evolves **language, cooperation, and shared knowledge from scratch** — no human-defined
-rewards, no pre-programmed behaviours. Agents learn to survive, communicate, and build
-collective memory through natural selection pressure.
+THRONG is a multi-agent artificial-life simulation in which two populations of
+neural agents — **blue** (prey) and **red** (predator) — co-evolve in a rich
+2D world. Blues must learn, from scratch and with no human-supplied rewards,
+to **survive, signal, and pass knowledge on**. The goal is not "an agent that
+plays a game well." The goal is **emergence**: language, culture, and proto-
+cognition arising purely from selection pressure.
 
-**Current Phase:** 7.5 — Dual Cultural Memory Grids + Red Co-evolution  
-**Framework:** JAX + Flax (fully JIT-compiled simulation)  
-**Obs Dim:** 2,310 per agent  
-**Device:** GPU (T4 on Kaggle)
+**Current state:** Phase 8.5 → entering Phase 9. JAX simulation runs end-to-end
+on free-tier T4 GPUs. The signal channel is **live as of May 28 2026** (a
+critical bug that silently zeroed all broadcasts for ~130k steps was just
+fixed). Next: Self-Model, Forward Dynamics, and Dreamer-style deliberation.
+
+**Framework:** JAX + Flax (full `lax.scan` rollout under one `@jax.jit`)
+**Active config:** `config_phase7.yaml`
+**Working files:** `jax_sim/` (PyTorch code in `agents/`, `environment/`,
+`main.py` is frozen legacy).
+
+For the full research log, theory, philosophy, and per-phase post-mortems see
+[THRONG.md](THRONG.md).
 
 ---
 
-## Quick Start
+## What THRONG Is Trying to Do
 
-### JAX Simulation (current — recommended)
+Most "intelligent agent" projects work *top-down*: define a task, define a
+reward, build an architecture, get it to score well. THRONG works *bottom-up*:
+build a world hard enough that **survival itself selects for the things we
+care about** — communication, cooperation, planning, cumulative culture — and
+get out of the way.
 
-```bash
-# 1. Install dependencies
-pip install jax[cuda12] flax optax pyyaml wandb
+The bet is that grounded, embodied, multi-agent pressure produces something
+qualitatively different from text-trained LLMs:
 
-# 2. Run from Python
-from jax_sim.main_jax import run_simulation
+- LLMs are **mirrors** of human concepts.
+- THRONG agents are **seeds** that grow their own concepts from physical
+  survival outcomes — concepts that may or may not align with anything a human
+  would name.
+
+We try to falsify this. Every claim ("agents are communicating", "they are
+forming a vocabulary", "they are planning") has a *number* we watch in the
+dashboard. If the number doesn't move, the claim is wrong, and the design is
+incomplete.
+
+---
+
+## Quick Start (Colab / Kaggle T4)
+
+```python
+# Cell 1 — setup
+!git clone https://github.com/overlordxrz-source/throng.git /content/throng 2>/dev/null || true
+%cd /content/throng
+!git reset --hard
+!git pull origin master
+!pip install -q jax[cuda12] flax optax pyyaml wandb orbax-checkpoint
+
+# Cell 2 — fresh run with aggressive overrides for free T4
+import sys, os, shutil
+sys.path.insert(0, "/content/throng")
+os.chdir("/content/throng")
+
+# Clear prior checkpoints if doing a fresh run after major code change
+shutil.rmtree("runs/jax_run/checkpoints", ignore_errors=True)
+
 import yaml
+from jax_sim.main_jax import run_simulation
+
 with open("config_phase7.yaml") as f:
     cfg = yaml.safe_load(f)
+
+# T4-friendly overrides (do NOT use these on an A100 / H100; scale back up)
+cfg["population_size"]    = 100
+cfg["red_population_size"] = 75
+cfg["grid_size"]          = 64
+cfg["n_layers"]           = 2     # brain_vote may expand this up to brain_max_layers=6
+cfg["ppo_rollout_steps"]  = 128
+cfg["ppo_minibatch_size"] = 256
+cfg["memory_buffer_size"] = 5
+cfg["mind_meld_enabled"]  = False
+cfg["use_pmap"]           = False
+
 final_params, metrics = run_simulation(cfg, seed=42, n_steps=1_000_000)
 ```
 
-### Legacy PyTorch (still available)
+**Local (Linux + CUDA 12):**
+
+```bash
+pip install jax[cuda12] flax optax orbax-checkpoint pyyaml wandb
+python -c "
+import yaml
+from jax_sim.main_jax import run_simulation
+cfg = yaml.safe_load(open('config_phase7.yaml'))
+run_simulation(cfg, seed=42, n_steps=1_000_000)
+"
+```
+
+**Legacy PyTorch (frozen, not maintained):**
 
 ```bash
 pip install -r requirements.txt
 python main.py --config config_phase7.yaml --headless --fresh
 ```
 
-### Kaggle Notebook (recommended for long runs)
-
-```python
-# Cell 1 — setup
-!git clone https://github.com/overlordxrz-source/throng.git /kaggle/working/throng 2>/dev/null || true
-%cd /kaggle/working/throng
-!git reset --hard
-!git pull origin master
-!pip install -q jax[cuda12] flax optax pyyaml wandb
-
-# Cell 2 — run
-import sys
-sys.path.insert(0, "/kaggle/working/throng")
-import yaml
-from jax_sim.main_jax import run_simulation
-
-with open("/kaggle/working/throng/config_phase7.yaml", "r") as f:
-    cfg = yaml.safe_load(f)
-cfg["ppo_minibatch_size"] = 512  # prevent P100 OOM
-cfg["use_pmap"] = False          # single GPU mode
-
-total_steps = 1_000_000
-final_params, metrics = run_simulation(cfg, seed=42, n_steps=total_steps)
-```
-
 ---
 
-## Architecture Overview
+## Architecture (At a Glance)
 
 ### The World
 
-A 128×128 toroidal grid with rich environmental layers:
+A toroidal grid (default 128×128, runnable at 64×64 for low-VRAM) with eight
+overlapping environmental channels — every cell carries:
 
-| Layer | What it is | Why it matters |
-|-------|-----------|----------------|
-| **Resources** | Gaussian food patches | Agents need energy to survive |
-| **Walls** | Procedural cave-like barriers | Navigation challenge |
-| **Shelter spots** | Safe zones (double red detection radius) | Strategic locations |
-| **Contested nodes** | High-value resources worth fighting over | Competition hotspots |
-| **Scent trails** | Fading traces left by red predators | Danger detection |
-| **Symbols** | Graffiti agents draw on the ground | Persistent communication |
-| **Cultural Fast** (0.90 decay) | Recent danger / coordination traces | "Red was here 5 steps ago" |
-| **Cultural Slow** (0.995 decay) | Stable landmarks / long-term memory | "This valley is safe" |
+| Channel | What it is | Why it matters |
+|---|---|---|
+| Resources | Gaussian food patches that regenerate | Energy economy |
+| Walls | Procedural cave-like barriers | Navigation challenge |
+| Shelter spots | Safe zones that double red detection range | Strategic geography |
+| Contested nodes | High-value hotspots agents fight over | Competition gradient |
+| Scent trails | Fading traces left by reds | Indirect danger signal |
+| Symbols | Persistent "graffiti" agents write to the ground | Long-lived communication |
+| Cultural Fast (decay 0.90) | Recent danger / coordination traces | "Red was here" memory |
+| Cultural Slow (decay 0.995) | Long-term landmarks | "This valley is safe" memory |
+| Puzzle grid | Co-op lock-and-key mechanic | Cooperation pressure |
 
 ### The Agent Brain
 
-Each agent has a **transformer-based neural network** (not a GRU anymore) with:
+Each agent is a **Flax transformer** (`jax_sim/network_jax.py`):
 
-- **4-6 attention layers** (curriculum expands from 4 → 6)
-- **128-dim tokens** processed through multi-head self-attention
-- **Recurrent carry state** (256-dim) passed between steps
+- 2–6 attention layers (`n_layers`), expanded dynamically by **brain-vote**.
+- 128-dim tokens through multi-head self-attention.
+- 256-dim recurrent **carry** persisting across the agent's lifetime.
+- Eight output heads (action, signal, symbol, culture-fast, culture-slow,
+  value, theory-of-mind, gain).
+- Observation dimension currently **1,800** at `n_layers=2, neighbor_k=6,
+  memory_buffer_size=5, env_ch=8`.
 
-### Input Tokens (what the agent "sees")
+### Learning
 
-Every step, the agent receives a flat observation vector (2,285 numbers) split into semantic tokens:
+- **MAPPO** (Multi-Agent PPO) — one shared policy per team. All blues update
+  one network; all reds update another.
+- **GAE** advantage normalisation, value clipping, gradient clipping at norm 2.
+- **Survival-only reward**: +small for staying alive each step, large negative
+  on death. We deliberately do **not** reward communicating, cooperating, or
+  exploring.
+- **Red curriculum**: floor stages `[6, 15, 30, 75]`. Reds graduate when blues
+  sustain ≥ `curriculum_survival_threshold` (0.80 by default) for
+  `curriculum_sustain_updates` (5) consecutive PPO updates.
+- **Capacity-based brain vote**: `n_layers` grows when *signal entropy
+  plateaus* + *signal diversity plateaus* + *VF loss stays high* + *survival
+  is under pressure*. Translation: "agents have squeezed everything they can
+  out of their current brain — give them more." Not "agents are dying" (the
+  old trigger).
 
-| Token Group | Dimensions | What it encodes |
-|-------------|-----------|-----------------|
-| Own state | 6 | Energy, age, neighbor count, etc. |
-| Neighbor signals | 6 × 32 = 192 | What nearby agents are saying |
-| Local symbols | 25 × 16 = 400 | Graffiti in 5×5 window |
-| Environment | 25 × 7 = 175 | Walls, food, shelter, contested, scent, presence |
-| Own signal | 32 | What I just broadcast |
-| Episodic memory | 20 × 34 = 680 | My diary of last 20 events |
-| Cultural Fast | 25 × 16 = 400 | Recent danger traces around me |
-| Cultural Slow | 25 × 16 = 400 | Long-term landmarks around me |
+### What Information Flows Between Agents
 
-### Output Heads (what the agent "decides")
+Four channels, each with a different temporal and spatial scale:
 
-| Head | Output | Purpose |
-|------|--------|---------|
-| `head_action` | 5 logits | Move N/S/E/W/Stay |
-| `head_signal` | 256 vocab logits | Which "word" to broadcast |
-| `head_symbol` | 16-dim tanh | What graffiti to draw |
-| `head_culture_fast` | 16-dim tanh | Danger trace to deposit |
-| `head_culture_slow` | 16-dim tanh | Landmark to record |
-| `head_value` | scalar | How good is my situation? |
-| `tom_head` | 5 logits × 6 neighbors | Predict what each neighbor will do |
+1. **Signals** (per-step, 32-dim continuous) — 6 nearest neighbours hear what
+   each agent broadcasts. **Live as of May 28 2026.**
+2. **Cultural Fast grid** (decay 0.90, ~10 step memory) — danger traces.
+3. **Cultural Slow grid** (decay 0.995, ~200 step memory) — stable landmarks.
+4. **Parameter sharing (MAPPO gradient)** — what one blue learns, every blue
+   learns. The "evolutionary memory" channel.
 
-### Learning: MAPPO + Survival Pressure
+(A fifth channel — **mind-meld** — is implemented but currently disabled for
+performance. It directly blends carries between adjacent old/young agents.)
 
-- **MAPPO (Multi-Agent PPO)** — reinforcement learning where the reward is simply *"did you survive?"*
-- **Theory-of-Mind head** — learns to predict neighbor actions (trained on actual neighbor moves)
-- **Signal entropy bonus** — encourages exploration of the communication space
-- **Curriculum** — reds start at 6 agents, ramp to 75 as blues prove they can survive
+---
+
+## What the Dashboard Means
+
+Every `T = ppo_rollout_steps` simulation steps you'll see a panel like:
+
+```
+======================================================================
+[step    5120] 2 steps/sec | blue=100 red=75 | ppo=40
+  Actions: N=15% S=30% E=15% W=27% Stay=14%
+  Energy:  mean=0.622 std=0.101 | Age: mean=62 max=345
+  Values:  mean=1.6022 | VF_loss=0.8093 | Clip=0.044
+  Reward:  mean=0.1037 | Entropy: 1.5030
+  Signals: 3135 unique | NB_GAIN↔surv: nan
+  Curriculum: red_floor=75 sustain=0/5 | brain=2L
+======================================================================
+```
+
+| Field | Meaning |
+|---|---|
+| `step` | Simulation steps since launch. |
+| `steps/sec` | Throughput. T4 free tier sustains ~2 steps/sec at N=100. |
+| `blue=… red=…` | Currently alive populations. |
+| `ppo=` | PPO update count. |
+| `Actions: …%` | Action distribution this rollout. Healthy = no single action above ~50%. |
+| `Energy` | Per-agent energy. Should stabilise around `repro_energy_thresh` once foraging is solved. |
+| `Age max=…` | Lifespan of the oldest agent — proxy for "real elders exist". |
+| `Values mean / VF_loss / Clip` | Critic stats. Loss should fall as predation pressure stabilises. Clip is PPO fraction clipped. |
+| `Reward` | Mean per-step reward — survival-only, so close to 0.10 ≈ 100% survival. |
+| `Entropy` | Action policy entropy. `ln(5)=1.609` is fully uniform. Below ~1.0 means a strong preference has formed. |
+| `Signals: N unique` | **Distinct broadcast vectors among alive agents** this rollout. Pre-May-28: stuck at 1 (channel was dead). Now: ~N_alive, which means broadcasts are non-trivial but **not yet compressed into a vocabulary**. |
+| `NB_GAIN↔surv` | Spearman correlation between "did I weight neighbour signals?" and "did I survive?". `nan` until there's enough death variance. **Positive = listening is selected for.** |
+| `Curriculum red_floor / sustain` | Current red population minimum, and how many consecutive PPO updates met the survival threshold. |
+| `brain=NL` | Current `n_layers` of the blue transformer. Grows via brain-vote up to `brain_max_layers`. |
+
+The `[DEBUG]` block that prints **before** the first `step 512` summary is a
+one-shot sanity panel that verifies (a) parameters initialised without NaN,
+(b) action logits and entropy are at sensible defaults, (c) the JIT-compiled
+rollout produced no NaNs, (d) PPO inputs (rewards / values / advantages /
+returns) have reasonable means and stds, (e) gradient norms are nonzero and
+below clip, and (f) PPO updates didn't blow anything up. After the first
+cycle, the same block prints once per minibatch so you can see exactly which
+PPO update introduced a numerical event, should one occur.
 
 ---
 
@@ -127,160 +216,164 @@ Every step, the agent receives a flat observation vector (2,285 numbers) split i
 
 ```
 throng/
-├── config_phase7.yaml           # All hyperparameters
-├── jax_sim/                     # ★ Active — JAX implementation
-│   ├── main_jax.py              # Simulation loop + rollout (full @jax.jit via lax.scan)
-│   ├── network_jax.py           # AgentNetworkJax (Flax transformer)
-│   ├── rl_jax.py                # PPO loss, GAE, minibatch updates
-│   ├── grid_jax.py              # Grid state, obs building, puzzle mechanics
-│   └── population_jax.py        # PopState, reproduction, mind-meld
-├── main.py                      # Legacy PyTorch CLI
-├── environment/                 # Legacy PyTorch grid
-├── agents/                      # Legacy PyTorch network + RL
-├── communication/
-│   ├── channel.py               # Signal aggregation
-│   └── analysis.py              # MI, compositionality, culture metrics
-├── utils/
-│   ├── logging.py               # Structured JSON logs
-│   └── checkpointing.py         # Full state save/load
-└── README.md                    # You are here
+├── config_phase7.yaml         # Active hyperparameters
+├── jax_sim/                   # ★ Active code
+│   ├── main_jax.py            # Outer loop, PPO orchestration, telemetry,
+│   │                          #   brain-vote, curriculum, checkpointing
+│   ├── network_jax.py         # AgentNetworkJax — Flax transformer + heads
+│   ├── rl_jax.py              # PPO + GAE + minibatch updates
+│   ├── grid_jax.py            # GridState + obs builder + world generation
+│   ├── population_jax.py      # PopState + reproduction + mind-meld
+│   └── debug_metrics.py       # Sanity panel
+├── agents/, environment/, communication/, utils/   # Legacy PyTorch
+├── main.py                    # Legacy CLI
+├── THRONG.md                  # Full research log + theory + roadmap
+└── README.md                  # You are here
 ```
 
 ---
 
-## What the Metrics Mean
+## Configuration Cheatsheet
 
-### Mutual Information (MI)
+All knobs live in `config_phase7.yaml`. The ones you actually touch:
 
-Every ~1,000 steps, THRONG runs a logistic regression from each of the 32 signal
-embedding dimensions against environmental features. **Higher MI = that dimension
-correlates with something real in the world.**
-
-Example: `dim15/'own_energy'=0.12` means signal dimension 15 is weakly encoding
-how much energy the agent has. When MI reaches ~0.3+, it's a reliable signal.
-
-### Culture Metrics
-
-| Metric | Meaning |
-|--------|---------|
-| `H` | Entropy of symbol distribution (higher = more diversity) |
-| `surv_corr` | Correlation between symbol patterns and survival |
-| `r@1, r@5, r@10` | Recall: how well can we predict red positions from cultural traces? |
-
-### Chain Depth
-
-How many hops does a signal travel? `max=0` means no relay chains yet. When
-`hops>1 > 0`, agents are repeating messages they heard from others — **rumour chains**.
-
-### NB_GAIN_SURV
-
-Spearman correlation between "did I listen to neighbors?" (signal gain) and
-"did I survive?" A value near 1.0 means **listening to others is strongly
-selected for** — the population has discovered communication is useful.
-
----
-
-## Configuration
-
-All parameters live in `config_phase7.yaml`. Key knobs:
-
-| Parameter | What it does | Current |
-|-----------|-------------|---------|
-| `population_size` | Blue agents | 500 |
-| `red_population_size` | Red predators | 75 |
-| `n_layers` | Transformer layers (expands via curriculum) | 4 |
-| `brain_token_dim` | Transformer hidden size | 128 |
-| `signal_dim` | Continuous signal embedding size | 32 |
-| `symbol_dim` | Symbol/cultural vector size | 16 |
-| `neighbor_k` | How many neighbors each agent observes | 6 |
-| `local_obs_radius` | Window size for grid patches | 2 (5×5) |
-| `memory_buffer_size` | Episodic memory slots per agent | 20 |
-| `culture_fast_decay` | How fast recent danger fades | 0.90 |
-| `culture_slow_decay` | How fast landmarks fade | 0.995 |
+| Knob | What it controls | Default |
+|---|---|---|
+| `population_size` | Blue agents (max alive) | 500 |
+| `red_population_size` | Red agents (max alive) | 75 |
+| `grid_size` | World edge length | 128 |
+| `n_layers` | Initial transformer depth | 2–4 |
+| `brain_max_layers` | Cap for brain-vote expansion | 6 |
+| `brain_token_dim` | Transformer hidden | 128 |
+| `signal_dim` | Continuous signal embed | 32 |
+| `signal_vocab_size` | Discrete signal vocab | 64 |
+| `symbol_dim` | Symbol / cultural vector dim | 16 |
+| `neighbor_k` | Visible neighbours | 6 |
+| `local_obs_radius` | Half-width of local patch (2 → 5×5) | 2 |
+| `memory_buffer_size` | Episodic memory slots | 20 |
+| `culture_fast_decay` | 0.90 | recent-danger half-life ≈ 7 steps |
+| `culture_slow_decay` | 0.995 | landmark half-life ≈ 140 steps |
 | `ppo_rollout_steps` | Steps between PPO updates | 512 |
-| `ppo_minibatch_size` | GPU batch size for PPO | 2048 |
-| `min_population` | Blue population floor (auto-respawn) | 200 |
-| `repro_energy_thresh` | Energy needed to self-clone | 0.80 |
-| `repro_energy_cost` | Energy cost of cloning | 0.40 |
-| `curriculum_survival_threshold` | Blue survival rate to advance red stage | 0.80 |
-| `curriculum_sustain_updates` | Consecutive PPO updates above threshold | 5 |
+| `ppo_minibatch_size` | PPO minibatch (touch this for OOM) | 2048 |
+| `repro_energy_thresh` / `_cost` | High-energy self-cloning rule | 0.80 / 0.40 |
+| `min_population` | Floor-enforced respawn | 200 |
+| `curriculum_survival_threshold` | Sustain blue surv to advance reds | 0.80 |
+| `curriculum_sustain_updates` | Consecutive updates required | 5 |
+| `brain_vote_interval` | Steps between capacity checks | 5000 |
+| `brain_vote_survival_threshold` | Survival level that gates a layer add | 0.55 |
+| `signal_gate_prob` | Fraction of self-obs randomly masked | 0.5 |
+| `resource_obs_noise` | Gaussian σ on resource readings | 0.2 |
+| `red_starvation_steps` | Steps without a catch before a red starves | 400 |
 
 ---
 
-## Current State & Roadmap
+## Roadmap
 
-### ✅ What Works Now
+### ✅ What works right now (confirmed in current run)
 
-- [x] Transformer-based agent brains (4-6 layers)
-- [x] Discrete vocab communication (256 tokens)
-- [x] Episodic memory buffer per agent (20 slots)
-- [x] Theory-of-Mind prediction head
-- [x] Dual cultural memory grids (fast danger + slow landmarks)
-- [x] Red co-evolution with curriculum (6 → 75 agents)
-- [x] MAPPO training with survival-only reward
-- [x] Shelter, contested resources, scent trails
-- [x] Checkpoint save/load with full state
-- [x] MI, compositionality, culture, chain-depth metrics
+- Transformer brains, capacity-based brain-vote (2L → 6L).
+- Eight environment channels, dual cultural grids, scent trails, contested
+  nodes, shelter, puzzles.
+- Discrete + continuous signals; **signal propagation fixed and live (May 28
+  2026)**.
+- Red curriculum with survival-gated graduation `[6, 15, 30, 75]`.
+- Episodic memory buffer per agent (20 slots).
+- Theory-of-Mind head predicting neighbour actions.
+- MAPPO + GAE + value clipping + grad clipping; numerically stable.
+- Orbax checkpointing (params-only; population restarts on resume).
+- Distillation pass (currently age-based; "human among apes" version queued).
+- Sanity-DEBUG panel that surfaces NaN / gradient anomalies the moment they
+  happen.
 
-### 🔄 In Progress
+### 🎯 Next, in order — Phase 9
 
-- [ ] First successful long run on Kaggle (1M+ steps) with JAX
-- [ ] Measure actual steps/sec on T4
-- [ ] Verify cultural memory emergence and signal-to-survival correlation
+These are organised by *cost and risk*, so the cheap wins land first.
 
-### ✅ Completed: JAX Rewrite
+**Phase 9.1 — Self-Model + Metacognition** (1–2 days)
+- `head_self_action(h_t)` predicting the agent's own next action.
+- Auxiliary cross-entropy loss against the actually sampled action.
+- Confidence head + low-confidence → "help" signal mode.
+- Gated mind-meld (only blend carries when both confident).
 
-The entire simulation is now JAX-native. Key facts:
-- **`sim_step`** decorated with `@jax.jit`, executed via `jax.lax.scan` — one compiled XLA program
-- **Everything inside JIT**: obs building, forward pass, movement, wall collision, resource consumption, energy decay, reproduction, mind-meld, catch detection, puzzles, rewards, culture writes/decay
-- **Outside JIT** (intentional): red curriculum reproduction (dynamic `min_pop`), PPO gradient updates (own JIT), telemetry
-- Red curriculum stages: `[6, 15, 30, 75]` — advances when blues sustain ≥80% survival
+**Phase 9.2 — Forward Dynamics Head** (~2 days)
+- `head_fwd(h_t, a_t, pooled_neighbour_signals) → predicted_obs_{t+1}`.
+- MSE auxiliary loss; coefficient ramps 0.05 → 0.2 over 50k steps.
+- **The signal channel is included in the input**, so signals become
+  load-bearing for prediction — a sharper selection pressure than survival.
+- Falsifiable test: ablating signals from `head_fwd` should *increase*
+  prediction MSE. If it doesn't, signals are still cosmetic and the
+  environment needs to be tightened further.
 
-### 🎯 Next
+**Phase 9.3 — Dreamer / Imagination Loop** (gated on 9.2 working)
+- At inference, use `head_fwd` + critic to score each candidate action by
+  imagined-2-step return.
+- Replace `argmax(action_logits)` with `argmax_a vf(fwd(h, a))`.
+- Fixed branching factor (5 actions × depth K) — JIT-friendly.
 
-- **Richer signals** — continuous 32-dim vectors instead of discrete tokens
-- **Scale up** — 256×256 grid, 1000+ agents, once performance is confirmed
-- **Deception / tool use** — can agents learn to lie or use objects?
+**Phase 9.4 — Communication Upgrades** (post-9.3)
+- Multi-head attention over neighbour signals (replace mean-pool).
+- Variable-length message sequences (2–5 tokens / step).
+- Adversarial reds that can mimic blue signals.
+
+### 📊 Dashboard metrics queued
+
+- **Signal clusters (k-means, k=16)** — effective cluster count + occupancy
+  entropy. When this drops from ≈ N_alive toward a small fixed number with
+  survival still ≥80%, **a vocabulary is forming**.
+- **Self-prediction accuracy** (after Phase 9.1).
+- **Forward-dynamics MSE + signal-ablation Δ** (after Phase 9.2). This Δ is
+  the single sharpest test of whether communication is real.
+
+### 🗂️ Deprioritised / on ice
+
+- Hierarchical RL (redundant with carry + value head).
+- Crafting / construction (high engineering, weak hypothesis).
+- Generic "scale up before adding architecture" — the current 64×64 / N=100
+  setup is sufficient to observe vocabulary formation if the architecture is
+  right; scale is not the bottleneck.
 
 ---
 
-## GPU Notes
+## Philosophy in One Paragraph
 
-Current target: **T4 GPU** (Kaggle free tier). With the JAX rewrite, the entire
-simulation step is compiled to a single XLA kernel — no Python loop bottleneck.
+Language and intelligence in biological organisms were not designed. They
+were *grown* under information asymmetry — animals that needed to coordinate
+to survive, in environments that did not hand them concepts. THRONG is the
+hypothesis that this growth process can be replicated computationally if four
+ingredients are present: (1) partial observability sharp enough to make
+silence costly, (2) coordination pressure that makes cooperation pay, (3) a
+communication channel that is load-bearing for at least one downstream task,
+and (4) cumulative memory so that a discovery by one agent can be inherited
+by the next generation. We've built (1), (2), and (4). Phase 9.2's
+signal-conditioned forward-dynamics head is what makes (3) *provably* the
+case for the first time.
 
-For JAX GPU install:
-```bash
-pip install jax[cuda12] flax optax
-```
-
----
-
-## Checkpoints
-
-**JAX:** Saved via Orbax every N updates to `runs/main_run/checkpoints/`.
-Contains: grid state, both populations, both param trees, optimizer states, carries.
-Automatically resumes from latest checkpoint on restart.
-
-**Legacy PyTorch:** Saved as `checkpoint_{step}.pkl` under `runs/run_XXX/`.
-Resume: `python main.py --resume runs/run_XXX/checkpoint_latest.pkl`
+For the full version, with citations, see [THRONG.md](THRONG.md) — sections
+"Philosophical Foundations" and "The Architecture of Thought".
 
 ---
 
-## Design Philosophy
+## Running Tips
 
-> "Give them a rich enough world and a reason to talk, then get out of the way."
+- **OOM on P100 / T4?** Drop `ppo_minibatch_size` to 256, `n_layers` to 2,
+  `grid_size` to 64.
+- **First run takes 5–10 minutes to start producing steps** — XLA is
+  compiling the entire `lax.scan` rollout into one kernel. After that,
+  steps/sec is constant.
+- **Checkpoints resume populations from scratch** but restore params — this
+  is intentional. Long-run training is robust to interrupted populations
+  because MAPPO learns from the shared policy, not from individual lifelines.
+- **If `Signals: 1 unique` persists for more than 5k steps after a fresh
+  pull**, your build is from before commit `82a1c7f` and is still suffering
+  from the signal-propagation bug. `git pull && rm -rf runs/jax_run/checkpoints`.
 
-THRONG is built on the hypothesis that **intelligence and language emerge from
-environmental pressure**, not architectural tricks. We don't:
-- Pre-define what signals mean
-- Reward agents for communicating
-- Hard-code cooperative behaviours
+---
 
-Instead, we create a world where survival is genuinely hard, give agents the
-capacity to sense, remember, and broadcast, and let selection do the rest.
+## License & Citation
 
-The cultural memory grids (Phase 7.5) are the newest addition — a shared
-writable layer that persists across agent lifetimes. It's the first step toward
-true cumulative culture: one agent's hard-won knowledge can outlive them and
-benefit the tribe.
+Research project, MIT-style permissive license (see repo root). If you build
+on THRONG, please cite the repository and the relevant phase in `THRONG.md`.
+
+---
+
+*"Give them a rich enough world and a reason to talk, then get out of the way."*
