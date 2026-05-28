@@ -238,6 +238,19 @@ def params_apply_variables(params: Any) -> dict:
     return {"params": params}
 
 
+def make_model_apply(model: AgentNetworkJax):
+    """Return ``apply(params, carries, obs, n_layers, ...)`` with correct Flax variables."""
+    def apply_fn(params, carries, obs, n_layers, detach_value: bool = False):
+        return model.apply(
+            params_apply_variables(params),
+            carries,
+            obs,
+            n_layers,
+            detach_value=detach_value,
+        )
+    return apply_fn
+
+
 def sanitize_agent_params(params: Any) -> Any:
     """
     Fix param trees corrupted by merging full Flax variable dicts.

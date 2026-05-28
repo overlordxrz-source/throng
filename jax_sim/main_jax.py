@@ -43,6 +43,7 @@ from jax_sim.network_jax import (
     AUX_HEAD_KEYS,
     ensure_aux_head_params,
     init_agent_params,
+    make_model_apply,
     params_apply_variables,
     sanitize_agent_params,
 )
@@ -201,9 +202,11 @@ def build_observations_jax(
 
 # ── Single simulation step (for scan) ──────────────────────────────────────
 
-def make_sim_step(config: Dict, model: AgentNetworkJax):
+def make_sim_step(config: Dict, model: AgentNetworkJax, model_apply=None):
     """Factory: returns a jittable step function.
     Params are passed through carry to avoid stale closure capture."""
+    if model_apply is None:
+        model_apply = make_model_apply(model)
     gs = config["grid_size"]
     K = config["neighbor_k"]
     r = config["local_obs_radius"]
@@ -257,8 +260,8 @@ def make_sim_step(config: Dict, model: AgentNetworkJax):
         r_obs = build_observations_jax(r_pop, grid, blue_map, red_map, config, 0, key=key_r_obs)
 
         # ── Forward passes ──────────────────────────────────────
-        b_new_c, b_outs = model.apply(b_params_sg, b_carries, b_obs, _n_layers)
-        r_new_c, r_outs = model.apply(r_params_sg, r_carries, r_obs, _n_layers)
+        b_new_c, b_outs = model_apply(b_params_sg, b_carries, b_obs, _n_layers)
+        r_new_c, r_outs = model_apply(r_params_sg, r_carries, r_obs, _n_layers)
 
         b_action_logits, b_signal_logits, b_sym_w, b_vals, b_tom, _, _, b_cult_f, b_cult_s = b_outs
         r_action_logits, r_signal_logits, r_sym_w, r_vals, r_tom, _, _, r_cult_f, r_cult_s = r_outs
@@ -565,6 +568,7 @@ def run_simulation(
         vocab_size=config["vocab_size"],
         memory_slots=config.get("memory_slots", 0),
     )
+    model_apply = make_model_apply(model)
 
     # Compute exact obs_dim and init model
     obs_dim = compute_obs_dim_torch(config)
@@ -614,7 +618,7 @@ def run_simulation(
     _emb_ok = "kernel" in _bp.get("emb_own", {})
     _aux_ok = all(k in _bp for k in AUX_HEAD_KEYS)
     try:
-        model.apply(params_apply_variables(b_params), dummy_carry, dummy_obs, n_layers)
+        model_apply(b_params, dummy_carry, dummy_obs, n_layers)
         _apply_ok = True
     except Exception as _apply_err:
         _apply_ok = False
@@ -657,9 +661,7 @@ def run_simulation(
     # ── Debug: inspect initial action logits / entropy ──────
     test_carry = jnp.zeros((1, hidden_d))
     test_obs = jnp.zeros((1, obs_dim))
-    _, test_outs = model.apply(
-        params_apply_variables(b_params), test_carry, test_obs, n_layers
-    )
+    _, test_outs = model_apply(b_params, test_carry, test_obs, n_layers)
     test_logits = test_outs[0]  # action_logits
     test_probs = jax.nn.softmax(test_logits, axis=-1)
     test_entropy = -jnp.sum(test_probs * jnp.log(test_probs + 1e-10), axis=-1)
@@ -707,7 +709,7 @@ def run_simulation(
     def _rebuild_sim_step(cur_n_layers):
         cfg_copy = dict(config)
         cfg_copy["n_layers"] = cur_n_layers
-        return make_sim_step(cfg_copy, model)
+        return make_sim_step(cfg_copy, model, model_apply)
 
     sim_step_fn = _rebuild_sim_step(n_layers)
     if use_pmap:
@@ -793,7 +795,7 @@ def run_simulation(
         _b_actions_np = np.asarray(b_batch["actions"])
         _b_alive_np   = np.asarray(b_batch["alive"]) if "alive" in b_batch else None
         b_params, b_opt_state, b_metrics = ppo_update(
-            b_params, b_opt_state, b_optimizer, model.apply,
+            b_params, b_opt_state, b_optimizer, model_apply,
             b_batch, n_layers, update_key,
             clip_eps=float(config.get("ppo_clip_eps", config.get("ppo_clip", 0.2))),
             vf_coef=float(config.get("ppo_value_coef", 0.25)),
@@ -821,7 +823,7 @@ def run_simulation(
         _r_actions_np = np.asarray(r_batch["actions"])
         _r_alive_np   = np.asarray(r_batch["alive"]) if "alive" in r_batch else None
         r_params, r_opt_state, r_metrics = ppo_update(
-            r_params, r_opt_state, r_optimizer, model.apply,
+            r_params, r_opt_state, r_optimizer, model_apply,
             r_batch, n_layers, update_key,
             clip_eps=float(config.get("ppo_clip_eps", config.get("ppo_clip", 0.2))),
             vf_coef=float(config.get("ppo_value_coef", 0.25)),
