@@ -39,7 +39,7 @@ from jax_sim.population_jax import (
     apply_auto_reproduce
 )
 from jax_sim.network_jax import AgentNetworkJax
-from jax_sim.rl_jax import compute_gae, ppo_loss, create_optimizer, ppo_update, fwd_dynamics_update
+from jax_sim.rl_jax import compute_gae, ppo_loss, create_optimizer, ppo_update, auxiliary_update
 from agents.network_torch import compute_obs_dim_torch
 
 
@@ -576,10 +576,10 @@ def run_simulation(
     b_params = model.init(keys[3], dummy_carry, dummy_obs, n_layers)
     r_params = model.init(keys[5], dummy_carry, dummy_obs, n_layers)
 
-    # ── Forward dynamics apply functions (bound to model instance) ──
+    # ── Auxiliary heads apply function (forward dynamics + self-prediction) ──
     import functools as _functools
-    b_fwd_apply_fn = _functools.partial(model.apply, method=model.forward_dynamics)
-    r_fwd_apply_fn = b_fwd_apply_fn   # same architecture, different params
+    b_aux_apply_fn = _functools.partial(model.apply, method=model.auxiliary_heads)
+    r_aux_apply_fn = b_aux_apply_fn   # same architecture, different params passed at call time
 
     # ── NaN debug after init ────────────────────────────────
     flat_params = jax.tree_util.tree_leaves(b_params)
@@ -739,14 +739,18 @@ def run_simulation(
             gamma=float(config.get("ppo_gamma", 0.99)),
             lam=float(config.get("ppo_gae_lam", 0.95)),
         )
-        # Forward dynamics auxiliary loss for blue
+        # Auxiliary losses (forward dynamics + self-prediction) for blue
+        _self_pred_coef = float(config.get("self_pred_coef", 0.1))
         fwd_key, update_key = jax.random.split(update_key)
-        b_params, b_opt_state, b_fwd_loss = fwd_dynamics_update(
-            b_params, b_opt_state, b_optimizer, b_fwd_apply_fn,
+        b_params, b_opt_state, b_fwd_loss, b_sp_loss, b_sp_acc = auxiliary_update(
+            b_params, b_opt_state, b_optimizer, b_aux_apply_fn,
             _b_carries_np, _b_actions_np, _b_alive_np,
-            fwd_key, minibatch_size=_fwd_mb, fwd_coef=_fwd_coef,
+            fwd_key, minibatch_size=_fwd_mb,
+            fwd_coef=_fwd_coef, self_pred_coef=_self_pred_coef,
         )
-        b_metrics["fwd_loss"] = b_fwd_loss
+        b_metrics["fwd_loss"]    = b_fwd_loss
+        b_metrics["sp_loss"]     = b_sp_loss
+        b_metrics["sp_acc"]      = b_sp_acc
 
         print("  [DEBUG] --- Red PPO Update ---")
         r_batch = rollout_data["red"]
@@ -764,12 +768,14 @@ def run_simulation(
             lam=float(config.get("ppo_gae_lam", 0.95)),
         )
         fwd_key, update_key = jax.random.split(update_key)
-        r_params, r_opt_state, r_fwd_loss = fwd_dynamics_update(
-            r_params, r_opt_state, r_optimizer, r_fwd_apply_fn,
+        r_params, r_opt_state, r_fwd_loss, r_sp_loss, r_sp_acc = auxiliary_update(
+            r_params, r_opt_state, r_optimizer, r_aux_apply_fn,
             _r_carries_np, _r_actions_np, _r_alive_np,
-            fwd_key, minibatch_size=_fwd_mb, fwd_coef=_fwd_coef,
+            fwd_key, minibatch_size=_fwd_mb,
+            fwd_coef=_fwd_coef, self_pred_coef=_self_pred_coef,
         )
         r_metrics["fwd_loss"] = r_fwd_loss
+        r_metrics["sp_acc"]   = r_sp_acc
 
         # ── Brain Vote (capacity-based, runs after PPO) ──────────
         _bv_ent = float(b_metrics.get('ppo_entropy', 0)) if isinstance(b_metrics, dict) else 0
@@ -888,9 +894,10 @@ def run_simulation(
             ent_val = float(b_metrics.get('ppo_entropy', 0)) if isinstance(b_metrics, dict) else 0
             clip_frac = float(b_metrics.get('ppo_clip_frac', 0)) if isinstance(b_metrics, dict) else 0
             fwd_loss_val = float(b_metrics.get('fwd_loss', float('nan'))) if isinstance(b_metrics, dict) else float('nan')
+            sp_acc_val   = float(b_metrics.get('sp_acc',   float('nan'))) if isinstance(b_metrics, dict) else float('nan')
             print(f"  Values:  mean={val_mean:.4f} | VF_loss={vf_loss:.4f} | Clip={clip_frac:.3f}")
             print(f"  Reward:  mean={rew_mean:.4f} | Entropy: {ent_val:.4f}")
-            print(f"  FwdDyn:  loss={fwd_loss_val:.4f} (target: ~0.05-0.10 when learned)")
+            print(f"  AuxLoss: fwd={fwd_loss_val:.4f} (↓ to ~0.05) | self_pred_acc={sp_acc_val:.3f} (↑ from 0.20 random)")
             print(f"  Signals: {unique_signals} unique | NB_GAIN↔surv: {sp_r:.3f}")
             print(f"  Curriculum: red_floor={red_curriculum_stages[red_curriculum_idx]} sustain={red_sustain_count}/{red_sustain_needed} | brain={n_layers}L")
             print(f"{'='*70}\n")
