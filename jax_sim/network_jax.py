@@ -233,7 +233,13 @@ def init_agent_params(
     params_aux = model.init(
         k_aux, carry, action_oh, method=model.auxiliary_heads
     )["params"]
-    return freeze({**unfreeze(params_main), **unfreeze(params_aux)})
+    # Only copy aux-head keys — a full dict merge can overwrite main weights with
+    # empty Flax scopes for modules that setup() defines but auxiliary_heads skips.
+    merged = unfreeze(params_main)
+    aux_flat = unfreeze(params_aux)
+    for k in AUX_HEAD_KEYS:
+        merged[k] = aux_flat[k]
+    return freeze(merged)
 
 
 def ensure_aux_head_params(

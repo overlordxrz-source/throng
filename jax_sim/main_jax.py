@@ -604,7 +604,12 @@ def run_simulation(
     b_params = init_agent_params(model, keys[3], dummy_carry, dummy_obs, n_layers)
     r_params = init_agent_params(model, keys[5], dummy_carry, dummy_obs, n_layers)
     from flax.core import unfreeze as _unfreeze_params
-    print(f"[DEBUG] Aux head params present: {all(k in _unfreeze_params(b_params) for k in AUX_HEAD_KEYS)}")
+    _bp = _unfreeze_params(b_params)
+    _emb_ok = "kernel" in _bp.get("emb_own", {})
+    print(
+        f"[DEBUG] Params OK: emb_own={_emb_ok} | "
+        f"aux_heads={all(k in _bp for k in AUX_HEAD_KEYS)}"
+    )
 
     # ── Auxiliary heads apply function (forward dynamics + self-prediction) ──
     import functools as _functools
