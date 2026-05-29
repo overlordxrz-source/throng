@@ -20,36 +20,35 @@ from typing import Dict, Tuple, Any
 
 
 def compute_gae(
-    rewards: jnp.ndarray,   # (T, N)
-    values:  jnp.ndarray,   # (T, N)
-    dones:   jnp.ndarray,   # (T, N)  1.0 = terminal
+    rewards,   # (T, N) — numpy or JAX
+    values,    # (T, N)
+    dones,     # (T, N)  1.0 = terminal
     gamma: float = 0.99,
     lam:   float = 0.95,
-) -> Tuple[jnp.ndarray, jnp.ndarray]:
+) -> Tuple[np.ndarray, np.ndarray]:
     """
-    Pure discounted returns + advantage = returns - values.
-    NO bootstrapping from predicted values to break feedback loop.
-    For short rollouts (32 steps) this is standard and stable.
-    Returns (advantages, returns) both (T, N).
+    Pure discounted returns + advantage = returns - values (CPU numpy loop).
+
+    Rollout batches are offloaded to CPU before PPO; a JAX lax.scan here would
+    index numpy arrays with traced indices and raise TracerArrayConversionError.
     """
+    del lam  # kept for API compat; no value bootstrapping in this rollout setup
+    rewards = np.asarray(rewards, dtype=np.float32)
+    values = np.asarray(values, dtype=np.float32)
+    dones = np.asarray(dones, dtype=np.float32)
     T, N = rewards.shape
 
-    # Compute pure discounted returns independent of value predictions
-    def _returns_step(carry, t):
-        ret = rewards[t] + gamma * carry * (1.0 - dones[t])
-        return ret, ret
+    returns = np.empty((T, N), dtype=np.float32)
+    carry = np.zeros(N, dtype=np.float32)
+    for t in range(T - 1, -1, -1):
+        carry = rewards[t] + gamma * carry * (1.0 - dones[t])
+        returns[t] = carry
 
-    _, returns = lax.scan(_returns_step, jnp.zeros(N), jnp.arange(T - 1, -1, -1))
-    returns = returns[::-1]  # (T, N)
-
-    # Advantages = returns - predicted values
     advantages = returns - values
-
-    # Normalize advantages only (values learn raw returns scale)
-    adv_mean = jnp.mean(advantages)
-    adv_std = jnp.std(advantages) + 1e-8
+    adv_mean = advantages.mean()
+    adv_std = advantages.std() + 1e-8
     advantages = (advantages - adv_mean) / adv_std
-    advantages = jnp.clip(advantages, -10.0, 10.0)
+    advantages = np.clip(advantages, -10.0, 10.0)
 
     return advantages, returns
 
