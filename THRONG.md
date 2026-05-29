@@ -3927,7 +3927,7 @@ Resume in JAX with the same `run_simulation(cfg, ...)` and place checkpoints und
 
 1. **Stop Modal GPU** when not training — notebook billing continues until kernel stops.
 2. **Download `390/`** (or full `checkpoints/`) to local backup before deleting volume.
-3. Implement **k-means signal-cluster dashboard metric** (May 28 plan) — retire raw `N unique`.
+3. ~~Implement **k-means signal-cluster dashboard metric**~~ — **done** (`Active Clusters: X/16` in JAX dashboard, May 30).
 4. **Phase 9.4** (neighbor signal attention) or **VQ discrete signals** before another 200k identical run.
 5. Consider **stricter survival** or **red visibility** so `NB_GAIN↔surv` and signal compression can become measurable.
 
@@ -4041,7 +4041,21 @@ Use the same `seed=42` and config as the original run. Incompatible old checkpoi
 | `d280fc9` | Checkpoint shape mismatch → start fresh instead of crash |
 | `1d3682e` / `a022b0f` | JIT-safe red mask; `observations_jax` + `train_entry` |
 | `69d5ffd` | `checkpoint_dir` + resolve symlinks before Orbax |
-| `3e40b0f` | Remove nested `@jax.jit` on red mask (`ConcretizationTypeError` on `gs`) |
+| `3e40b0f` | Remove nested `@jit` on red mask (`ConcretizationTypeError` on `gs`) |
+| `7774180` | THRONG Modal runbook + Lethal Ecology notes |
+
+### Offline decode (`tools/decode_signals.py`)
+
+Run on the training corpus (does not stop the GPU run):
+
+```bash
+cd /root/throng
+python tools/decode_signals.py runs/jax_run/signal_corpus.jsonl
+python tools/decode_signals.py runs/jax_run/signal_corpus.jsonl --k 16   # match dashboard
+python tools/decode_signals.py runs/jax_run/signal_corpus.jsonl --min-step 25000  # late run only
+```
+
+**JAX gap (May 30):** `main_jax.py` corpus logging does **not** yet write `nb_scout_sig_lag1` / `nb_scout_dist_lag1` (PyTorch `main.py` does). Decoder prints *“nb_scout_sig_lag1 field absent”* and **skips lag-1 binary + direction LRT**. Clusters, MI, and scout–blind Δ still run. **TODO:** port lag-1 fields from `main.py` (~879–904) into `corpus_writer.maybe_record` in `jax_sim/main_jax.py`.
 
 ### Common failures
 
@@ -4057,4 +4071,39 @@ Use the same `seed=42` and config as the original run. Incompatible old checkpoi
 
 `Configured CheckpointManager using deprecated legacy API` — safe to ignore for training; migrate to new Orbax API later.
 
-— *appended 2026-05-30*
+### In-progress Lethal Ecology run (interim, ~35k env steps)
+
+**Status:** Modal A100, `train_entry`, git `3e40b0f`+ , `seed=42`, `n_steps=200_000` (in progress). Resume from volume checkpoints works; curriculum **re-ramps 40→150** after each resume (weights only).
+
+**Training dashboard (~34–35k, `red_floor=150`):**
+
+```
+[step  34304] blue=500 red=150 | fwd_env=0.026 | self_pred_acc=0.34 | Active Clusters: 12/16 | NB_GAIN↔surv: nan
+[step  35328] blue=500 red=150 | fwd_env=0.026 | self_pred_acc=0.35 | Active Clusters: 10/16 | NB_GAIN↔surv: nan
+```
+
+- **Stable:** `has_nan=0`, ~5 steps/sec, VF_loss ~1.1–1.3, blues **496–500** at max reds — ecology **not** culling population yet.
+- **Policy:** recurring **S-ward** stereotype (~30% S); entropy ~1.44 (sharper than early run).
+- **Aux:** `fwd_env` plateau ~0.024–0.027 (real loc_env MSE, vs pre-pivot `fwd≈0.0001` on carry).
+- **Still flat:** `NB_GAIN↔surv: nan` throughout; no brain vote (4L).
+
+**`decode_signals.py` @ ~21.5k env steps (42,032 corpus records):**
+
+| Finding | Result |
+|---------|--------|
+| Scout vs blind signal Δ | **≈ 0** all dims (max \|Δ\| ~0.007) — no dedicated “alarm” channel |
+| MI / Spearman | Many dims weakly encode **`red_dist`**; `resource` MI ≈ 0 |
+| k=8 clusters | Bulk **STAY** clusters; small scout-heavy **E** cluster (n≈1611, 85% scout, low red_dist); rare high–red_dist **W** outliers |
+| Lag-1 / direction LRT | **Skipped** — no `nb_scout_sig_lag1` in JAX corpus |
+
+**Interpretation (35k):** Representation learning (threat proximity in continuous 32-D, loc_env aux) is active; **emergent communication** (scout-specific symbols, listening→survival, direction LRT) shows **no early signature**. Same pattern as pre-pivot 200k at a high level — improved aux metric, not improved vocabulary/channel.
+
+**Worth finishing 200k?** Yes for a **completed Lethal vs `992b67b` comparison** and final decode at ~50k / ~200k. **Low expectation** of late comms breakthrough without code changes (lag-1 logging, tighter blindness, VQ/discrete signals, or stronger selection).
+
+**Next code priorities (ordered):**
+
+1. Port **lag-1 corpus fields** to JAX → enable direction LRT on remaining run + future runs.
+2. **VQ / 9.4 neighbor attention** or **`red_detection_radius: 0`** experiment — per May 29 roadmap.
+3. Optional: **persist curriculum index** in Orbax checkpoint on resume.
+
+— *appended 2026-05-30 (interim 35k + decode @21k)*
