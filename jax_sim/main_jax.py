@@ -13,6 +13,7 @@ Everything inside scan is @jit-compiled to a single XLA kernel.
 """
 
 import os
+from pathlib import Path
 os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2")  # suppress INFO/WARN
 os.environ.setdefault("XLA_FLAGS", "--xla_gpu_autotune_level=0")  # disable autotune spam
 
@@ -419,7 +420,12 @@ def _run_simulation_impl(
     )
 
     # ── Init Checkpointing ──────────────────────────────────
-    ckpt_dir = os.path.abspath(f"runs/{run_name}/checkpoints")
+    ckpt_dir = config.get("checkpoint_dir") or os.path.abspath(
+        f"runs/{run_name}/checkpoints"
+    )
+    # Orbax mkdir fails on symlinks (FileExistsError); use real volume path.
+    ckpt_dir = str(Path(ckpt_dir).resolve())
+    Path(ckpt_dir).mkdir(parents=True, exist_ok=True)
     options = ocp.CheckpointManagerOptions(max_to_keep=2, create=True)
     ckpt_mngr = ocp.CheckpointManager(ckpt_dir, ocp.StandardCheckpointer(), options=options)
 
