@@ -341,6 +341,25 @@ def layer_entropy_torch(
 
 # ── Observation dimension helper ──────────────────────────────────────────────
 
+def loc_env_flat_bounds(config: dict) -> tuple[int, int]:
+    """Start/end indices of flattened loc_env in the observation vector."""
+    K = config["neighbor_k"]
+    sd = config["signal_dim"]
+    symd = config.get("symbol_dim", 16)
+    r = config["local_obs_radius"]
+    W = (2 * r + 1) ** 2
+    start = 6 + K * sd + W * symd
+    end = start + W * 8
+    return start, end
+
+
+def compute_fwd_env_dim(config: dict) -> int:
+    """Flat loc_env size (W × 8 env channels)."""
+    r = config["local_obs_radius"]
+    W = (2 * r + 1) ** 2
+    return W * 8
+
+
 def compute_obs_dim_torch(config: dict) -> int:
     K    = config["neighbor_k"]
     sd   = config["signal_dim"]

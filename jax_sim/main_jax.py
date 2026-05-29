@@ -48,7 +48,7 @@ from jax_sim.network_jax import (
     sanitize_agent_params,
 )
 from jax_sim.rl_jax import compute_gae, ppo_loss, create_optimizer, ppo_update, auxiliary_update
-from agents.network_torch import compute_obs_dim_torch
+from agents.network_torch import compute_obs_dim_torch, compute_fwd_env_dim, loc_env_flat_bounds
 
 
 # ── Config defaults ─────────────────────────────────────────────────────────
@@ -180,6 +180,23 @@ def build_observations_jax(
 
     loc_cult_fast = get_local_patches(grid.cultural_fast, pop.positions, r, gs)
     loc_cult_slow = get_local_patches(grid.cultural_slow, pop.positions, r, gs)
+
+    # Beyond-patch red sensing (blues only): mask loc_env red channel when too far
+    det_r = int(config.get("red_detection_radius", 0))
+    if det_r > 0 and red_map.any():
+        r_pos = jnp.argwhere(red_map)
+        b_pos = pop.positions.astype(jnp.float32)
+        diff = jnp.abs(b_pos[:, None, :] - r_pos[None, :, :].astype(jnp.float32))
+        diff = jnp.minimum(diff, gs - diff)
+        min_dist = jnp.max(diff, axis=-1).min(axis=1)
+        in_shelter = get_local_patches(
+            grid.shelter_spots.astype(jnp.float32), pop.positions, 0, gs
+        ).reshape(N) > 0.5
+        effective_det_r = jnp.where(in_shelter, det_r * 2.0, float(det_r))
+        blind = (min_dist > effective_det_r) & pop.alive
+        loc_env = loc_env.at[:, :, 1].set(
+            jnp.where(blind[:, None], 0.0, loc_env[:, :, 1])
+        )
 
     parts = [
         own_state,                          # (N, 6)
@@ -558,6 +575,8 @@ def run_simulation(
     )
 
     # ── Init model ──────────────────────────────────────────
+    _loc_env_start, _loc_env_end = loc_env_flat_bounds(config)
+    _fwd_env_dim = compute_fwd_env_dim(config)
     model = AgentNetworkJax(
         hidden_dim=hidden_d,
         n_heads=config["n_heads"],
@@ -567,6 +586,7 @@ def run_simulation(
         symbol_dim=config["symbol_dim"],
         vocab_size=config["vocab_size"],
         memory_slots=config.get("memory_slots", 0),
+        fwd_env_dim=_fwd_env_dim,
     )
     model_apply = make_model_apply(model)
 
@@ -598,7 +618,7 @@ def run_simulation(
     print(f"[JAX] git={_git_sha} | Phase9 auxiliary: {_phase9}")
 
     # ── Red curriculum state ─────────────────────────────────
-    red_curriculum_stages = [6, 15, 30, 75]
+    red_curriculum_stages = list(config.get("red_curriculum_stages", [6, 15, 30, 75]))
     red_curriculum_idx = 0
     red_sustain_count = 0
     red_sustain_threshold = float(config.get("curriculum_survival_threshold", 0.80))
@@ -793,6 +813,7 @@ def run_simulation(
         # Save carries on CPU before ppo_update deletes them (needed for fwd dynamics)
         _b_carries_np = np.asarray(b_batch["carries"])
         _b_actions_np = np.asarray(b_batch["actions"])
+        _b_obs_np = np.asarray(b_batch["obs"])
         _b_alive_np   = np.asarray(b_batch["alive"]) if "alive" in b_batch else None
         b_params, b_opt_state, b_metrics = ppo_update(
             b_params, b_opt_state, b_optimizer, model_apply,
@@ -809,8 +830,9 @@ def run_simulation(
         fwd_key, update_key = jax.random.split(update_key)
         b_params, b_opt_state, b_fwd_loss, b_sp_loss, b_sp_acc = auxiliary_update(
             b_params, b_opt_state, b_optimizer, b_aux_apply_fn,
-            _b_carries_np, _b_actions_np, _b_alive_np,
-            fwd_key, minibatch_size=_fwd_mb,
+            _b_carries_np, _b_actions_np, _b_obs_np,
+            _loc_env_start, _loc_env_end,
+            _b_alive_np, fwd_key, minibatch_size=_fwd_mb,
             fwd_coef=_fwd_coef, self_pred_coef=_self_pred_coef,
         )
         b_metrics["fwd_loss"]    = b_fwd_loss
@@ -821,6 +843,7 @@ def run_simulation(
         r_batch = rollout_data["red"]
         _r_carries_np = np.asarray(r_batch["carries"])
         _r_actions_np = np.asarray(r_batch["actions"])
+        _r_obs_np = np.asarray(r_batch["obs"])
         _r_alive_np   = np.asarray(r_batch["alive"]) if "alive" in r_batch else None
         r_params, r_opt_state, r_metrics = ppo_update(
             r_params, r_opt_state, r_optimizer, model_apply,
@@ -835,8 +858,9 @@ def run_simulation(
         fwd_key, update_key = jax.random.split(update_key)
         r_params, r_opt_state, r_fwd_loss, r_sp_loss, r_sp_acc = auxiliary_update(
             r_params, r_opt_state, r_optimizer, r_aux_apply_fn,
-            _r_carries_np, _r_actions_np, _r_alive_np,
-            fwd_key, minibatch_size=_fwd_mb,
+            _r_carries_np, _r_actions_np, _r_obs_np,
+            _loc_env_start, _loc_env_end,
+            _r_alive_np, fwd_key, minibatch_size=_fwd_mb,
             fwd_coef=_fwd_coef, self_pred_coef=_self_pred_coef,
         )
         r_metrics["fwd_loss"] = r_fwd_loss
@@ -926,12 +950,18 @@ def run_simulation(
             val_mean = float(b_vals_all[b_alive_all].mean()) if b_alive_all.any() else 0
             ret_mean = float(b_metrics.get("returns_mean", 0)) if isinstance(b_metrics, dict) else 0
             
-            # Signal diversity (unique signals broadcast)
+            # Signal vocabulary compression (k-means clusters with >2% occupancy)
             b_signals_np = np.array(b_pop_np.signals)
-            if alive_mask_final.sum() > 0:
-                unique_signals = len(np.unique(b_signals_np[alive_mask_final]))
-            else:
-                unique_signals = 0
+            active_clusters_str = "N/A"
+            if alive_mask_final.sum() >= 16:
+                alive_sigs = b_signals_np[alive_mask_final]
+                from sklearn.cluster import MiniBatchKMeans
+                km = MiniBatchKMeans(n_clusters=16, n_init="auto", random_state=42)
+                labels = km.fit_predict(alive_sigs)
+                counts = np.bincount(labels, minlength=16)
+                thresh = max(1, int(0.02 * len(alive_sigs)))
+                active_clusters = int((counts > thresh).sum())
+                active_clusters_str = f"{active_clusters}/16"
             
             # Reward breakdown
             rew_alive = b_rew_all[b_alive_all]
@@ -962,8 +992,8 @@ def run_simulation(
             sp_acc_val   = float(b_metrics.get('sp_acc',   float('nan'))) if isinstance(b_metrics, dict) else float('nan')
             print(f"  Values:  mean={val_mean:.4f} | VF_loss={vf_loss:.4f} | Clip={clip_frac:.3f}")
             print(f"  Reward:  mean={rew_mean:.4f} | Entropy: {ent_val:.4f}")
-            print(f"  AuxLoss: fwd={fwd_loss_val:.4f} (↓ to ~0.05) | self_pred_acc={sp_acc_val:.3f} (↑ from 0.20 random)")
-            print(f"  Signals: {unique_signals} unique | NB_GAIN↔surv: {sp_r:.3f}")
+            print(f"  AuxLoss: fwd_env={fwd_loss_val:.4f} (loc_env MSE) | self_pred_acc={sp_acc_val:.3f} (↑ from 0.20 random)")
+            print(f"  Active Clusters: {active_clusters_str} | NB_GAIN↔surv: {sp_r:.3f}")
             print(f"  Curriculum: red_floor={red_curriculum_stages[red_curriculum_idx]} sustain={red_sustain_count}/{red_sustain_needed} | brain={n_layers}L")
             print(f"{'='*70}\n")
 

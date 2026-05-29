@@ -390,7 +390,7 @@ cfg["use_pmap"] = False
 final_params, metrics = run_simulation(cfg, seed=42, n_steps=200_000)
 ```
 
-Checkpoints are saved every 2,000 steps to `runs/jax_run/checkpoints/`. Only model params are checkpointed (population state restarts fresh on resume).
+Checkpoints are saved every 2,000 steps to `runs/jax_run/checkpoints/`. Only model params are checkpointed (population state restarts fresh on resume). See **May 29, 2026** below for Modal volume layout and how to download weights locally.
 
 ---
 
@@ -3803,3 +3803,130 @@ Adding to the table (Section "Philosophical Foundations"):
 If 9.2 shows that signals do **not** improve `head_fwd` accuracy even after 500k steps of joint training, then the environment lacks information asymmetry sufficient to make communication useful, and we need to make red detection *strictly* signal-dependent (currently it's still possible to see reds in the 5×5 patch). That would be a hard pivot back to Phase 5's "force communication" path.
 
 — *appended 2026-05-28*
+
+---
+
+## May 29, 2026 — Modal A100 Phase 9 Run Complete (200k steps)
+
+### TL;DR
+
+- **First full-scale Phase 9 training run finished:** `n_steps=200_000`, commit **`992b67b`**, Modal Notebook A100, `population_size=500`, `n_layers=4`, `ppo_rollout_steps=512`, Phase **9.1** (self-prediction) + **9.2** (latent forward dynamics on carry) both active.
+- **Infrastructure validated:** long runs, resume from Orbax checkpoints, auxiliary-head init (`is_initializing()` + `make_model_apply`), dashboard `AuxLoss` line. Checkpoints persisted on Modal Volume **`throng-runs`** mounted at **`/mnt/throng-runs`**.
+- **Science result (honest):** RL stack stable; **no emergent vocabulary** (`Signals: ~15.9k unique` ≈ N_alive through 200k). **NB_GAIN↔surv: nan** (near-universal blue survival). **Brain vote never fired** (4L throughout). Aux heads train (`fwd ≈ 0.0001`, `self_pred_acc ≈ 0.24–0.35`) but did not produce load-bearing communication.
+- **Next code priorities:** signal-cluster metric on dashboard; **VQ / discrete signals** or **9.4 neighbor-signal attention**; harder survival so selection pressure isn’t flat; optional signal-conditioned forward dynamics (9.2 extension from roadmap).
+
+### Run config (Modal)
+
+| Setting | Value |
+|---------|-------|
+| `population_size` | 500 |
+| `red_population_size` | 75 |
+| `grid_size` | 128 |
+| `n_layers` | 4 |
+| `ppo_rollout_steps` | 512 |
+| `ppo_minibatch_size` | 4096 |
+| `neighbor_k` | 6 |
+| `memory_buffer_size` | 20 |
+| `mind_meld_enabled` | True |
+| `seed` | 42 |
+| `n_steps` | 200_000 |
+| Git | `992b67b` |
+
+Throughput: **~5–6 steps/sec** after JIT warmup on A100. Cost: **~$50+** across multiple sessions (restarts, dead kernels, fresh runs before volume wiring).
+
+### Final dashboard (step 199680, PPO #390)
+
+```
+[step  199680] 5 steps/sec | blue=499 red=75 | ppo=390
+  Values:  mean=6.7584 | VF_loss=1.1674 | Clip=0.002
+  Reward:  mean=0.0925 | Entropy: 1.5598
+  AuxLoss: fwd=0.0001 | self_pred_acc=0.288
+  Signals: 15902 unique | NB_GAIN↔surv: nan
+  Curriculum: red_floor=75 | brain=4L
+[CKPT] Saved step 199680
+Done!
+```
+
+### Findings vs hypotheses
+
+| Hypothesis / metric | Result |
+|---------------------|--------|
+| Phase 9.2 forward dynamics learns | ✅ `fwd` drops to ~0.0001 by ~2k steps (likely easy: carry updates `0.9·c + 0.1·pool`) |
+| Phase 9.1 self-model | ⚠️ `self_pred_acc` ~0.25–0.35 (above 0.20 random, not strong); brief spikes to ~0.54 early when policy was more stereotyped |
+| Signal vocabulary compression | ❌ **~15.8k–16k unique** at 200k (no drop toward shared tokens) |
+| Survival pressure | ❌ Blues ~500 alive; **NB_GAIN↔surv always nan** |
+| Brain vote (4L→5L+) | ❌ Never triggered |
+| Red learning | ✅ Reds at floor 75; red rewards/returns active late run |
+| Value learning | ✅ VF ~1.0–1.2 late run; value std recovered (~0.27–0.41) |
+| Distillation | ✅ Fired on schedule (`[step N] DISTILL — population`) |
+
+### Resume behaviour (important)
+
+- Checkpoints store **`b_params`** and **`r_params` only** (Orbax `CheckpointManager`, `max_to_keep=2`).
+- Orbax step index = **PPO update number** (`ui + 1`), **not** env step. Example: folder **`390`** = env step **`390 × 512 = 199680`**.
+- On resume: weights restored; **population / grid / carries restart fresh** → curriculum re-ramps 6→15→30→75; dashboard Age resets low even though weights are mature.
+
+### Modal ops lessons
+
+1. **Volume:** Create **`throng-runs`** in notebook **Files → Volumes** (mounts under **`/mnt/throng-runs`**, not `/root/throng-runs`). Symlink `runs/jax_run/checkpoints` → `/mnt/throng-runs/checkpoints` in setup cell.
+2. **Repo path:** After kernel recycle, clone to **`/root/throng`** — the repo is **not** on the volume, only checkpoints.
+3. **Idle timeout:** Raise sidebar idle timeout (e.g. **12 hr**); default **10 min** kills idle kernels (training cell running = not idle).
+4. **Notebook UI:** Scrolling output can freeze while training continues; trust **`/mnt/throng-runs/checkpoints`** folder numbers, not last visible log line.
+5. **Flax init bugs fixed (`992b67b`):** aux heads need `is_initializing()` in `__call__`; `model.apply` must use `{'params': params}` via `make_model_apply()` inside JIT.
+
+### Downloading checkpoints locally
+
+**What is saved**
+
+| Item | Path (in container) | Contents |
+|------|---------------------|----------|
+| Latest weights | `/mnt/throng-runs/checkpoints/<STEP>/` | Flax pytrees: `b_params`, `r_params` (blue + red brains) |
+| Final run | **`<STEP>=390`** | Matches env step **199680** |
+| Corpus (optional) | `/root/throng/runs/jax_run/signal_corpus.jsonl` | Sampled signal/action logs (ephemeral unless copied) |
+
+Orbax stores **directories per step**, not a single `.pkl`. Copy the whole step folder (e.g. `390/`).
+
+**Method A — Modal Files panel (easiest)**
+
+1. Open left sidebar → **Files**.
+2. Go to **`/mnt/throng-runs/checkpoints/`**.
+3. You should see numeric folders (e.g. `389`, `390`) — only **2** kept (`max_to_keep=2`).
+4. Right-click folder **`390`** (latest) → **Download** (or download entire `checkpoints` tree).
+
+**Method B — `modal` CLI (from your Mac)**
+
+```bash
+pip install modal
+modal volume get throng-runs checkpoints ./throng_checkpoints_200k
+```
+
+This pulls the volume’s `checkpoints/` tree to `./throng_checkpoints_200k/` on your machine. Latest step subfolder = **`390/`**.
+
+**Method C — Tar in notebook, then download**
+
+Run once in Modal (after `os.chdir("/root/throng")` and volume mount confirmed):
+
+```python
+import subprocess
+subprocess.run(
+    "tar czf /root/throng_ckpt_390.tar.gz -C /mnt/throng-runs/checkpoints 390".split(),
+    check=True,
+)
+print("Download /root/throng_ckpt_390.tar.gz from Files panel")
+```
+
+To archive both kept checkpoints: replace `390` with `.` and use `throng_ckpt_all.tar.gz`.
+
+**Loading locally (later)**
+
+Resume in JAX with the same `run_simulation(cfg, ...)` and place checkpoints under `runs/jax_run/checkpoints/` with Orbax layout intact, or point `CheckpointManager` at the copied directory. Same config + `seed=42` required for consistent resume semantics.
+
+### What’s Next, Practically
+
+1. **Stop Modal GPU** when not training — notebook billing continues until kernel stops.
+2. **Download `390/`** (or full `checkpoints/`) to local backup before deleting volume.
+3. Implement **k-means signal-cluster dashboard metric** (May 28 plan) — retire raw `N unique`.
+4. **Phase 9.4** (neighbor signal attention) or **VQ discrete signals** before another 200k identical run.
+5. Consider **stricter survival** or **red visibility** so `NB_GAIN↔surv` and signal compression can become measurable.
+
+— *appended 2026-05-29*

@@ -11,9 +11,9 @@ grid_size: 128
 window_size: 1200
 
 population_size: 500
-red_population_size: 75
+red_population_size: 150
 min_population: 200
-min_red_population: 15
+min_red_population: 150
 repro_energy_thresh: 0.80        # agent must have 80% energy to self-clone
 repro_energy_cost: 0.40          # cloning costs 40% of parent energy
 
@@ -118,7 +118,7 @@ puzzle_timeout: 100              # steps before puzzle resets
 
 # ── Energy mechanics ─────────────────────────────────────────────────────────
 energy_decay: 0.001
-starvation_threshold: 0.05
+starvation_threshold: 0.1
 reward_starvation: -0.5
 reward_resource: 0.1
 resource_decay: 0.05                 # how much resource depletes per consumption step
@@ -147,7 +147,8 @@ reward_red_starve_per_step: -0.01
 reward_move: 0.01
 
 # Observation constraints
-red_detection_radius: 0         # NO direct red detection beyond 5×5 patch
+red_detection_radius: 1          # Chebyshev threat sense beyond 5×5 patch (Lethal Ecology)
+red_curriculum_stages: [40, 80, 120, 150]
 resource_obs_noise: 0.2         # 20% Gaussian noise on resource observations
 
 brain_vote_interval: 5000

@@ -37,6 +37,7 @@ class AgentNetworkJax(nn.Module):
     vocab_size: int = 256
     max_layers: int = 6
     memory_slots: int = 0
+    fwd_env_dim: int = 200   # W × 8 flattened loc_env (set from config in main_jax)
 
     def setup(self):
         d = self.hidden_dim
@@ -69,9 +70,9 @@ class AgentNetworkJax(nn.Module):
         self.head_culture_fast = nn.Dense(sym_d)
         self.head_culture_slow = nn.Dense(sym_d)
 
-        # Forward dynamics head: predicts carry_{t+1} from carry_t + action_onehot
+        # Forward dynamics head: predicts next-step flat loc_env from carry_t + action
         self.head_fwd_1 = nn.Dense(self.hidden_dim * 4)
-        self.head_fwd_2 = nn.Dense(self.hidden_dim)
+        self.head_fwd_2 = nn.Dense(self.fwd_env_dim)
 
         # Self-prediction head (Phase 9.1): predicts own next action from carry_t
         self.head_self_pred = nn.Dense(5)
@@ -185,8 +186,8 @@ class AgentNetworkJax(nn.Module):
         action_oh: jnp.ndarray,  # (N, 5)
     ) -> jnp.ndarray:
         """
-        Predict carry_{t+1} from carry_t + action_onehot.
-        IMPORTANT: caller must stop_gradient the target carry_{t+1}.
+        Predict flat loc_env_{t+1} from carry_t + action_onehot.
+        IMPORTANT: caller must stop_gradient the target loc_env_{t+1}.
         """
         inp = jnp.concatenate([carry_t, action_oh], axis=-1)
         h = nn.relu(self.head_fwd_1(inp))
@@ -201,21 +202,15 @@ class AgentNetworkJax(nn.Module):
         Compute both auxiliary predictions from carry_t in one forward pass.
 
         Returns:
-          carry_pred       (N, hidden_dim) — predicted carry_{t+1} (forward dynamics)
-          self_pred_logits (N, 5)          — predicted action_{t+1} (self-prediction)
+          env_pred         (N, fwd_env_dim) — predicted flat loc_env_{t+1}
+          self_pred_logits (N, 5)           — predicted action_{t+1}
 
-        Caller must stop_gradient carry_{t+1} before computing fwd loss.
-        Self-prediction accuracy > 0.20 (random baseline) signals the agent
-        has built a model of its own future behaviour.
+        Caller must stop_gradient loc_env_{t+1} before computing fwd loss.
         """
-        # Forward dynamics
         fwd_inp = jnp.concatenate([carry_t, action_oh], axis=-1)
-        carry_pred = self.head_fwd_2(nn.relu(self.head_fwd_1(fwd_inp)))
-
-        # Self-prediction: what action will I take next?
+        env_pred = self.head_fwd_2(nn.relu(self.head_fwd_1(fwd_inp)))
         self_pred_logits = self.head_self_pred(carry_t)
-
-        return carry_pred, self_pred_logits
+        return env_pred, self_pred_logits
 
 
 def init_agent_params(

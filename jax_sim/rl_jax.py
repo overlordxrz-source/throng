@@ -301,21 +301,20 @@ def ppo_update(
 @functools.partial(jax.jit, static_argnames=("aux_apply_fn", "optimizer", "fwd_coef", "self_pred_coef"))
 def _aux_minibatch_step(
     params, opt_state, aux_apply_fn, optimizer,
-    carry_t, action_oh, carry_tp1, action_tp1_oh, alive_mask,
+    carry_t, action_oh, loc_env_tp1, action_tp1_oh, alive_mask,
     fwd_coef, self_pred_coef,
 ):
     """
     Single minibatch gradient step combining:
-      - Forward dynamics loss: predict carry_{t+1} from (carry_t, action_t)
+      - Forward dynamics loss: predict flat loc_env_{t+1} from (carry_t, action_t)
       - Self-prediction loss:  predict action_{t+1} from carry_t
     """
     def loss_fn(p):
-        carry_pred, self_pred_logits = aux_apply_fn(p, carry_t, action_oh)
+        env_pred, self_pred_logits = aux_apply_fn(p, carry_t, action_oh)
 
-        # Forward dynamics — stop_gradient on target is CRITICAL.
-        # Without it the model learns carry_pred = 0.9 * carry_t trivially.
-        target = jax.lax.stop_gradient(carry_tp1)
-        fwd_err = jnp.square(carry_pred - target).mean(axis=-1)          # (M,)
+        # Predict external world (loc_env), not latent carry — stop_gradient on target.
+        target = jax.lax.stop_gradient(loc_env_tp1)
+        fwd_err = jnp.mean(jnp.square(env_pred - target), axis=-1)       # (M,)
         fwd_loss = (fwd_err * alive_mask).sum() / (alive_mask.sum() + 1e-8)
 
         # Self-prediction cross-entropy
@@ -346,36 +345,41 @@ def auxiliary_update(
     aux_apply_fn,         # model.apply bound to auxiliary_heads method
     carries_np,           # (T, N, hidden_dim) numpy — full rollout carries
     actions_np,           # (T, N) numpy int    — full rollout actions
-    alive_np,             # (T, N) numpy float, or None
-    key: jax.Array,
+    obs_np,               # (T, N, obs_dim) numpy — for loc_env_{t+1} target
+    loc_env_start: int,
+    loc_env_end: int,
+    alive_np=None,        # (T, N) numpy float, or None
+    key: jax.Array = None,
     minibatch_size: int = 1024,
     fwd_coef: float = 0.05,
     self_pred_coef: float = 0.1,
 ) -> Tuple[Dict, Any, float, float, float]:
     """
     Compute forward dynamics + self-prediction auxiliary losses using
-    sequential (t, t+1) carry pairs from the rollout.
+    sequential (t, t+1) pairs from the rollout.
+
+    Forward dynamics target is obs[t+1, loc_env_start:loc_env_end] (flat loc_env).
 
     Returns: (params, opt_state, avg_fwd_loss, avg_sp_loss, avg_sp_acc)
-    Self-prediction accuracy starts at ~0.20 (random) and rises if agents
-    build internal models of their own behaviour.
     """
     T, N, hidden_dim = carries_np.shape
 
-    carry_t      = carries_np[:-1].reshape((T - 1) * N, hidden_dim)
-    carry_tp1    = carries_np[1:].reshape((T - 1) * N, hidden_dim)
-    action_t     = actions_np[:-1].reshape((T - 1) * N)
-    action_tp1   = actions_np[1:].reshape((T - 1) * N)
-    action_oh    = np.eye(5, dtype=np.float32)[action_t]    # ((T-1)*N, 5)
-    action_tp1_oh = np.eye(5, dtype=np.float32)[action_tp1] # ((T-1)*N, 5)
+    carry_t = carries_np[:-1].reshape((T - 1) * N, hidden_dim)
+    action_t = actions_np[:-1].reshape((T - 1) * N)
+    action_tp1 = actions_np[1:].reshape((T - 1) * N)
+    loc_env_tp1 = obs_np[1:].reshape((T - 1) * N, obs_np.shape[-1])[:, loc_env_start:loc_env_end]
+    action_oh = np.eye(5, dtype=np.float32)[action_t]
+    action_tp1_oh = np.eye(5, dtype=np.float32)[action_tp1]
 
     if alive_np is not None:
         alive_t = alive_np[:-1].reshape((T - 1) * N).astype(np.float32)
     else:
         alive_t = np.ones((T - 1) * N, dtype=np.float32)
 
-    M    = carry_t.shape[0]
-    rng  = np.random.RandomState(int(jax.random.bits(key, dtype=jnp.uint32)))
+    M = carry_t.shape[0]
+    if key is None:
+        key = jax.random.PRNGKey(0)
+    rng = np.random.RandomState(int(jax.random.bits(key, dtype=jnp.uint32)))
     perm = rng.permutation(M)
     n_mb = max(1, M // minibatch_size)
 
@@ -387,7 +391,7 @@ def auxiliary_update(
             params, opt_state, aux_apply_fn, optimizer,
             jnp.array(carry_t[idx]),
             jnp.array(action_oh[idx]),
-            jnp.array(carry_tp1[idx]),
+            jnp.array(loc_env_tp1[idx]),
             jnp.array(action_tp1_oh[idx]),
             jnp.array(alive_t[idx]),
             fwd_coef, self_pred_coef,
@@ -405,13 +409,5 @@ def fwd_dynamics_update(params, opt_state, optimizer, fwd_apply_fn,
                         minibatch_size=1024, fwd_coef=0.05):
     """Deprecated: use auxiliary_update instead."""
     import functools as _ft
-    aux_fn = _ft.partial(
-        lambda apply, p, ct, ao: apply(p, ct, ao)[0],  # extract carry_pred only
-        fwd_apply_fn,
-    )
-    p, o, fl, _, _ = auxiliary_update(
-        params, opt_state, optimizer, fwd_apply_fn,
-        carries_np, actions_np, alive_np, key,
-        minibatch_size=minibatch_size, fwd_coef=fwd_coef, self_pred_coef=0.0,
-    )
+    raise NotImplementedError("fwd_dynamics_update requires obs_np and loc_env bounds; use auxiliary_update")
     return p, o, fl
