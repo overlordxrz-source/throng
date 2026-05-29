@@ -116,6 +116,29 @@ def _normalize_config(cfg: Dict) -> Dict:
 RED_SENSE_API_VERSION = 2
 
 
+def _verify_main_jax_on_disk() -> None:
+    """Fail fast if the .py on disk is not the JIT-safe red-sense build."""
+    try:
+        with open(__file__, encoding="utf-8") as f:
+            disk_src = f.read()
+    except OSError as exc:
+        raise RuntimeError(f"Cannot read {__file__}: {exc}") from exc
+    if "red_map.any()" in disk_src:
+        raise RuntimeError(
+            f"{__file__} on disk is OUT OF DATE (still has red_map.any).\n"
+            "Fix: cd /root/throng && git fetch origin && git reset --hard origin/master\n"
+            "Then restart the Jupyter kernel and re-run all cells."
+        )
+    if "RED_SENSE_API_VERSION" not in disk_src or "limit_red_sensing" not in disk_src:
+        raise RuntimeError(
+            f"{__file__} on disk is too old (missing RED_SENSE_API_VERSION).\n"
+            "Fix: cd /root/throng && git fetch origin && git reset --hard origin/master"
+        )
+
+
+_verify_main_jax_on_disk()
+
+
 @jax.jit
 def _mask_loc_env_red_channel(
     loc_env: jnp.ndarray,
@@ -642,9 +665,26 @@ def run_simulation(
         _phase9 = "OFF — git pull required"
     print(f"[JAX] code: {_main_path}")
     print(f"[JAX] git={_git_sha} | Phase9 auxiliary: {_phase9}")
+    _bo_path = _inspect.getfile(build_observations_jax)
+    try:
+        with open(_bo_path, encoding="utf-8") as _f:
+            _disk_bo = _f.read()
+    except OSError:
+        _disk_bo = ""
+    if "red_map.any()" in _disk_bo:
+        raise RuntimeError(
+            f"Git is at {_git_sha} but {_bo_path} on disk still has red_map.any().\n"
+            "Run: cd /root/throng && git fetch origin && git reset --hard origin/master"
+        )
+    _mem_bo = _inspect.getsource(build_observations_jax)
+    if "red_map.any()" in _mem_bo:
+        raise RuntimeError(
+            "Stale build_observations_jax in memory (red_map.any).\n"
+            "Restart the Jupyter kernel (Kernel → Restart), then re-run from Cell 1."
+        )
     if "limit_red_sensing" not in _inspect.signature(build_observations_jax).parameters:
         raise RuntimeError(
-            "Stale jax_sim.main_jax loaded (missing limit_red_sensing). "
+            "Stale jax_sim.main_jax in memory (missing limit_red_sensing). "
             "Restart the Jupyter kernel, then: cd /root/throng && git pull"
         )
     print(f"[JAX] red_sense_api=v{RED_SENSE_API_VERSION} (JIT vectorized)")
