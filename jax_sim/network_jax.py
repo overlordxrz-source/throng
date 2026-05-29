@@ -17,6 +17,7 @@ import jax
 import jax.numpy as jnp
 from flax import linen as nn
 from flax.core import freeze, unfreeze
+from flax.core.frozen_dict import FrozenDict
 from typing import Any, Optional, Tuple
 
 # Params created only in auxiliary_heads (not touched by __call__ during init).
@@ -100,7 +101,8 @@ def dead_code_reset_codebook_params(
         **flat["codebook"],
         "embedding": jnp.where(dead_mask[:, None], replacement, cb),
     }
-    return freeze(flat)
+    # Match container type — optax Adam state must stay aligned with params tree.
+    return freeze(flat) if isinstance(params, FrozenDict) else flat
 
 
 class AgentNetworkJax(nn.Module):
