@@ -11,7 +11,6 @@ from jax_sim.population_jax import PopState
 RED_SENSE_API_VERSION = 2
 
 
-@jax.jit
 def _mask_loc_env_red_channel(
     loc_env: jnp.ndarray,
     pop: PopState,
