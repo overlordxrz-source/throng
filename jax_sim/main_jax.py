@@ -49,6 +49,7 @@ from jax_sim.network_jax import (
 )
 from jax_sim.rl_jax import compute_gae, ppo_loss, create_optimizer, ppo_update, auxiliary_update
 from agents.network_torch import compute_obs_dim_torch, compute_fwd_env_dim, loc_env_flat_bounds
+from jax_sim.observations_jax import RED_SENSE_API_VERSION, build_observations_jax
 
 
 # ── Config defaults ─────────────────────────────────────────────────────────
@@ -110,159 +111,6 @@ def _normalize_config(cfg: Dict) -> Dict:
     return cfg
 
 
-# ── Observation builder (JAX) ──────────────────────────────────────────────
-
-# Bumped when red-detection masking changes (printed at startup to catch stale imports).
-RED_SENSE_API_VERSION = 2
-
-
-def _verify_main_jax_on_disk() -> None:
-    """Fail fast if the .py on disk is not the JIT-safe red-sense build."""
-    try:
-        with open(__file__, encoding="utf-8") as f:
-            disk_src = f.read()
-    except OSError as exc:
-        raise RuntimeError(f"Cannot read {__file__}: {exc}") from exc
-    if "red_map.any()" in disk_src:
-        raise RuntimeError(
-            f"{__file__} on disk is OUT OF DATE (still has red_map.any).\n"
-            "Fix: cd /root/throng && git fetch origin && git reset --hard origin/master\n"
-            "Then restart the Jupyter kernel and re-run all cells."
-        )
-    if "RED_SENSE_API_VERSION" not in disk_src or "limit_red_sensing" not in disk_src:
-        raise RuntimeError(
-            f"{__file__} on disk is too old (missing RED_SENSE_API_VERSION).\n"
-            "Fix: cd /root/throng && git fetch origin && git reset --hard origin/master"
-        )
-
-
-_verify_main_jax_on_disk()
-
-
-@jax.jit
-def _mask_loc_env_red_channel(
-    loc_env: jnp.ndarray,
-    pop: PopState,
-    red_map: jnp.ndarray,
-    shelter_spots: jnp.ndarray,
-    det_r: int,
-    gs: int,
-) -> jnp.ndarray:
-    """Zero loc_env red-presence channel when no live red within Chebyshev det_r."""
-    coords_y, coords_x = jnp.meshgrid(
-        jnp.arange(gs), jnp.arange(gs), indexing="ij"
-    )
-    grid_coords = jnp.stack([coords_y, coords_x], axis=-1).astype(jnp.float32)
-    b_pos = pop.positions.astype(jnp.float32)
-    diff = jnp.abs(b_pos[:, None, None, :] - grid_coords[None, :, :, :])
-    diff = jnp.minimum(diff, gs - diff)
-    cheb = jnp.max(diff, axis=-1)
-    cheb_at_reds = jnp.where(red_map[None, :, :], cheb, jnp.inf)
-    min_dist = cheb_at_reds.min(axis=(1, 2))
-    in_shelter = shelter_spots[pop.positions[:, 0], pop.positions[:, 1]]
-    effective_det_r = jnp.where(in_shelter, float(det_r) * 2.0, float(det_r))
-    blind = jnp.isfinite(min_dist) & (min_dist > effective_det_r) & pop.alive
-    return loc_env.at[:, :, 1].set(
-        jnp.where(blind[:, None], 0.0, loc_env[:, :, 1])
-    )
-
-
-def build_observations_jax(
-    pop: PopState,
-    grid: GridState,
-    blue_map: jnp.ndarray,
-    red_map: jnp.ndarray,
-    config: Dict,
-    step: int,
-    key: jnp.ndarray = None,
-    limit_red_sensing: bool = False,
-) -> jnp.ndarray:
-    """Build flat observation vector for all agents.
-    
-    When key is provided, applies signal gate (random env masking)
-    and observation noise on resources.
-    """
-    gs = config["grid_size"]
-    K = config["neighbor_k"]
-    r = config["local_obs_radius"]
-    sym_d = config["symbol_dim"]
-    sig_d = config["signal_dim"]
-    W = (2 * r + 1) ** 2
-    N = pop.max_pop
-
-    norm_age = pop.ages.astype(jnp.float32) / float(config["max_age"])
-    norm_x = pop.positions[:, 0].astype(jnp.float32) / gs
-    norm_y = pop.positions[:, 1].astype(jnp.float32) / gs
-    energy = pop.energy
-    nl_norm = pop.n_layers.astype(jnp.float32) / 6.0
-    mat_frac = jnp.zeros(N, dtype=jnp.float32)
-
-    own_state = jnp.stack([norm_age, mat_frac, energy, nl_norm, norm_x, norm_y], axis=1)
-
-    nb_sigs = get_neighbour_signals(
-        pop.positions, pop.signals, pop.alive, K, gs,
-    )  # (N, K, sig_d)
-
-    loc_sym = get_local_patches(grid.symbols, pop.positions, r, gs)
-    loc_pres = jnp.concatenate([
-        get_local_patches(blue_map.astype(jnp.float32), pop.positions, r, gs)[..., None],
-        get_local_patches(red_map.astype(jnp.float32), pop.positions, r, gs)[..., None],
-    ], axis=-1)  # (N, W, 2)
-    loc_wall = get_local_patches(grid.walls.astype(jnp.float32), pop.positions, r, gs)[..., None]
-    loc_res = get_local_patches(grid.resources, pop.positions, r, gs)[..., None]
-    loc_shelter = get_local_patches(grid.shelter_spots.astype(jnp.float32), pop.positions, r, gs)[..., None]
-    loc_contested = get_local_patches(grid.contested_res, pop.positions, r, gs)[..., None]
-    loc_scent = get_local_patches(grid.scent_trails, pop.positions, r, gs)[..., None]
-    loc_puzzle = get_local_patches(grid.puzzle_grid, pop.positions, r, gs)[..., None]
-
-    # 8 env channels: blue_pres, red_pres, wall, resource, shelter, contested, scent, puzzle
-    loc_env = jnp.concatenate([
-        loc_pres, loc_wall, loc_res, loc_shelter, loc_contested, loc_scent, loc_puzzle
-    ], axis=-1)  # (N, W, 8)
-
-    # Observation noise on resource channel (index 3 in loc_env)
-    if key is not None:
-        k_noise, k_gate = jax.random.split(key)
-        noise_std = float(config.get("resource_obs_noise", 0.0))
-        if noise_std > 0:
-            res_noise = jax.random.normal(k_noise, loc_res.shape) * noise_std
-            loc_env = loc_env.at[:, :, 3].add(res_noise.squeeze(-1))
-
-        # Signal gate: randomly mask a fraction of env features per agent
-        gate_frac = float(config.get("signal_gate_mask_frac", 0.0))
-        if config.get("signal_gate_enabled", False) and gate_frac > 0:
-            gate_mask = jax.random.bernoulli(k_gate, 1.0 - gate_frac, loc_env.shape)
-            loc_env = loc_env * gate_mask
-
-    loc_cult_fast = get_local_patches(grid.cultural_fast, pop.positions, r, gs)
-    loc_cult_slow = get_local_patches(grid.cultural_slow, pop.positions, r, gs)
-
-    # Beyond-patch red sensing (blues only): mask loc_env red channel when too far
-    det_r = int(config.get("red_detection_radius", 0))
-    if det_r > 0 and limit_red_sensing:
-        loc_env = _mask_loc_env_red_channel(
-            loc_env, pop, red_map, grid.shelter_spots, det_r, gs
-        )
-
-    parts = [
-        own_state,                          # (N, 6)
-        nb_sigs.reshape(N, -1),            # (N, K*sig_d)
-        loc_sym.reshape(N, -1),             # (N, W*sym_d)
-        loc_env.reshape(N, -1),             # (N, W*8)
-        pop.signals,                        # (N, sig_d)
-    ]
-
-    if pop.memory_buffer is not None:
-        parts.append(pop.memory_buffer.reshape(N, -1))
-
-    parts.append(loc_cult_fast.reshape(N, -1))
-    parts.append(loc_cult_slow.reshape(N, -1))
-
-    obs = jnp.concatenate(parts, axis=1)
-    obs = jnp.where(pop.alive[:, None], obs, 0.0)
-    return obs
-
-
 # ── Single simulation step (for scan) ──────────────────────────────────────
 
 def make_sim_step(config: Dict, model: AgentNetworkJax, model_apply=None):
@@ -300,6 +148,7 @@ def make_sim_step(config: Dict, model: AgentNetworkJax, model_apply=None):
     _red_starvation_steps = int(config.get("red_starvation_steps", 400))
     _contested_min_harv = int(config.get("contested_min_harvesters", 2))
     _n_layers = config["n_layers"]
+    from jax_sim import observations_jax as _obs
 
     @jax.jit
     def sim_step(carry, step_key):
@@ -318,12 +167,14 @@ def make_sim_step(config: Dict, model: AgentNetworkJax, model_apply=None):
         red_map = jnp.zeros((gs, gs), dtype=jnp.bool_)
         red_map = red_map.at[r_pop.positions[:, 0], r_pop.positions[:, 1]].set(r_pop.alive)
 
-        # ── Observations (with signal gate + noise) ─────────────
-        b_obs = build_observations_jax(
+        # ── Observations (via observations_jax — reload with train_entry) ──
+        b_obs = _obs.build_observations_jax(
             b_pop, grid, blue_map, red_map, config, 0,
             key=key_b_obs, limit_red_sensing=True,
         )
-        r_obs = build_observations_jax(r_pop, grid, blue_map, red_map, config, 0, key=key_r_obs)
+        r_obs = _obs.build_observations_jax(
+            r_pop, grid, blue_map, red_map, config, 0, key=key_r_obs,
+        )
 
         # ── Forward passes ──────────────────────────────────────
         b_new_c, b_outs = model_apply(b_params_sg, b_carries, b_obs, _n_layers)
@@ -540,6 +391,17 @@ def run_simulation(
     seed: int = 42,
     n_steps: int = 100000,
 ) -> Tuple[Dict, Dict]:
+    """Prefer ``from jax_sim.train_entry import run_simulation`` after git pull."""
+    from jax_sim.train_entry import run_simulation as _fresh_run
+
+    return _fresh_run(config, seed=seed, n_steps=n_steps)
+
+
+def _run_simulation_impl(
+    config: Dict,
+    seed: int = 42,
+    n_steps: int = 100000,
+) -> Tuple[Dict, Dict]:
     """
     Run full JAX simulation.
     Returns: (final_params, metrics_history)
@@ -665,29 +527,17 @@ def run_simulation(
         _phase9 = "OFF — git pull required"
     print(f"[JAX] code: {_main_path}")
     print(f"[JAX] git={_git_sha} | Phase9 auxiliary: {_phase9}")
-    _bo_path = _inspect.getfile(build_observations_jax)
-    try:
-        with open(_bo_path, encoding="utf-8") as _f:
-            _disk_bo = _f.read()
-    except OSError:
-        _disk_bo = ""
+    from jax_sim import observations_jax as _obs_mod
+
+    _bo_path = _inspect.getfile(_obs_mod.build_observations_jax)
+    with open(_bo_path, encoding="utf-8") as _f:
+        _disk_bo = _f.read()
     if "red_map.any()" in _disk_bo:
         raise RuntimeError(
-            f"Git is at {_git_sha} but {_bo_path} on disk still has red_map.any().\n"
+            f"Git is at {_git_sha} but {_bo_path} still has red_map.any().\n"
             "Run: cd /root/throng && git fetch origin && git reset --hard origin/master"
         )
-    _mem_bo = _inspect.getsource(build_observations_jax)
-    if "red_map.any()" in _mem_bo:
-        raise RuntimeError(
-            "Stale build_observations_jax in memory (red_map.any).\n"
-            "Restart the Jupyter kernel (Kernel → Restart), then re-run from Cell 1."
-        )
-    if "limit_red_sensing" not in _inspect.signature(build_observations_jax).parameters:
-        raise RuntimeError(
-            "Stale jax_sim.main_jax in memory (missing limit_red_sensing). "
-            "Restart the Jupyter kernel, then: cd /root/throng && git pull"
-        )
-    print(f"[JAX] red_sense_api=v{RED_SENSE_API_VERSION} (JIT vectorized)")
+    print(f"[JAX] red_sense_api=v{RED_SENSE_API_VERSION} (observations_jax)")
 
     # ── Red curriculum state ─────────────────────────────────
     red_curriculum_stages = list(config.get("red_curriculum_stages", [6, 15, 30, 75]))
@@ -1301,6 +1151,8 @@ if __name__ == "__main__":
         cfg = DEFAULT_CONFIG
 
     print("[JAX] Starting simulation...")
-    final_params, metrics = run_simulation(cfg, seed=42, n_steps=1024)
+    from jax_sim.train_entry import run_simulation as run_simulation_fresh
+
+    final_params, metrics = run_simulation_fresh(cfg, seed=42, n_steps=1024)
     print("[JAX] Done!")
     print(f"Final metrics: {metrics}")

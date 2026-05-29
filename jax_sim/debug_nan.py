@@ -2,7 +2,8 @@
 import jax
 import jax.numpy as jnp
 import yaml
-from jax_sim.main_jax import build_observations_jax, init_population, init_grid
+from jax_sim.observations_jax import build_observations_jax
+from jax_sim.main_jax import init_population, init_grid
 from jax_sim.network_jax import AgentNetworkJax
 
 with open('config_phase7.yaml') as f:
