@@ -541,14 +541,6 @@ def _run_simulation_impl(
         _phase9 = "OFF — git pull required"
     print(f"[JAX] code: {_main_path}")
     print(f"[JAX] git={_git_sha} | Phase9 auxiliary: {_phase9}")
-    from flax.core import unfreeze as _unfreeze
-    _vq_on = "codebook" in _unfreeze(b_params)
-    print(
-        f"[JAX] signal_bottleneck={'VQ' if _vq_on else 'LEGACY softmax'} "
-        f"| vocab={config.get('vocab_size', 64)} "
-        f"| vq_beta={config.get('vq_beta', 0.25)} "
-        f"| vq_loss_coef={config.get('vq_loss_coef', 0.1)}"
-    )
     from jax_sim import observations_jax as _obs_mod
 
     _bo_path = _inspect.getfile(_obs_mod.build_observations_jax)
@@ -587,6 +579,13 @@ def _run_simulation_impl(
     except Exception as _apply_err:
         _apply_ok = False
         print(f"[DEBUG] apply smoke-test FAILED: {_apply_err}")
+    _vq_on = "codebook" in _bp
+    print(
+        f"[JAX] signal_bottleneck={'VQ' if _vq_on else 'LEGACY softmax'} "
+        f"| vocab={config.get('vocab_size', 64)} "
+        f"| vq_beta={config.get('vq_beta', 0.25)} "
+        f"| vq_loss_coef={config.get('vq_loss_coef', 0.1)}"
+    )
     print(
         f"[DEBUG] Params OK: emb_own={_emb_ok} | aux_heads={_aux_ok} | apply={_apply_ok}"
     )
