@@ -53,11 +53,7 @@ def vector_quantize_signals(
 
     codebook_q = codebook
     if dead_code_reset and vocab_size > 0 and n_agents > 0:
-        usage_counts = jax.lax.segment_sum(
-            jnp.ones((n_agents,), dtype=jnp.int32),
-            token_ids,
-            num_segments=vocab_size,
-        )
+        usage_counts = jnp.bincount(token_ids, length=vocab_size)
         dead_mask = usage_counts == 0
         batch_idx = jnp.arange(vocab_size) % n_agents
         replacement = jax.lax.stop_gradient(z_e[batch_idx])
@@ -95,11 +91,7 @@ def dead_code_reset_codebook_params(
         return params
     flat = unfreeze(params)
     cb = flat["codebook"]["embedding"]
-    usage = jax.lax.segment_sum(
-        jnp.ones(token_ids.shape, dtype=jnp.int32),
-        token_ids,
-        num_segments=vocab_size,
-    )
+    usage = jnp.bincount(token_ids, length=vocab_size)
     dead_mask = usage == 0
     n_pool = z_e.shape[0]
     rand_idx = jax.random.randint(rng, (vocab_size,), 0, n_pool)
