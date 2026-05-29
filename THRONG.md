@@ -4055,7 +4055,7 @@ python tools/decode_signals.py runs/jax_run/signal_corpus.jsonl --k 16   # match
 python tools/decode_signals.py runs/jax_run/signal_corpus.jsonl --min-step 25000  # late run only
 ```
 
-**JAX gap (May 30):** `main_jax.py` corpus logging does **not** yet write `nb_scout_sig_lag1` / `nb_scout_dist_lag1` (PyTorch `main.py` does). Decoder prints *“nb_scout_sig_lag1 field absent”* and **skips lag-1 binary + direction LRT**. Clusters, MI, and scout–blind Δ still run. **TODO:** port lag-1 fields from `main.py` (~879–904) into `corpus_writer.maybe_record` in `jax_sim/main_jax.py`.
+**Lag-1 corpus (fixed `c4a45f3+`):** JAX now writes `nb_scout_sig_lag1` / `nb_scout_dist_lag1` (ported from `main.py` ~879–914). Re-run `decode_signals.py` on corpus recorded **after** that commit. `is_scout` in corpus uses `red_detection_radius`, not `scout_detect_radius`.
 
 ### Common failures
 
@@ -4098,12 +4098,40 @@ python tools/decode_signals.py runs/jax_run/signal_corpus.jsonl --min-step 25000
 
 **Interpretation (35k):** Representation learning (threat proximity in continuous 32-D, loc_env aux) is active; **emergent communication** (scout-specific symbols, listening→survival, direction LRT) shows **no early signature**. Same pattern as pre-pivot 200k at a high level — improved aux metric, not improved vocabulary/channel.
 
-**Worth finishing 200k?** Yes for a **completed Lethal vs `992b67b` comparison** and final decode at ~50k / ~200k. **Low expectation** of late comms breakthrough without code changes (lag-1 logging, tighter blindness, VQ/discrete signals, or stronger selection).
+**Stop recommendation (~38k, Cam):** At **496/500 blues vs 150 reds**, survival ≈ **99%+** → **`NB_GAIN↔surv: nan`** (no death variance). Continuing to 200k mostly adds steps of **immortal blues** without making the comms channel load-bearing. **Safe to stop** the current run; keep checkpoints for comparison.
 
-**Next code priorities (ordered):**
+---
 
-1. Port **lag-1 corpus fields** to JAX → enable direction LRT on remaining run + future runs.
-2. **VQ / 9.4 neighbor attention** or **`red_detection_radius: 0`** experiment — per May 29 roadmap.
-3. Optional: **persist curriculum index** in Orbax checkpoint on resume.
+## Phase 10 — Next iteration game plan (Cam → Will, May 30)
 
-— *appended 2026-05-30 (interim 35k + decode @21k)*
+**Verdict on Lethal Ecology @ ~37k:** JAX stack is production-grade (~5 steps/sec, 500 agents, dual culture, aux heads in `lax.scan`). **Science:** ecology is not lethal; no early comms signature (scout≈blind Δ, nan NB_GAIN, decode without LRT on old corpus).
+
+| Priority | Item | Status |
+|----------|------|--------|
+| **P1** | **Lag-1 corpus** (`nb_scout_sig_lag1`, `nb_scout_dist_lag1`) for direction LRT | **Done** in `jax_sim/main_jax.py` |
+| **P2** | **`red_detection_radius: 0`** — no Chebyshev threat sense beyond 5×5; dodge-without-listening disabled | **Done** in `config_phase7.yaml` |
+| **P3** | **VQ bottleneck** on signal head (STE, finite codebook) — discrete “words” without collapsing gradients | **TODO** — design below |
+| **P4** | **Red lethality** — if blues still don’t die at radius 0, buff reds (move reward, catch radius, speed asymmetry) until deaths create NB_GAIN gradient | **TODO** — tune after P2 |
+
+### P3 — VQ signal head (sketch)
+
+- Add **VectorQuantizer** module in `network_jax.py` / `network_torch.py`: codebook size `K_vq` (e.g. 64–256), commitment loss `β‖sg(z)−e‖² + ‖z−sg(e)‖²`, straight-through `z + (quantize(z)−z).detach()`.
+- Signal head outputs **pre-VQ** `z`; broadcast **quantized** vectors to neighbors and corpus.
+- Dashboard: **codebook usage** (perplexity / active codes) alongside Active Clusters.
+- Training: start with small `K_vq`, anneal commitment if codes collapse.
+
+### P4 — Make deaths happen (candidates)
+
+- Increase `reward_red_catch` or lower blue energy / raise `starvation_threshold`.
+- `red_catch_radius: 1` (if currently 0) with radius-0 **vision** only.
+- Red move bonus > blue move bonus in `sim_step` rewards.
+- Log **blue deaths per 1k steps** on dashboard (new metric) so “lethal” is visible before NB_GAIN.
+
+### Fresh run checklist
+
+1. `git pull` → `train_entry`, confirm `red_sense_api=v2`, **`red_detection_radius: 0`** in loaded cfg.
+2. **Fresh** run (or resume only if same config lineage); wipe ckpts if switching from radius-1 Lethal run.
+3. Decode at **~25k** and **~100k** — must show **LAG-1 DIRECTION LRT** block.
+4. Target: blues **&lt; 450** at 150 reds before claiming ecology works.
+
+— *appended 2026-05-30 (Phase 10 plan + stop @38k)*

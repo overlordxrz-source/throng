@@ -147,7 +147,7 @@ reward_red_starve_per_step: -0.01
 reward_move: 0.01
 
 # Observation constraints
-red_detection_radius: 1          # Chebyshev threat sense beyond 5×5 patch (Lethal Ecology)
+red_detection_radius: 0          # 0 = blind beyond 5×5 patch; need neighbor signals (Phase 10)
 red_curriculum_stages: [40, 80, 120, 150]
 resource_obs_noise: 0.2         # 20% Gaussian noise on resource observations
 
