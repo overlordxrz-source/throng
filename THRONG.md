@@ -387,10 +387,12 @@ cfg["memory_buffer_size"] = 5
 cfg["mind_meld_enabled"] = False
 cfg["use_pmap"] = False
 
+from jax_sim.train_entry import run_simulation  # preferred after git pull (see THRONG.md Modal runbook)
+
 final_params, metrics = run_simulation(cfg, seed=42, n_steps=200_000)
 ```
 
-Checkpoints are saved every 2,000 steps to `runs/jax_run/checkpoints/`. Only model params are checkpointed (population state restarts fresh on resume). See **May 29, 2026** below for Modal volume layout and how to download weights locally.
+Checkpoints: set `cfg["checkpoint_dir"]` to a persistent path on Modal (e.g. `/mnt/throng-runs/checkpoints`). Saves every `checkpoint_interval` **env steps** (default 2000 → every 3 PPO updates when `ppo_rollout_steps=512`). Only **`b_params`** / **`r_params`** are saved; population restarts fresh on resume. See **May 29–30, 2026** below for Modal volume layout, resume cells, and download instructions.
 
 ---
 
@@ -3604,7 +3606,7 @@ The `sim_step` function in `main_jax.py` is decorated with `@jax.jit` and execut
 
 | Component | Inside JIT? |
 |-----------|------------|
-| Observation building (`build_observations_jax`) | ✅ Yes |
+| Observation building (`jax_sim/observations_jax.py`) | ✅ Yes |
 | Neural net forward pass (`model.apply`) | ✅ Yes |
 | Action sampling (`jax.random.categorical`) | ✅ Yes |
 | Movement + wall collision (`apply_moves`) | ✅ Yes |
@@ -3868,7 +3870,7 @@ Done!
 
 ### Modal ops lessons
 
-1. **Volume:** Create **`throng-runs`** in notebook **Files → Volumes** (mounts under **`/mnt/throng-runs`**, not `/root/throng-runs`). Symlink `runs/jax_run/checkpoints` → `/mnt/throng-runs/checkpoints` in setup cell.
+1. **Volume:** Create **`throng-runs`** in notebook **Files → Volumes** (mounts under **`/mnt/throng-runs`**, not `/root/throng-runs`). Set **`cfg["checkpoint_dir"] = "/mnt/throng-runs/checkpoints"`** — do **not** symlink `runs/jax_run/checkpoints` (Orbax `mkdir` raises `FileExistsError` on symlinks; fixed in **`69d5ffd`** by resolving the real path).
 2. **Repo path:** After kernel recycle, clone to **`/root/throng`** — the repo is **not** on the volume, only checkpoints.
 3. **Idle timeout:** Raise sidebar idle timeout (e.g. **12 hr**); default **10 min** kills idle kernels (training cell running = not idle).
 4. **Notebook UI:** Scrolling output can freeze while training continues; trust **`/mnt/throng-runs/checkpoints`** folder numbers, not last visible log line.
@@ -3930,3 +3932,129 @@ Resume in JAX with the same `run_simulation(cfg, ...)` and place checkpoints und
 5. Consider **stricter survival** or **red visibility** so `NB_GAIN↔surv` and signal compression can become measurable.
 
 — *appended 2026-05-29*
+
+---
+
+## May 30, 2026 — Lethal Ecology pivot + Modal JAX runbook
+
+### TL;DR
+
+- **Code pivot (`845c8ae` → `3e40b0f`):** “Lethal Ecology” — harder reds (`red_curriculum_stages: [40, 80, 120, 150]`, `min_red_population: 150`, `starvation_threshold: 0.1`, `red_detection_radius: 1`), forward aux predicts **`loc_env`** (200-d) not carry (anti-cheat), dashboard **`Active Clusters: X/16`** (k-means) instead of raw signal unique count.
+- **JAX fixes for Modal notebooks:** `observations_jax.py` (JIT-safe red-distance mask), `train_entry.run_simulation` (evicts stale `sys.modules` after `git pull`), `checkpoint_dir` on volume, no symlink checkpoints, shape-mismatch checkpoint fallback.
+- **Early Lethal run (step ~2560, git `3e40b0f`):** stable (`has_nan=0`), `fwd_env≈0.023`, curriculum 40→80 fired, ~5 steps/sec on A100 after warmup.
+
+### Import rule (notebooks)
+
+**Always use:**
+
+```python
+from jax_sim.train_entry import run_simulation
+```
+
+Do **not** rely on `from jax_sim.main_jax import run_simulation` after a kernel has been alive through a `git pull` — Jupyter caches the old module while `git rev-parse` still shows the new SHA. `train_entry` deletes `jax_sim.*` from `sys.modules` and reloads from disk.
+
+Startup must print:
+
+```text
+[JAX] red_sense_api=v2 (observations_jax)
+```
+
+If that line is missing, you are still on stale code.
+
+### Modal notebook cells (copy-paste)
+
+**Cell 1 — setup (Python cell; shell lines need `!` or `subprocess`)**
+
+```python
+import os, subprocess, sys
+from pathlib import Path
+
+REPO = Path("/root/throng")
+if not REPO.exists():
+    subprocess.run(["git", "clone", "https://github.com/overlordxrz-source/throng.git", str(REPO)], check=True)
+else:
+    subprocess.run(["git", "-C", str(REPO), "fetch", "origin"], check=True)
+    subprocess.run(["git", "-C", str(REPO), "reset", "--hard", "origin/master"], check=True)
+
+print("git:", subprocess.check_output(["git", "-C", str(REPO), "rev-parse", "--short", "HEAD"], text=True).strip())
+os.chdir(REPO)
+sys.path.insert(0, str(REPO))
+
+Path("/mnt/throng-runs/checkpoints").mkdir(parents=True, exist_ok=True)
+
+import yaml
+with open(REPO / "config_phase7.yaml") as f:
+    cfg = yaml.safe_load(f)
+cfg["checkpoint_dir"] = "/mnt/throng-runs/checkpoints"
+cfg["population_size"] = cfg["max_population"] = cfg["max_pop"] = 500
+cfg["n_layers"] = 4
+cfg["ppo_rollout_steps"] = 512
+```
+
+**Cell 2 — fresh train** (wipes volume checkpoints):
+
+```python
+import shutil
+shutil.rmtree("/mnt/throng-runs/checkpoints", ignore_errors=True)
+from jax_sim.train_entry import run_simulation
+final_params, metrics = run_simulation(cfg, seed=42, n_steps=200_000)
+```
+
+**Cell 2 — resume** (same cell, **omit** `shutil.rmtree`):
+
+```python
+from jax_sim.train_entry import run_simulation
+final_params, metrics = run_simulation(cfg, seed=42, n_steps=200_000)
+```
+
+Expect: `[JAX] Resuming from checkpoint step …` and `[JAX] Restored params from step …. Population starts fresh.`
+
+### Resume caveats
+
+| Restored | Not restored |
+|----------|----------------|
+| `b_params`, `r_params` | Population, grid, carries, optimizer state |
+| Continues PPO loop from last Orbax step | Red curriculum index / sustain counter (restarts at stage **40**) |
+| Same `n_steps` = same total PPO budget | Dashboard Age resets low |
+
+Use the same `seed=42` and config as the original run. Incompatible old checkpoints (e.g. pre–`loc_env` `head_fwd_2` shape) log a warning and start fresh — delete `/mnt/throng-runs/checkpoints` only when intentionally restarting Lethal Ecology.
+
+### Checkpoint timing
+
+- `checkpoint_interval` in yaml = **env steps** (default **2000**).
+- With `ppo_rollout_steps=512`, saves every `max(1, 2000 // 512) = 3` PPO updates.
+- Log line `[CKPT] Saved step 1536` = env step `(ui+1) × 512`; Orbax folder name = **PPO update index** (`ui + 1`).
+
+### Lethal Ecology vs pre-pivot (`992b67b`) — what to watch
+
+| Metric | Pre-pivot | Lethal (early) |
+|--------|-----------|----------------|
+| Aux forward | `fwd ≈ 0.0001` (carry) | `fwd_env ≈ 0.02–0.04` (loc_env MSE) |
+| Signals dashboard | `N unique` (~16k) | `Active Clusters: X/16` |
+| Red floor | 6→15→30→75 | 40→80→120→150 |
+| Threat sensing | patch + optional radius | `red_detection_radius: 1` (vectorized in `observations_jax`) |
+
+### JAX / Orbax fixes (commits)
+
+| Commit | Fix |
+|--------|-----|
+| `d280fc9` | Checkpoint shape mismatch → start fresh instead of crash |
+| `1d3682e` / `a022b0f` | JIT-safe red mask; `observations_jax` + `train_entry` |
+| `69d5ffd` | `checkpoint_dir` + resolve symlinks before Orbax |
+| `3e40b0f` | Remove nested `@jax.jit` on red mask (`ConcretizationTypeError` on `gs`) |
+
+### Common failures
+
+| Symptom | Cause | Fix |
+|---------|-------|-----|
+| `red_map.any()` / no `red_sense_api` line | Stale module or old file on disk | `git reset --hard origin/master`; `train_entry` import; kernel restart if needed |
+| `ModuleNotFoundError: train_entry` | Pull didn’t run | Cell 1 `subprocess` git sync; verify `jax_sim/train_entry.py` exists |
+| `FileExistsError` on checkpoints | Symlinked checkpoint path | Use `checkpoint_dir` only (no symlink) |
+| `Requested shape (1024, 200) … (1024, 256)` | Old carry-fwd checkpoint | `rm -rf /mnt/throng-runs/checkpoints` for fresh Lethal run |
+| `SyntaxError` on `cd /root/throng` | Shell in Python cell | Use `subprocess` or prefix `!` |
+
+### Orbax warning
+
+`Configured CheckpointManager using deprecated legacy API` — safe to ignore for training; migrate to new Orbax API later.
+
+— *appended 2026-05-30*
