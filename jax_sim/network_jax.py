@@ -27,6 +27,7 @@ def vector_quantize_signals(
     z_e: jnp.ndarray,
     codebook: jnp.ndarray,
     beta: float = 0.25,
+    dead_code_reset: bool = True,
 ) -> Tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
     """
     VQ bottleneck with straight-through estimator.
@@ -34,15 +35,38 @@ def vector_quantize_signals(
     z_e: (N, signal_dim) continuous pre-quantization vectors.
     codebook: (vocab_size, signal_dim) embedding table.
 
+    dead_code_reset: if True, any codebook row unused in this batch is replaced
+    with a stop-gradient copy of a batch z_e vector, then quantization is recomputed.
+    This is the standard anti-collapse trick (VQ-VAE-2 style).
+
     Returns:
       signal_out: (N, signal_dim) — STE uses discrete z_q in forward, grads to z_e.
       token_ids: (N,) — nearest codebook index per agent.
       loss_vq: (N,) — per-agent VQ loss (codebook + commitment).
     """
+    vocab_size = codebook.shape[0]
+    n_agents = z_e.shape[0]
+
     diff = z_e[:, None, :] - codebook[None, :, :]
     dist_sq = jnp.sum(diff * diff, axis=-1)
     token_ids = jnp.argmin(dist_sq, axis=-1)
-    z_q = codebook[token_ids]
+
+    codebook_q = codebook
+    if dead_code_reset and vocab_size > 0 and n_agents > 0:
+        usage_counts = jax.lax.segment_sum(
+            jnp.ones((n_agents,), dtype=jnp.int32),
+            token_ids,
+            num_segments=vocab_size,
+        )
+        dead_mask = usage_counts == 0
+        batch_idx = jnp.arange(vocab_size) % n_agents
+        replacement = jax.lax.stop_gradient(z_e[batch_idx])
+        codebook_q = jnp.where(dead_mask[:, None], replacement, codebook)
+        diff = z_e[:, None, :] - codebook_q[None, :, :]
+        dist_sq = jnp.sum(diff * diff, axis=-1)
+        token_ids = jnp.argmin(dist_sq, axis=-1)
+
+    z_q = codebook_q[token_ids]
 
     z_e_sg = jax.lax.stop_gradient(z_e)
     z_q_sg = jax.lax.stop_gradient(z_q)
@@ -52,6 +76,39 @@ def vector_quantize_signals(
 
     signal_out = z_e + jax.lax.stop_gradient(z_q - z_e)
     return signal_out, token_ids, loss_vq
+
+
+def dead_code_reset_codebook_params(
+    params: Any,
+    token_ids: jnp.ndarray,
+    z_e: jnp.ndarray,
+    vocab_size: int,
+    rng: jax.Array,
+) -> Any:
+    """
+  Persist dead-code reset into the codebook embedding (runs after PPO on CPU/GPU).
+
+  token_ids: (M,) int — tokens used in the rollout window (alive agents only).
+  z_e: (M, signal_dim) matching encoder outputs for those rows.
+    """
+    if z_e.shape[0] == 0:
+        return params
+    flat = unfreeze(params)
+    cb = flat["codebook"]["embedding"]
+    usage = jax.lax.segment_sum(
+        jnp.ones(token_ids.shape, dtype=jnp.int32),
+        token_ids,
+        num_segments=vocab_size,
+    )
+    dead_mask = usage == 0
+    n_pool = z_e.shape[0]
+    rand_idx = jax.random.randint(rng, (vocab_size,), 0, n_pool)
+    replacement = jax.lax.stop_gradient(z_e[rand_idx])
+    flat["codebook"] = {
+        **flat["codebook"],
+        "embedding": jnp.where(dead_mask[:, None], replacement, cb),
+    }
+    return freeze(flat)
 
 
 class AgentNetworkJax(nn.Module):
@@ -67,6 +124,7 @@ class AgentNetworkJax(nn.Module):
     symbol_dim: int = 16
     vocab_size: int = 64
     vq_beta: float = 0.25
+    vq_dead_code_reset: bool = True
     max_layers: int = 6
     memory_slots: int = 0
     fwd_env_dim: int = 200   # W × 8 flattened loc_env (set from config in main_jax)
@@ -123,7 +181,7 @@ class AgentNetworkJax(nn.Module):
         Returns: (new_carries, outputs_tuple)
         outputs_tuple = (
             action_logits, signal_out, symbol_write, values,
-            tom_logits, token_ids, loss_vq, culture_fast, culture_slow,
+            tom_logits, token_ids, loss_vq, z_e, culture_fast, culture_slow,
         )
         """
         N = obs.shape[0]
@@ -194,7 +252,10 @@ class AgentNetworkJax(nn.Module):
         z_e = self.head_signal(pooled)                 # (N, signal_dim)
         codebook_w = self.codebook.embedding           # (vocab_size, signal_dim)
         signal_out, token_ids, loss_vq = vector_quantize_signals(
-            z_e, codebook_w, beta=self.vq_beta,
+            z_e,
+            codebook_w,
+            beta=self.vq_beta,
+            dead_code_reset=self.vq_dead_code_reset,
         )
         symbol_write = self.head_symbol(pooled)              # (N, sym_d)
         values = self.head_value(value_input).squeeze(-1)  # (N,)  unbounded, Huber loss prevents explosion
@@ -210,7 +271,7 @@ class AgentNetworkJax(nn.Module):
 
         return new_carries, (
             action_logits, signal_out, symbol_write, values,
-            tom_logits, token_ids, loss_vq, culture_fast, culture_slow,
+            tom_logits, token_ids, loss_vq, z_e, culture_fast, culture_slow,
         )
 
     def forward_dynamics(

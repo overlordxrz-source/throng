@@ -16,6 +16,8 @@ import os
 from pathlib import Path
 os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2")  # suppress INFO/WARN
 os.environ.setdefault("XLA_FLAGS", "--xla_gpu_autotune_level=0")  # disable autotune spam
+# Leave headroom for PPO backward after rollout scan (default JAX grabs ~90% of VRAM).
+os.environ.setdefault("XLA_PYTHON_CLIENT_MEM_FRACTION", "0.80")
 
 import jax
 import jax.numpy as jnp
@@ -43,6 +45,7 @@ from jax_sim.network_jax import (
     AgentNetworkJax,
     AUX_HEAD_KEYS,
     ensure_aux_head_params,
+    dead_code_reset_codebook_params,
     init_agent_params,
     make_model_apply,
     params_apply_variables,
@@ -70,6 +73,7 @@ DEFAULT_CONFIG = {
     "vocab_size": 64,
     "vq_beta": 0.25,
     "vq_loss_coef": 0.1,
+    "vq_dead_code_reset": True,
     "memory_buffer_size": 20,
     "ppo_rollout_steps": 512,
     "ppo_epochs": 1,
@@ -112,6 +116,16 @@ def _normalize_config(cfg: Dict) -> Dict:
     cfg.setdefault("memory_slots", cfg.get("memory_buffer_size", 20))
     cfg.setdefault("ppo_rollout_steps", cfg.get("ppo_rollout_steps", 512))
     return cfg
+
+
+# ── Rollout → CPU (free GPU before PPO backward) ───────────────────────────
+
+def _rollout_to_cpu(rollout_data: Dict) -> Dict:
+    """Move scan outputs off GPU so PPO backward has room (obs alone ~2.4GB)."""
+    return jax.tree_util.tree_map(
+        lambda x: np.asarray(jax.device_get(x)) if isinstance(x, (jax.Array, jnp.ndarray)) else x,
+        rollout_data,
+    )
 
 
 # ── Single simulation step (for scan) ──────────────────────────────────────
@@ -183,8 +197,8 @@ def make_sim_step(config: Dict, model: AgentNetworkJax, model_apply=None):
         b_new_c, b_outs = model_apply(b_params_sg, b_carries, b_obs, _n_layers)
         r_new_c, r_outs = model_apply(r_params_sg, r_carries, r_obs, _n_layers)
 
-        b_action_logits, b_signal_out, b_sym_w, b_vals, b_tom, b_token_ids, b_loss_vq, b_cult_f, b_cult_s = b_outs
-        r_action_logits, r_signal_out, r_sym_w, r_vals, r_tom, r_token_ids, r_loss_vq, r_cult_f, r_cult_s = r_outs
+        b_action_logits, b_signal_out, b_sym_w, b_vals, b_tom, b_token_ids, b_loss_vq, b_z_e, b_cult_f, b_cult_s = b_outs
+        r_action_logits, r_signal_out, r_sym_w, r_vals, r_tom, r_token_ids, r_loss_vq, r_z_e, r_cult_f, r_cult_s = r_outs
 
         # ── Write VQ signals (STE forward ≡ discrete z_q) for neighbours ──
         b_pop = b_pop.replace(
@@ -368,6 +382,7 @@ def make_sim_step(config: Dict, model: AgentNetworkJax, model_apply=None):
             "values": b_vals, "rewards": b_rew, "dones": b_done,
             "carries": b_carries,
             "loss_vq": b_loss_vq,
+            "z_e": b_z_e,
             "token_ids": b_token_ids,
             "positions": b_pop.positions,
             "signals": b_pop.signals,
@@ -379,6 +394,7 @@ def make_sim_step(config: Dict, model: AgentNetworkJax, model_apply=None):
             "values": r_vals, "rewards": r_rew, "dones": r_done,
             "carries": r_carries,
             "loss_vq": r_loss_vq,
+            "z_e": r_z_e,
             "token_ids": r_token_ids,
             "positions": r_pop.positions,
             "signals": r_pop.signals,
@@ -510,6 +526,7 @@ def _run_simulation_impl(
         symbol_dim=config["symbol_dim"],
         vocab_size=config["vocab_size"],
         vq_beta=float(config.get("vq_beta", 0.25)),
+        vq_dead_code_reset=bool(config.get("vq_dead_code_reset", True)),
         memory_slots=config.get("memory_slots", 0),
         fwd_env_dim=_fwd_env_dim,
     )
@@ -518,6 +535,12 @@ def _run_simulation_impl(
     # Compute exact obs_dim and init model
     obs_dim = compute_obs_dim_torch(config)
     print(f"[JAX] obs_dim = {obs_dim}")
+    _ppo_mb = int(config.get("ppo_minibatch_size", 512))
+    if _ppo_mb > 768:
+        print(
+            f"[JAX] WARN: ppo_minibatch_size={_ppo_mb} is large for 500 agents — "
+            "use 512 to avoid PPO backward OOM on A100"
+        )
 
     # Verify the interpreter loaded this repo (not a stale clone / wrong cwd).
     import inspect as _inspect
@@ -584,7 +607,8 @@ def _run_simulation_impl(
         f"[JAX] signal_bottleneck={'VQ' if _vq_on else 'LEGACY softmax'} "
         f"| vocab={config.get('vocab_size', 64)} "
         f"| vq_beta={config.get('vq_beta', 0.25)} "
-        f"| vq_loss_coef={config.get('vq_loss_coef', 0.1)}"
+        f"| vq_loss_coef={config.get('vq_loss_coef', 0.1)} "
+        f"| dead_code_reset={config.get('vq_dead_code_reset', True)}"
     )
     print(
         f"[DEBUG] Params OK: emb_own={_emb_ok} | aux_heads={_aux_ok} | apply={_apply_ok}"
@@ -737,12 +761,16 @@ def _run_simulation_impl(
             final_carry, rollout_data = lax.scan(sim_step_fn, init_carry, step_keys)
             grid, b_pop, r_pop, b_carries, r_carries, b_params, r_params = final_carry
 
+        # ── Free GPU: full (T×N) rollout must not sit on device during PPO backward
+        rollout_data = _rollout_to_cpu(rollout_data)
+        jax.clear_caches()
+
         # ── NaN debug after rollout ─────────────────────────────
         b_batch = rollout_data["blue"]
-        has_nan_obs = bool(jnp.isnan(b_batch["obs"]).any())
-        has_nan_vals = bool(jnp.isnan(b_batch["values"]).any())
-        has_nan_logp = bool(jnp.isnan(b_batch["log_probs"]).any())
-        has_nan_rew = bool(jnp.isnan(b_batch["rewards"]).any())
+        has_nan_obs = bool(np.isnan(b_batch["obs"]).any())
+        has_nan_vals = bool(np.isnan(b_batch["values"]).any())
+        has_nan_logp = bool(np.isnan(b_batch["log_probs"]).any())
+        has_nan_rew = bool(np.isnan(b_batch["rewards"]).any())
         if ui == 0:
             print(f"[DEBUG] Rollout data NaN: obs={has_nan_obs} vals={has_nan_vals} logp={has_nan_logp} rew={has_nan_rew}")
 
@@ -806,6 +834,19 @@ def _run_simulation_impl(
         b_metrics["sp_loss"]     = b_sp_loss
         b_metrics["sp_acc"]      = b_sp_acc
 
+        if config.get("vq_dead_code_reset", True) and "z_e" in b_batch:
+            _dc_key, update_key = jax.random.split(update_key)
+            _tok = jnp.asarray(b_batch["token_ids"]).reshape(-1)
+            _ze = jnp.asarray(b_batch["z_e"]).reshape(-1, int(config["signal_dim"]))
+            _alive = jnp.asarray(b_batch["alive"]).reshape(-1).astype(bool)
+            b_params = dead_code_reset_codebook_params(
+                b_params,
+                _tok[_alive],
+                _ze[_alive],
+                int(config["vocab_size"]),
+                _dc_key,
+            )
+
         print("  [DEBUG] --- Red PPO Update ---")
         r_batch = rollout_data["red"]
         _r_carries_np = np.asarray(r_batch["carries"])
@@ -833,6 +874,19 @@ def _run_simulation_impl(
         )
         r_metrics["fwd_loss"] = r_fwd_loss
         r_metrics["sp_acc"]   = r_sp_acc
+
+        if config.get("vq_dead_code_reset", True) and "z_e" in r_batch:
+            _dc_key, update_key = jax.random.split(update_key)
+            _tok = jnp.asarray(r_batch["token_ids"]).reshape(-1)
+            _ze = jnp.asarray(r_batch["z_e"]).reshape(-1, int(config["signal_dim"]))
+            _alive = jnp.asarray(r_batch["alive"]).reshape(-1).astype(bool)
+            r_params = dead_code_reset_codebook_params(
+                r_params,
+                _tok[_alive],
+                _ze[_alive],
+                int(config["vocab_size"]),
+                _dc_key,
+            )
 
         # ── Brain Vote (capacity-based, runs after PPO) ──────────
         _bv_ent = float(b_metrics.get('ppo_entropy', 0)) if isinstance(b_metrics, dict) else 0

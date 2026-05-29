@@ -51,7 +51,7 @@ params = model.init(init_key, dummy_carry, b_obs, n_layers=cfg["n_layers"])
 # Forward pass
 key, act_key = jax.random.split(key)
 new_carry, outs = model.apply(params, dummy_carry, b_obs, n_layers=cfg["n_layers"])
-action_logits, signal_out, sym_w, values, tom, tok, loss_vq, c_f, c_s = outs
+action_logits, signal_out, sym_w, values, tom, tok, loss_vq, _z_e, c_f, c_s = outs
 
 # Sample actions
 action_keys = jax.random.split(act_key, 500)

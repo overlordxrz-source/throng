@@ -59,6 +59,7 @@ red_catch_radius: 0
 vocab_size: 64
 vq_beta: 0.25
 vq_loss_coef: 0.1
+vq_dead_code_reset: true
 gumbel_tau: 0.5
 
 # ── Anneal: diversity → crystallization ───────────────────────────────────────
@@ -128,7 +129,7 @@ resource_decay: 0.05                 # how much resource depletes per consumptio
 # ── MAPPO ──────────────────────────────────────────────────────────────────────
 ppo_rollout_steps: 512
 ppo_epochs: 1
-ppo_minibatch_size: 2048
+ppo_minibatch_size: 512   # 500 agents × 512 steps; 2048 minibatch OOMs backward on A100
 ppo_warmup_steps: 15
 ppo_clip: 0.2
 ppo_clip_eps: 0.2
