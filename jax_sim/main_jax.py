@@ -68,6 +68,8 @@ DEFAULT_CONFIG = {
     "n_layers": 4,
     "brain_token_dim": 128,
     "vocab_size": 64,
+    "vq_beta": 0.25,
+    "vq_loss_coef": 0.1,
     "memory_buffer_size": 20,
     "ppo_rollout_steps": 512,
     "ppo_epochs": 1,
@@ -181,15 +183,16 @@ def make_sim_step(config: Dict, model: AgentNetworkJax, model_apply=None):
         b_new_c, b_outs = model_apply(b_params_sg, b_carries, b_obs, _n_layers)
         r_new_c, r_outs = model_apply(r_params_sg, r_carries, r_obs, _n_layers)
 
-        b_action_logits, b_signal_logits, b_sym_w, b_vals, b_tom, _, _, b_cult_f, b_cult_s = b_outs
-        r_action_logits, r_signal_logits, r_sym_w, r_vals, r_tom, _, _, r_cult_f, r_cult_s = r_outs
+        b_action_logits, b_signal_out, b_sym_w, b_vals, b_tom, b_token_ids, b_loss_vq, b_cult_f, b_cult_s = b_outs
+        r_action_logits, r_signal_out, r_sym_w, r_vals, r_tom, r_token_ids, r_loss_vq, r_cult_f, r_cult_s = r_outs
 
-        # ── Write signals back to population (critical: this is what neighbours receive) ──
-        # signal_probs is (N, vocab_size=64); take first sig_d=32 dims as the broadcast vector
-        b_new_sigs = jax.nn.softmax(b_signal_logits, axis=-1)[:, :sig_d]
-        b_pop = b_pop.replace(signals=jnp.where(b_pop.alive[:, None], b_new_sigs, 0.0))
-        r_new_sigs = jax.nn.softmax(r_signal_logits, axis=-1)[:, :sig_d]
-        r_pop = r_pop.replace(signals=jnp.where(r_pop.alive[:, None], r_new_sigs, 0.0))
+        # ── Write VQ signals (STE forward ≡ discrete z_q) for neighbours ──
+        b_pop = b_pop.replace(
+            signals=jnp.where(b_pop.alive[:, None], b_signal_out, 0.0)
+        )
+        r_pop = r_pop.replace(
+            signals=jnp.where(r_pop.alive[:, None], r_signal_out, 0.0)
+        )
 
         # ── Sample actions ──────────────────────────────────────
         b_action_keys = jax.random.split(key_act, b_pop.max_pop)
@@ -364,6 +367,8 @@ def make_sim_step(config: Dict, model: AgentNetworkJax, model_apply=None):
             "obs": b_obs, "actions": b_actions, "log_probs": b_log_probs_taken,
             "values": b_vals, "rewards": b_rew, "dones": b_done,
             "carries": b_carries,
+            "loss_vq": b_loss_vq,
+            "token_ids": b_token_ids,
             "positions": b_pop.positions,
             "signals": b_pop.signals,
             "energy": b_pop.energy,
@@ -373,6 +378,8 @@ def make_sim_step(config: Dict, model: AgentNetworkJax, model_apply=None):
             "obs": r_obs, "actions": r_actions, "log_probs": r_log_probs_taken,
             "values": r_vals, "rewards": r_rew, "dones": r_done,
             "carries": r_carries,
+            "loss_vq": r_loss_vq,
+            "token_ids": r_token_ids,
             "positions": r_pop.positions,
             "signals": r_pop.signals,
             "energy": r_pop.energy,
@@ -502,6 +509,7 @@ def _run_simulation_impl(
         signal_dim=config["signal_dim"],
         symbol_dim=config["symbol_dim"],
         vocab_size=config["vocab_size"],
+        vq_beta=float(config.get("vq_beta", 0.25)),
         memory_slots=config.get("memory_slots", 0),
         fwd_env_dim=_fwd_env_dim,
     )
@@ -533,6 +541,14 @@ def _run_simulation_impl(
         _phase9 = "OFF — git pull required"
     print(f"[JAX] code: {_main_path}")
     print(f"[JAX] git={_git_sha} | Phase9 auxiliary: {_phase9}")
+    from flax.core import unfreeze as _unfreeze
+    _vq_on = "codebook" in _unfreeze(b_params)
+    print(
+        f"[JAX] signal_bottleneck={'VQ' if _vq_on else 'LEGACY softmax'} "
+        f"| vocab={config.get('vocab_size', 64)} "
+        f"| vq_beta={config.get('vq_beta', 0.25)} "
+        f"| vq_loss_coef={config.get('vq_loss_coef', 0.1)}"
+    )
     from jax_sim import observations_jax as _obs_mod
 
     _bo_path = _inspect.getfile(_obs_mod.build_observations_jax)
@@ -635,10 +651,16 @@ def _run_simulation_impl(
             print(f"[JAX] Resuming from checkpoint step {latest}...")
             restored = ckpt_mngr.restore(latest, items=abstract_tree)
             b_params = sanitize_agent_params(
-                ensure_aux_head_params(model, restored["b_params"], keys[3], hidden_d)
+                ensure_aux_head_params(
+                    model, restored["b_params"], keys[3], hidden_d,
+                    obs_dim=obs_dim, n_layers=n_layers,
+                )
             )
             r_params = sanitize_agent_params(
-                ensure_aux_head_params(model, restored["r_params"], keys[5], hidden_d)
+                ensure_aux_head_params(
+                    model, restored["r_params"], keys[5], hidden_d,
+                    obs_dim=obs_dim, n_layers=n_layers,
+                )
             )
             start_update = latest
             print(f"[JAX] Restored params from step {latest}. Population starts fresh.")
@@ -766,6 +788,7 @@ def _run_simulation_impl(
             clip_eps=float(config.get("ppo_clip_eps", config.get("ppo_clip", 0.2))),
             vf_coef=float(config.get("ppo_value_coef", 0.25)),
             ent_coef=float(config.get("ppo_entropy_coef", 0.02)),
+            vq_coef=float(config.get("vq_loss_coef", 0.1)),
             minibatch_size=_fwd_mb,
             gamma=float(config.get("ppo_gamma", 0.99)),
             lam=float(config.get("ppo_gae_lam", 0.95)),
@@ -796,6 +819,7 @@ def _run_simulation_impl(
             clip_eps=float(config.get("ppo_clip_eps", config.get("ppo_clip", 0.2))),
             vf_coef=float(config.get("ppo_value_coef", 0.25)),
             ent_coef=float(config.get("ppo_entropy_coef", 0.02)),
+            vq_coef=float(config.get("vq_loss_coef", 0.1)),
             minibatch_size=_fwd_mb,
             gamma=float(config.get("ppo_gamma", 0.99)),
             lam=float(config.get("ppo_gae_lam", 0.95)),
@@ -895,6 +919,14 @@ def _run_simulation_impl(
             val_mean = float(b_vals_all[b_alive_all].mean()) if b_alive_all.any() else 0
             ret_mean = float(b_metrics.get("returns_mean", 0)) if isinstance(b_metrics, dict) else 0
             
+            # VQ codebook usage (unique token_ids among alive at final rollout step)
+            vq_codes_str = "N/A"
+            if "token_ids" in rollout_data["blue"]:
+                b_tok_last = np.array(rollout_data["blue"]["token_ids"])[-1]
+                if alive_mask_final.sum() > 0:
+                    alive_toks = b_tok_last[alive_mask_final]
+                    vq_codes_str = f"{len(np.unique(alive_toks))}/{config.get('vocab_size', 64)}"
+
             # Signal vocabulary compression (k-means clusters with >2% occupancy)
             b_signals_np = np.array(b_pop_np.signals)
             active_clusters_str = "N/A"
@@ -935,10 +967,11 @@ def _run_simulation_impl(
             clip_frac = float(b_metrics.get('ppo_clip_frac', 0)) if isinstance(b_metrics, dict) else 0
             fwd_loss_val = float(b_metrics.get('fwd_loss', float('nan'))) if isinstance(b_metrics, dict) else float('nan')
             sp_acc_val   = float(b_metrics.get('sp_acc',   float('nan'))) if isinstance(b_metrics, dict) else float('nan')
+            vq_loss_val  = float(b_metrics.get('ppo_vq_loss', float('nan'))) if isinstance(b_metrics, dict) else float('nan')
             print(f"  Values:  mean={val_mean:.4f} | VF_loss={vf_loss:.4f} | Clip={clip_frac:.3f}")
             print(f"  Reward:  mean={rew_mean:.4f} | Entropy: {ent_val:.4f}")
             print(f"  AuxLoss: fwd_env={fwd_loss_val:.4f} (loc_env MSE) | self_pred_acc={sp_acc_val:.3f} (↑ from 0.20 random)")
-            print(f"  Active Clusters: {active_clusters_str} | NB_GAIN↔surv: {sp_r:.3f}")
+            print(f"  VQ: loss={vq_loss_val:.4f} | codes_active={vq_codes_str} | clusters={active_clusters_str} | NB_GAIN↔surv: {sp_r:.3f}")
             print(f"  Curriculum: red_floor={red_curriculum_stages[red_curriculum_idx]} sustain={red_sustain_count}/{red_sustain_needed} | brain={n_layers}L")
             print(f"{'='*70}\n")
 

@@ -59,9 +59,8 @@ print('Params NaN:', has_nan_params)
 
 # Forward pass
 print('Forward pass...')
-action_logits, signal_logits, sym_w, vals, tom, tok, sig_p, c_f, c_s, new_carry = model.apply(
-    params, dummy_carry, b_obs, n_layers=cfg_jax['n_layers']
-)
+new_carry, outs = model.apply(params, dummy_carry, b_obs, n_layers=cfg_jax['n_layers'])
+action_logits, signal_out, sym_w, vals, tom, tok, loss_vq, c_f, c_s = outs
 
 print('action_logits NaN:', bool(jnp.isnan(action_logits).any()), 'max:', float(jnp.max(jnp.abs(action_logits))))
 print('values NaN:', bool(jnp.isnan(vals).any()), 'max:', float(jnp.max(jnp.abs(vals))))

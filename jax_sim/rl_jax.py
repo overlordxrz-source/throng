@@ -68,6 +68,8 @@ def ppo_loss(
     clip_eps: float = 0.2,
     vf_coef: float = 0.25,
     ent_coef: float = 0.05,
+    vq_coef: float = 0.1,
+    loss_vq_rollout: jnp.ndarray = None,  # (M,) per-agent VQ loss from rollout
     alive: jnp.ndarray = None,  # (M,) bool-ish
 ) -> Tuple[jnp.ndarray, Dict]:
     """
@@ -141,12 +143,21 @@ def ppo_loss(
     loss_logit_penalty = logit_penalty.sum() / denom
     total_loss = loss_pg + vf_coef * loss_vf + loss_ent + loss_logit_penalty
 
+    loss_vq_mean = jnp.array(0.0)
+    if loss_vq_rollout is not None:
+        vq = loss_vq_rollout
+        if alive is not None:
+            vq = vq * mask
+        loss_vq_mean = vq.sum() / denom
+        total_loss = total_loss + vq_coef * loss_vq_mean
+
     metrics = {
         "ppo_pg_loss":  loss_pg,
         "ppo_vf_loss":  loss_vf,
         "ppo_entropy":  entropy.sum() / denom,
         "ppo_logit_pen": loss_logit_penalty,
         "ppo_clip_frac": jnp.mean(jnp.abs(ratio - 1.0) > clip_eps),
+        "ppo_vq_loss": loss_vq_mean,
     }
 
     return total_loss, metrics
@@ -164,13 +175,13 @@ def create_optimizer(lr: float = 3e-4, max_grad_norm: float = 2.0) -> optax.Grad
 def _minibatch_step(
     params, opt_state, apply_fn, optimizer,
     obs, actions, old_log_probs, advantages, returns, carries,
-    n_layers, old_values, clip_eps, vf_coef, ent_coef, alive
+    n_layers, old_values, clip_eps, vf_coef, ent_coef, vq_coef, loss_vq, alive
 ):
     grad_fn = jax.value_and_grad(ppo_loss, has_aux=True)
     (loss, metrics), grads = grad_fn(
         params, apply_fn, obs, actions, old_log_probs,
         advantages, returns, carries, n_layers,
-        old_values, clip_eps, vf_coef, ent_coef, alive=alive
+        old_values, clip_eps, vf_coef, ent_coef, vq_coef, loss_vq, alive=alive
     )
     updates, new_opt_state = optimizer.update(grads, opt_state, params)
     new_params = optax.apply_updates(params, updates)
@@ -189,6 +200,7 @@ def ppo_update(
     clip_eps: float = 0.2,
     vf_coef: float = 0.5,
     ent_coef: float = 0.01,
+    vq_coef: float = 0.1,
     minibatch_size: int = 512,
     gamma: float = 0.99,
     lam: float = 0.95,
@@ -206,6 +218,7 @@ def ppo_update(
     values = batch["values"]
     carries = batch["carries"]
     alive = batch.get("alive")
+    loss_vq = batch.get("loss_vq")
 
     advantages, returns = compute_gae(rewards, values, dones, gamma=gamma, lam=lam)
 
@@ -232,9 +245,10 @@ def ppo_update(
     flat_carries = flatten_to_cpu(carries)
     flat_values = flatten_to_cpu(values)
     flat_alive = flatten_to_cpu(alive)
+    flat_loss_vq = flatten_to_cpu(loss_vq)
 
     # Delete GPU references so XLA can reclaim VRAM
-    del obs, actions, old_log_probs, advantages, returns, carries, values, alive
+    del obs, actions, old_log_probs, advantages, returns, carries, values, alive, loss_vq
     del batch
 
     # Shuffle on CPU (no GPU allocation for permutation array)
@@ -263,11 +277,12 @@ def ppo_update(
         mb_c = jnp.array(flat_carries[idx])
         mb_v = jnp.array(flat_values[idx])
         mb_al = jnp.array(flat_alive[idx]) if flat_alive is not None else None
+        mb_vq = jnp.array(flat_loss_vq[idx]) if flat_loss_vq is not None else None
 
         params, opt_state, mb_mets, grads = _minibatch_step(
             params, opt_state, apply_fn, optimizer,
             mb_obs, mb_act, mb_lp, mb_adv, mb_ret, mb_c,
-            n_layers, mb_v, clip_eps, vf_coef, ent_coef, mb_al
+            n_layers, mb_v, clip_eps, vf_coef, ent_coef, vq_coef, mb_vq, mb_al
         )
 
         # Accumulate as Python floats to avoid holding 500 JAX arrays

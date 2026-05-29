@@ -4110,15 +4110,15 @@ python tools/decode_signals.py runs/jax_run/signal_corpus.jsonl --min-step 25000
 |----------|------|--------|
 | **P1** | **Lag-1 corpus** (`nb_scout_sig_lag1`, `nb_scout_dist_lag1`) for direction LRT | **Done** in `jax_sim/main_jax.py` |
 | **P2** | **`red_detection_radius: 0`** — no Chebyshev threat sense beyond 5×5; dodge-without-listening disabled | **Done** in `config_phase7.yaml` |
-| **P3** | **VQ bottleneck** on signal head (STE, finite codebook) — discrete “words” without collapsing gradients | **TODO** — design below |
-| **P4** | **Red lethality** — if blues still don’t die at radius 0, buff reds (move reward, catch radius, speed asymmetry) until deaths create NB_GAIN gradient | **TODO** — tune after P2 |
+| **P3** | **VQ bottleneck** on signal head (STE, finite codebook) — discrete “words” without collapsing gradients | **Done** — `jax_sim/network_jax.py` (`vector_quantize_signals`, `codebook` Embed 64×signal_dim, `vq_beta` / `vq_loss_coef` in cfg) |
+| **P4** | **Red lethality** — if blues still don’t die at radius 0, buff reds (move reward, catch radius, speed asymmetry) until deaths create NB_GAIN gradient | **On hold** — isolate blind + VQ first |
 
-### P3 — VQ signal head (sketch)
+### P3 — VQ signal head (implemented)
 
-- Add **VectorQuantizer** module in `network_jax.py` / `network_torch.py`: codebook size `K_vq` (e.g. 64–256), commitment loss `β‖sg(z)−e‖² + ‖z−sg(e)‖²`, straight-through `z + (quantize(z)−z).detach()`.
-- Signal head outputs **pre-VQ** `z`; broadcast **quantized** vectors to neighbors and corpus.
-- Dashboard: **codebook usage** (perplexity / active codes) alongside Active Clusters.
-- Training: start with small `K_vq`, anneal commitment if codes collapse.
+- `head_signal` → continuous `z_e`; nearest L2 codebook entry `z_q`; STE `signal_out = z_e + stop_gradient(z_q - z_e)` (forward ≡ `z_q`).
+- `PopState.signals` receives `signal_out`; rollout stores `token_ids` + `loss_vq`; PPO adds `vq_loss_coef * mean(loss_vq)`.
+- Dashboard: `VQ: loss=… | codes_active=X/64 | clusters=…`.
+- **Fresh run** required when resuming pre-VQ checkpoints (head_signal shape change); `ensure_aux_head_params` merges `codebook` if missing.
 
 ### P4 — Make deaths happen (candidates)
 

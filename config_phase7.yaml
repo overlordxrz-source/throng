@@ -55,8 +55,10 @@ red_starvation_steps: 400
 red_spawn_step: 2000
 red_catch_radius: 0
 
-# ── Discrete token bottleneck (kept for network compatibility, but tau=0 disables sampling) ─
+# ── VQ signal bottleneck (P3) ─────────────────────────────────────────────────
 vocab_size: 64
+vq_beta: 0.25
+vq_loss_coef: 0.1
 gumbel_tau: 0.5
 
 # ── Anneal: diversity → crystallization ───────────────────────────────────────

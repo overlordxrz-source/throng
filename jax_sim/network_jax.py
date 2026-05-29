@@ -7,8 +7,8 @@ Architecture (same as PyTorch version):
     cultural_fast(W, sym_dim), cultural_slow(W, sym_dim)
   - Embed each token → d_model=128
   - Transformer blocks (4-6 layers, 4 heads)
-  - Output heads: action(5), signal(vocab=256), symbol_write(sym_dim),
-    value(1), tom(K, 5), culture_fast(sym_dim), culture_slow(sym_dim)
+  - Output heads: action(5), signal via VQ codebook(vocab_size × signal_dim),
+    symbol_write(sym_dim), value(1), tom(K, 5), culture_fast(sym_dim), culture_slow(sym_dim)
 """
 
 from __future__ import annotations
@@ -23,6 +23,37 @@ from typing import Any, Optional, Tuple
 AUX_HEAD_KEYS = ("head_fwd_1", "head_fwd_2", "head_self_pred")
 
 
+def vector_quantize_signals(
+    z_e: jnp.ndarray,
+    codebook: jnp.ndarray,
+    beta: float = 0.25,
+) -> Tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
+    """
+    VQ bottleneck with straight-through estimator.
+
+    z_e: (N, signal_dim) continuous pre-quantization vectors.
+    codebook: (vocab_size, signal_dim) embedding table.
+
+    Returns:
+      signal_out: (N, signal_dim) — STE uses discrete z_q in forward, grads to z_e.
+      token_ids: (N,) — nearest codebook index per agent.
+      loss_vq: (N,) — per-agent VQ loss (codebook + commitment).
+    """
+    diff = z_e[:, None, :] - codebook[None, :, :]
+    dist_sq = jnp.sum(diff * diff, axis=-1)
+    token_ids = jnp.argmin(dist_sq, axis=-1)
+    z_q = codebook[token_ids]
+
+    z_e_sg = jax.lax.stop_gradient(z_e)
+    z_q_sg = jax.lax.stop_gradient(z_q)
+    codebook_loss = jnp.sum((z_e_sg - z_q) ** 2, axis=-1)
+    commitment_loss = beta * jnp.sum((z_e - z_q_sg) ** 2, axis=-1)
+    loss_vq = codebook_loss + commitment_loss
+
+    signal_out = z_e + jax.lax.stop_gradient(z_q - z_e)
+    return signal_out, token_ids, loss_vq
+
+
 class AgentNetworkJax(nn.Module):
     """
     Transformer-based agent brain.
@@ -34,7 +65,8 @@ class AgentNetworkJax(nn.Module):
     obs_dim: int = 2285
     signal_dim: int = 32
     symbol_dim: int = 16
-    vocab_size: int = 256
+    vocab_size: int = 64
+    vq_beta: float = 0.25
     max_layers: int = 6
     memory_slots: int = 0
     fwd_env_dim: int = 200   # W × 8 flattened loc_env (set from config in main_jax)
@@ -63,7 +95,8 @@ class AgentNetworkJax(nn.Module):
         # Output heads
         self.final_norm = nn.LayerNorm()
         self.head_action = nn.Dense(5)           # 5 actions
-        self.head_signal = nn.Dense(self.vocab_size)  # discrete vocab
+        self.head_signal = nn.Dense(self.signal_dim)  # continuous z_e pre-VQ
+        self.codebook = nn.Embed(self.vocab_size, self.signal_dim)
         self.head_symbol = nn.Dense(sym_d)       # symbol write
         self.head_value = nn.Dense(1, kernel_init=nn.initializers.normal(0.01), bias_init=nn.initializers.zeros)  # zero init for stable value learning
         self.head_tom = nn.Dense(5)             # Theory-of-Mind per neighbour
@@ -89,8 +122,8 @@ class AgentNetworkJax(nn.Module):
         Forward pass.
         Returns: (new_carries, outputs_tuple)
         outputs_tuple = (
-            action_logits, signal_logits, symbol_write, values,
-            tom_logits, token_ids, signal_probs, culture_fast, culture_slow
+            action_logits, signal_out, symbol_write, values,
+            tom_logits, token_ids, loss_vq, culture_fast, culture_slow,
         )
         """
         N = obs.shape[0]
@@ -158,7 +191,11 @@ class AgentNetworkJax(nn.Module):
 
         # Output heads
         action_logits = self.head_action(pooled) / 2.0   # (N, 5)  temperature=2.0 for exploration
-        signal_logits = self.head_signal(pooled)            # (N, vocab_size)
+        z_e = self.head_signal(pooled)                 # (N, signal_dim)
+        codebook_w = self.codebook.embedding           # (vocab_size, signal_dim)
+        signal_out, token_ids, loss_vq = vector_quantize_signals(
+            z_e, codebook_w, beta=self.vq_beta,
+        )
         symbol_write = self.head_symbol(pooled)              # (N, sym_d)
         values = self.head_value(value_input).squeeze(-1)  # (N,)  unbounded, Huber loss prevents explosion
         tom_logits = self.head_tom(pooled)[:, None, :]     # (N, 1, 5) — simplified; real version needs K
@@ -166,18 +203,14 @@ class AgentNetworkJax(nn.Module):
         culture_fast = self.head_culture_fast(pooled)       # (N, sym_d)
         culture_slow = self.head_culture_slow(pooled)       # (N, sym_d)
 
-        # Discrete token sampling
-        token_ids = jnp.argmax(signal_logits, axis=-1)      # (N,)
-        signal_probs = jax.nn.softmax(signal_logits, axis=-1)  # (N, vocab_size)
-
         # Register auxiliary-head params in the same init as __call__ (Flax idiom).
         if self.is_initializing():
             _action_oh = jnp.zeros((N, 5), dtype=obs.dtype)
             self.auxiliary_heads(carries, _action_oh)
 
         return new_carries, (
-            action_logits, signal_logits, symbol_write, values,
-            tom_logits, token_ids, signal_probs, culture_fast, culture_slow,
+            action_logits, signal_out, symbol_write, values,
+            tom_logits, token_ids, loss_vq, culture_fast, culture_slow,
         )
 
     def forward_dynamics(
@@ -276,12 +309,28 @@ def ensure_aux_head_params(
     params: Any,
     rng: jax.Array,
     hidden_dim: int,
+    obs_dim: int = 0,
+    n_layers: int = 4,
 ) -> Any:
-    """Fill missing auxiliary-head params when resuming an older checkpoint."""
+    """Fill missing auxiliary-head / VQ params when resuming an older checkpoint."""
     flat = unfreeze(params)
-    if all(k in flat for k in AUX_HEAD_KEYS):
+    needs_vq = (
+        "codebook" not in flat
+        or (
+            "head_signal" in flat
+            and flat["head_signal"]["kernel"].shape[-1] != model.signal_dim
+        )
+    )
+    if all(k in flat for k in AUX_HEAD_KEYS) and not needs_vq:
         return params
     carry = jnp.zeros((1, hidden_dim))
+    if needs_vq and obs_dim > 0:
+        obs = jnp.zeros((1, obs_dim))
+        fresh = model.init(rng, carry, obs, n_layers)["params"]
+        fresh_flat = unfreeze(fresh)
+        for k in ("codebook", "head_signal"):
+            flat[k] = fresh_flat[k]
+        print("[JAX] Merged fresh VQ params (codebook, head_signal) into restored checkpoint")
     action_oh = jnp.zeros((1, 5), dtype=jnp.float32)
     aux_only = model.init(
         rng, carry, action_oh, method=model.auxiliary_heads
@@ -290,7 +339,7 @@ def ensure_aux_head_params(
     for k in AUX_HEAD_KEYS:
         if k not in flat:
             flat[k] = aux_flat[k]
-    print("[JAX] Merged fresh auxiliary-head params into restored checkpoint")
+            print("[JAX] Merged fresh auxiliary-head params into restored checkpoint")
     return sanitize_agent_params(freeze(flat))
 
 
