@@ -112,6 +112,38 @@ def _normalize_config(cfg: Dict) -> Dict:
 
 # ── Observation builder (JAX) ──────────────────────────────────────────────
 
+# Bumped when red-detection masking changes (printed at startup to catch stale imports).
+RED_SENSE_API_VERSION = 2
+
+
+@jax.jit
+def _mask_loc_env_red_channel(
+    loc_env: jnp.ndarray,
+    pop: PopState,
+    red_map: jnp.ndarray,
+    shelter_spots: jnp.ndarray,
+    det_r: int,
+    gs: int,
+) -> jnp.ndarray:
+    """Zero loc_env red-presence channel when no live red within Chebyshev det_r."""
+    coords_y, coords_x = jnp.meshgrid(
+        jnp.arange(gs), jnp.arange(gs), indexing="ij"
+    )
+    grid_coords = jnp.stack([coords_y, coords_x], axis=-1).astype(jnp.float32)
+    b_pos = pop.positions.astype(jnp.float32)
+    diff = jnp.abs(b_pos[:, None, None, :] - grid_coords[None, :, :, :])
+    diff = jnp.minimum(diff, gs - diff)
+    cheb = jnp.max(diff, axis=-1)
+    cheb_at_reds = jnp.where(red_map[None, :, :], cheb, jnp.inf)
+    min_dist = cheb_at_reds.min(axis=(1, 2))
+    in_shelter = shelter_spots[pop.positions[:, 0], pop.positions[:, 1]]
+    effective_det_r = jnp.where(in_shelter, float(det_r) * 2.0, float(det_r))
+    blind = jnp.isfinite(min_dist) & (min_dist > effective_det_r) & pop.alive
+    return loc_env.at[:, :, 1].set(
+        jnp.where(blind[:, None], 0.0, loc_env[:, :, 1])
+    )
+
+
 def build_observations_jax(
     pop: PopState,
     grid: GridState,
@@ -185,21 +217,8 @@ def build_observations_jax(
     # Beyond-patch red sensing (blues only): mask loc_env red channel when too far
     det_r = int(config.get("red_detection_radius", 0))
     if det_r > 0 and limit_red_sensing:
-        coords_y, coords_x = jnp.meshgrid(
-            jnp.arange(gs), jnp.arange(gs), indexing="ij"
-        )
-        grid_coords = jnp.stack([coords_y, coords_x], axis=-1).astype(jnp.float32)
-        b_pos = pop.positions.astype(jnp.float32)
-        diff = jnp.abs(b_pos[:, None, None, :] - grid_coords[None, :, :, :])
-        diff = jnp.minimum(diff, gs - diff)
-        cheb = jnp.max(diff, axis=-1)
-        cheb_at_reds = jnp.where(red_map[None, :, :], cheb, jnp.inf)
-        min_dist = cheb_at_reds.min(axis=(1, 2))
-        in_shelter = grid.shelter_spots[pop.positions[:, 0], pop.positions[:, 1]]
-        effective_det_r = jnp.where(in_shelter, det_r * 2.0, float(det_r))
-        blind = jnp.isfinite(min_dist) & (min_dist > effective_det_r) & pop.alive
-        loc_env = loc_env.at[:, :, 1].set(
-            jnp.where(blind[:, None], 0.0, loc_env[:, :, 1])
+        loc_env = _mask_loc_env_red_channel(
+            loc_env, pop, red_map, grid.shelter_spots, det_r, gs
         )
 
     parts = [
@@ -623,6 +642,12 @@ def run_simulation(
         _phase9 = "OFF — git pull required"
     print(f"[JAX] code: {_main_path}")
     print(f"[JAX] git={_git_sha} | Phase9 auxiliary: {_phase9}")
+    if "limit_red_sensing" not in _inspect.signature(build_observations_jax).parameters:
+        raise RuntimeError(
+            "Stale jax_sim.main_jax loaded (missing limit_red_sensing). "
+            "Restart the Jupyter kernel, then: cd /root/throng && git pull"
+        )
+    print(f"[JAX] red_sense_api=v{RED_SENSE_API_VERSION} (JIT vectorized)")
 
     # ── Red curriculum state ─────────────────────────────────
     red_curriculum_stages = list(config.get("red_curriculum_stages", [6, 15, 30, 75]))
