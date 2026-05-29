@@ -120,6 +120,7 @@ def build_observations_jax(
     config: Dict,
     step: int,
     key: jnp.ndarray = None,
+    limit_red_sensing: bool = False,
 ) -> jnp.ndarray:
     """Build flat observation vector for all agents.
     
@@ -183,17 +184,20 @@ def build_observations_jax(
 
     # Beyond-patch red sensing (blues only): mask loc_env red channel when too far
     det_r = int(config.get("red_detection_radius", 0))
-    if det_r > 0 and red_map.any():
-        r_pos = jnp.argwhere(red_map)
+    if det_r > 0 and limit_red_sensing:
+        coords_y, coords_x = jnp.meshgrid(
+            jnp.arange(gs), jnp.arange(gs), indexing="ij"
+        )
+        grid_coords = jnp.stack([coords_y, coords_x], axis=-1).astype(jnp.float32)
         b_pos = pop.positions.astype(jnp.float32)
-        diff = jnp.abs(b_pos[:, None, :] - r_pos[None, :, :].astype(jnp.float32))
+        diff = jnp.abs(b_pos[:, None, None, :] - grid_coords[None, :, :, :])
         diff = jnp.minimum(diff, gs - diff)
-        min_dist = jnp.max(diff, axis=-1).min(axis=1)
-        in_shelter = get_local_patches(
-            grid.shelter_spots.astype(jnp.float32), pop.positions, 0, gs
-        ).reshape(N) > 0.5
+        cheb = jnp.max(diff, axis=-1)
+        cheb_at_reds = jnp.where(red_map[None, :, :], cheb, jnp.inf)
+        min_dist = cheb_at_reds.min(axis=(1, 2))
+        in_shelter = grid.shelter_spots[pop.positions[:, 0], pop.positions[:, 1]]
         effective_det_r = jnp.where(in_shelter, det_r * 2.0, float(det_r))
-        blind = (min_dist > effective_det_r) & pop.alive
+        blind = jnp.isfinite(min_dist) & (min_dist > effective_det_r) & pop.alive
         loc_env = loc_env.at[:, :, 1].set(
             jnp.where(blind[:, None], 0.0, loc_env[:, :, 1])
         )
@@ -273,7 +277,10 @@ def make_sim_step(config: Dict, model: AgentNetworkJax, model_apply=None):
         red_map = red_map.at[r_pop.positions[:, 0], r_pop.positions[:, 1]].set(r_pop.alive)
 
         # ── Observations (with signal gate + noise) ─────────────
-        b_obs = build_observations_jax(b_pop, grid, blue_map, red_map, config, 0, key=key_b_obs)
+        b_obs = build_observations_jax(
+            b_pop, grid, blue_map, red_map, config, 0,
+            key=key_b_obs, limit_red_sensing=True,
+        )
         r_obs = build_observations_jax(r_pop, grid, blue_map, red_map, config, 0, key=key_r_obs)
 
         # ── Forward passes ──────────────────────────────────────
