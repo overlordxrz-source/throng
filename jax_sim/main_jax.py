@@ -702,17 +702,27 @@ def run_simulation(
     start_update = 0
     if ckpt_mngr.latest_step() is not None:
         latest = ckpt_mngr.latest_step()
-        print(f"[JAX] Resuming from checkpoint step {latest}...")
         abstract_tree = {"b_params": b_params, "r_params": r_params}
-        restored = ckpt_mngr.restore(latest, items=abstract_tree)
-        b_params = sanitize_agent_params(
-            ensure_aux_head_params(model, restored["b_params"], keys[3], hidden_d)
-        )
-        r_params = sanitize_agent_params(
-            ensure_aux_head_params(model, restored["r_params"], keys[5], hidden_d)
-        )
-        start_update = latest
-        print(f"[JAX] Restored params from step {latest}. Population starts fresh.")
+        try:
+            print(f"[JAX] Resuming from checkpoint step {latest}...")
+            restored = ckpt_mngr.restore(latest, items=abstract_tree)
+            b_params = sanitize_agent_params(
+                ensure_aux_head_params(model, restored["b_params"], keys[3], hidden_d)
+            )
+            r_params = sanitize_agent_params(
+                ensure_aux_head_params(model, restored["r_params"], keys[5], hidden_d)
+            )
+            start_update = latest
+            print(f"[JAX] Restored params from step {latest}. Population starts fresh.")
+        except ValueError as exc:
+            if "not compatible" in str(exc) or "stored shape" in str(exc):
+                print(
+                    f"[JAX] Checkpoint step {latest} incompatible with current model "
+                    f"(architecture changed) — starting fresh."
+                )
+                print("[JAX] Delete old ckpts: rm -rf /mnt/throng-runs/checkpoints")
+            else:
+                raise
     
     # ── Training loop ───────────────────────────────────────
     n_updates = n_steps // T
