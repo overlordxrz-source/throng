@@ -10,9 +10,10 @@
 grid_size: 128
 window_size: 1200
 
-population_size: 500
-red_population_size: 250
-min_population: 150              # P4b/P10.3: blue repro floor (strict; cap still 500)
+population_size: 200           # P10.5 Hard-Ceiling: cap blues (no 500-agent entropy explosion)
+max_population: 200
+max_pop: 200
+min_population: 150              # P10.5 Goldilocks: 150–200 high-stress band
 min_red_population: 250          # P4b: max red pressure immediately on resume
 repro_energy_thresh: 0.95        # P10.2 Metabolic Squeeze: rare clones (was 0.80)
 repro_energy_cost: 0.80          # P10.2: cloning nearly starves parent (was 0.40)
@@ -137,7 +138,7 @@ ppo_warmup_steps: 15
 ppo_clip: 0.2
 ppo_clip_eps: 0.2
 ppo_lr: 3.0e-4
-ppo_gamma: 0.99
+ppo_gamma: 0.999                 # P10.5: long-horizon survival (500+ step credit)
 ppo_gae_lam: 0.95
 ppo_value_coef: 0.1
 ppo_entropy_coef: 0.02
@@ -156,6 +157,9 @@ reward_red_move: 0.04        # P4: reward red movement (hunter aggression)
 # ── P10.4 Safety Bubble (NB_GAIN temporal depth: mean age 150+) ───────────────
 # Predator jitter: red_catch_prob (not detection_radius — blues stay blind)
 # Slightly more regen than P10.3 famine; repro still squeezed (P10.2 thresholds)
+
+# ── P10.5 Hard-Ceiling (population 150–200, γ=0.999) ─────────────────────────
+# Blues capped at 200; min 150 — no hyper-breeding luxury band at 500
 
 # Observation constraints
 red_detection_radius: 0          # 0 = blind beyond 5×5 patch; need neighbor signals (Phase 10)
