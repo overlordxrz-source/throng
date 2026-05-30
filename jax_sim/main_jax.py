@@ -816,6 +816,10 @@ def _run_simulation_impl(
     _lag1_scout_dist = None
     _lag1_scout_tok = None
     _alarm_range = float(config.get("alarm_scout_range", 8))
+    print(
+        f"[JAX] corpus scout label: is_scout = (red_dist <= alarm_scout_range={_alarm_range})",
+        flush=True,
+    )
     _corpus_sig_dim = int(config["signal_dim"])
     for ui in range(start_update, n_updates):
         update_key = update_keys[ui]

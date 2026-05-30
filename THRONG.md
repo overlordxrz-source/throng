@@ -41,7 +41,8 @@ train_entry.run_simulation()  →  main_jax._run_simulation_impl()
 | [`jax_sim/observations_jax.py`](jax_sim/observations_jax.py) | Obs builder; startup must print `red_sense_api=v2` |
 | [`jax_sim/grid_jax.py`](jax_sim/grid_jax.py) | Catches (`red_catch_prob`), resources, shelter |
 | [`tools/decode_signals.py`](tools/decode_signals.py) | Offline corpus analysis |
-| [`scripts/modal_train.py`](scripts/modal_train.py) | P10.5 config + nohup-friendly entry |
+| [`run_bg.py`](run_bg.py) | **Preferred** nohup entry (`python -u run_bg.py`) |
+| [`scripts/modal_train.py`](scripts/modal_train.py) | Same config as `run_bg.py` |
 
 **Network outputs:** `action_logits, signal_out, symbol_write, values, tom_logits, token_ids, loss_vq, z_e, culture_fast, culture_slow`.
 
@@ -137,7 +138,7 @@ export XLA_PYTHON_CLIENT_MEM_FRACTION=0.80
 export JAX_COMPILATION_CACHE_DIR=/tmp/throng_jax_cache
 mkdir -p /tmp/throng_jax_cache
 
-nohup python -u /root/throng/scripts/modal_train.py > /mnt/throng-runs/train.log 2>&1 &
+nohup python -u /root/throng/run_bg.py > /mnt/throng-runs/train.log 2>&1 &
 tail -f /mnt/throng-runs/train.log
 ```
 
@@ -182,11 +183,51 @@ modal volume get throng-runs checkpoints ~/throng_checkpoints_backup
 
 ---
 
-## 6. Measurement — `decode_signals.py`
+## 6. Clean corpus restart (post scout/VQ fix `5964a24+`)
+
+Archive pre-fix JSONL so decode only sees new labels (`vq_token`, `alarm_scout_range` scouts):
+
+```bash
+mv /root/throng/runs/jax_run/signal_corpus.jsonl \
+   /mnt/throng-runs/signal_corpus_prefig.jsonl
+```
+
+Resume training (**do not** wipe checkpoints):
+
+```bash
+cd /root/throng && git pull   # or reset --hard origin/master
+nohup python -u run_bg.py > /mnt/throng-runs/train.log 2>&1 &
+tail -f /mnt/throng-runs/train.log
+```
+
+Startup must include:
+
+```text
+[JAX] corpus scout label: is_scout = (red_dist <= alarm_scout_range=8)
+```
+
+**While corpus accumulates:** do **not** change reward structure, `vq_beta`, or `vq_loss_coef` — one variable at a time.
+
+After **~20k new env steps** on the fresh corpus file, decode (set `--min-step` to first step in the new file, or `0` if file is clean):
+
+```bash
+python tools/decode_signals.py runs/jax_run/signal_corpus.jsonl --k 16 --min-step <first_new_step>
+```
+
+### Three numbers that matter
+
+| # | Metric | Pass condition |
+|---|--------|----------------|
+| 1 | **Scouts %** in corpus summary | **5–30%**. If still **&lt;1%**, scout labeling broken — confirm log shows `alarm_scout_range=8` from config (not hardcoded). |
+| 2 | **LAG-1 DIRECTION LRT** eligible | **≥50** blind fleeing with lag-1 fields. **p &lt; 0.05** on any direction → communication signal. |
+| 3 | **VQ TOKEN DIRECTION TEST** χ² | Alert tokens (low emitter `red_dist`) vs safe tokens (high `red_dist`) → different flee mix. **Most important** vocabulary test. |
+
+---
+
+## 7. Measurement — `decode_signals.py`
 
 ```bash
 pip install scikit-learn scipy
-cp runs/jax_run/signal_corpus.jsonl /mnt/throng-runs/   # optional persistence
 
 python tools/decode_signals.py runs/jax_run/signal_corpus.jsonl --k 16 --min-step 20000
 ```
@@ -205,7 +246,7 @@ python tools/decode_signals.py runs/jax_run/signal_corpus.jsonl --k 16 --min-ste
 
 ---
 
-## 7. Dashboard glossary
+## 8. Dashboard glossary
 
 | Line | Meaning |
 |------|---------|
@@ -220,7 +261,7 @@ python tools/decode_signals.py runs/jax_run/signal_corpus.jsonl --k 16 --min-ste
 
 ---
 
-## 8. Git commits (JAX Phase 10, recent)
+## 9. Git commits (JAX Phase 10, recent)
 
 | SHA | Fix / feature |
 |-----|----------------|
@@ -240,7 +281,7 @@ python tools/decode_signals.py runs/jax_run/signal_corpus.jsonl --k 16 --min-ste
 
 ---
 
-## 9. Common failures
+## 10. Common failures
 
 | Symptom | Fix |
 |---------|-----|
@@ -254,7 +295,7 @@ python tools/decode_signals.py runs/jax_run/signal_corpus.jsonl --k 16 --min-ste
 
 ---
 
-## 10. Roadmap (what’s next)
+## 11. Roadmap (what’s next)
 
 ### Immediate
 
@@ -283,7 +324,7 @@ python tools/decode_signals.py runs/jax_run/signal_corpus.jsonl --k 16 --min-ste
 
 ---
 
-## 11. Legacy pointers
+## 12. Legacy pointers
 
 | Path | Status |
 |------|--------|
