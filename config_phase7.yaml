@@ -12,7 +12,7 @@ window_size: 1200
 
 population_size: 500
 red_population_size: 250
-min_population: 150              # P4b Selective Squeeze: blue repro floor (was 200; cap still 500)
+min_population: 150              # P4b/P10.3: blue repro floor (strict; cap still 500)
 min_red_population: 250          # P4b: max red pressure immediately on resume
 repro_energy_thresh: 0.95        # P10.2 Metabolic Squeeze: rare clones (was 0.80)
 repro_energy_cost: 0.80          # P10.2: cloning nearly starves parent (was 0.40)
@@ -76,8 +76,10 @@ signal_entropy_anneal_end: 50000
 
 # ── Procedural environment ────────────────────────────────────────────────────
 wall_density: 0.08
-resource_n_patches: 20
-resource_regen_rate: 0.0025      # P10.2 Metabolic Squeeze: half regen (was 0.005)
+resource_n_patches: 10           # P10.3 Famine: half map patches (was 20)
+resource_regen_rate: 0.00025     # P10.3 Famine: 10% of P10.2 (0.0025 → 0.00025)
+resource_max: 0.5                # P10.3: cap cell resources (default 1.0)
+resource_spawn_boost: 0.1       # P10.3: per-step spawn increment (was hardcoded 0.2)
 
 # ── Phase 7: New world objects ────────────────────────────────────────────────
 shelter_n_spots: 5              # shelter spots per map

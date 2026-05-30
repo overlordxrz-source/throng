@@ -166,6 +166,8 @@ def make_sim_step(config: Dict, model: AgentNetworkJax, model_apply=None):
     _scent_decay_steps = int(config.get("scent_decay_steps", 20))
     _red_starvation_steps = int(config.get("red_starvation_steps", 400))
     _contested_min_harv = int(config.get("contested_min_harvesters", 2))
+    _resource_max = float(config.get("resource_max", 1.0))
+    _resource_spawn_boost = float(config.get("resource_spawn_boost", 0.2))
     _n_layers = config["n_layers"]
     from jax_sim import observations_jax as _obs
 
@@ -265,8 +267,8 @@ def make_sim_step(config: Dict, model: AgentNetworkJax, model_apply=None):
         res_key = jax.random.split(key_misc)[0]
         regen_rate = float(config.get("resource_regen_rate", 0.005))
         spawn_mask = jax.random.bernoulli(res_key, regen_rate, (gs, gs))
-        new_res = grid.resources + spawn_mask.astype(jnp.float32) * 0.2
-        grid = grid.replace(resources=jnp.clip(new_res, 0.0, 1.0))
+        new_res = grid.resources + spawn_mask.astype(jnp.float32) * _resource_spawn_boost
+        grid = grid.replace(resources=jnp.clip(new_res, 0.0, _resource_max))
 
         # ── Energy decay ────────────────────────────────────────
         b_pop = b_pop.replace(energy=jnp.clip(b_pop.energy - _energy_decay, 0.0, 1.0))
@@ -473,10 +475,15 @@ def _run_simulation_impl(
     
     # Resource patches (structured hotspots, not uniform drizzle)
     k_res, k_shelter, k_contest, k_puzzle = jax.random.split(keys[9], 4)
-    resources = generate_resource_patches(
-        k_res, gs,
-        n_patches=int(config.get("resource_n_patches", 20)),
-        patch_radius=5.0,
+    _resource_max_init = float(config.get("resource_max", 1.0))
+    resources = jnp.clip(
+        generate_resource_patches(
+            k_res, gs,
+            n_patches=int(config.get("resource_n_patches", 20)),
+            patch_radius=5.0,
+        ),
+        0.0,
+        _resource_max_init,
     )
     
     # Shelter spots (safe zones)

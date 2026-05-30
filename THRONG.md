@@ -4388,3 +4388,21 @@ Every **`distill_interval`** env steps (default **10k**), top **`distill_keep_fr
 Hot-resume only — do not wipe checkpoints. Stack on P4b (`min_population: 150`, `distill_enabled: false`, reds `[250]`).
 
 — *appended 2026-05-30 (P10.2 metabolic squeeze)*
+
+---
+
+## Phase 10.3 — “The Famine” (May 30)
+
+**Problem:** Elite hoarders + clones keep `blue≈500` despite P4b/P10.2.
+
+| Parameter | P10.2 | P10.3 |
+|-----------|-------|-------|
+| `resource_regen_rate` | 0.0025 | **0.00025** (10%) |
+| `resource_n_patches` | 20 | **10** (half) |
+| `resource_max` | 1.0 (implicit) | **0.5** |
+| `resource_spawn_boost` | 0.2 (hardcoded) | **0.1** |
+| `min_population` | 150 | **150** (unchanged) |
+
+Hot-resume only. Requires **`6f95da2+`** for `resource_max` / `resource_spawn_boost` in `main_jax.py`.
+
+— *appended 2026-05-30 (P10.3 famine)*
