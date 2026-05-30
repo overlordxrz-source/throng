@@ -4372,3 +4372,19 @@ Every **`distill_interval`** env steps (default **10k**), top **`distill_keep_fr
 **Expect after resume:** blues can fall toward **~150** under pressure; `NB_GAIN↔surv` may become finite; no `[DISTILL]` lines.
 
 — *appended 2026-05-30 (P4b config)*
+
+---
+
+## Phase 10.2 — Metabolic Squeeze (May 30)
+
+**Problem (post-P4b):** Blues stay ~500 via **energy cloning** despite `min_population: 150` and heavy catches.
+
+| Parameter | P4b | P10.2 |
+|-----------|-----|-------|
+| `repro_energy_thresh` | 0.80 | **0.95** |
+| `repro_energy_cost` | 0.40 | **0.80** |
+| `resource_regen_rate` | 0.005 | **0.0025** |
+
+Hot-resume only — do not wipe checkpoints. Stack on P4b (`min_population: 150`, `distill_enabled: false`, reds `[250]`).
+
+— *appended 2026-05-30 (P10.2 metabolic squeeze)*

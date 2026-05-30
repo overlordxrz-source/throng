@@ -14,8 +14,8 @@ population_size: 500
 red_population_size: 250
 min_population: 150              # P4b Selective Squeeze: blue repro floor (was 200; cap still 500)
 min_red_population: 250          # P4b: max red pressure immediately on resume
-repro_energy_thresh: 0.80        # agent must have 80% energy to self-clone
-repro_energy_cost: 0.40          # cloning costs 40% of parent energy
+repro_energy_thresh: 0.95        # P10.2 Metabolic Squeeze: rare clones (was 0.80)
+repro_energy_cost: 0.80          # P10.2: cloning nearly starves parent (was 0.40)
 
 # Curriculum
 curriculum_red_count: 6
@@ -77,7 +77,7 @@ signal_entropy_anneal_end: 50000
 # ── Procedural environment ────────────────────────────────────────────────────
 wall_density: 0.08
 resource_n_patches: 20
-resource_regen_rate: 0.005
+resource_regen_rate: 0.0025      # P10.2 Metabolic Squeeze: half regen (was 0.005)
 
 # ── Phase 7: New world objects ────────────────────────────────────────────────
 shelter_n_spots: 5              # shelter spots per map
