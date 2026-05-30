@@ -11,9 +11,9 @@ grid_size: 128
 window_size: 1200
 
 population_size: 500
-red_population_size: 150
+red_population_size: 250
 min_population: 200
-min_red_population: 150
+min_red_population: 80
 repro_energy_thresh: 0.80        # agent must have 80% energy to self-clone
 repro_energy_cost: 0.40          # cloning costs 40% of parent energy
 
@@ -53,7 +53,7 @@ symbol_decay: 0.993
 
 red_starvation_steps: 400
 red_spawn_step: 2000
-red_catch_radius: 0
+red_catch_radius: 1          # P4: adjacent reds catch blues (Chebyshev ≤ 1)
 
 # ── VQ signal bottleneck (P3) ─────────────────────────────────────────────────
 vocab_size: 64
@@ -143,15 +143,16 @@ ppo_max_grad_norm: 2.0
 
 # Rewards
 reward_blue_alive: 0.05
-reward_blue_caught: -1.0
+reward_blue_caught: -2.0      # P4: harsher death penalty for caught blues
 reward_blue_red_proximity: -0.01
-reward_red_catch: 1.0
-reward_red_starve_per_step: -0.01
+reward_red_catch: 3.0         # P4: stronger hunt incentive
+reward_red_starve_per_step: -0.02
 reward_move: 0.01
+reward_red_move: 0.04        # P4: reward red movement (hunter aggression)
 
 # Observation constraints
 red_detection_radius: 0          # 0 = blind beyond 5×5 patch; need neighbor signals (Phase 10)
-red_curriculum_stages: [40, 80, 120, 150]
+red_curriculum_stages: [80, 150, 200, 250]   # P4: lethal swarm from the start
 resource_obs_noise: 0.2         # 20% Gaussian noise on resource observations
 
 brain_vote_interval: 5000

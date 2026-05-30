@@ -148,7 +148,9 @@ def make_sim_step(config: Dict, model: AgentNetworkJax, model_apply=None):
     _reward_move = float(config.get("reward_move", 0.01))
     _reward_resource = float(config.get("reward_resource", 0.1))
     _reward_red_catch = float(config.get("reward_red_catch", 1.0))
+    _reward_red_move = float(config.get("reward_red_move", 0.0))
     _reward_red_starve = float(config.get("reward_red_starve_per_step", -0.01))
+    _red_catch_radius = int(config.get("red_catch_radius", 1))
     _puzzle_reward = float(config.get("puzzle_reward", 5.0))
     _energy_decay = float(config["energy_decay"])
     _starv_thresh = float(config["starvation_threshold"])
@@ -227,6 +229,7 @@ def make_sim_step(config: Dict, model: AgentNetworkJax, model_apply=None):
         b_new_pos = apply_moves(b_pop.positions, b_actions, b_pop.alive, gs, grid.walls)
         r_new_pos = apply_moves(r_pop.positions, r_actions, r_pop.alive, gs, grid.walls)
         b_moved = (b_new_pos != b_pop.positions).any(axis=-1) & b_pop.alive
+        r_moved = (r_new_pos != r_pop.positions).any(axis=-1) & r_pop.alive
         b_pop = b_pop.replace(positions=b_new_pos)
         r_pop = r_pop.replace(positions=r_new_pos)
 
@@ -304,7 +307,7 @@ def make_sim_step(config: Dict, model: AgentNetworkJax, model_apply=None):
         b_new_alive, r_catch_rew, b_catch_pen, caught_b = apply_catches(
             b_pop.positions, b_pop.alive,
             r_pop.positions, r_pop.alive,
-            gs, catch_radius=1,
+            gs, catch_radius=_red_catch_radius,
         )
         # Shelter protection: blues on shelter spots can't be caught
         on_shelter = grid.shelter_spots[b_pop.positions[:, 0], b_pop.positions[:, 1]]
@@ -345,6 +348,7 @@ def make_sim_step(config: Dict, model: AgentNetworkJax, model_apply=None):
 
         r_rew = _reward_red_catch * r_catch_rew
         r_rew = r_rew + jnp.where(r_pop.alive, _reward_red_starve, 0.0)
+        r_rew = r_rew + _reward_red_move * r_moved.astype(jnp.float32)
 
         # ── Write symbols / culture ─────────────────────────────
         grid = grid.replace(
@@ -388,6 +392,7 @@ def make_sim_step(config: Dict, model: AgentNetworkJax, model_apply=None):
             "signals": b_pop.signals,
             "energy": b_pop.energy,
             "alive": b_pop.alive,
+            "blue_caught": caught_b.astype(jnp.float32),
         }
         r_rollout = {
             "obs": r_obs, "actions": r_actions, "log_probs": r_log_probs_taken,
@@ -509,9 +514,12 @@ def _run_simulation_impl(
         max_pop, hidden_d, config["signal_dim"], gs, team_id=0,
         key=keys[1], n_agents=max_pop, memory_slots=config.get("memory_slots", 0),
     )
+    _red_stages = list(config.get("red_curriculum_stages", [80, 150, 200, 250]))
+    _red_start_n = int(config.get("min_red_population", _red_stages[0]))
+    _red_start_n = min(_red_start_n, max_pop_red)
     r_pop = init_population(
         max_pop_red, hidden_d, config["signal_dim"], gs, team_id=1,
-        key=keys[2], n_agents=6, memory_slots=config.get("memory_slots", 0),
+        key=keys[2], n_agents=_red_start_n, memory_slots=config.get("memory_slots", 0),
     )
 
     # ── Init model ──────────────────────────────────────────
@@ -582,7 +590,10 @@ def _run_simulation_impl(
     red_sustain_count = 0
     red_sustain_threshold = float(config.get("curriculum_survival_threshold", 0.80))
     red_sustain_needed = int(config.get("curriculum_sustain_updates", 5))
-    print(f"[CURRICULUM] Red stages: {red_curriculum_stages}, start={red_curriculum_stages[0]}")
+    print(
+        f"[CURRICULUM] Red stages: {red_curriculum_stages}, start={red_curriculum_stages[0]} "
+        f"| catch_radius={int(config.get('red_catch_radius', 1))}"
+    )
 
     dummy_obs = jnp.zeros((1, obs_dim))
     dummy_carry = jnp.zeros((1, hidden_d))
@@ -1024,8 +1035,15 @@ def _run_simulation_impl(
             print(f"  Values:  mean={val_mean:.4f} | VF_loss={vf_loss:.4f} | Clip={clip_frac:.3f}")
             print(f"  Reward:  mean={rew_mean:.4f} | Entropy: {ent_val:.4f}")
             print(f"  AuxLoss: fwd_env={fwd_loss_val:.4f} (loc_env MSE) | self_pred_acc={sp_acc_val:.3f} (↑ from 0.20 random)")
+            blue_caught_rollout = 0
+            if "blue_caught" in rollout_data["blue"]:
+                blue_caught_rollout = int(np.asarray(rollout_data["blue"]["blue_caught"]).sum())
             print(f"  VQ: loss={vq_loss_val:.4f} | codes_active={vq_codes_str} | clusters={active_clusters_str} | NB_GAIN↔surv: {sp_r:.3f}")
-            print(f"  Curriculum: red_floor={red_curriculum_stages[red_curriculum_idx]} sustain={red_sustain_count}/{red_sustain_needed} | brain={n_layers}L")
+            print(
+                f"  Ecology: blue_caught={blue_caught_rollout} this rollout | "
+                f"red_floor={red_curriculum_stages[red_curriculum_idx]} "
+                f"sustain={red_sustain_count}/{red_sustain_needed} | brain={n_layers}L"
+            )
             print(f"{'='*70}\n")
 
         # ── Evolutionary Distillation (CPU, Outer Loop) ─────────

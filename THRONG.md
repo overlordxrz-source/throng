@@ -4111,7 +4111,7 @@ python tools/decode_signals.py runs/jax_run/signal_corpus.jsonl --min-step 25000
 | **P1** | **Lag-1 corpus** (`nb_scout_sig_lag1`, `nb_scout_dist_lag1`) for direction LRT | **Done** in `jax_sim/main_jax.py` |
 | **P2** | **`red_detection_radius: 0`** — no Chebyshev threat sense beyond 5×5; dodge-without-listening disabled | **Done** in `config_phase7.yaml` |
 | **P3** | **VQ bottleneck** on signal head (STE, finite codebook) — discrete “words” without collapsing gradients | **Done** — `jax_sim/network_jax.py` (`vector_quantize_signals`, `codebook` Embed 64×signal_dim, `vq_beta` / `vq_loss_coef` in cfg) |
-| **P4** | **Red lethality** — if blues still don’t die at radius 0, buff reds (move reward, catch radius, speed asymmetry) until deaths create NB_GAIN gradient | **On hold** — isolate blind + VQ first |
+| **P4** | **Red lethality** — catch radius 1, swarm curriculum [80→250], red hunt/move rewards | **Done** — `config_phase7.yaml` + `main_jax.py` (`blue_caught` dashboard) |
 
 ### P3 — VQ signal head (implemented)
 
@@ -4120,12 +4120,13 @@ python tools/decode_signals.py runs/jax_run/signal_corpus.jsonl --min-step 25000
 - Dashboard: `VQ: loss=… | codes_active=X/64 | clusters=…`.
 - **Fresh run** required when resuming pre-VQ checkpoints (head_signal shape change); `ensure_aux_head_params` merges `codebook` if missing.
 
-### P4 — Make deaths happen (candidates)
+### P4 — Lethal ecology (implemented)
 
-- Increase `reward_red_catch` or lower blue energy / raise `starvation_threshold`.
-- `red_catch_radius: 1` (if currently 0) with radius-0 **vision** only.
-- Red move bonus > blue move bonus in `sim_step` rewards.
-- Log **blue deaths per 1k steps** on dashboard (new metric) so “lethal” is visible before NB_GAIN.
+- `red_catch_radius: 1` — wired from config in `sim_step` (Chebyshev adjacent catch).
+- `red_curriculum_stages: [80, 150, 200, 250]`, `min_red_population: 80`, `red_population_size: 250`, reds spawn at **80** at init.
+- `reward_red_catch: 3.0`, `reward_red_move: 0.04`, `reward_blue_caught: -2.0`, harsher red starve pressure.
+- Dashboard: **`Ecology: blue_caught=N this rollout`** per PPO block.
+- **Fresh run** after P4 (wipe `/mnt/throng-runs/checkpoints`); keep P3 VQ weights only if intentionally resuming same lineage.
 
 ### Fresh run checklist
 
