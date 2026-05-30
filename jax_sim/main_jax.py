@@ -684,12 +684,19 @@ def _run_simulation_impl(
     r_carries = jnp.zeros((max_pop_red, hidden_d))
 
     # ── Restore Checkpoint ──────────────────────────────────
+    import sys as _sys
+    _ckpt_latest = ckpt_mngr.latest_step()
+    if _ckpt_latest is not None:
+        print(f"[JAX] Checkpoint on volume: latest PPO update = {_ckpt_latest}", flush=True)
+    else:
+        print("[JAX] No checkpoint on volume — training from update 0.", flush=True)
+
     start_update = 0
-    if ckpt_mngr.latest_step() is not None:
-        latest = ckpt_mngr.latest_step()
+    if _ckpt_latest is not None:
+        latest = _ckpt_latest
         abstract_tree = {"b_params": b_params, "r_params": r_params}
         try:
-            print(f"[JAX] Resuming from checkpoint step {latest}...")
+            print(f"[JAX] Resuming from checkpoint step {latest}...", flush=True)
             restored = ckpt_mngr.restore(latest, items=abstract_tree)
             b_params = sanitize_agent_params(
                 ensure_aux_head_params(
@@ -718,6 +725,17 @@ def _run_simulation_impl(
     # ── Training loop ───────────────────────────────────────
     n_updates = n_steps // T
     update_keys = jax.random.split(keys[4], n_updates)
+    print(
+        f"[JAX] Training PPO updates {start_update} → {n_updates - 1} "
+        f"(~env steps {start_update * T} → {n_steps})",
+        flush=True,
+    )
+    if start_update < n_updates:
+        print(
+            f"[JAX] About to run lax.scan rollout ({T}×{max_pop} agents). "
+            "First compile can take 5–15+ min with no new lines — not frozen.",
+            flush=True,
+        )
 
     # ── Brain vote state (capacity-based, not survival-based) ─
     brain_max_layers_val = int(config.get("brain_max_layers", 6))
@@ -776,7 +794,16 @@ def _run_simulation_impl(
             rollout_data = jax.tree_util.tree_map(flatten_pmap, rollout_data)
         else:
             init_carry = (grid, b_pop, r_pop, b_carries, r_carries, b_params, r_params)
+            if ui == start_update:
+                print(f"[JAX] lax.scan rollout starting (update {ui + 1})...", flush=True)
+            _t_rollout0 = __import__("time").time()
             final_carry, rollout_data = lax.scan(sim_step_fn, init_carry, step_keys)
+            if ui == start_update:
+                _dt0 = __import__("time").time() - _t_rollout0
+                print(
+                    f"[JAX] lax.scan rollout done in {_dt0:.1f}s (update {ui + 1}) — PPO next.",
+                    flush=True,
+                )
             grid, b_pop, r_pop, b_carries, r_carries, b_params, r_params = final_carry
 
         # ── Free GPU: full (T×N) rollout must not sit on device during PPO backward
