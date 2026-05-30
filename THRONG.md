@@ -4136,3 +4136,221 @@ python tools/decode_signals.py runs/jax_run/signal_corpus.jsonl --min-step 25000
 4. Target: blues **&lt; 450** at 150 reds before claiming ecology works.
 
 — *appended 2026-05-30 (Phase 10 plan + stop @38k)*
+
+---
+
+## Third-agent onboarding — JAX Phase 10 lethal run (May 30, 2026)
+
+**Read this section first** if you are a new agent picking up Throng mid-run. It consolidates Modal ops, Phase 10 (P1–P4), VQ, checkpoint/resume, and the **active P4 lethal run** through ~10k env steps.
+
+### What Throng is (30 seconds)
+
+Multi-agent RL on a toroidal grid: **500 blue** agents (survivors) vs **red** predators (hunters). Blues get rich observations (local patch + **neighbor VQ signals** + culture + memory). Training is **JAX** in `jax_sim/` (`main_jax.py` + `lax.scan` rollout + PPO). Active experiment config: **`config_phase7.yaml`**. Goal: emergent **discrete communication** under **blind threat sensing** + **lethal ecology** so only useful alarm-like signals are selected.
+
+### Active run snapshot (live @ ~9.7k env steps, git `f9bf11a`)
+
+| Field | Value |
+|-------|--------|
+| **Run name** | Phase 10 **Lethal** — blind + VQ + P4 |
+| **Git** | `f9bf11a` (P4 ecology); pull **`8a6f016+`** for OOM/GAE/FrozenDict/`bincount` fixes if notebook predates |
+| **Target** | `n_steps=150_000` (~293 PPO updates @ `ppo_rollout_steps=512`) |
+| **Progress** | ~**9.7k** env steps (PPO #19), **~6%** of 150k |
+| **Checkpoints** | Modal volume `throng-runs` → `/mnt/throng-runs/checkpoints/` (e.g. **7680**, **9216**) |
+| **Blues / reds** | **496–498 / 250** (full red curriculum reached) |
+| **VQ** | **63/64** `codes_active` — monoculture **dead** (P3 success) |
+| **Ecology** | `blue_caught` **3k–5.3k** per rollout — catches happen; pop still ~500 (repro refills) |
+| **NB_GAIN↔surv** | still **`nan`** (~99% survival → no death-age variance) |
+| **Policy** | **N-ward / W-ward** heavy (~33–38% N) — movement bias, not random |
+| **Distill** | `[step 9728] DISTILL — population` — expected (`distill_enabled: true`, interval 10k steps) |
+
+**Latest dashboard excerpt (representative @ 7680–9728):**
+
+```text
+[step 7680] blue=497 red=250 | VQ codes_active=63/64 | Ecology: blue_caught=3086 | red_floor=250
+[step 9216] blue=494 red=250 | self_pred_acc=0.38 | Ecology: blue_caught=3887
+[step 9728] blue=496 red=250 | Ecology: blue_caught=5310 | [DISTILL — population]
+```
+
+**Interpretation:** Infrastructure + **VQ channel** are production-grade. **Selection pressure on comms** is still weak because **population almost never collapses** despite heavy catching. Do **not** claim “language emerged” until decode + survival-linked metrics move.
+
+### Phase 10 checklist (P1–P4)
+
+| ID | Feature | Config / code | Status |
+|----|---------|---------------|--------|
+| **P1** | Lag-1 corpus for direction LRT | `nb_scout_sig_lag1`, `nb_scout_dist_lag1` in `main_jax.py` | Done |
+| **P2** | Blues blind to global red positions | `red_detection_radius: 0` | Done |
+| **P3** | VQ signal bottleneck (64 codes, STE, dead-code reset) | `network_jax.py`, `vq_*` in cfg | Done — **62–63/64 active** |
+| **P4** | Lethal reds | see below | Done — **catches high**, **pop still ~500** |
+
+**P4 config (`config_phase7.yaml` @ `f9bf11a`):**
+
+```yaml
+red_detection_radius: 0
+red_catch_radius: 1
+red_curriculum_stages: [80, 150, 200, 250]
+min_red_population: 80
+red_population_size: 250
+reward_red_catch: 3.0
+reward_red_move: 0.04
+reward_blue_caught: -2.0
+ppo_minibatch_size: 512
+vq_beta: 0.25
+vq_loss_coef: 0.1
+vq_dead_code_reset: true
+```
+
+**P4 code:** `red_catch_radius` read in `make_sim_step` → `apply_catches(...)`; reds **init at 80** (not 6); dashboard **`Ecology: blue_caught=N`** = sum of catch events in last rollout (not unique deaths).
+
+### Git commit map (May 30 JAX stack)
+
+| SHA | What |
+|-----|------|
+| `0500ee8` | Phase 10 prep: lag-1 corpus, blind (`red_detection_radius: 0`) |
+| `9a7bb24` | **P3 VQ** bottleneck + PPO `loss_vq` |
+| `bd0ba2c` | VQ banner after `b_params` init |
+| `8077a12` | OOM fix: CPU rollout offload, `ppo_minibatch_size: 512`, dead-code VQ in-forward |
+| `2f32e4e` | `jnp.bincount` (Modal JAX lacks `lax.segment_sum`) |
+| `697e96a` | GAE on CPU numpy (post–rollout-offload) |
+| `8a6f016` | FrozenDict fix after dead-code param reset |
+| **`f9bf11a`** | **P4 lethal ecology** |
+
+**Do not** use Cam’s regex patch cell on `network_jax.py` — dead-code reset is in repo.
+
+### JAX architecture (files that matter)
+
+| File | Role |
+|------|------|
+| `jax_sim/train_entry.py` | **Always import** `run_simulation` here (evicts stale modules after `git pull`) |
+| `jax_sim/main_jax.py` | Training loop, `lax.scan` sim step, curriculum, dashboard, checkpoints |
+| `jax_sim/network_jax.py` | Transformer + **VQ** (`vector_quantize_signals`, `codebook`, dead-code reset) |
+| `jax_sim/rl_jax.py` | PPO + GAE (numpy GAE after CPU rollout) |
+| `jax_sim/observations_jax.py` | Obs builder; **`red_sense_api=v2`** required at startup |
+| `config_phase7.yaml` | Source of truth for Phase 7/10 hyperparameters |
+
+**Network outputs (tuple from `__call__`):** `action_logits, signal_out, symbol_write, values, tom_logits, token_ids, loss_vq, z_e, culture_fast, culture_slow`.
+
+**Checkpoints save only:** `b_params`, `r_params` (not population, not optimizer, not curriculum index).
+
+### Dashboard glossary
+
+| Line | Meaning |
+|------|---------|
+| `codes_active=X/64` | Unique VQ token IDs among alive blues (last rollout step) |
+| `clusters=X/16` | k-means on alive signal vectors (occupancy &gt;2%) |
+| `Ecology: blue_caught=N` | Catch events in rollout (high is good for P4; not death count) |
+| `fwd_env` | MSE predicting flat **loc_env** (200-d), not carry |
+| `NB_GAIN↔surv` | Spearman(nb_gain, age); **nan** if everyone lives |
+| `red_floor` | Current red reproduction floor from curriculum |
+| `sustain=k/5` | Consecutive PPO updates with blue survival ≥ `curriculum_survival_threshold` (0.80) |
+
+### Modal — definitive fresh lethal cell (one cell)
+
+Mount volume **`throng-runs`** at **`/mnt/throng-runs`**. Wipes checkpoints for **new** experiment lineage.
+
+```python
+import os, subprocess, sys, shutil
+from pathlib import Path
+import yaml
+
+REPO = Path("/root/throng")
+subprocess.run(["git", "-C", str(REPO), "fetch", "origin"], check=True) if REPO.exists() else subprocess.run(
+    ["git", "clone", "https://github.com/overlordxrz-source/throng.git", str(REPO)], check=True)
+subprocess.run(["git", "-C", str(REPO), "reset", "--hard", "origin/master"], check=True)
+print("Git:", subprocess.check_output(["git", "-C", str(REPO), "rev-parse", "--short", "HEAD"], text=True).strip())
+
+os.chdir(REPO)
+sys.path.insert(0, str(REPO))
+os.environ.setdefault("XLA_PYTHON_CLIENT_MEM_FRACTION", "0.80")
+
+shutil.rmtree("/mnt/throng-runs/checkpoints", ignore_errors=True)
+Path("/mnt/throng-runs/checkpoints").mkdir(parents=True, exist_ok=True)
+
+with open(REPO / "config_phase7.yaml") as f:
+    cfg = yaml.safe_load(f)
+cfg["checkpoint_dir"] = "/mnt/throng-runs/checkpoints"
+cfg["population_size"] = cfg["max_population"] = cfg["max_pop"] = 500
+cfg["red_population_size"] = cfg["max_pop_red"] = 250
+cfg["min_red_population"] = 80
+cfg["n_layers"] = 4
+cfg["ppo_rollout_steps"] = 512
+cfg["ppo_minibatch_size"] = 512
+cfg["red_detection_radius"] = 0
+cfg["red_catch_radius"] = 1
+cfg["red_curriculum_stages"] = [80, 150, 200, 250]
+cfg["vq_beta"] = 0.25
+cfg["vq_loss_coef"] = 0.1
+cfg["vq_dead_code_reset"] = True
+
+from jax_sim.train_entry import run_simulation
+run_simulation(cfg, seed=42, n_steps=150_000)
+```
+
+**Startup must include:**
+
+```text
+[JAX] git=f9bf11a (or newer)
+[JAX] signal_bottleneck=VQ | dead_code_reset=True
+[CURRICULUM] Red stages: [80, 150, 200, 250], start=80 | catch_radius=1
+[JAX] red_sense_api=v2 (observations_jax)
+```
+
+### Modal — resume (same config lineage, **no** `rmtree`)
+
+```python
+# After git sync + cfg load (same keys as above), NO shutil.rmtree
+from jax_sim.train_entry import run_simulation
+run_simulation(cfg, seed=42, n_steps=150_000)
+```
+
+Expect: `[JAX] Resuming from checkpoint step N…` — **population and curriculum restart**; only weights restore.
+
+### Backup checkpoints off Modal (laptop)
+
+```bash
+python3 -m venv ~/throng-modal-cli && ~/throng-modal-cli/bin/pip install modal
+~/throng-modal-cli/bin/modal token new   # old account
+~/throng-modal-cli/bin/modal volume get throng-runs checkpoints ~/throng_checkpoints_backup
+```
+
+New account upload: `modal volume put throng-runs ~/throng_checkpoints_backup/checkpoints /checkpoints`
+
+Repo script: `scripts/download_modal_checkpoints.sh`
+
+### Common failures (updated)
+
+| Symptom | Fix |
+|---------|-----|
+| `UnboundLocalError` on `b_params` | Pull `bd0ba2c+` |
+| `segment_sum` missing | Pull `2f32e4e+` (`jnp.bincount`) |
+| `TracerArrayConversionError` in GAE | Pull `697e96a+` |
+| `FrozenDict` / optax mismatch on update 2+ | Pull `8a6f016+` |
+| OOM ~17GB on PPO | `ppo_minibatch_size: 512`, CPU rollout offload (`8077a12+`) |
+| `codes_active=1/64` | `vq_dead_code_reset: true`; stronger `vq_beta` only if still stuck after 10k |
+| Assert `sha >= "8077a12"` | **Wrong** — git SHAs are not ordered; use file asserts (`jnp.bincount` in `network_jax.py`) |
+| Resume old soft-ecology ckpt for P4 experiment | Misleading — wipe or use only if intentional |
+
+### Corpus & decode (after run or from notebook FS)
+
+- Corpus path: `runs/jax_run/signal_corpus.jsonl` (container disk — **not** on Modal volume by default; copy off if needed).
+- Requires corpus recorded **after** lag-1 port (`0500ee8+`).
+
+```bash
+python tools/decode_signals.py runs/jax_run/signal_corpus.jsonl --k 16
+python tools/decode_signals.py runs/jax_run/signal_corpus.jsonl --min-step 25000
+```
+
+Look for **LAG-1 DIRECTION LRT** block. Scout vs blind Δ on **`red_detection_radius: 0`** runs.
+
+### What to do next (agent playbook)
+
+1. **Let current run continue** to 150k if GPU budget allows (~140k steps remaining).
+2. At **~25k / ~50k / 150k**: run `decode_signals.py`; check lag-1 LRT + token–`red_dist` MI.
+3. If still **`blue≈500`** and **`NB_GAIN: nan`** at **`red_floor=250`**: propose **P4b** (lower `min_population`, fewer shelters, stricter `curriculum_survival_threshold`, or disable distill) — do not re-tune VQ unless `codes_active` collapses.
+4. On Modal spend limit: **`modal volume get`** checkpoints before account dies; resume on new account per above.
+5. **Do not** stop early solely for high `blue_caught` — measure **population** and decode.
+
+### Distillation note (`distill_enabled: true`)
+
+Every **`distill_interval`** env steps (default **10k**), top **`distill_keep_frac`** (5%) blues by age survive; others reset. Fires as `[step 9728] DISTILL — population`. This **reshuffles** population genetics; can mask short-term survival trends. Disable in yaml for cleaner ecology experiments if needed.
+
+— *appended 2026-05-30 (third-agent onboarding + P4 run @ ~10k)*
