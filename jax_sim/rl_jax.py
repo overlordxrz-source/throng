@@ -320,44 +320,59 @@ def ppo_update(
 
 # ── Auxiliary Losses: Forward Dynamics + Self-Prediction (Phase 9.1 + 9.2) ───
 
-@functools.partial(jax.jit, static_argnames=("aux_apply_fn", "optimizer", "fwd_coef", "self_pred_coef"))
+@functools.partial(
+    jax.jit,
+    static_argnames=("aux_apply_fn", "optimizer", "fwd_coef", "carry_fwd_coef", "self_pred_coef"),
+)
 def _aux_minibatch_step(
     params, opt_state, aux_apply_fn, optimizer,
-    carry_t, action_oh, loc_env_tp1, action_tp1_oh, alive_mask,
-    fwd_coef, self_pred_coef,
+    carry_t, action_oh, loc_env_tp1, carry_tp1, action_tp1_oh, alive_mask,
+    fwd_coef, carry_fwd_coef, self_pred_coef,
 ):
     """
     Single minibatch gradient step combining:
-      - Forward dynamics loss: predict flat loc_env_{t+1} from (carry_t, action_t)
-      - Self-prediction loss:  predict action_{t+1} from carry_t
+      - Forward dynamics (loc_env): predict flat loc_env_{t+1} from (carry_t, action_t)
+      - Latent forward dynamics: predict carry_{t+1} from (carry_t, action_t)
+      - Self-prediction loss: predict action_{t+1} from carry_t
     """
     def loss_fn(p):
-        env_pred, self_pred_logits = aux_apply_fn(p, carry_t, action_oh)
+        env_pred, self_pred_logits, carry_pred = aux_apply_fn(p, carry_t, action_oh)
 
-        # Predict external world (loc_env), not latent carry — stop_gradient on target.
-        target = jax.lax.stop_gradient(loc_env_tp1)
-        fwd_err = jnp.mean(jnp.square(env_pred - target), axis=-1)       # (M,)
+        # External world target — stop_gradient on loc_env_{t+1}
+        env_target = jax.lax.stop_gradient(loc_env_tp1)
+        fwd_err = jnp.mean(jnp.square(env_pred - env_target), axis=-1)
         fwd_loss = (fwd_err * alive_mask).sum() / (alive_mask.sum() + 1e-8)
 
-        # Self-prediction cross-entropy
+        # Latent carry target — stop_gradient or network learns identity (0.9*carry_t)
+        carry_target = jax.lax.stop_gradient(carry_tp1)
+        carry_err = jnp.square(carry_pred - carry_target)
+        carry_fwd_loss = (carry_err * alive_mask[..., None]).sum() / (
+            alive_mask.sum() * carry_tp1.shape[-1] + 1e-8
+        )
+
         log_probs = jax.nn.log_softmax(self_pred_logits, axis=-1)
-        ce = -jnp.sum(action_tp1_oh * log_probs, axis=-1)                # (M,)
+        ce = -jnp.sum(action_tp1_oh * log_probs, axis=-1)
         sp_loss = (ce * alive_mask).sum() / (alive_mask.sum() + 1e-8)
 
-        total = fwd_coef * fwd_loss + self_pred_coef * sp_loss
-        return total, (fwd_loss, sp_loss, self_pred_logits)
+        total = (
+            fwd_coef * fwd_loss
+            + carry_fwd_coef * carry_fwd_loss
+            + self_pred_coef * sp_loss
+        )
+        return total, (fwd_loss, carry_fwd_loss, sp_loss, self_pred_logits)
 
-    (_, (fwd_l, sp_l, sp_logits)), grads = jax.value_and_grad(loss_fn, has_aux=True)(params)
+    (_, (fwd_l, carry_fwd_l, sp_l, sp_logits)), grads = jax.value_and_grad(
+        loss_fn, has_aux=True
+    )(params)
     updates, new_opt_state = optimizer.update(grads, opt_state, params)
     new_params = optax.apply_updates(params, updates)
 
-    # Self-prediction accuracy (random baseline = 0.20 for 5 actions)
     sp_acc = (
         (jnp.argmax(sp_logits, axis=-1) == jnp.argmax(action_tp1_oh, axis=-1)).astype(jnp.float32)
         * alive_mask
     ).sum() / (alive_mask.sum() + 1e-8)
 
-    return new_params, new_opt_state, fwd_l, sp_l, sp_acc
+    return new_params, new_opt_state, fwd_l, carry_fwd_l, sp_l, sp_acc
 
 
 def auxiliary_update(
@@ -374,19 +389,21 @@ def auxiliary_update(
     key: jax.Array = None,
     minibatch_size: int = 1024,
     fwd_coef: float = 0.05,
+    carry_fwd_coef: float = 0.05,
     self_pred_coef: float = 0.1,
-) -> Tuple[Dict, Any, float, float, float]:
+) -> Tuple[Dict, Any, float, float, float, float]:
     """
-    Compute forward dynamics + self-prediction auxiliary losses using
-    sequential (t, t+1) pairs from the rollout.
+    Compute forward dynamics + latent carry dynamics + self-prediction aux losses.
 
-    Forward dynamics target is obs[t+1, loc_env_start:loc_env_end] (flat loc_env).
+    Forward dynamics target: obs[t+1, loc_env_start:loc_env_end] (flat loc_env).
+    Carry dynamics target: carries[t+1] with stop_gradient (Phase 11 / 9.2).
 
-    Returns: (params, opt_state, avg_fwd_loss, avg_sp_loss, avg_sp_acc)
+    Returns: (params, opt_state, avg_fwd_loss, avg_carry_fwd_loss, avg_sp_loss, avg_sp_acc)
     """
     T, N, hidden_dim = carries_np.shape
 
     carry_t = carries_np[:-1].reshape((T - 1) * N, hidden_dim)
+    carry_tp1 = carries_np[1:].reshape((T - 1) * N, hidden_dim)
     action_t = actions_np[:-1].reshape((T - 1) * N)
     action_tp1 = actions_np[1:].reshape((T - 1) * N)
     loc_env_tp1 = obs_np[1:].reshape((T - 1) * N, obs_np.shape[-1])[:, loc_env_start:loc_env_end]
@@ -405,24 +422,33 @@ def auxiliary_update(
     perm = rng.permutation(M)
     n_mb = max(1, M // minibatch_size)
 
-    fwd_sum = sp_loss_sum = sp_acc_sum = 0.0
+    fwd_sum = carry_fwd_sum = sp_loss_sum = sp_acc_sum = 0.0
 
     for i in range(n_mb):
         idx = perm[i * minibatch_size : (i + 1) * minibatch_size]
-        params, opt_state, fwd_l, sp_l, sp_a = _aux_minibatch_step(
+        params, opt_state, fwd_l, carry_fwd_l, sp_l, sp_a = _aux_minibatch_step(
             params, opt_state, aux_apply_fn, optimizer,
             jnp.array(carry_t[idx]),
             jnp.array(action_oh[idx]),
             jnp.array(loc_env_tp1[idx]),
+            jnp.array(carry_tp1[idx]),
             jnp.array(action_tp1_oh[idx]),
             jnp.array(alive_t[idx]),
-            fwd_coef, self_pred_coef,
+            fwd_coef, carry_fwd_coef, self_pred_coef,
         )
-        fwd_sum      += float(fwd_l)
-        sp_loss_sum  += float(sp_l)
-        sp_acc_sum   += float(sp_a)
+        fwd_sum += float(fwd_l)
+        carry_fwd_sum += float(carry_fwd_l)
+        sp_loss_sum += float(sp_l)
+        sp_acc_sum += float(sp_a)
 
-    return params, opt_state, fwd_sum / n_mb, sp_loss_sum / n_mb, sp_acc_sum / n_mb
+    return (
+        params,
+        opt_state,
+        fwd_sum / n_mb,
+        carry_fwd_sum / n_mb,
+        sp_loss_sum / n_mb,
+        sp_acc_sum / n_mb,
+    )
 
 
 # Keep old name as alias for backward compatibility with any external callers

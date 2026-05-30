@@ -194,4 +194,7 @@ hebb_lr: 0.001
 alarm_scout_range: 8
 alarm_min_group: 20
 
+# Phase 11 staging (feature/phase11-imagination only — not on master P10.6 run)
+carry_fwd_coef: 0.05   # MSE on carry_{t+1}; target always stop_gradient
+
 exit_on_graduation: false

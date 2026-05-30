@@ -597,6 +597,10 @@ def _run_simulation_impl(
         _phase9 = "OFF — git pull required"
     print(f"[JAX] code: {_main_path}")
     print(f"[JAX] git={_git_sha} | Phase9 auxiliary: {_phase9}")
+    if hasattr(_rl_jax_mod, "auxiliary_update") and "carry_fwd_coef" in str(
+        _inspect.getsource(_rl_jax_mod.auxiliary_update)
+    ):
+        print("[JAX] Phase11 carry_fwd: head_fwd_dyn_1/2 → carry_{t+1} MSE (stop_grad target)")
     from jax_sim import observations_jax as _obs_mod
 
     _bo_path = _inspect.getfile(_obs_mod.build_observations_jax)
@@ -889,6 +893,7 @@ def _run_simulation_impl(
 
         # PPO update (not JIT — Python loop)
         _fwd_coef = float(config.get("fwd_coef", 0.05))
+        _carry_fwd_coef = float(config.get("carry_fwd_coef", 0.05))
         _fwd_mb   = int(config.get("ppo_minibatch_size", 512))
 
         if ui == start_update:
@@ -925,14 +930,16 @@ def _run_simulation_impl(
         # Auxiliary losses (forward dynamics + self-prediction) for blue
         _self_pred_coef = float(config.get("self_pred_coef", 0.1))
         fwd_key, update_key = jax.random.split(update_key)
-        b_params, b_opt_state, b_fwd_loss, b_sp_loss, b_sp_acc = auxiliary_update(
+        b_params, b_opt_state, b_fwd_loss, b_carry_fwd_loss, b_sp_loss, b_sp_acc = auxiliary_update(
             b_params, b_opt_state, b_optimizer, b_aux_apply_fn,
             _b_carries_np, _b_actions_np, _b_obs_np,
             _loc_env_start, _loc_env_end,
             _b_alive_np, fwd_key, minibatch_size=_fwd_mb,
-            fwd_coef=_fwd_coef, self_pred_coef=_self_pred_coef,
+            fwd_coef=_fwd_coef, carry_fwd_coef=_carry_fwd_coef,
+            self_pred_coef=_self_pred_coef,
         )
-        b_metrics["fwd_loss"]    = b_fwd_loss
+        b_metrics["fwd_loss"] = b_fwd_loss
+        b_metrics["carry_fwd_loss"] = b_carry_fwd_loss
         b_metrics["sp_loss"]     = b_sp_loss
         b_metrics["sp_acc"]      = b_sp_acc
 
@@ -984,14 +991,16 @@ def _run_simulation_impl(
                 flush=True,
             )
         fwd_key, update_key = jax.random.split(update_key)
-        r_params, r_opt_state, r_fwd_loss, r_sp_loss, r_sp_acc = auxiliary_update(
+        r_params, r_opt_state, r_fwd_loss, r_carry_fwd_loss, r_sp_loss, r_sp_acc = auxiliary_update(
             r_params, r_opt_state, r_optimizer, r_aux_apply_fn,
             _r_carries_np, _r_actions_np, _r_obs_np,
             _loc_env_start, _loc_env_end,
             _r_alive_np, fwd_key, minibatch_size=_fwd_mb,
-            fwd_coef=_fwd_coef, self_pred_coef=_self_pred_coef,
+            fwd_coef=_fwd_coef, carry_fwd_coef=_carry_fwd_coef,
+            self_pred_coef=_self_pred_coef,
         )
         r_metrics["fwd_loss"] = r_fwd_loss
+        r_metrics["carry_fwd_loss"] = r_carry_fwd_loss
         r_metrics["sp_acc"]   = r_sp_acc
 
         if config.get("vq_dead_code_reset", True) and "z_e" in r_batch:
@@ -1138,11 +1147,27 @@ def _run_simulation_impl(
             ent_val = float(b_metrics.get('ppo_entropy', 0)) if isinstance(b_metrics, dict) else 0
             clip_frac = float(b_metrics.get('ppo_clip_frac', 0)) if isinstance(b_metrics, dict) else 0
             fwd_loss_val = float(b_metrics.get('fwd_loss', float('nan'))) if isinstance(b_metrics, dict) else float('nan')
+            carry_fwd_val = float(b_metrics.get('carry_fwd_loss', float('nan'))) if isinstance(b_metrics, dict) else float('nan')
             sp_acc_val   = float(b_metrics.get('sp_acc',   float('nan'))) if isinstance(b_metrics, dict) else float('nan')
             vq_loss_val  = float(b_metrics.get('ppo_vq_loss', float('nan'))) if isinstance(b_metrics, dict) else float('nan')
+            _carry_last = np.asarray(rollout_data["blue"]["carries"][-1])
+            _alive_rollout = np.asarray(rollout_data["blue"]["alive"][-1]).astype(bool)
+            if _alive_rollout.sum() > 0:
+                _carry_alive = _carry_last[_alive_rollout]
+                carry_rank = int(np.linalg.matrix_rank(_carry_alive, tol=0.1))
+                carry_entropy = float(
+                    -np.sum(np.abs(_carry_alive) * np.log(np.abs(_carry_alive) + 1e-8))
+                )
+            else:
+                carry_rank = 0
+                carry_entropy = float('nan')
             print(f"  Values:  mean={val_mean:.4f} | VF_loss={vf_loss:.4f} | Clip={clip_frac:.3f}")
             print(f"  Reward:  mean={rew_mean:.4f} | Entropy: {ent_val:.4f}")
-            print(f"  AuxLoss: fwd_env={fwd_loss_val:.4f} (loc_env MSE) | self_pred_acc={sp_acc_val:.3f} (↑ from 0.20 random)")
+            print(
+                f"  AuxLoss: fwd_env={fwd_loss_val:.4f} | carry_fwd={carry_fwd_val:.4f} "
+                f"(↓0.05–0.1) | self_pred_acc={sp_acc_val:.3f} | "
+                f"carry_rank={carry_rank} | carry_H={carry_entropy:.2f}"
+            )
             blue_caught_rollout = 0
             if "blue_caught" in rollout_data["blue"]:
                 blue_caught_rollout = int(np.asarray(rollout_data["blue"]["blue_caught"]).sum())
