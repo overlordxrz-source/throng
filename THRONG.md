@@ -4,7 +4,54 @@
 
 **Read this file first.** Full historical lab notebook (~290KB) lives in [`docs/THRONG_ARCHIVE.md`](docs/THRONG_ARCHIVE.md) if you need old run logs.
 
-**Cam reboot:** Read **§0** (who you are), **§4** (live experiment), **§5b** (B200 hardware), then the full **[SYSTEM RESTORE](docs/THRONG_ARCHIVE.md#system-restore-the-cam-context)** block at the bottom of the archive.
+**Cam reboot (60 seconds):** Read **§0b** (what to do *right now*) → **§0** (who you are) → **§4** (live run) → **§11** (unlock sequence) → archive **[SYSTEM RESTORE](docs/THRONG_ARCHIVE.md#system-restore-the-cam-context)** + **[SYSTEM UPDATE](docs/THRONG_ARCHIVE.md#system-update-may-2026--b200-phase-11-staging-phase-9-canvas)**.
+
+---
+
+## 0b. Thermodynamic Wait — current state (load this first)
+
+**Phase name:** *Thermodynamic Wait* — holding pattern until **≥100k env steps** + `decode_signals.py`.
+
+| Question | Answer |
+|----------|--------|
+| **What is running?** | P10.6 on Modal **B200**, `master` only — `subprocess.Popen` → `run_bg.py` |
+| **Last known step** | **~42k** env steps @ **~6 steps/sec** (User telemetry, May 2026) |
+| **Target** | **≥100k** env steps, then decode |
+| **Corpus** | `/mnt/throng-runs/signal_corpus.jsonl` — 4-step lag, fsync each rollout |
+| **Checkpoints** | `/mnt/throng-runs/checkpoints/` — resumed Orbax ~75; weights only |
+| **Cam directive** | **Observation-only.** Do not touch `master` code. Do not merge Phase 11. |
+| **Will status** | **Dormant on `master`.** Phase 11 carry fwd **complete on feature branch** — awaiting decode unlock. |
+| **User will ping with** | Step count ≥100k + `decode_signals.py` output |
+
+### What Cam does now
+
+1. **Synergic Synthesis** updates to User — interpret Lotka-Volterra, entropy, VQ turnover as *healthy selection*.
+2. **`@Will` blocks** only if User asks for code — default message: **STANDBY, no action**.
+3. **Do not** suggest comm rewards, VQ shaping, disabling CPU offload, or merging `feature/phase11-imagination` until decode passes.
+
+### What unlocks at 100k (in order)
+
+```bash
+# On Modal after User confirms step ≥100000:
+python tools/decode_signals.py /mnt/throng-runs/signal_corpus.jsonl --k 16 --min-step <first_p10.6_step>
+```
+
+| # | Pass condition |
+|---|----------------|
+| 1 | **Scouts %** = 5–30% |
+| 2 | **LAG-1 eligible** ≥50, **p < 0.05** on flee direction |
+| 3 | **VQ TOKEN DIRECTION χ²** significant (most important) |
+
+**If pass:** User/Cam approve → merge `feature/phase11-imagination` → Phase 11.1 GPU rollouts → Phase 11.2 imagination.  
+**If fail:** ecology config tweaks only — never scout rewards.
+
+### Horcrux (context backup)
+
+Cam's persona + triad workflow live in Git so reboots recover identity:
+
+- **Horcrux** = metaphor for durable context written to repo (from *Harry Potter* — soul fragment in an object)
+- **Primary:** [`docs/THRONG_ARCHIVE.md#system-restore-the-cam-context`](docs/THRONG_ARCHIVE.md#system-restore-the-cam-context) (`6d542f6`)
+- **Supplement:** [`docs/THRONG_ARCHIVE.md#system-update-may-2026--b200-phase-11-staging-phase-9-canvas`](docs/THRONG_ARCHIVE.md#system-update-may-2026--b200-phase-11-staging-phase-9-canvas) (`d6a588d+`)
 
 ---
 
@@ -34,13 +81,25 @@
 3. **Keep the ecology mathematically pure** — no scout/alarm comm rewards, no blind VQ loss shaping. Lethal selection forges language.
 4. **Current run: observation-only on `master`** until **≥100k env steps** and decode. Stability beats speed.
 5. **Phase 11 code lives on `feature/phase11-imagination` only** — never merge to `master` mid-run.
+6. **Thermodynamic Wait:** Will is **dormant**; User pings with decode output at ≥100k — that is the only unlock.
 
 ### Branch policy (May 2026)
 
 | Branch | Purpose | Touch during P10.6? |
 |--------|---------|---------------------|
 | **`master`** | Live B200 run, P10.6 causal corpus | **NO** code changes to `network_jax.py`, `rl_jax.py`, `config_phase7.yaml` |
-| **`feature/phase11-imagination`** | Staged carry fwd dynamics + future imagination | Will develops here; User does **not** run training from this branch until post-decode merge |
+| **`feature/phase11-imagination`** | Staged carry fwd dynamics + future imagination | ✅ **Will done** (`0481445`); User does **not** train from this branch until post-decode merge |
+
+**Phase 11 already staged (feature branch only — not on `master`):**
+
+| Component | Detail |
+|-----------|--------|
+| `head_fwd_dyn_1/2` | Predict **carry_{t+1}** from `[carry_t, onehot(action_t)]` |
+| Loss | MSE with **`jax.lax.stop_gradient(carry_tp1)`** — mandatory (else learns `0.9*carry` identity) |
+| Config | `carry_fwd_coef: 0.05` (branch yaml only) |
+| Dashboard | `carry_fwd`, `carry_rank`, `carry_H` |
+| Docs | `docs/PHASE11_STAGING.md` on feature branch |
+| Success | `carry_fwd` ↓ from ~0.5 toward **0.05–0.1** over 50k–200k steps |
 
 ---
 
@@ -112,7 +171,9 @@ train_entry.run_simulation()  →  main_jax._run_simulation_impl()
 
 ## 4. Current experiment — Phase 10.6 “High-Fidelity Causal Logging” (ACTIVE)
 
-**Status (May 2026):** Live on **Modal B200** via notebook `subprocess.Popen` streaming `run_bg.py`. Resumed from Orbax **step ~75**; telemetry **~42k env steps @ ~6 steps/sec** (May 2026). Target **≥100k** before decode. **CODE FREEZE on `master`** — no changes to `network_jax.py`, `rl_jax.py`, `config_phase7.yaml`, rewards, `vq_beta`, or CPU rollout offload until decode.
+**Status:** **Thermodynamic Wait** — B200 burning steps toward **100k**. No code changes on `master`.
+
+Live on **Modal B200** via notebook `subprocess.Popen` streaming `run_bg.py`. Resumed from Orbax **step ~75**; last User telemetry **~42k env steps @ ~6 steps/sec**. **CODE FREEZE on `master`** until decode @ ≥100k.
 
 Inherits **P10.5** population ceiling; adds **volume corpus + tight lag**:
 
@@ -232,7 +293,7 @@ Pass: **Scouts % 5–30**, **LAG-1 eligible ≥50**, **VQ TOKEN DIRECTION χ²**
 | `XLA_PYTHON_CLIENT_MEM_FRACTION=0.80` | JAX **pre-reserves ~153GB** at init — mostly empty playground to avoid fragmentation. **Not model size.** |
 | `lax.scan` rollout | **~17s** on B200 (was ~37s on A100) — >2× physics speedup |
 | PPO update | Still **~40s** — bottleneck is **H2D** (see below), not tensor math |
-| Throughput | **~5 env steps/sec** overall — acceptable; stability > speed for P10.6 |
+| Throughput | **~6 steps/sec** overall — acceptable; stability > speed for P10.6 |
 
 **H2D bottleneck (`8077a12`):** Rollout tensors are **CPU-offloaded** before PPO (A100 OOM fix). Logs show `blue PPO minibatch 1/200 (M=102400, mb=512) — H2D + backward...` — data streams host→device across PCIe while B200 tensor cores wait. **Do not disable offload mid-run.** Phase 11 candidate: keep rollouts on GPU once past 100k decode.
 
@@ -399,6 +460,7 @@ python tools/decode_signals.py /mnt/throng-runs/signal_corpus.jsonl --k 16 --min
 | `6d542f6` | Cam **SYSTEM RESTORE** horcrux in archive |
 | `5c13cb4` | THRONG.md Cam reboot pack (B200, Lotka-Volterra, triad) |
 | `0481445` | **`feature/phase11-imagination`** — carry fwd dynamics (not on master) |
+| `d6a588d` | Cam reboot pack — branch policy, canvas map, archive SYSTEM UPDATE |
 
 **Do not** apply Cam's regex patch on `network_jax.py` — dead-code reset is in repo.
 
@@ -422,6 +484,15 @@ python tools/decode_signals.py /mnt/throng-runs/signal_corpus.jsonl --k 16 --min
 
 ## 11. Roadmap (what’s next)
 
+### NOW — Thermodynamic Wait (P10.6)
+
+**Cam + Will: dormant on `master`.** User runs B200; we wait for ≥100k + decode output.
+
+1. B200 continues → **≥100k env steps** (no merges, no patches).
+2. Corpus accumulates on volume with 4-step causal lag + fsync.
+3. User runs decode (see §0b) and pastes results to Cam.
+4. Healthy ecology while waiting = Lotka-Volterra (pop 170–200, catches 1800–2800, age 38–164, entropy ~1.58).
+
 ### Immediate (P10.6 — IN PROGRESS)
 
 1. **Let B200 run** to **≥100k env steps** — observation-only, no code changes.
@@ -431,7 +502,7 @@ python tools/decode_signals.py /mnt/throng-runs/signal_corpus.jsonl --k 16 --min
 
 ### Phase 11 (after decode @ 100k)
 
-**Staged on branch `feature/phase11-imagination`** (commit `0481445+`) — see [`docs/PHASE11_STAGING.md`](docs/PHASE11_STAGING.md) on that branch.
+**Staged on branch `feature/phase11-imagination`** (`0481445`) — full notes in `docs/PHASE11_STAGING.md` on that branch (checkout branch to read).
 
 | Track | Item | Notes |
 |-------|------|-------|
@@ -483,13 +554,18 @@ python tools/decode_signals.py /mnt/throng-runs/signal_corpus.jsonl --k 16 --min
 |------|--------|
 | `main.py`, `agents/network_torch.py` | PyTorch era — reference only |
 | `config.yaml`, Kaggle cells in archive | Pre-JAX |
-| [`docs/THRONG_ARCHIVE.md`](docs/THRONG_ARCHIVE.md) | Full timeline, step-by-step logs |
-| **[SYSTEM RESTORE: THE CAM CONTEXT](docs/THRONG_ARCHIVE.md#system-restore-the-cam-context)** | Persona, triad workflow, P10.6 state — load if context was reset |
+| [`docs/THRONG_ARCHIVE.md`](docs/THRONG_ARCHIVE.md) | Full timeline + horcrux + SYSTEM UPDATE |
+| **[SYSTEM RESTORE: THE CAM CONTEXT](docs/THRONG_ARCHIVE.md#system-restore-the-cam-context)** | Persona, triad, P10.6 ignition (`6d542f6`) |
+| **[SYSTEM UPDATE May 2026](docs/THRONG_ARCHIVE.md#system-update-may-2026--b200-phase-11-staging-phase-9-canvas)** | B200, Phase 11 branch, canvas map, holding pattern |
 
-**New Cam instance:** §0 → §4 → §5 B200 → §11 Phase 9 canvas map → **[SYSTEM RESTORE](docs/THRONG_ARCHIVE.md#system-restore-the-cam-context)**.
+### Cam reboot paste (give fresh Cam this)
 
-**New Will instance:** **`master` = freeze**; **`feature/phase11-imagination` = staging**; see §11 + [`docs/PHASE11_STAGING.md`](docs/PHASE11_STAGING.md) on feature branch.
+> You are **Cam**, Polymath orchestrator. Read `THRONG.md` §0b first. We are in **Thermodynamic Wait**: P10.6 on B200 ~42k→100k env steps, `master` frozen. Will staged carry fwd on `feature/phase11-imagination` (`0481445`) — **do not merge**. No comm rewards ever. User will paste `decode_signals.py` at ≥100k. Until then: Synergic Synthesis to User, `@Will` blocks say STANDBY. Horcrux: archive SYSTEM RESTORE + SYSTEM UPDATE.
+
+**New Cam instance:** §0b → §0 → §4 → §11 → archive horcrux blocks.
+
+**New Will instance:** **`master` = freeze / dormant**; **`feature/phase11-imagination` = done, no merge**; wait for decode.
 
 ---
 
-*Last updated: 2026-05-29 — P10.6 ~42k/100k on B200; Phase 11 carry fwd staged on feature branch; Cam horcrux `6d542f6`.*
+*Last updated: 2026-05-29 — Thermodynamic Wait; ~42k/100k B200; Phase 11 staged `0481445`; horcrux `6d542f6`; docs `d6a588d`.*

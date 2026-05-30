@@ -4674,17 +4674,19 @@ We are running a pristine causal dataset capture.
 
 ## Code freeze (`master`)
 
-**Do not change** until User confirms ≥100k + decode: `network_jax.py`, `rl_jax.py`, `config_phase7.yaml`, PPO offload, rewards, `vq_beta`.
+**Thermodynamic Wait (May 2026):** Cam + Will **dormant**. User runs B200 to ≥100k; User pings with `decode_signals.py` output — only unlock.
+
+**Do not change** until User confirms ≥100k + decode: `network_jax.py`, `rl_jax.py`, `config_phase7.yaml`, PPO offload, rewards, `vq_beta`. **Do not merge** `feature/phase11-imagination`.
 
 ## Phase 11 staging (`feature/phase11-imagination`)
 
-Will staged **latent carry forward dynamics** (Phase 9 canvas #1 / Cam directive):
+Will staged **latent carry forward dynamics** (Phase 9 canvas #1 / Cam directive) — **implementation complete, awaiting merge gate**:
 
 - `head_fwd_dyn_1/2` → predict **carry_{t+1}** from `[carry_t, onehot(action_t)]`
 - MSE with **`stop_gradient(carry_{t+1})`** — mandatory (carry update `0.9*carry + 0.1*pooled`)
 - Dashboard: `carry_fwd`, `carry_rank`, `carry_H`
-- Docs: `docs/PHASE11_STAGING.md` on feature branch (commit `0481445+`)
-- **Not merged to master** until P10.6 decode passes
+- Docs: `docs/PHASE11_STAGING.md` on feature branch (commit `0481445`)
+- **Not merged to master** until P10.6 decode passes; Will dormant on master
 
 ## Phase 9 Research Canvas (User doc) — quick map
 
