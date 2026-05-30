@@ -444,6 +444,19 @@ def _run_simulation_impl(
     """
     config = _normalize_config(config)
 
+    # Persistent JAX cache on a network volume (Modal) deserializes slowly and often
+    # looks like a hang → spurious KeyboardInterrupt when the notebook times out.
+    _jax_cache = os.environ.get("JAX_COMPILATION_CACHE_DIR", "")
+    if _jax_cache.startswith("/mnt"):
+        _local_cache = "/tmp/throng_jax_cache"
+        os.makedirs(_local_cache, exist_ok=True)
+        os.environ["JAX_COMPILATION_CACHE_DIR"] = _local_cache
+        print(
+            f"[JAX] Using local compilation cache {_local_cache} "
+            f"(skipped volume path {_jax_cache})",
+            flush=True,
+        )
+
     run_name = config.get("run_name", "jax_run")
     os.makedirs(f"runs/{run_name}", exist_ok=True)
     
@@ -874,6 +887,12 @@ def _run_simulation_impl(
         _fwd_coef = float(config.get("fwd_coef", 0.05))
         _fwd_mb   = int(config.get("ppo_minibatch_size", 512))
 
+        if ui == start_update:
+            print(
+                "  [JAX] Compiling Blue PPO backward (_minibatch_step) — "
+                "often 3–10+ min on first update; do not Stop.",
+                flush=True,
+            )
         print("  [DEBUG] --- Blue PPO Update ---")
         b_batch = rollout_data["blue"]
         # Save carries on CPU before ppo_update deletes them (needed for fwd dynamics)
@@ -881,6 +900,7 @@ def _run_simulation_impl(
         _b_actions_np = np.asarray(b_batch["actions"])
         _b_obs_np = np.asarray(b_batch["obs"])
         _b_alive_np   = np.asarray(b_batch["alive"]) if "alive" in b_batch else None
+        _t_ppo0 = __import__("time").time()
         b_params, b_opt_state, b_metrics = ppo_update(
             b_params, b_opt_state, b_optimizer, model_apply,
             b_batch, n_layers, update_key,
@@ -892,6 +912,11 @@ def _run_simulation_impl(
             gamma=float(config.get("ppo_gamma", 0.99)),
             lam=float(config.get("ppo_gae_lam", 0.95)),
         )
+        if ui == start_update:
+            print(
+                f"  [JAX] Blue PPO done in {__import__('time').time() - _t_ppo0:.1f}s",
+                flush=True,
+            )
         # Auxiliary losses (forward dynamics + self-prediction) for blue
         _self_pred_coef = float(config.get("self_pred_coef", 0.1))
         fwd_key, update_key = jax.random.split(update_key)
