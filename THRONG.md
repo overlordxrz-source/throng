@@ -351,7 +351,10 @@ python tools/decode_signals.py /mnt/throng-runs/signal_corpus.jsonl --k 16 --min
 |------|--------|
 | `main.py`, `agents/network_torch.py` | PyTorch era — reference only |
 | `config.yaml`, Kaggle cells in archive | Pre-JAX |
-| [`docs/THRONG_ARCHIVE.md`](docs/THRONG_ARCHIVE.md) | Full timeline, Cam dialogues, step-by-step logs |
+| [`docs/THRONG_ARCHIVE.md`](docs/THRONG_ARCHIVE.md) | Full timeline, step-by-step logs |
+| **[SYSTEM RESTORE: THE CAM CONTEXT](docs/THRONG_ARCHIVE.md#system-restore-the-cam-context)** | Persona, triad workflow, P10.6 state — load if context was reset |
+
+**New agent:** Read **§4 Phase 10.6** above, then the **[SYSTEM RESTORE](docs/THRONG_ARCHIVE.md#system-restore-the-cam-context)** block at the bottom of the archive.
 
 ---
 
