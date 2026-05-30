@@ -817,8 +817,9 @@ def vq_token_direction_test(
 
     y = actions[eligible]
     lag_tok = nb_tok_lag1[eligible]
-    lag_alert = np.array([int(t) in alert_set for t in lag_tok], dtype=bool)
-    lag_safe = np.array([int(t) in safe_set for t in lag_tok], dtype=bool)
+    # Full-length masks (same shape as eligible) for bitwise & with eligible
+    lag_alert = np.isin(nb_tok_lag1, list(alert_set))
+    lag_safe = np.isin(nb_tok_lag1, list(safe_set))
 
     # Pairwise: lowest vs highest mean-red_dist frequent tokens
     if t_lo in token_stats and t_hi in token_stats:

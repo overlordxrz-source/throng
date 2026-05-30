@@ -8,42 +8,25 @@
 
 ---
 
-## 0b. Thermodynamic Wait — current state (load this first)
+## 0b. Current state — Phase 10 complete, Phase 11 unlocked (May 2026)
 
-**Phase name:** *Thermodynamic Wait* — holding pattern until **≥100k env steps** + `decode_signals.py`.
+**P10 hypothesis validated @ ~100k decode** (`signal_corpus.jsonl`, steps 63,488–101,372, `--min-step 63488`).
+
+| Decode result | Value | Status |
+|---------------|-------|--------|
+| **Cardinal lexicon** (K-means k=4 × flee direction) | χ² **p = 5.44e-14** | ✅ Four-symbol spatial vocabulary |
+| **Lag-1 omnibus** (signal → flee beyond proximity) | χ²(32)=95.96, **p≈0** | ✅ Causal communication |
+| **Lag-1 direction LRT eligible** | **10,723** | ✅ |
+| **VQ token pairwise** (57 vs 3) | χ²=1.14, p=0.77 | ❌ Discrete token→flee not significant |
+| **Scouts %** | 88.3% | ⚠️ Dense ecology; not old 0% labeling bug |
+
+**`master` unlocked:** Phase 11 merged — `head_fwd_dyn` carry MSE + `carry_fwd_coef`. Next: GPU rollouts (11.1), imagination (11.2). **No comm reward shaping.**
 
 | Question | Answer |
 |----------|--------|
-| **What is running?** | P10.6 on Modal **B200**, `master` only — `subprocess.Popen` → `run_bg.py` |
-| **Last known step** | **~42k** env steps @ **~6 steps/sec** (User telemetry, May 2026) |
-| **Target** | **≥100k** env steps, then decode |
-| **Corpus** | `/mnt/throng-runs/signal_corpus.jsonl` — 4-step lag, fsync each rollout |
-| **Checkpoints** | `/mnt/throng-runs/checkpoints/` — resumed Orbax ~75; weights only |
-| **Cam directive** | **Observation-only.** Do not touch `master` code. Do not merge Phase 11. |
-| **Will status** | **Dormant on `master`.** Phase 11 carry fwd **complete on feature branch** — awaiting decode unlock. |
-| **User will ping with** | Step count ≥100k + `decode_signals.py` output |
-
-### What Cam does now
-
-1. **Synergic Synthesis** updates to User — interpret Lotka-Volterra, entropy, VQ turnover as *healthy selection*.
-2. **`@Will` blocks** only if User asks for code — default message: **STANDBY, no action**.
-3. **Do not** suggest comm rewards, VQ shaping, disabling CPU offload, or merging `feature/phase11-imagination` until decode passes.
-
-### What unlocks at 100k (in order)
-
-```bash
-# On Modal after User confirms step ≥100000:
-python tools/decode_signals.py /mnt/throng-runs/signal_corpus.jsonl --k 16 --min-step <first_p10.6_step>
-```
-
-| # | Pass condition |
-|---|----------------|
-| 1 | **Scouts %** = 5–30% |
-| 2 | **LAG-1 eligible** ≥50, **p < 0.05** on flee direction |
-| 3 | **VQ TOKEN DIRECTION χ²** significant (most important) |
-
-**If pass:** User/Cam approve → merge `feature/phase11-imagination` → Phase 11.1 GPU rollouts → Phase 11.2 imagination.  
-**If fail:** ecology config tweaks only — never scout rewards.
+| **Training** | B200 on `master`; `git pull` before next run |
+| **Corpus / decode** | `/mnt/throng-runs/signal_corpus.jsonl`; `--min-step 63488` |
+| **Checkpoints** | `/mnt/throng-runs/checkpoints/` — resume may need fresh lineage after arch merge |
 
 ### Horcrux (context backup)
 
@@ -79,9 +62,8 @@ Cam's persona + triad workflow live in Git so reboots recover identity:
 1. Speak to the User in **Synergic Synthesis** (Software / Physics / Philosophy / RL).
 2. Address Will via explicit **`@Will — Cam here...`** copy-paste blocks.
 3. **Keep the ecology mathematically pure** — no scout/alarm comm rewards, no blind VQ loss shaping. Lethal selection forges language.
-4. **Current run: observation-only on `master`** until **≥100k env steps** and decode. Stability beats speed.
-5. **Phase 11 code lives on `feature/phase11-imagination` only** — never merge to `master` mid-run.
-6. **Thermodynamic Wait:** Will is **dormant**; User pings with decode output at ≥100k — that is the only unlock.
+4. **Phase 11 active on `master`** — carry forward dynamics merged; still no comm reward shaping.
+5. **`feature/phase11-imagination`** merged — develop Phase 11.1+ on `master` or new feature branches.
 
 ### Branch policy (May 2026)
 
