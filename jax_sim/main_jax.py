@@ -911,6 +911,7 @@ def _run_simulation_impl(
             minibatch_size=_fwd_mb,
             gamma=float(config.get("ppo_gamma", 0.99)),
             lam=float(config.get("ppo_gae_lam", 0.95)),
+            team="blue",
         )
         if ui == start_update:
             print(
@@ -944,12 +945,23 @@ def _run_simulation_impl(
                 _dc_key,
             )
 
+        if ui == start_update:
+            import gc as _gc
+            del _b_carries_np, _b_actions_np, _b_obs_np, _b_alive_np
+            _gc.collect()
+            print(
+                "  [JAX] Blue aux + VQ reset done — Red PPO next "
+                "(may compile ~3–10 min on first update; do not Stop).",
+                flush=True,
+            )
+
         print("  [DEBUG] --- Red PPO Update ---")
         r_batch = rollout_data["red"]
         _r_carries_np = np.asarray(r_batch["carries"])
         _r_actions_np = np.asarray(r_batch["actions"])
         _r_obs_np = np.asarray(r_batch["obs"])
         _r_alive_np   = np.asarray(r_batch["alive"]) if "alive" in r_batch else None
+        _t_rppo0 = __import__("time").time()
         r_params, r_opt_state, r_metrics = ppo_update(
             r_params, r_opt_state, r_optimizer, model_apply,
             r_batch, n_layers, update_key,
@@ -960,7 +972,13 @@ def _run_simulation_impl(
             minibatch_size=_fwd_mb,
             gamma=float(config.get("ppo_gamma", 0.99)),
             lam=float(config.get("ppo_gae_lam", 0.95)),
+            team="red",
         )
+        if ui == start_update:
+            print(
+                f"  [JAX] Red PPO done in {__import__('time').time() - _t_rppo0:.1f}s",
+                flush=True,
+            )
         fwd_key, update_key = jax.random.split(update_key)
         r_params, r_opt_state, r_fwd_loss, r_sp_loss, r_sp_acc = auxiliary_update(
             r_params, r_opt_state, r_optimizer, r_aux_apply_fn,

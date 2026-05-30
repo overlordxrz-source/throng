@@ -203,6 +203,7 @@ def ppo_update(
     minibatch_size: int = 512,
     gamma: float = 0.99,
     lam: float = 0.95,
+    team: str = "blue",
 ) -> Tuple[Dict, Any, Dict]:
     """
     Single gradient update step using minibatches.
@@ -266,6 +267,13 @@ def ppo_update(
 
     for i in range(n_minibatches):
         idx = perm[i * minibatch_size : (i + 1) * minibatch_size]
+
+        if i == 0:
+            print(
+                f"  [JAX] {team} PPO minibatch 1/{n_minibatches} "
+                f"(M={M}, mb={minibatch_size}) — H2D + backward...",
+                flush=True,
+            )
 
         # Transfer just this minibatch to GPU
         mb_obs = jnp.array(flat_obs[idx])
