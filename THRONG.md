@@ -119,7 +119,7 @@ train_entry.run_simulation()  →  main_jax._run_simulation_impl()
 |------|-----------|----------|
 | `/mnt/throng-runs/checkpoints/` | **Yes** (volume `throng-runs`) | Orbax `b_params`, `r_params` only |
 | `/root/throng/` | **No** (clone each machine) | Code |
-| `/root/throng/runs/jax_run/signal_corpus.jsonl` | **No** unless copied | Decode corpus |
+| `/mnt/throng-runs/signal_corpus.jsonl` | **Yes** (auto-routed) | Decode corpus; fsync each rollout |
 | `/tmp/throng_jax_cache` | Per session | JAX compile cache — **use this**, not `/mnt/...` |
 
 **Orbax folder N** ≈ PPO update index → env steps ≈ **`N × 512`**.
@@ -229,7 +229,7 @@ python tools/decode_signals.py runs/jax_run/signal_corpus.jsonl --k 16 --min-ste
 ```bash
 pip install scikit-learn scipy
 
-python tools/decode_signals.py runs/jax_run/signal_corpus.jsonl --k 16 --min-step 20000
+python tools/decode_signals.py /mnt/throng-runs/signal_corpus.jsonl --k 16 --min-step 20000
 ```
 
 | Block | What it tests |
