@@ -4,6 +4,36 @@
 
 **Read this file first.** Full historical lab notebook (~290KB) lives in [`docs/THRONG_ARCHIVE.md`](docs/THRONG_ARCHIVE.md) if you need old run logs.
 
+**Cam reboot:** Read **§0** (who you are), **§4** (live experiment), **§5b** (B200 hardware), then the full **[SYSTEM RESTORE](docs/THRONG_ARCHIVE.md#system-restore-the-cam-context)** block at the bottom of the archive.
+
+---
+
+## 0. Team, roles, and standing directives (Cam)
+
+### The triad
+
+| Entity | Role |
+|--------|------|
+| **User (Human Operator)** | Runs code on Modal, manages Jupyter, passes messages between Cam and Will, physical control of the experiment |
+| **Will (Cursor agent)** | Reads/writes the repo, patches code, verifies facts, pushes Git. Precise engineer; needs Cam for architecture and physics |
+| **Cam (You)** | Polymath orchestrator — software, physics, philosophy, RL/ML. Synthesizes direction; User copy-pastes **`@Will — Cam here...`** blocks to Will |
+
+### Who Cam is
+
+**Cam, the Polymath AI Orchestrator** — four lenses on every decision:
+
+1. **Software:** fault-tolerant JAX pipelines, Modal/volume ops, causal logging
+2. **Physics:** grid as thermodynamic system — light-cones (max speed 1 cell/step), Lotka-Volterra ecology, entropy
+3. **Philosophy:** emergent language — *meaning is use*; selection, not reward shaping, defines symbols
+4. **RL/ML:** MAPPO, VQ bottlenecks, GAE, policy entropy, auxiliary self-prediction
+
+### Standing directives (do not violate mid-run)
+
+1. Speak to the User in **Synergic Synthesis** (Software / Physics / Philosophy / RL).
+2. Address Will via explicit **`@Will — Cam here...`** copy-paste blocks.
+3. **Keep the ecology mathematically pure** — no scout/alarm comm rewards, no blind VQ loss shaping. Lethal selection forges language.
+4. **Current run: observation-only** until **≥100k env steps** and decode. Stability beats speed.
+
 ---
 
 ## 1. What this project is
@@ -63,7 +93,8 @@ train_entry.run_simulation()  →  main_jax._run_simulation_impl()
 | **10.2** | Metabolic squeeze | `repro_energy_thresh: 0.95`, `repro_energy_cost: 0.80` | Harder cloning |
 | **10.3** | Famine | `resource_regen_rate: 0.00025`, 10 patches, `resource_max: 0.5` | Pop crash events (500→147) |
 | **10.4** | Safety bubble | `red_catch_prob: 0.8`, regen +20%, `max_age: 1000` | Longer lives for NB_GAIN |
-| **10.5** | **Hard ceiling** ← **NOW** | `max_pop: 200`, `min_pop: 150`, `ppo_gamma: 0.999` | Goldilocks band; less entropy explosion |
+| **10.5** | Hard ceiling | `max_pop: 200`, `min_pop: 150`, `ppo_gamma: 0.999` | Goldilocks band; less entropy explosion |
+| **10.6** | **Causal logging** ← **NOW** | `corpus_every_n_steps: 4`, volume corpus + fsync | 4-step lag isolates neighbor flee *before* predator arrives |
 
 **Recurring failure mode:** Blues stay at cap → ~99% survival → **`NB_GAIN↔surv: nan`** → no evolutionary pressure on neighbor-signal benefit.
 
@@ -73,7 +104,7 @@ train_entry.run_simulation()  →  main_jax._run_simulation_impl()
 
 ## 4. Current experiment — Phase 10.6 “High-Fidelity Causal Logging” (ACTIVE)
 
-**Status (Cam, May 2026):** Live run via notebook `subprocess.Popen` streaming `run_bg.py` (Modal rejects `nohup`). **STANDBY** — no changes to `network_jax.py`, `rl_jax.py`, rewards, or `vq_beta` until decode @ 50k–100k.
+**Status (May 2026):** Live on **Modal B200** via notebook `subprocess.Popen` streaming `run_bg.py`. Resumed from Orbax **step ~75** (~38k env steps); target **≥100k** before decode. **CODE FREEZE** — no changes to `network_jax.py`, `rl_jax.py`, `config_phase7.yaml`, rewards, `vq_beta`, or CPU rollout offload until decode.
 
 Inherits **P10.5** population ceiling; adds **volume corpus + tight lag**:
 
@@ -81,14 +112,52 @@ Inherits **P10.5** population ceiling; adds **volume corpus + tight lag**:
 |-----------|--------|
 | `corpus_every_n_steps` | **4** (was 20) — lag-1 scout buffer ≈ 4 env steps |
 | `corpus_sample_frac` | **0.15** (was 0.08) |
-| Corpus path | **`/mnt/throng-runs/signal_corpus.jsonl`** (auto) |
+| Corpus path | **`/mnt/throng-runs/signal_corpus.jsonl`** (auto-routed) |
 | Durability | **`flush_to_disk()`** (fsync) each PPO rollout |
 | Scout label | `red_dist <= alarm_scout_range` (**8**) |
+| Checkpoints | `/mnt/throng-runs/checkpoints/` — resume keeps weights; pop/grid fresh |
 | Archive | Pre-10.6 file → `signal_corpus_20step_archive.jsonl` on volume |
 
-**Decode target:** `python tools/decode_signals.py /mnt/throng-runs/signal_corpus.jsonl --k 16` — watch **Scouts %**, **LAG-1 eligible ≥50**, **VQ TOKEN DIRECTION χ²**.
+**Causal light-cone (Cam):** Max agent speed = 1 cell/step, `alarm_scout_range` = 8. Sampling every **4** env steps captures the neighbor's flee decision shift *before* the predator physically arrives — isolates semantic meaning from co-location noise.
 
-**Notebook pattern:** `Popen(["python","-u","/root/throng/run_bg.py"])` + stream stdout; `SIGTERM` on Stop (last completed rollout should be fsync’d; mid-rollout stop may lose partial update).
+### What healthy telemetry looks like (verified ~35k–39k)
+
+The system should **breathe** — this is selection working, not a bug.
+
+**Lotka-Volterra oscillator** (bounded by `max_pop=200`, `min_pop=150`):
+
+| Phase | Example | Meaning |
+|-------|---------|---------|
+| Ceiling | `blue=200`, Age mean ~150–164 | Pop at cap, agents aging |
+| Crash | `blue=170`, Age mean ~38–57, `blue_caught` ~2800 | Mass extinction — only good escape policies survive |
+| Rebound | `blue=200`, Age mean ~147–164, catches ~1800 | Cloning from floor refills pop |
+
+Example swing: step 38912 → 2876 catches, age 51; step 39424 → 1812 catches, age 164.
+
+**RL diagnostics (good signs):**
+
+| Metric | Healthy range | Interpretation |
+|--------|---------------|----------------|
+| Policy entropy | **~1.58** (max ln(5) ≈ **1.61**) | Highly stochastic — still exploring evasion, not collapsed |
+| `self_pred_acc` | **~0.25** (chance 0.20) | Self-prediction head building internal forward model |
+| `codes_active` | **56–63/64** | Dead-code reset + generational turnover — "semantic furnace" |
+| `VF_loss` | tracks swings | Critic learning safe vs extinction zones (returns std ~3.5) |
+| `NB_GAIN↔surv` | finite when deaths occur | May still be `nan` at ceiling — watch during crash phases |
+
+**Decode @ ≥100k:**
+
+```bash
+python tools/decode_signals.py /mnt/throng-runs/signal_corpus.jsonl --k 16 --min-step <first_step_in_p10.6_file>
+```
+
+Pass: **Scouts % 5–30**, **LAG-1 eligible ≥50**, **VQ TOKEN DIRECTION χ²** significant.
+
+**Notebook pattern (Modal Jupyter — nohup rejected):**
+
+```python
+# Popen(["python","-u","/root/throng/run_bg.py"]) — stream stdout
+# KeyboardInterrupt → SIGTERM child; corpus fsync'd each completed PPO rollout
+```
 
 ---
 
@@ -147,9 +216,23 @@ Inherits **P10.5** population ceiling; adds **volume corpus + tight lag**:
 
 **Resume restores:** weights only. Population, grid, curriculum counters, optimizer → **fresh**.
 
-### Recommended: train with nohup (not long notebook cells)
+### Hardware: Blackwell B200 (current)
 
-Notebooks often die with **`KeyboardInterrupt`** during silent JAX compile (cell timeout) — **you did not necessarily press a key**.
+| Item | Detail |
+|------|--------|
+| VRAM | **192GB HBM3** |
+| `XLA_PYTHON_CLIENT_MEM_FRACTION=0.80` | JAX **pre-reserves ~153GB** at init — mostly empty playground to avoid fragmentation. **Not model size.** |
+| `lax.scan` rollout | **~17s** on B200 (was ~37s on A100) — >2× physics speedup |
+| PPO update | Still **~40s** — bottleneck is **H2D** (see below), not tensor math |
+| Throughput | **~5 env steps/sec** overall — acceptable; stability > speed for P10.6 |
+
+**H2D bottleneck (`8077a12`):** Rollout tensors are **CPU-offloaded** before PPO (A100 OOM fix). Logs show `blue PPO minibatch 1/200 (M=102400, mb=512) — H2D + backward...` — data streams host→device across PCIe while B200 tensor cores wait. **Do not disable offload mid-run.** Phase 11 candidate: keep rollouts on GPU once past 100k decode.
+
+### Recommended: train without dying notebook cells
+
+Notebooks often die with **`KeyboardInterrupt`** during silent JAX compile (cell timeout) — **you did not necessarily press a key**. Modal Jupyter **rejects `nohup`** — use **`subprocess.Popen`** streaming `run_bg.py` instead.
+
+**Bash / SSH (nohup OK):**
 
 ```bash
 cd /root/throng 2>/dev/null || git clone https://github.com/overlordxrz-source/throng.git /root/throng
@@ -163,7 +246,7 @@ nohup python -u /root/throng/run_bg.py > /mnt/throng-runs/train.log 2>&1 &
 tail -f /mnt/throng-runs/train.log
 ```
 
-`Ctrl+C` on `tail` does **not** stop training. Check: `ps aux | grep modal_train`.
+`Ctrl+C` on `tail` does **not** stop training. Check: `ps aux | grep run_bg`.
 
 ### Notebook setup only (decode, short tasks)
 
@@ -184,6 +267,8 @@ Must appear early in log:
 ```text
 [JAX] red_sense_api=v2 (observations_jax)
 [JAX] signal_bottleneck=VQ | dead_code_reset=True
+[JAX] corpus scout label: is_scout = (red_dist <= alarm_scout_range=8)
+Corpus persistence: /mnt/throng-runs/signal_corpus.jsonl
 [CURRICULUM] ... catch_radius=1 | catch_prob=0.8
 [JAX] Restored params from step N   # if resuming
 ```
@@ -297,6 +382,11 @@ python tools/decode_signals.py /mnt/throng-runs/signal_corpus.jsonl --k 16 --min
 | `0d5f88a` | P10.4 safety bubble |
 | `63d6f37` | P10.5 hard ceiling |
 | `5964a24` | Corpus scout=alarm range; `vq_token` logging |
+| `364d451` | `train_entry` evicts stale `communication.*` |
+| `3b57770` | Corpus auto-route to volume; fsync each PPO update |
+| `c2fa99a` | `corpus_every_n_steps: 4`, `corpus_sample_frac: 0.15` |
+| `1a0dcf7` | THRONG.md rewrite; archive split → `docs/THRONG_ARCHIVE.md` |
+| `6d542f6` | Cam **SYSTEM RESTORE** horcrux in archive |
 
 **Do not** apply Cam's regex patch on `network_jax.py` — dead-code reset is in repo.
 
@@ -306,7 +396,9 @@ python tools/decode_signals.py /mnt/throng-runs/signal_corpus.jsonl --k 16 --min
 
 | Symptom | Fix |
 |---------|-----|
-| `KeyboardInterrupt` mid-compile | Use **nohup**; wait 5–15+ min; don't use volume JAX cache |
+| `KeyboardInterrupt` mid-compile | **subprocess Popen** (Jupyter) or **nohup** (bash); wait 5–15+ min; don't use volume JAX cache |
+| B200 shows ~150GB VRAM used | Normal — `MEM_FRACTION=0.80` pre-allocation, not OOM |
+| Slow PPO on B200 despite fast scan | Expected — **CPU rollout offload → H2D** (`8077a12`); fix in Phase 11 |
 | `/root/throng` missing | Clone repo (Cell 1 or bash) |
 | No `red_sense_api=v2` | `git reset --hard origin/master` + `train_entry` |
 | OOM on PPO | `ppo_minibatch_size: 512`, `XLA_PYTHON_CLIENT_MEM_FRACTION=0.80` |
@@ -318,29 +410,33 @@ python tools/decode_signals.py /mnt/throng-runs/signal_corpus.jsonl --k 16 --min
 
 ## 11. Roadmap (what’s next)
 
-### Immediate
+### Immediate (P10.6 — IN PROGRESS)
 
-1. **Train** P10.5 to **50k–150k** env steps via **nohup**; keep checkpoints on volume.
-2. **Persist corpus** to `/mnt/throng-runs/signal_corpus.jsonl`.
-3. **Decode** at 25k / 50k / 100k with `--min-step` — confirm scouts %, lag-1 LRT, **VQ token direction χ²**.
-4. Watch **`Age: mean → 150+`** and **`NB_GAIN↔surv` finite**.
+1. **Let B200 run** to **≥100k env steps** — observation-only, no code changes.
+2. Corpus already on **`/mnt/throng-runs/signal_corpus.jsonl`** with 4-step causal lag + fsync.
+3. **Decode @ 100k** — scouts %, lag-1 LRT, **VQ token direction χ²** (see §6).
+4. Healthy ecology = **Lotka-Volterra swings** (pop 170–200, catches 1800–2800, age 38–164).
 
-### If still `blue≈200` + `nan` NB_GAIN at 100k+
+### Phase 11 (after decode @ 100k)
 
-- Tighten ecology further (fewer shelters, lower `min_population`, lower `red_catch_prob`, starvation) — **config only**, not reward hacks.
-- Consider logging **token_ids** into dashboard histograms (already in corpus).
+- **GPU-resident rollouts** — disable CPU offload on B200; expect **15+ steps/sec** (Cam estimate).
+- Ecology tweaks only if decode fails — **config only**, never comm reward hacks.
+
+### If decode fails at 100k
+
+- Tighten ecology (fewer shelters, lower `min_population`, lower `red_catch_prob`) — config only.
+- Do **not** add scout rewards or shape VQ loss.
 
 ### Medium term (science)
 
 - **Phase 9.4** — neighbor signal attention (if VQ vocabulary stabilizes).
-- **Dreamer / 9.3** — only if aux ablations show signals carry usable info.
 - Prove **directional** alarm: lag-1 LRT + VQ token flee χ² **same sign** across seeds.
 
 ### Explicit non-goals
 
 - ❌ Scout / alarm **reward shaping**
 - ❌ ToM reward for communication
-- ❌ Long `run_simulation()` in notebook without nohup
+- ❌ Disabling CPU offload **during** P10.6 run
 - ❌ Wiping checkpoints unless new experiment lineage
 
 ---
@@ -354,8 +450,10 @@ python tools/decode_signals.py /mnt/throng-runs/signal_corpus.jsonl --k 16 --min
 | [`docs/THRONG_ARCHIVE.md`](docs/THRONG_ARCHIVE.md) | Full timeline, step-by-step logs |
 | **[SYSTEM RESTORE: THE CAM CONTEXT](docs/THRONG_ARCHIVE.md#system-restore-the-cam-context)** | Persona, triad workflow, P10.6 state — load if context was reset |
 
-**New agent:** Read **§4 Phase 10.6** above, then the **[SYSTEM RESTORE](docs/THRONG_ARCHIVE.md#system-restore-the-cam-context)** block at the bottom of the archive.
+**New Cam instance:** §0 → §4 → §5 B200 → **[SYSTEM RESTORE](docs/THRONG_ARCHIVE.md#system-restore-the-cam-context)** in archive.
+
+**New Will instance:** §4 code freeze + §5 H2D bottleneck + §6 decode criteria.
 
 ---
 
-*Last updated: 2026-05-29 — Phase 10.5 Hard-Ceiling, corpus scout/VQ fix `5964a24`.*
+*Last updated: 2026-05-29 — Phase 10.6 on B200 (~39k→100k), Cam horcrux `6d542f6`, Lotka-Volterra + H2D docs.*
