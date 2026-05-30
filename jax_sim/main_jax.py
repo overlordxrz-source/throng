@@ -814,9 +814,9 @@ def _run_simulation_impl(
     _lag1_scout_pos = None
     _lag1_scout_sig = None
     _lag1_scout_dist = None
+    _lag1_scout_tok = None
     _alarm_range = float(config.get("alarm_scout_range", 8))
     _corpus_sig_dim = int(config["signal_dim"])
-    _corpus_det_r = int(config.get("red_detection_radius", 0))
     for ui in range(start_update, n_updates):
         update_key = update_keys[ui]
         step_keys = jax.random.split(update_key, T)
@@ -1238,6 +1238,7 @@ def _run_simulation_impl(
         # ── Corpus Writing (CPU) ───────────────────────────────
         b_pos_all = np.array(rollout_data["blue"]["positions"])
         b_sig_all = np.array(rollout_data["blue"]["signals"])
+        b_tok_all = np.array(rollout_data["blue"]["token_ids"])
         b_act_all = np.array(rollout_data["blue"]["actions"])
         b_alive_all = np.array(rollout_data["blue"]["alive"])
         b_energy_all = np.array(rollout_data["blue"]["energy"])
@@ -1284,7 +1285,8 @@ def _run_simulation_impl(
                 
                 min_idx = np.argmin(dists, axis=1)
                 red_dist = dists[np.arange(n_alive), min_idx]
-                is_scout = red_dist <= _corpus_det_r
+                # Corpus scout = red within alarm range (not red_detection_radius, which is 0 when blind)
+                is_scout = red_dist <= _alarm_range
                 
                 # Bearing (simple dy/dx)
                 nearest_red_pos = pos_r_active[min_idx]
@@ -1309,6 +1311,7 @@ def _run_simulation_impl(
 
             nb_scout_lag1 = np.full((n_alive, _corpus_sig_dim), np.nan, dtype=np.float32)
             nb_scout_dist_lag1 = np.full(n_alive, np.nan, dtype=np.float32)
+            nb_scout_token_lag1 = np.full(n_alive, -1, dtype=np.int32)
             if _lag1_scout_pos is not None and len(_lag1_scout_pos) > 0:
                 gs_val = int(config["grid_size"])
                 pos_b_alive = b_pos[alive_idx].astype(np.float32)
@@ -1321,11 +1324,14 @@ def _run_simulation_impl(
                     if within.any():
                         nb_scout_lag1[ai] = _lag1_scout_sig[within].mean(axis=0)
                         nb_scout_dist_lag1[ai] = float(_lag1_scout_dist[within].mean())
+                        toks = _lag1_scout_tok[within].astype(np.int64)
+                        nb_scout_token_lag1[ai] = int(np.bincount(toks).argmax())
 
             corpus_writer.maybe_record(
                 step=global_step,
                 alive_idx=alive_idx,
                 signals=b_sig_all[t],
+                token_ids=b_tok_all[t],
                 actions=b_act_all[t],
                 is_scout=is_scout,
                 nearest_red_dist=red_dist,
@@ -1335,16 +1341,19 @@ def _run_simulation_impl(
                 neighbor_count=nb_count,
                 nb_scout_sig_lag1=nb_scout_lag1,
                 nb_scout_dist_lag1=nb_scout_dist_lag1,
+                nb_scout_token_lag1=nb_scout_token_lag1,
             )
             if is_scout.any():
                 pos_b_alive = b_pos[alive_idx].astype(np.float32)
                 _lag1_scout_pos = pos_b_alive[is_scout].copy()
                 _lag1_scout_sig = b_sig_all[t, alive_idx[is_scout]].copy()
                 _lag1_scout_dist = red_dist[is_scout].copy()
+                _lag1_scout_tok = b_tok_all[t, alive_idx[is_scout]].copy()
             else:
                 _lag1_scout_pos = None
                 _lag1_scout_sig = None
                 _lag1_scout_dist = None
+                _lag1_scout_tok = None
 
         # Convert metrics to Python floats for logging (skip non-scalars)
         metrics_py = {}

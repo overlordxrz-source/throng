@@ -351,8 +351,10 @@ class SignalCorpusWriter:
         local_resource:    np.ndarray,
         own_energy:        np.ndarray,
         neighbor_count:    np.ndarray,
+        token_ids:         Optional[np.ndarray] = None,
         nb_scout_sig_lag1:  Optional[np.ndarray] = None,
         nb_scout_dist_lag1: Optional[np.ndarray] = None,
+        nb_scout_token_lag1: Optional[np.ndarray] = None,
     ) -> None:
         """Write sampled records; no-op if called more often than every_n_steps.
 
@@ -384,6 +386,8 @@ class SignalCorpusWriter:
                 "energy":    round(float(own_energy[i]), 4),
                 "neighbors": round(float(neighbor_count[i]), 4),
             }
+            if token_ids is not None:
+                rec["vq_token"] = int(token_ids[idx])
             if nb_scout_sig_lag1 is not None:
                 row = nb_scout_sig_lag1[i]
                 rec["nb_scout_sig_lag1"] = (
@@ -393,6 +397,9 @@ class SignalCorpusWriter:
             if nb_scout_dist_lag1 is not None:
                 d = float(nb_scout_dist_lag1[i])
                 rec["nb_scout_dist_lag1"] = None if not np.isfinite(d) else round(d, 3)
+            if nb_scout_token_lag1 is not None:
+                tok = int(nb_scout_token_lag1[i])
+                rec["nb_scout_token_lag1"] = None if tok < 0 else tok
             lines.append(json.dumps(rec))
         self._fh.write("\n".join(lines) + "\n")
 

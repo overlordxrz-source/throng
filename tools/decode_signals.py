@@ -91,6 +91,19 @@ def load_corpus(path: str) -> dict:
     else:
         nb_dist_lag1 = None
 
+    vq_tokens = np.array(
+        [r.get("vq_token", -1) for r in records], dtype=np.int32
+    )
+    nb_tok_lag1_raw = [r.get("nb_scout_token_lag1", None) for r in records]
+    has_tok_lag1 = any(v is not None for v in nb_tok_lag1_raw)
+    if has_tok_lag1:
+        nb_tok_lag1 = np.array(
+            [v if v is not None else -1 for v in nb_tok_lag1_raw],
+            dtype=np.int32,
+        )
+    else:
+        nb_tok_lag1 = None
+
     return {
         "signals":      signals,
         "actions":      actions,
@@ -99,6 +112,8 @@ def load_corpus(path: str) -> dict:
         "ctx":          ctx,
         "nb_lag1":      nb_lag1,
         "nb_dist_lag1": nb_dist_lag1,
+        "vq_tokens":    vq_tokens,
+        "nb_tok_lag1":  nb_tok_lag1,
         "n":            len(records),
     }
 
@@ -729,6 +744,126 @@ def lag1_direction_lrt(
     print(f"  Significant dim + coef pattern matching bearing = signal encodes direction")
 
 
+# ── VQ token vocabulary: flee direction vs lag-1 scout token ───────────────────
+
+def vq_token_direction_test(
+    actions:      np.ndarray,
+    scouts:       np.ndarray,
+    ctx:          dict,
+    vq_tokens:    np.ndarray,
+    nb_tok_lag1:  Optional[np.ndarray],
+    nb_dist_lag1: Optional[np.ndarray],
+    min_token_n:  int = 25,
+    min_elig:     int = 50,
+) -> None:
+    """
+    Codebook-level alarm test: do high-alert VQ tokens (low emitter red_dist)
+  predict different flee directions among blind listeners than safe tokens?
+
+    Uses lag-1 mode scout token among agents within alarm_scout_range at T-1.
+    """
+    from scipy.stats import chi2_contingency
+
+    A_STAY = 4
+    dir_names = {0: "N", 1: "S", 2: "E", 3: "W"}
+
+    print(f"\n{'─'*70}")
+    print(f"  VQ TOKEN DIRECTION TEST  (lag-1 scout token → blind flee direction)")
+    print(f"{'─'*70}")
+
+    if nb_tok_lag1 is None:
+        print("  nb_scout_token_lag1 absent — re-run corpus after vq_token logging.")
+        return
+
+    valid_tok = vq_tokens >= 0
+    token_stats: dict[int, tuple[float, int]] = {}
+    for t in range(int(vq_tokens.max()) + 1 if valid_tok.any() else 0):
+        mask = valid_tok & (vq_tokens == t)
+        if int(mask.sum()) < 5:
+            continue
+        token_stats[t] = (float(ctx["red_dist"][mask].mean()), int(mask.sum()))
+
+    if not token_stats:
+        print("  No vq_token field in corpus — accumulate data after training fix.")
+        return
+
+    print(f"\n  Per-token emitter context  (mean red_dist when token is transmitted):")
+    print(f"  {'tok':>4}  {'N':>6}  {'red_dist':>9}")
+    print(f"  {'-'*24}")
+    for t in sorted(token_stats, key=lambda x: token_stats[x][0]):
+        mu, n = token_stats[t]
+        print(f"  {t:>4}  {n:>6}  {mu:>9.2f}")
+
+    dists = np.array([token_stats[t][0] for t in token_stats])
+    t_lo = int(min(token_stats, key=lambda x: token_stats[x][0]))
+    t_hi = int(max(token_stats, key=lambda x: token_stats[x][0]))
+    alert_cut = float(np.percentile(dists, 25))
+    safe_cut = float(np.percentile(dists, 75))
+    alert_set = {t for t, (mu, n) in token_stats.items() if mu <= alert_cut and n >= min_token_n}
+    safe_set = {t for t, (mu, n) in token_stats.items() if mu >= safe_cut and n >= min_token_n}
+
+    blind = ~scouts
+    fleeing = blind & (actions != A_STAY)
+    has_lag = nb_tok_lag1 >= 0
+    if nb_dist_lag1 is not None:
+        has_lag &= np.isfinite(nb_dist_lag1)
+    eligible = fleeing & has_lag
+
+    n_elig = int(eligible.sum())
+    print(f"\n  Blind fleeing with lag-1 scout token: {n_elig:,}")
+    if n_elig < min_elig:
+        print(f"  Too few eligible records (< {min_elig}) — accumulate more corpus.")
+        return
+
+    y = actions[eligible]
+    lag_tok = nb_tok_lag1[eligible]
+    lag_alert = np.array([int(t) in alert_set for t in lag_tok], dtype=bool)
+    lag_safe = np.array([int(t) in safe_set for t in lag_tok], dtype=bool)
+
+    # Pairwise: lowest vs highest mean-red_dist frequent tokens
+    if t_lo in token_stats and t_hi in token_stats:
+        for label, tok in [("ALERT (low red_dist)", t_lo), ("SAFE (high red_dist)", t_hi)]:
+            sub = eligible & (nb_tok_lag1 == tok)
+            ns = int(sub.sum())
+            if ns < 10:
+                print(f"\n  Token {tok} ({label}): n={ns} — too few listeners")
+                continue
+            print(f"\n  Listeners with lag-1 scout token {tok} ({label}, "
+                  f"emitter red_dist≈{token_stats[tok][0]:.1f})  n={ns}")
+            for a, nm in dir_names.items():
+                cnt = int((actions[sub] == a).sum())
+                print(f"    {nm}: {cnt:5d}  ({100*cnt/max(ns,1):5.1f}%)")
+
+        sub_lo = eligible & (nb_tok_lag1 == t_lo)
+        sub_hi = eligible & (nb_tok_lag1 == t_hi)
+        if int(sub_lo.sum()) >= 10 and int(sub_hi.sum()) >= 10:
+            cats = sorted(dir_names.keys())
+            table = np.zeros((2, len(cats)), dtype=np.int64)
+            for j, a in enumerate(cats):
+                table[0, j] = int((actions[sub_lo] == a).sum())
+                table[1, j] = int((actions[sub_hi] == a).sum())
+            chi2, p, _, _ = chi2_contingency(table)
+            print(f"\n  χ²(token {t_lo} vs {t_hi} flee directions) = {chi2:.2f}  p={p:.4f}")
+
+    if alert_set and safe_set:
+        sub_a = eligible & lag_alert
+        sub_s = eligible & lag_safe
+        print(f"\n  Quartile sets: alert tokens {sorted(alert_set)}  safe tokens {sorted(safe_set)}")
+        print(f"  Listeners lag-1 alert-token: {int(sub_a.sum()):,}  safe-token: {int(sub_s.sum()):,}")
+        if int(sub_a.sum()) >= 10 and int(sub_s.sum()) >= 10:
+            cats = sorted(dir_names.keys())
+            table = np.zeros((2, len(cats)), dtype=np.int64)
+            for j, a in enumerate(cats):
+                table[0, j] = int((actions[sub_a] == a).sum())
+                table[1, j] = int((actions[sub_s] == a).sum())
+            chi2, p, _, _ = chi2_contingency(table)
+            print(f"  χ²(alert-set vs safe-set flee directions) = {chi2:.2f}  p={p:.4f}")
+            if p < 0.05:
+                print("  → Significant: codebook alert tokens associate with different flee mix.")
+            else:
+                print("  → Not significant at p<0.05 (may need more corpus).")
+
+
 # ── Withdrawal comparison ──────────────────────────────────────────────────────
 
 def _quick_withdrawal_metrics(corpus_path: str, seed: int = 42) -> dict:
@@ -958,6 +1093,8 @@ def main() -> None:
         data["ctx"] = {k: v[keep] for k, v in data["ctx"].items()}
         data["nb_lag1"]      = data["nb_lag1"][keep]      if data["nb_lag1"]      is not None else None
         data["nb_dist_lag1"] = data["nb_dist_lag1"][keep] if data["nb_dist_lag1"] is not None else None
+        data["vq_tokens"]    = data["vq_tokens"][keep]
+        data["nb_tok_lag1"]  = data["nb_tok_lag1"][keep]  if data["nb_tok_lag1"]  is not None else None
         data["n"]   = int(keep.sum())
 
     n       = data["n"]
@@ -1040,6 +1177,10 @@ def main() -> None:
         topographic_similarity(signals, actions, scouts, ctx, nb_lag1, sig_dim)
         categorical_vocabulary_tests(signals, scouts, ctx, sig_dim)
         lag1_direction_lrt(actions, scouts, nb_lag1, nb_dist_lag1, sig_dim)
+        vq_token_direction_test(
+            actions, scouts, ctx, data["vq_tokens"], data.get("nb_tok_lag1"),
+            nb_dist_lag1, min_token_n=25, min_elig=50,
+        )
     else:
         print(f"\n{'─'*70}")
         print(f"  LAG-1 COMMUNICATION TEST")
@@ -1054,6 +1195,7 @@ def main() -> None:
     print("  • scout cluster with distinct signal → possible alarm call")
     print("  • clusters mapping to N/S/E/W → directional vocabulary")
     print("  • lag-1 β significant after controlling red_dist → genuine communication")
+    print("  • VQ token direction χ²: alert codebook tokens → different flee mix")
     print(f"{'='*70}\n")
 
 

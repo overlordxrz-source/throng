@@ -4574,7 +4574,9 @@ Notebook:
 
 **Interpretation:** VQ + blind run produces **load-bearing proximity information** in continuous signals; **neighbor alarm → flee** is **not yet testable** in decode until scout labeling matches `alarm_scout_range` or corpus grows with a fix.
 
-**Planned fix:** set corpus `is_scout = (red_dist <= alarm_scout_range)` when `red_detection_radius == 0`.
+**Fixed (`main_jax.py`):** corpus `is_scout = (nearest_red_dist <= alarm_scout_range)` (default **8**), independent of `red_detection_radius`. Re-record corpus after deploy for valid scout % and lag-1 LRT.
+
+**VQ tokens in corpus (`vq_token`, `nb_scout_token_lag1`):** discrete codebook index 0–63 per emission; lag-1 mode scout token for listeners. `decode_signals.py` runs **VQ TOKEN DIRECTION TEST** (χ² on flee mix: alert vs safe tokens).
 
 ### Active config summary (`config_phase7.yaml` @ `63d6f37+`)
 
