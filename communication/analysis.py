@@ -23,6 +23,7 @@ noise (diffuse clusters).  Cluster stability over time = proto-language.
 from __future__ import annotations
 
 import json
+import os
 import threading
 import queue
 from dataclasses import dataclass, field
@@ -331,13 +332,23 @@ class SignalCorpusWriter:
         sample_frac:   float = 0.08,
         every_n_steps: int   = 20,
         rng:           Optional[np.random.Generator] = None,
+        volume_dir:    Optional[str] = None,
     ) -> None:
-        self.path          = path
         self.sample_frac   = sample_frac
         self.every_n_steps = every_n_steps
         self._rng          = rng or np.random.default_rng()
         self._last_step    = -(every_n_steps + 1)
-        self._fh           = open(path, "a", buffering=8192)
+
+        persist_root = volume_dir
+        if persist_root is None and os.path.isdir("/mnt/throng-runs"):
+            persist_root = "/mnt/throng-runs"
+        if persist_root:
+            os.makedirs(persist_root, exist_ok=True)
+            path = os.path.join(persist_root, os.path.basename(path))
+            print(f"[JAX] Corpus persistence: {path}", flush=True)
+
+        self.path = path
+        self._fh = open(path, "a", buffering=8192)
 
     def maybe_record(
         self,
@@ -406,9 +417,16 @@ class SignalCorpusWriter:
     def flush(self) -> None:
         self._fh.flush()
 
+    def flush_to_disk(self) -> None:
+        """Flush Python buffer and fsync — call after each PPO rollout on Modal."""
+        if self._fh is None or self._fh.closed:
+            return
+        self._fh.flush()
+        os.fsync(self._fh.fileno())
+
     def close(self) -> None:
         try:
-            self._fh.flush()
+            self.flush_to_disk()
             self._fh.close()
         except Exception:
             pass

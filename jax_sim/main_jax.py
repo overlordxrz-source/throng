@@ -1359,6 +1359,8 @@ def _run_simulation_impl(
                 _lag1_scout_dist = None
                 _lag1_scout_tok = None
 
+        corpus_writer.flush_to_disk()
+
         # Convert metrics to Python floats for logging (skip non-scalars)
         metrics_py = {}
         for k, v in b_metrics.items():

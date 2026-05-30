@@ -183,9 +183,9 @@ mi_analysis_interval: 1000
 mi_window: 1000
 signal_cluster_k: 12
 
-# Signal corpus (offline language analysis)
-corpus_sample_frac: 0.08
-corpus_every_n_steps: 20
+# Signal corpus (offline language analysis) — P10.6 tight causal lag (~4 env steps)
+corpus_sample_frac: 0.15
+corpus_every_n_steps: 4
 
 # Within-lifetime Hebbian learning
 hebb_lr: 0.001
