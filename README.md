@@ -18,7 +18,7 @@ fixed). Next: Self-Model, Forward Dynamics, and Dreamer-style deliberation.
 `main.py` is frozen legacy).
 
 For the full research log, theory, philosophy, and per-phase post-mortems see
-[THRONG.md](THRONG.md).
+[THRONG.md](THRONG.md) (agent onboarding). Full historical log: [docs/THRONG_ARCHIVE.md](docs/THRONG_ARCHIVE.md).
 
 ---
 
