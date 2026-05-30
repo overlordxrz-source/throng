@@ -4055,7 +4055,7 @@ python tools/decode_signals.py runs/jax_run/signal_corpus.jsonl --k 16   # match
 python tools/decode_signals.py runs/jax_run/signal_corpus.jsonl --min-step 25000  # late run only
 ```
 
-**Lag-1 corpus (fixed `c4a45f3+`):** JAX now writes `nb_scout_sig_lag1` / `nb_scout_dist_lag1` (ported from `main.py` ~879–914). Re-run `decode_signals.py` on corpus recorded **after** that commit. `is_scout` in corpus uses `red_detection_radius`, not `scout_detect_radius`.
+**Lag-1 corpus (`0500ee8+`):** JAX writes `nb_scout_sig_lag1` / `nb_scout_dist_lag1` in `main_jax.py`. Lag-1 **geometry** uses `alarm_scout_range` (default **8**). **`is_scout` in corpus** currently uses `red_detection_radius` — on **blind** runs (`red_detection_radius: 0`) this labels almost nobody as scout (only co-located reds). See **Corpus scout labeling** under May 30 continued section below; fix pending.
 
 ### Common failures
 
@@ -4403,6 +4403,211 @@ Hot-resume only — do not wipe checkpoints. Stack on P4b (`min_population: 150`
 | `resource_spawn_boost` | 0.2 (hardcoded) | **0.1** |
 | `min_population` | 150 | **150** (unchanged) |
 
-Hot-resume only. Requires **`6f95da2+`** for `resource_max` / `resource_spawn_boost` in `main_jax.py`.
+Hot-resume only. Requires **`5538f16+`** for `resource_max` / `resource_spawn_boost` in `main_jax.py`.
 
 — *appended 2026-05-30 (P10.3 famine)*
+
+---
+
+## May 30 (continued) — P10.4–P10.5, Modal ops, decode @ ~26k
+
+**Read this section** for the current lethal-ecology lineage (blind + VQ + famine + safety bubble + hard ceiling), Modal training that survives kernel timeouts, and offline decode interpretation.
+
+### Phase 10.4 — Safety Bubble (NB_GAIN temporal depth)
+
+**Goal:** Agents must live **long enough** (target **mean age 150+**) for `NB_GAIN↔surv` to have variance; reduce instant death while keeping selection.
+
+| Parameter | P10.3 | P10.4 |
+|-----------|-------|-------|
+| `red_catch_prob` | 1.0 (implicit) | **0.8** — 20% predator jitter on in-range catches (`apply_catches` in `grid_jax.py`) |
+| `resource_regen_rate` | 0.00025 | **0.0003** (+20%) |
+| `max_age` | 20000 in yaml; JAX default **500** if key missing from notebook | **1000** explicit in `config_phase7.yaml` |
+| `red_detection_radius` | 0 | **0** (unchanged — still blind) |
+
+**Code:** `red_catch_prob` wired in `make_sim_step` → `apply_catches(..., catch_prob=..., rng=...)`. Curriculum log prints `catch_prob=`.
+
+— *`0d5f88a`*
+
+### Phase 10.5 — Hard-Ceiling (anti hyper-breeding)
+
+**Goal:** Cap blue headcount so population stays in a **150–200** “Goldilocks” band; increase PPO horizon for long-term survival.
+
+| Parameter | P10.4 | P10.5 |
+|-----------|-------|-------|
+| `population_size` / `max_population` / `max_pop` | 500 | **200** |
+| `min_population` | 150 | **150** |
+| `ppo_gamma` | 0.99 | **0.999** |
+
+Reds unchanged: **250** floor, `red_curriculum_stages: [250]`, P10.2 repro squeeze, P10.4 catch jitter.
+
+**Observed @ resume step 40 (~20.5k env steps, git `63d6f37`):** `blue=192`, rollout OK at **512×200** agents; VQ **62/64** codes active; `Age: mean≈49` (fresh pop after resume — age must accumulate over many updates).
+
+— *`63d6f37`*
+
+### Git commit map (May 29–30, post-P10.3)
+
+| SHA | What |
+|-----|------|
+| `aeb51f6` | Progress logs before first `lax.scan` |
+| `f26c16a` | Single `model.init` on checkpoint resume; optimizer init **after** restore |
+| `c41d885` | Redirect `JAX_COMPILATION_CACHE_DIR` off `/mnt/*` → `/tmp/throng_jax_cache`; Blue PPO compile log |
+| `a0a565e` | Red PPO progress logs; `scripts/modal_train.py` for nohup |
+| `0d5f88a` | P10.4 Safety Bubble (`red_catch_prob`, regen, `max_age`) |
+| `63d6f37` | P10.5 Hard-Ceiling (pop 200, γ=0.999) |
+
+### Modal — why `KeyboardInterrupt` without pressing keys
+
+Notebook cells that run `run_simulation()` often die during **silent JAX compile** (model.init, first `lax.scan`, first Blue/Red `_minibatch_step`). Python raises **`KeyboardInterrupt`** when the **kernel/cell is stopped** — not only when the user presses a key.
+
+Common causes:
+
+| Cause | Notes |
+|-------|--------|
+| Notebook / platform **cell timeout** | 10–30+ min with no output looks “frozen” |
+| **Idle kernel** recycle | Sidebar timeout (raise to 12h if available) |
+| Browser sleep / disconnect | Remote kernel stops |
+| **JAX cache on volume** | Deserializing compile cache from `/mnt/...` is very slow; fixed by using **`/tmp/throng_jax_cache`** (`c41d885+` auto-redirects if env points at `/mnt`) |
+
+**Symptom progression (typical):** init compile → rollout compile → Blue PPO compile → Red PPO H2D — each phase can be killed independently.
+
+**Recommended:** run training **outside the notebook** (below). Use notebook only for setup, decode, and `tail -f` logs.
+
+### Modal — recommended training (nohup)
+
+**Volume:** `throng-runs` → `/mnt/throng-runs` (checkpoints only). **Repo:** clone to `/root/throng` each new machine (not on volume).
+
+```bash
+cd /root/throng 2>/dev/null || git clone https://github.com/overlordxrz-source/throng.git /root/throng
+cd /root/throng && git fetch origin && git reset --hard origin/master
+
+export XLA_PYTHON_CLIENT_MEM_FRACTION=0.80
+export JAX_COMPILATION_CACHE_DIR=/tmp/throng_jax_cache
+mkdir -p /tmp/throng_jax_cache
+
+nohup python -u /root/throng/scripts/modal_train.py > /mnt/throng-runs/train.log 2>&1 &
+tail -f /mnt/throng-runs/train.log
+```
+
+`scripts/modal_train.py` loads `config_phase7.yaml`, applies **P10.5 + P10.4** overrides, `checkpoint_dir=/mnt/throng-runs/checkpoints`, `n_steps=150_000`, `seed=42`. **Ctrl+C on `tail` does not stop training.**
+
+Check progress:
+
+```bash
+ps aux | grep modal_train
+ls -lt /mnt/throng-runs/checkpoints/ | head
+```
+
+### Modal — notebook setup cell (decode / short tasks)
+
+In Jupyter, shell commands need **`!`** prefix:
+
+```python
+import os, subprocess, sys
+from pathlib import Path
+
+REPO = Path("/root/throng")
+if not REPO.is_dir():
+    subprocess.run(["git", "clone", "https://github.com/overlordxrz-source/throng.git", str(REPO)], check=True)
+else:
+    subprocess.run(["git", "-C", str(REPO), "fetch", "origin"], check=True)
+    subprocess.run(["git", "-C", str(REPO), "reset", "--hard", "origin/master"], check=True)
+
+print("Git:", subprocess.check_output(["git", "-C", str(REPO), "rev-parse", "--short", "HEAD"], text=True).strip())
+os.chdir(REPO)
+sys.path.insert(0, str(REPO))
+os.environ.setdefault("XLA_PYTHON_CLIENT_MEM_FRACTION", "0.80")
+os.environ["JAX_COMPILATION_CACHE_DIR"] = "/tmp/throng_jax_cache"
+os.makedirs("/tmp/throng_jax_cache", exist_ok=True)
+```
+
+Long `run_simulation()` in a notebook cell is **discouraged**; use nohup script above.
+
+### Resume / init behaviour (`f26c16a+`)
+
+On checkpoint resume:
+
+1. **One** `model.init` (template), copy structure for red, **restore** Orbax weights.
+2. **Optimizer** created **after** restore (momentum matches restored weights).
+3. Logs: `[JAX] Compiling model.init (template for restore)…` → `model.init done — restoring…` → `Restored params from step N`.
+
+**Orbax step N** = PPO update index; env steps ≈ **`N × ppo_rollout_steps`** (512).
+
+### Corpus — path, persistence, decode
+
+| Item | Path |
+|------|------|
+| Corpus (default) | `/root/throng/runs/jax_run/signal_corpus.jsonl` |
+| Append across resumes | Yes (`SignalCorpusWriter` append mode) |
+| On volume? | **No** by default — copy before container dies |
+
+```bash
+cp /root/throng/runs/jax_run/signal_corpus.jsonl /mnt/throng-runs/signal_corpus.jsonl
+pip install scikit-learn scipy
+python tools/decode_signals.py runs/jax_run/signal_corpus.jsonl --k 16 --min-step 20000
+```
+
+Notebook:
+
+```python
+!pip install -q scikit-learn scipy
+!python /root/throng/tools/decode_signals.py /root/throng/runs/jax_run/signal_corpus.jsonl --k 16 --min-step 20000
+```
+
+**What decode analyzes:** continuous **`sig`** vectors (32-d post-VQ `signal_out`), not discrete `token_ids` (not in corpus yet). Use **`tools/decode_tokens.py`** only for legacy `events.jsonl` runs.
+
+### Corpus scout labeling (known issue @ blind + lag-1)
+
+| Field | Rule today | Effect when `red_detection_radius: 0` |
+|-------|------------|----------------------------------------|
+| `is_scout` | `nearest_red_dist <= red_detection_radius` | **~0% scouts** in corpus (only co-located reds) |
+| Lag-1 buffer | Scouts within **`alarm_scout_range` (8)** at T−1 | Almost no lag-1 scout fields → **LRT skipped** |
+
+**Decode @ 4,458 records (steps 20k–26.1k, `--min-step 20000`):**
+
+| Finding | Result |
+|---------|--------|
+| `red_dist` encoding | ✅ Strong — Spearman up to ~0.52; MI 0.35–0.42 on several dims; **all dims peak MI on `red_dist`** (redundant continuous proximity code) |
+| k=16 clusters | ✅ Different mean `red_dist` (e.g. ~3 vs ~104) — geographic/threat structure |
+| Scouts | ❌ **2 / 4,458** — scout vs blind block meaningless |
+| Lag-1 direction LRT | ❌ **6 eligible** records (need ≥50) — “accumulate more corpus” |
+| `NB_GAIN↔surv` (training) | Still **nan** early after resume (low mean age ~49–50) |
+
+**Interpretation:** VQ + blind run produces **load-bearing proximity information** in continuous signals; **neighbor alarm → flee** is **not yet testable** in decode until scout labeling matches `alarm_scout_range` or corpus grows with a fix.
+
+**Planned fix:** set corpus `is_scout = (red_dist <= alarm_scout_range)` when `red_detection_radius == 0`.
+
+### Active config summary (`config_phase7.yaml` @ `63d6f37+`)
+
+Stack for current lineage:
+
+- **P2:** `red_detection_radius: 0`
+- **P3:** VQ 64 codes, `vq_dead_code_reset: true`
+- **P4b:** `min_population: 150`, `min_red_population: 250`, `red_curriculum_stages: [250]`, `distill_enabled: false`
+- **P10.2:** `repro_energy_thresh: 0.95`, `repro_energy_cost: 0.80`
+- **P10.3:** `resource_regen_rate: 0.00025`, `resource_n_patches: 10`, `resource_max: 0.5`, `resource_spawn_boost: 0.1`
+- **P10.4:** `red_catch_prob: 0.8`, `resource_regen_rate: 0.0003`, `max_age: 1000`
+- **P10.5:** `population_size` / `max_pop`: **200**, `ppo_gamma: 0.999`
+- **P4:** `red_catch_radius: 1`, hunt rewards as in yaml
+
+### Checkpoint ↔ env step cheat sheet
+
+```
+env_step ≈ orbax_folder × 512
+```
+
+Examples: folder **39** ≈ 19,968 env steps; folder **40** ≈ 20,480; **`[CKPT] Saved step 20480`** ↔ folder **40**.
+
+### What to do next (agent playbook, updated)
+
+1. **Train via `nohup` + `modal_train.py`** — not long notebook cells.
+2. **Persist corpus** to volume periodically.
+3. **Decode** at ~25k / ~50k / ~100k with `--k 16 --min-step <floor>`.
+4. Watch dashboard: **`blue=150–200`**, **`Age: mean → 150+`**, **`NB_GAIN↔surv` finite**, **`codes_active` ≥ 50**.
+5. Fix **corpus `is_scout`** for blind runs before trusting lag-1 LRT.
+6. Optional: log **`token_ids`** into corpus for discrete-token decode.
+
+### Third-agent onboarding note
+
+The section **“Third-agent onboarding — JAX Phase 10 lethal run”** above describes the **early P4 @ ~10k** snapshot. For **current** ops and P10.4–P10.5, prefer **this section** and `config_phase7.yaml`.
+
+— *appended 2026-05-29 (Modal survival, P10.4–P10.5, decode @ 26k)*
