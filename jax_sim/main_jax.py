@@ -604,12 +604,72 @@ def _run_simulation_impl(
 
     dummy_obs = jnp.zeros((1, obs_dim))
     dummy_carry = jnp.zeros((1, hidden_d))
-    b_params = sanitize_agent_params(
-        init_agent_params(model, keys[3], dummy_carry, dummy_obs, n_layers)
-    )
-    r_params = sanitize_agent_params(
-        init_agent_params(model, keys[5], dummy_carry, dummy_obs, n_layers)
-    )
+    _ckpt_latest = ckpt_mngr.latest_step()
+    start_update = 0
+    if _ckpt_latest is not None:
+        print(
+            f"[JAX] Checkpoint on volume: latest PPO update = {_ckpt_latest}",
+            flush=True,
+        )
+        print(
+            "[JAX] Compiling model.init (template for restore) — often 1–5 min with "
+            "no new lines. Not frozen; do not Stop the kernel.",
+            flush=True,
+        )
+        b_params = sanitize_agent_params(
+            init_agent_params(model, keys[3], dummy_carry, dummy_obs, n_layers)
+        )
+        # Same architecture as blue; restore overwrites — skip 2nd full model.init compile.
+        r_params = jax.tree_util.tree_map(jnp.copy, b_params)
+        print("[JAX] model.init done — restoring checkpoint weights...", flush=True)
+        abstract_tree = {"b_params": b_params, "r_params": r_params}
+        try:
+            restored = ckpt_mngr.restore(_ckpt_latest, items=abstract_tree)
+            b_params = sanitize_agent_params(
+                ensure_aux_head_params(
+                    model, restored["b_params"], keys[3], hidden_d,
+                    obs_dim=obs_dim, n_layers=n_layers,
+                )
+            )
+            r_params = sanitize_agent_params(
+                ensure_aux_head_params(
+                    model, restored["r_params"], keys[5], hidden_d,
+                    obs_dim=obs_dim, n_layers=n_layers,
+                )
+            )
+            start_update = int(_ckpt_latest)
+            print(
+                f"[JAX] Restored params from step {start_update}. Population starts fresh.",
+                flush=True,
+            )
+        except ValueError as exc:
+            if "not compatible" in str(exc) or "stored shape" in str(exc):
+                print(
+                    f"[JAX] Checkpoint step {_ckpt_latest} incompatible with current model "
+                    f"(architecture changed) — re-init from scratch.",
+                    flush=True,
+                )
+                print("[JAX] Delete old ckpts: rm -rf /mnt/throng-runs/checkpoints")
+                r_params = sanitize_agent_params(
+                    init_agent_params(model, keys[5], dummy_carry, dummy_obs, n_layers)
+                )
+                start_update = 0
+            else:
+                raise
+    else:
+        print("[JAX] No checkpoint on volume — training from update 0.", flush=True)
+        print(
+            "[JAX] Compiling model.init (blue + red) — two passes, 2–8 min total. "
+            "Do not Stop the kernel.",
+            flush=True,
+        )
+        b_params = sanitize_agent_params(
+            init_agent_params(model, keys[3], dummy_carry, dummy_obs, n_layers)
+        )
+        r_params = sanitize_agent_params(
+            init_agent_params(model, keys[5], dummy_carry, dummy_obs, n_layers)
+        )
+        print("[JAX] model.init done (blue + red).", flush=True)
     from flax.core import unfreeze as _unfreeze_params
     _bp = _unfreeze_params(b_params)
     _emb_ok = "kernel" in _bp.get("emb_own", {})
@@ -673,7 +733,7 @@ def _run_simulation_impl(
     print(f"[DEBUG] Init action_logits mean={float(test_logits.mean()):.4f} std={float(test_logits.std()):.4f}")
     print(f"[DEBUG] Init entropy mean={float(test_entropy.mean()):.4f} (expected ~1.6 for uniform 5-action)")
 
-    # ── Init optimizer ──────────────────────────────────────
+    # ── Init optimizer (after checkpoint restore so momentum matches weights) ──
     b_optimizer = create_optimizer(config["ppo_lr"], config["ppo_max_grad_norm"])
     r_optimizer = create_optimizer(config["ppo_lr"], config["ppo_max_grad_norm"])
     b_opt_state = b_optimizer.init(b_params)
@@ -683,45 +743,6 @@ def _run_simulation_impl(
     b_carries = jnp.zeros((max_pop, hidden_d))
     r_carries = jnp.zeros((max_pop_red, hidden_d))
 
-    # ── Restore Checkpoint ──────────────────────────────────
-    import sys as _sys
-    _ckpt_latest = ckpt_mngr.latest_step()
-    if _ckpt_latest is not None:
-        print(f"[JAX] Checkpoint on volume: latest PPO update = {_ckpt_latest}", flush=True)
-    else:
-        print("[JAX] No checkpoint on volume — training from update 0.", flush=True)
-
-    start_update = 0
-    if _ckpt_latest is not None:
-        latest = _ckpt_latest
-        abstract_tree = {"b_params": b_params, "r_params": r_params}
-        try:
-            print(f"[JAX] Resuming from checkpoint step {latest}...", flush=True)
-            restored = ckpt_mngr.restore(latest, items=abstract_tree)
-            b_params = sanitize_agent_params(
-                ensure_aux_head_params(
-                    model, restored["b_params"], keys[3], hidden_d,
-                    obs_dim=obs_dim, n_layers=n_layers,
-                )
-            )
-            r_params = sanitize_agent_params(
-                ensure_aux_head_params(
-                    model, restored["r_params"], keys[5], hidden_d,
-                    obs_dim=obs_dim, n_layers=n_layers,
-                )
-            )
-            start_update = latest
-            print(f"[JAX] Restored params from step {latest}. Population starts fresh.")
-        except ValueError as exc:
-            if "not compatible" in str(exc) or "stored shape" in str(exc):
-                print(
-                    f"[JAX] Checkpoint step {latest} incompatible with current model "
-                    f"(architecture changed) — starting fresh."
-                )
-                print("[JAX] Delete old ckpts: rm -rf /mnt/throng-runs/checkpoints")
-            else:
-                raise
-    
     # ── Training loop ───────────────────────────────────────
     n_updates = n_steps // T
     update_keys = jax.random.split(keys[4], n_updates)
