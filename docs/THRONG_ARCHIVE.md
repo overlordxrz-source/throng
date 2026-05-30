@@ -4653,3 +4653,52 @@ We are running a pristine causal dataset capture.
 3. Keep the ecosystem mathematically pure: Do NOT allow Will to add artificial communication rewards or shape the VQ loss blindly. Let the lethal ecology forge the language.
 
 — *encoded 2026-05-29 (Phase 10.6)*
+
+---
+
+# [SYSTEM UPDATE: May 2026 — B200, Phase 11 Staging, Phase 9 Canvas]
+
+> *Append for Cam/Will reboots after horcrux `6d542f6`. Full onboarding: `THRONG.md` §0–§11.*
+
+## Live run (`master` only)
+
+| Item | Value |
+|------|-------|
+| Hardware | Modal **B200** (192GB HBM3) |
+| VRAM ~150GB | `XLA_PYTHON_CLIENT_MEM_FRACTION=0.80` — XLA pre-allocation, not model size |
+| Throughput | ~**6 steps/sec**; `lax.scan` ~17s; PPO ~40s (**H2D** from `8077a12` CPU offload) |
+| Env steps | **~42k** and climbing (May 2026); target **≥100k** before decode |
+| Orbax resume | Step ~75+ on volume; weights persist, pop/grid fresh |
+| Corpus | `/mnt/throng-runs/signal_corpus.jsonl`, `corpus_every_n_steps: 4`, fsync each rollout |
+| Ecology | Lotka-Volterra: `blue` 170–200, catches 1800–2800, age 38–164, entropy ~1.58, codes 56–63/64 |
+
+## Code freeze (`master`)
+
+**Do not change** until User confirms ≥100k + decode: `network_jax.py`, `rl_jax.py`, `config_phase7.yaml`, PPO offload, rewards, `vq_beta`.
+
+## Phase 11 staging (`feature/phase11-imagination`)
+
+Will staged **latent carry forward dynamics** (Phase 9 canvas #1 / Cam directive):
+
+- `head_fwd_dyn_1/2` → predict **carry_{t+1}** from `[carry_t, onehot(action_t)]`
+- MSE with **`stop_gradient(carry_{t+1})`** — mandatory (carry update `0.9*carry + 0.1*pooled`)
+- Dashboard: `carry_fwd`, `carry_rank`, `carry_H`
+- Docs: `docs/PHASE11_STAGING.md` on feature branch (commit `0481445+`)
+- **Not merged to master** until P10.6 decode passes
+
+## Phase 9 Research Canvas (User doc) — quick map
+
+| Done on master | Staged / future |
+|----------------|-----------------|
+| VQ 64-code bottleneck | Carry fwd → **feature branch** |
+| loc_env fwd aux (`fwd_env`) | Cross-attention receiver (9.4) |
+| Self-pred on own action | Confidence head, real neighbor ToM, GWT token, Dreamer imagination |
+
+## Post-100k unlock sequence
+
+1. `decode_signals.py` — scouts 5–30%, lag-1 LRT ≥50, VQ token χ²
+2. Merge `feature/phase11-imagination` (if approved)
+3. Phase 11.1: GPU-resident rollouts on B200
+4. Phase 11.2: K-step imagination once `carry_fwd` ↓ 0.05–0.1
+
+— *appended 2026-05-29 (B200 telemetry, Phase 11 branch, canvas map)*
