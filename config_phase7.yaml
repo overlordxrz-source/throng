@@ -24,7 +24,7 @@ curriculum_sustain_steps: 2000
 curriculum_survival_threshold: 0.80   # blue survival rate to advance red floor
 curriculum_sustain_updates: 5         # consecutive PPO updates above threshold
 
-max_age: 20000
+max_age: 1000                 # P10.4 Safety Bubble: above JAX default 500; room for mean age 150+
 base_maturation_steps: 200
 
 # Brain architecture — 4L from birth
@@ -54,6 +54,7 @@ symbol_decay: 0.993
 red_starvation_steps: 400
 red_spawn_step: 2000
 red_catch_radius: 1          # P4: adjacent reds catch blues (Chebyshev ≤ 1)
+red_catch_prob: 0.8          # P10.4: 20% predator jitter on in-range catches
 
 # ── VQ signal bottleneck (P3) ─────────────────────────────────────────────────
 vocab_size: 64
@@ -77,7 +78,7 @@ signal_entropy_anneal_end: 50000
 # ── Procedural environment ────────────────────────────────────────────────────
 wall_density: 0.08
 resource_n_patches: 10           # P10.3 Famine: half map patches (was 20)
-resource_regen_rate: 0.00025     # P10.3 Famine: 10% of P10.2 (0.0025 → 0.00025)
+resource_regen_rate: 0.0003      # P10.4 Safety Bubble: +20% vs P10.3 famine (0.00025)
 resource_max: 0.5                # P10.3: cap cell resources (default 1.0)
 resource_spawn_boost: 0.1       # P10.3: per-step spawn increment (was hardcoded 0.2)
 
@@ -151,6 +152,10 @@ reward_red_catch: 3.0         # P4: stronger hunt incentive
 reward_red_starve_per_step: -0.02
 reward_move: 0.01
 reward_red_move: 0.04        # P4: reward red movement (hunter aggression)
+
+# ── P10.4 Safety Bubble (NB_GAIN temporal depth: mean age 150+) ───────────────
+# Predator jitter: red_catch_prob (not detection_radius — blues stay blind)
+# Slightly more regen than P10.3 famine; repro still squeezed (P10.2 thresholds)
 
 # Observation constraints
 red_detection_radius: 0          # 0 = blind beyond 5×5 patch; need neighbor signals (Phase 10)

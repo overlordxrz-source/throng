@@ -225,25 +225,36 @@ def apply_catches(
     r_alive: jnp.ndarray,
     grid_size: int,
     catch_radius: int = 1,
+    catch_prob: float = 1.0,
+    rng: jnp.ndarray | None = None,
 ) -> Tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray]:
     """
     Return (b_new_alive, r_catch_reward, b_catch_penalty, caught_idx_mask)
     Red catches blue if within catch_radius Chebyshev distance.
+    If catch_prob < 1.0, each in-range blue survives with probability (1 - catch_prob)
+    (predator jitter / safety bubble).
     """
     max_b = b_pos.shape[0]
-    max_r = r_pos.shape[0]
 
     # Compute pairwise Chebyshev distances (toroidal)
     diff = jnp.abs(b_pos[:, None, :] - r_pos[None, :, :])  # (B, R, 2)
     diff = jnp.minimum(diff, grid_size - diff)
     dist = jnp.max(diff, axis=-1)  # (B, R)
 
-    caught = (dist <= catch_radius) & b_alive[:, None] & r_alive[None, :]
-    caught_b = jnp.any(caught, axis=1)  # (B,)
+    in_range = (dist <= catch_radius) & b_alive[:, None] & r_alive[None, :]
+    in_range_b = jnp.any(in_range, axis=1)  # (B,)
+
+    if catch_prob >= 1.0:
+        caught_b = in_range_b
+        caught = in_range
+    else:
+        roll = jax.random.uniform(rng, (max_b,))
+        caught_b = in_range_b & (roll < catch_prob)
+        caught = in_range & caught_b[:, None]
 
     b_new_alive = b_alive & ~caught_b
 
-    # Red reward per catch (one per blue caught)
+    # Red reward per successful catch (one per blue actually caught)
     r_catch_rew = jnp.sum(caught, axis=0).astype(jnp.float32)  # (R,)
     b_penalty = -1.0 * caught_b.astype(jnp.float32)
 

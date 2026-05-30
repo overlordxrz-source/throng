@@ -151,6 +151,7 @@ def make_sim_step(config: Dict, model: AgentNetworkJax, model_apply=None):
     _reward_red_move = float(config.get("reward_red_move", 0.0))
     _reward_red_starve = float(config.get("reward_red_starve_per_step", -0.01))
     _red_catch_radius = int(config.get("red_catch_radius", 1))
+    _red_catch_prob = float(config.get("red_catch_prob", 1.0))
     _puzzle_reward = float(config.get("puzzle_reward", 5.0))
     _energy_decay = float(config["energy_decay"])
     _starv_thresh = float(config["starvation_threshold"])
@@ -305,11 +306,15 @@ def make_sim_step(config: Dict, model: AgentNetworkJax, model_apply=None):
                 b_pop, gs, radius=_mm_radius, rate=_mm_rate, direction=_mm_dir,
             )
 
-        # ── Catch detection ─────────────────────────────────────
+        # ── Catch detection (optional predator jitter via red_catch_prob) ──
+        catch_rng = jax.random.split(key_misc)[1]
         b_new_alive, r_catch_rew, b_catch_pen, caught_b = apply_catches(
             b_pop.positions, b_pop.alive,
             r_pop.positions, r_pop.alive,
-            gs, catch_radius=_red_catch_radius,
+            gs,
+            catch_radius=_red_catch_radius,
+            catch_prob=_red_catch_prob,
+            rng=catch_rng,
         )
         # Shelter protection: blues on shelter spots can't be caught
         on_shelter = grid.shelter_spots[b_pop.positions[:, 0], b_pop.positions[:, 1]]
@@ -599,7 +604,8 @@ def _run_simulation_impl(
     red_sustain_needed = int(config.get("curriculum_sustain_updates", 5))
     print(
         f"[CURRICULUM] Red stages: {red_curriculum_stages}, start={red_curriculum_stages[0]} "
-        f"| catch_radius={int(config.get('red_catch_radius', 1))}"
+        f"| catch_radius={int(config.get('red_catch_radius', 1))} "
+        f"| catch_prob={float(config.get('red_catch_prob', 1.0))}"
     )
 
     dummy_obs = jnp.zeros((1, obs_dim))
