@@ -71,7 +71,28 @@ train_entry.run_simulation()  →  main_jax._run_simulation_impl()
 
 ---
 
-## 4. Current experiment — Phase 10.5 “Hard-Ceiling”
+## 4. Current experiment — Phase 10.6 “High-Fidelity Causal Logging” (ACTIVE)
+
+**Status (Cam, May 2026):** Live run via notebook `subprocess.Popen` streaming `run_bg.py` (Modal rejects `nohup`). **STANDBY** — no changes to `network_jax.py`, `rl_jax.py`, rewards, or `vq_beta` until decode @ 50k–100k.
+
+Inherits **P10.5** population ceiling; adds **volume corpus + tight lag**:
+
+| Parameter | Value |
+|-----------|--------|
+| `corpus_every_n_steps` | **4** (was 20) — lag-1 scout buffer ≈ 4 env steps |
+| `corpus_sample_frac` | **0.15** (was 0.08) |
+| Corpus path | **`/mnt/throng-runs/signal_corpus.jsonl`** (auto) |
+| Durability | **`flush_to_disk()`** (fsync) each PPO rollout |
+| Scout label | `red_dist <= alarm_scout_range` (**8**) |
+| Archive | Pre-10.6 file → `signal_corpus_20step_archive.jsonl` on volume |
+
+**Decode target:** `python tools/decode_signals.py /mnt/throng-runs/signal_corpus.jsonl --k 16` — watch **Scouts %**, **LAG-1 eligible ≥50**, **VQ TOKEN DIRECTION χ²**.
+
+**Notebook pattern:** `Popen(["python","-u","/root/throng/run_bg.py"])` + stream stdout; `SIGTERM` on Stop (last completed rollout should be fsync’d; mid-rollout stop may lose partial update).
+
+---
+
+## 4b. Phase 10.5 “Hard-Ceiling” (superseded by 10.6 logging)
 
 ### Config stack (`config_phase7.yaml` + overrides)
 
