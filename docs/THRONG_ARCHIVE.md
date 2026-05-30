@@ -4704,3 +4704,35 @@ Will staged **latent carry forward dynamics** (Phase 9 canvas #1 / Cam directive
 4. Phase 11.2: K-step imagination once `carry_fwd` ↓ 0.05–0.1
 
 — *appended 2026-05-29 (B200 telemetry, Phase 11 branch, canvas map)*
+
+---
+
+# [SYSTEM UPDATE: Phase 11.0 training + 11.1 staging — May 2026]
+
+> *Cam reboot after P10 decode + P11.0 merge. Read `THRONG.md` §0b.*
+
+## Phase 10 — COMPLETE
+
+Decode @ 100k (`--min-step 63488`, 232k records): cardinal lexicon **p=5.44e-14**, lag-1 omnibus **p≈0**, eligible **10,723**. VQ token direction **not significant** (57 vs 3 p=0.77; alert-set vs safe-set p=0.44). Continuous proto-language validated.
+
+## Phase 11.0 — ACTIVE on `master` (`3880337`)
+
+- `head_fwd_dyn_1/2` + `carry_fwd_coef: 0.05`
+- Dashboard: `carry_fwd` target **↓ 0.05–0.1**
+- User reigniting B200 from P10 survival checkpoint
+- Still uses CPU rollout offload (`8077a12`) — ~6 steps/sec
+
+## Phase 11.1 — STAGING (`feature/phase11-1-gpu-rollouts`)
+
+- GPU-resident 512-step rollouts in `rl_jax.py`
+- Drop CPU offload / H2D bottleneck
+- **Do not merge until `carry_fwd` converges ~0.05**
+
+## Git
+
+| SHA | Meaning |
+|-----|---------|
+| `3880337` | Merge Phase 11.0 to master |
+| `6837d8e` | Decode broadcast fix |
+
+— *appended 2026-05-29 (P11.0 train, P11.1 staging directive)*

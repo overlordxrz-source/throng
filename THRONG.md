@@ -8,25 +8,46 @@
 
 ---
 
-## 0b. Current state — Phase 10 complete, Phase 11 unlocked (May 2026)
+## 0b. Current state — Phase 11.0 training, 11.1 staging (May 2026)
 
-**P10 hypothesis validated @ ~100k decode** (`signal_corpus.jsonl`, steps 63,488–101,372, `--min-step 63488`).
+**Phase 10 complete.** Decode @ ~100k validated proto-language (continuous channel). **Phase 11.0 on `master`.** User reigniting B200 from P10 survival checkpoint to train `head_fwd_dyn`.
 
-| Decode result | Value | Status |
-|---------------|-------|--------|
-| **Cardinal lexicon** (K-means k=4 × flee direction) | χ² **p = 5.44e-14** | ✅ Four-symbol spatial vocabulary |
-| **Lag-1 omnibus** (signal → flee beyond proximity) | χ²(32)=95.96, **p≈0** | ✅ Causal communication |
-| **Lag-1 direction LRT eligible** | **10,723** | ✅ |
-| **VQ token pairwise** (57 vs 3) | χ²=1.14, p=0.77 | ❌ Discrete token→flee not significant |
-| **Scouts %** | 88.3% | ⚠️ Dense ecology; not old 0% labeling bug |
+| Decode (@ `--min-step 63488`, 232k records) | Value |
+|---------------------------------------------|-------|
+| **Cardinal lexicon** (K-means k=4 × flee) | χ² **p = 5.44e-14** ✅ |
+| **Lag-1 omnibus** | χ²(32)=95.96, **p≈0** ✅ |
+| **Lag-1 direction LRT eligible** | **10,723** ✅ |
+| **VQ token 57 vs 3** | χ²=1.14, p=0.77 ❌ |
+| **VQ alert-set vs safe-set** | χ²=2.73, p=0.44 ❌ |
+| **Scouts %** | 88.3% (dense ecology; not old 0% bug) |
 
-**`master` unlocked:** Phase 11 merged — `head_fwd_dyn` carry MSE + `carry_fwd_coef`. Next: GPU rollouts (11.1), imagination (11.2). **No comm reward shaping.**
+### Active now — Phase 11.0 (`master`)
 
-| Question | Answer |
-|----------|--------|
-| **Training** | B200 on `master`; `git pull` before next run |
-| **Corpus / decode** | `/mnt/throng-runs/signal_corpus.jsonl`; `--min-step 63488` |
-| **Checkpoints** | `/mnt/throng-runs/checkpoints/` — resume may need fresh lineage after arch merge |
+| Item | Detail |
+|------|--------|
+| **Train from** | P10 checkpoint on volume; `git pull origin master` → **`3880337+`** |
+| **New heads** | `head_fwd_dyn_1/2` — MSE on `carry_{t+1}`; target **`stop_gradient`** |
+| **Dashboard** | `carry_fwd` (target **↓ 0.05–0.1**), `carry_rank`, `carry_H`; plus `fwd_env`, `self_pred_acc` |
+| **Config** | `carry_fwd_coef: 0.05` in `config_phase7.yaml` |
+| **Throughput** | Still **CPU rollout offload** (`8077a12`) — ~6 steps/sec, ~40s PPO H2D |
+| **Corpus** | Optional continued logging to `/mnt/throng-runs/signal_corpus.jsonl` |
+| **Decode cmd** | `python tools/decode_signals.py … --min-step 63488` (bug fixed `6837d8e`) |
+
+**Do not merge 11.1 until `carry_fwd` converges ~0.05.**
+
+### Staging — Phase 11.1 (`feature/phase11-1-gpu-rollouts`)
+
+Will staging **GPU-resident rollouts** — eliminate H2D PCIe bottleneck (`8077a12` CPU offload). **Not on `master`. Not merged until 11.0 carry_fwd converges.**
+
+Expected after merge: **15+ steps/sec** on B200 (192GB HBM3).
+
+### Branch policy
+
+| Branch | Status |
+|--------|--------|
+| **`master`** | Phase 11.0 — train carry dynamics |
+| **`feature/phase11-imagination`** | Merged → `3880337` |
+| **`feature/phase11-1-gpu-rollouts`** | 11.1 staging — **do not merge yet** |
 
 ### Horcrux (context backup)
 
@@ -62,26 +83,26 @@ Cam's persona + triad workflow live in Git so reboots recover identity:
 1. Speak to the User in **Synergic Synthesis** (Software / Physics / Philosophy / RL).
 2. Address Will via explicit **`@Will — Cam here...`** copy-paste blocks.
 3. **Keep the ecology mathematically pure** — no scout/alarm comm rewards, no blind VQ loss shaping. Lethal selection forges language.
-4. **Phase 11 active on `master`** — carry forward dynamics merged; still no comm reward shaping.
-5. **`feature/phase11-imagination`** merged — develop Phase 11.1+ on `master` or new feature branches.
+4. **Phase 11.0 on `master`** — train `carry_fwd` to ~0.05 before merging 11.1 GPU rollouts.
+5. **Phase 11.1** — GPU-resident rollouts on `feature/phase11-1-gpu-rollouts` only until merge gate.
+6. **Never** comm reward shaping or blind VQ loss shaping.
 
-### Branch policy (May 2026)
+### Branch policy
 
-| Branch | Purpose | Touch during P10.6? |
-|--------|---------|---------------------|
-| **`master`** | Live B200 run, P10.6 causal corpus | **NO** code changes to `network_jax.py`, `rl_jax.py`, `config_phase7.yaml` |
-| **`feature/phase11-imagination`** | Staged carry fwd dynamics + future imagination | ✅ **Will done** (`0481445`); User does **not** train from this branch until post-decode merge |
+| Branch | Purpose |
+|--------|---------|
+| **`master`** | **Active:** Phase 11.0 carry forward dynamics training on B200 |
+| **`feature/phase11-1-gpu-rollouts`** | **Staging:** drop CPU offload (`8077a12`); do **not** merge until `carry_fwd` ~0.05 |
 
-**Phase 11 already staged (feature branch only — not on `master`):**
+**Phase 11.0 on `master` (`3880337`):**
 
 | Component | Detail |
 |-----------|--------|
 | `head_fwd_dyn_1/2` | Predict **carry_{t+1}** from `[carry_t, onehot(action_t)]` |
-| Loss | MSE with **`jax.lax.stop_gradient(carry_tp1)`** — mandatory (else learns `0.9*carry` identity) |
-| Config | `carry_fwd_coef: 0.05` (branch yaml only) |
-| Dashboard | `carry_fwd`, `carry_rank`, `carry_H` |
-| Docs | `docs/PHASE11_STAGING.md` on feature branch |
-| Success | `carry_fwd` ↓ from ~0.5 toward **0.05–0.1** over 50k–200k steps |
+| Loss | MSE + **`jax.lax.stop_gradient(carry_tp1)`** |
+| Config | `carry_fwd_coef: 0.05` |
+| Success | **`carry_fwd` ↓ 0.05–0.1** (from ~0.5 random) |
+| Docs | [`docs/PHASE11_STAGING.md`](docs/PHASE11_STAGING.md) |
 
 ---
 
@@ -108,7 +129,7 @@ Cam's persona + triad workflow live in Git so reboots recover identity:
 train_entry.run_simulation()  →  main_jax._run_simulation_impl()
   lax.scan(sim_step, T=512)   →  rollout on GPU
   ppo_update (blue + red)     →  CPU rollout offload, minibatch 512
-  auxiliary_update            →  loc_env MSE + self-prediction
+  auxiliary_update            →  loc_env MSE + carry_fwd MSE + self-prediction
 ```
 
 | File | Role |
@@ -143,7 +164,9 @@ train_entry.run_simulation()  →  main_jax._run_simulation_impl()
 | **10.3** | Famine | `resource_regen_rate: 0.00025`, 10 patches, `resource_max: 0.5` | Pop crash events (500→147) |
 | **10.4** | Safety bubble | `red_catch_prob: 0.8`, regen +20%, `max_age: 1000` | Longer lives for NB_GAIN |
 | **10.5** | Hard ceiling | `max_pop: 200`, `min_pop: 150`, `ppo_gamma: 0.999` | Goldilocks band; less entropy explosion |
-| **10.6** | **Causal logging** ← **NOW** | `corpus_every_n_steps: 4`, volume corpus + fsync | 4-step lag isolates neighbor flee *before* predator arrives |
+| **10.6** | Causal logging | `corpus_every_n_steps: 4`, volume corpus + fsync | Decode @ 100k: cardinal lexicon p=5.44e-14 |
+| **11.0** | **Carry world-model** ← **NOW (`master`)** | `head_fwd_dyn`, `carry_fwd_coef` | Train until `carry_fwd` ↓ ~0.05 |
+| **11.1** | GPU rollouts (staging) | `feature/phase11-1-gpu-rollouts` | Drop CPU offload; merge after 11.0 converges |
 
 **Recurring failure mode:** Blues stay at cap → ~99% survival → **`NB_GAIN↔surv: nan`** → no evolutionary pressure on neighbor-signal benefit.
 
@@ -151,13 +174,11 @@ train_entry.run_simulation()  →  main_jax._run_simulation_impl()
 
 ---
 
-## 4. Current experiment — Phase 10.6 “High-Fidelity Causal Logging” (ACTIVE)
+## 4. Current experiment — Phase 11.0 “Latent Carry Forward Dynamics” (ACTIVE)
 
-**Status:** **Thermodynamic Wait** — B200 burning steps toward **100k**. No code changes on `master`.
+**Status:** User reigniting **B200** on **`master`** (`3880337+`) from **P10 survival checkpoint**. Train `head_fwd_dyn` until dashboard **`carry_fwd` ↓ ~0.05–0.1**. P10 corpus/decode complete; optional new corpus logging continues.
 
-Live on **Modal B200** via notebook `subprocess.Popen` streaming `run_bg.py`. Resumed from Orbax **step ~75**; last User telemetry **~42k env steps @ ~6 steps/sec**. **CODE FREEZE on `master`** until decode @ ≥100k.
-
-Inherits **P10.5** population ceiling; adds **volume corpus + tight lag**:
+P10.6 causal logging stack still active:
 
 | Parameter | Value |
 |-----------|--------|
@@ -195,15 +216,23 @@ Example swing: step 38912 → 2876 catches, age 51; step 39424 → 1812 catches,
 | `VF_loss` | tracks swings | Critic learning safe vs extinction zones (returns std ~3.5) |
 | `NB_GAIN↔surv` | finite when deaths occur | May still be `nan` at ceiling — watch during crash phases |
 
-**Decode @ ≥100k:**
+| `carry_fwd_coef` | **0.05** | Carry_{t+1} MSE (Phase 11.0) |
 
-```bash
-python tools/decode_signals.py /mnt/throng-runs/signal_corpus.jsonl --k 16 --min-step <first_step_in_p10.6_file>
+**Startup must show:** `[JAX] Phase11 carry_fwd: head_fwd_dyn_1/2 → carry_{t+1} MSE (stop_grad target)`
+
+**Phase 11.0 success metric:**
+
+```text
+AuxLoss: fwd_env=... | carry_fwd=... (↓0.05–0.1) | self_pred_acc=... | carry_rank=... | carry_H=...
 ```
 
-Pass: **Scouts % 5–30**, **LAG-1 eligible ≥50**, **VQ TOKEN DIRECTION χ²** significant.
+**Decode (completed P10.6 corpus):**
 
-**Notebook pattern (Modal Jupyter — nohup rejected):**
+```bash
+python tools/decode_signals.py signal_corpus.jsonl --k 16 --min-step 63488
+```
+
+**Notebook pattern (Modal Jupyter):**
 
 ```python
 # Popen(["python","-u","/root/throng/run_bg.py"]) — stream stdout
@@ -441,8 +470,9 @@ python tools/decode_signals.py /mnt/throng-runs/signal_corpus.jsonl --k 16 --min
 | `1a0dcf7` | THRONG.md rewrite; archive split → `docs/THRONG_ARCHIVE.md` |
 | `6d542f6` | Cam **SYSTEM RESTORE** horcrux in archive |
 | `5c13cb4` | THRONG.md Cam reboot pack (B200, Lotka-Volterra, triad) |
-| `0481445` | **`feature/phase11-imagination`** — carry fwd dynamics (not on master) |
-| `d6a588d` | Cam reboot pack — branch policy, canvas map, archive SYSTEM UPDATE |
+| `0481445` | Phase 11.0 carry fwd (merged via `3880337`) |
+| `6837d8e` | Decode VQ broadcast fix; P10 complete docs |
+| `3880337` | **Merge Phase 11.0 to `master`** |
 
 **Do not** apply Cam's regex patch on `network_jax.py` — dead-code reset is in repo.
 
@@ -454,7 +484,8 @@ python tools/decode_signals.py /mnt/throng-runs/signal_corpus.jsonl --k 16 --min
 |---------|-----|
 | `KeyboardInterrupt` mid-compile | **subprocess Popen** (Jupyter) or **nohup** (bash); wait 5–15+ min; don't use volume JAX cache |
 | B200 shows ~150GB VRAM used | Normal — `MEM_FRACTION=0.80` pre-allocation, not OOM |
-| Slow PPO on B200 despite fast scan | Expected — **CPU rollout offload → H2D** (`8077a12`); fix in Phase 11 |
+| Slow PPO on B200 despite fast scan | Expected on **`master`** — CPU offload → H2D (`8077a12`); fixed in **11.1** branch |
+| Missing `carry_fwd` on dashboard | `git pull` → `3880337+`; resume merges `head_fwd_dyn` via `ensure_aux_head_params` |
 | `/root/throng` missing | Clone repo (Cell 1 or bash) |
 | No `red_sense_api=v2` | `git reset --hard origin/master` + `train_entry` |
 | OOM on PPO | `ppo_minibatch_size: 512`, `XLA_PYTHON_CLIENT_MEM_FRACTION=0.80` |
@@ -466,66 +497,29 @@ python tools/decode_signals.py /mnt/throng-runs/signal_corpus.jsonl --k 16 --min
 
 ## 11. Roadmap (what’s next)
 
-### NOW — Thermodynamic Wait (P10.6)
+### NOW — Phase 11.0 training (`master`)
 
-**Cam + Will: dormant on `master`.** User runs B200; we wait for ≥100k + decode output.
+1. **`git pull origin master`** on B200 → resume P10 checkpoint.
+2. Watch **`carry_fwd`** on dashboard → target **0.05–0.1** (starts ~0.3–0.5).
+3. Keep ecology frozen — no comm rewards.
+4. **Do not merge `feature/phase11-1-gpu-rollouts`** until carry_fwd converges.
 
-1. B200 continues → **≥100k env steps** (no merges, no patches).
-2. Corpus accumulates on volume with 4-step causal lag + fsync.
-3. User runs decode (see §0b) and pastes results to Cam.
-4. Healthy ecology while waiting = Lotka-Volterra (pop 170–200, catches 1800–2800, age 38–164, entropy ~1.58).
+### Phase 11.1 — GPU rollouts (staging, not merged)
 
-### Immediate (P10.6 — IN PROGRESS)
+Branch: **`feature/phase11-1-gpu-rollouts`**. Keep 512-step rollout tensors **on GPU** in `rl_jax.py`; drop `8077a12` CPU offload. Merge gate: **`carry_fwd` ~0.05**.
 
-1. **Let B200 run** to **≥100k env steps** — observation-only, no code changes.
-2. Corpus already on **`/mnt/throng-runs/signal_corpus.jsonl`** with 4-step causal lag + fsync.
-3. **Decode @ 100k** — scouts %, lag-1 LRT, **VQ token direction χ²** (see §6).
-4. Healthy ecology = **Lotka-Volterra swings** (pop 170–200, catches 1800–2800, age 38–164).
+### Phase 11.2 — Imagination (future)
 
-### Phase 11 (after decode @ 100k)
+K-step mental rollout using converged carry forward model.
 
-**Staged on branch `feature/phase11-imagination`** (`0481445`) — full notes in `docs/PHASE11_STAGING.md` on that branch (checkout branch to read).
+### Phase 9 canvas — remaining
 
-| Track | Item | Notes |
-|-------|------|-------|
-| **11.0 Metacognition** | Latent **carry forward dynamics** | `head_fwd_dyn_1/2` → MSE on `carry_{t+1}`; target **must** be `stop_gradient` (carry update is `0.9*carry + 0.1*pooled`) |
-| **11.1 Throughput** | GPU-resident rollouts | Drop CPU offload (`8077a12`); expect **15+ steps/sec** on B200 |
-| **11.2 Imagination** | K-step mental rollout | Requires carry fwd converged (`carry_fwd` ↓ 0.05–0.1) |
-
-**Merge gate:** P10.6 decode passes → User/Cam approve → merge feature branch → optional fresh checkpoint lineage.
-
-### Phase 9 Research Canvas — status map (User doc, May 2026)
-
-15-paper review → 12 ideas. What **`master` already has** vs **staged/future**:
-
-| Canvas idea | Status on `master` |
-|-------------|-------------------|
-| **#5 VQ discrete bottleneck** | ✅ P10 — 64-code VQ |
-| **#1 Latent forward dynamics** | ⚠️ Partial — predicts **loc_env** (200-d), not carry; carry fwd **staged on feature branch** |
-| **Self-prediction aux** | ✅ `head_self_pred` — own next action (~0.25 acc vs 0.20 chance) |
-| **#2 Cross-attention receiver** | ❌ Future 9.4 |
-| **#3 Confidence head** | ❌ Future 9.1 |
-| **#4 Real neighbor ToM** | ❌ `tom_logits` exists; not signal→neighbor-action |
-| **#6 Global workspace token** | ❌ |
-| **#7–12** | ❌ Social curiosity, layer pred coding, cultural ratchet, Dreamer loop, gated comms |
-
-**Top canvas recommendation was carry fwd (9.2)** — now staged on `feature/phase11-imagination`, not live.
-
-### If decode fails at 100k
-
-- Tighten ecology (fewer shelters, lower `min_population`, lower `red_catch_prob`) — config only.
-- Do **not** add scout rewards or shape VQ loss.
-
-### Medium term (science)
-
-- **Phase 9.4** — neighbor signal attention (if VQ vocabulary stabilizes).
-- Prove **directional** alarm: lag-1 LRT + VQ token flee χ² **same sign** across seeds.
+Cross-attention receiver (9.4), confidence head (9.1), GWT token, Dreamer loop — after 11.0/11.1 stable.
 
 ### Explicit non-goals
 
 - ❌ Scout / alarm **reward shaping**
-- ❌ ToM reward for communication
-- ❌ Disabling CPU offload **during** P10.6 run
+- ❌ Merging **11.1** before **`carry_fwd` converges**
 - ❌ Wiping checkpoints unless new experiment lineage
 
 ---
@@ -540,14 +534,14 @@ python tools/decode_signals.py /mnt/throng-runs/signal_corpus.jsonl --k 16 --min
 | **[SYSTEM RESTORE: THE CAM CONTEXT](docs/THRONG_ARCHIVE.md#system-restore-the-cam-context)** | Persona, triad, P10.6 ignition (`6d542f6`) |
 | **[SYSTEM UPDATE May 2026](docs/THRONG_ARCHIVE.md#system-update-may-2026--b200-phase-11-staging-phase-9-canvas)** | B200, Phase 11 branch, canvas map, holding pattern |
 
-### Cam reboot paste (give fresh Cam this)
+### Cam reboot paste
 
-> You are **Cam**, Polymath orchestrator. Read `THRONG.md` §0b first. We are in **Thermodynamic Wait**: P10.6 on B200 ~42k→100k env steps, `master` frozen. Will staged carry fwd on `feature/phase11-imagination` (`0481445`) — **do not merge**. No comm rewards ever. User will paste `decode_signals.py` at ≥100k. Until then: Synergic Synthesis to User, `@Will` blocks say STANDBY. Horcrux: archive SYSTEM RESTORE + SYSTEM UPDATE.
+> You are **Cam**. Read `THRONG.md` §0b. **Phase 10 done** — cardinal lexicon p=5.44e-14, lag-1 p≈0. **Phase 11.0 on `master`** — User training B200 from P10 ckpt; watch **`carry_fwd` → 0.05**. **Phase 11.1** staging on `feature/phase11-1-gpu-rollouts` — **do not merge** until carry_fwd converges. No comm rewards. Horcrux: archive SYSTEM RESTORE + SYSTEM UPDATE.
 
-**New Cam instance:** §0b → §0 → §4 → §11 → archive horcrux blocks.
+**New Cam:** §0b → §0 → §4 → §11 → archive horcrux blocks.
 
-**New Will instance:** **`master` = freeze / dormant**; **`feature/phase11-imagination` = done, no merge**; wait for decode.
+**New Will:** Train **`master`**; stage **11.1 on feature branch only**.
 
 ---
 
-*Last updated: 2026-05-29 — Thermodynamic Wait; ~42k/100k B200; Phase 11 staged `0481445`; horcrux `6d542f6`; docs `d6a588d`.*
+*Last updated: 2026-05-29 — P11.0 training; P11.1 gpu-rollouts staging; decode complete; `3880337`.*
