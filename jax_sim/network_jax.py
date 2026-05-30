@@ -21,7 +21,13 @@ from flax.core.frozen_dict import FrozenDict
 from typing import Any, Optional, Tuple
 
 # Params created only in auxiliary_heads (not touched by __call__ during init).
-AUX_HEAD_KEYS = ("head_fwd_1", "head_fwd_2", "head_self_pred")
+AUX_HEAD_KEYS = (
+    "head_fwd_1",
+    "head_fwd_2",
+    "head_self_pred",
+    "head_fwd_dyn_1",
+    "head_fwd_dyn_2",
+)
 
 
 def vector_quantize_signals(
@@ -162,6 +168,10 @@ class AgentNetworkJax(nn.Module):
         # Self-prediction head (Phase 9.1): predicts own next action from carry_t
         self.head_self_pred = nn.Dense(5)
 
+        # Latent forward dynamics (Phase 11 / 9.2): carry_{t+1} from [carry_t, action_t]
+        self.head_fwd_dyn_1 = nn.Dense(self.hidden_dim * 4)
+        self.head_fwd_dyn_2 = nn.Dense(self.hidden_dim)
+
     def __call__(
         self,
         carries: jnp.ndarray,   # (N, hidden_dim)
@@ -281,24 +291,39 @@ class AgentNetworkJax(nn.Module):
         h = nn.relu(self.head_fwd_1(inp))
         return self.head_fwd_2(h)
 
+    def carry_forward_dynamics(
+        self,
+        carry_t: jnp.ndarray,    # (N, hidden_dim)
+        action_oh: jnp.ndarray,  # (N, 5)
+    ) -> jnp.ndarray:
+        """
+        Predict carry_{t+1} from carry_t + action_onehot.
+        Caller must stop_gradient carry_{t+1} before computing MSE loss.
+        """
+        fwd_inp = jnp.concatenate([carry_t, action_oh], axis=-1)
+        h = nn.relu(self.head_fwd_dyn_1(fwd_inp))
+        return self.head_fwd_dyn_2(h)
+
     def auxiliary_heads(
         self,
         carry_t: jnp.ndarray,    # (N, hidden_dim)
         action_oh: jnp.ndarray,  # (N, 5)  — action taken at t
     ) -> tuple:
         """
-        Compute both auxiliary predictions from carry_t in one forward pass.
+        Compute auxiliary predictions from carry_t in one forward pass.
 
         Returns:
           env_pred         (N, fwd_env_dim) — predicted flat loc_env_{t+1}
           self_pred_logits (N, 5)           — predicted action_{t+1}
+          carry_pred       (N, hidden_dim)  — predicted carry_{t+1}
 
-        Caller must stop_gradient loc_env_{t+1} before computing fwd loss.
+        Caller must stop_gradient loc_env_{t+1} and carry_{t+1} before loss.
         """
         fwd_inp = jnp.concatenate([carry_t, action_oh], axis=-1)
         env_pred = self.head_fwd_2(nn.relu(self.head_fwd_1(fwd_inp)))
         self_pred_logits = self.head_self_pred(carry_t)
-        return env_pred, self_pred_logits
+        carry_pred = self.carry_forward_dynamics(carry_t, action_oh)
+        return env_pred, self_pred_logits, carry_pred
 
 
 def init_agent_params(
