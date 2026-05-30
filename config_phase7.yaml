@@ -12,8 +12,8 @@ window_size: 1200
 
 population_size: 500
 red_population_size: 250
-min_population: 200
-min_red_population: 80
+min_population: 150              # P4b Selective Squeeze: blue repro floor (was 200; cap still 500)
+min_red_population: 250          # P4b: max red pressure immediately on resume
 repro_energy_thresh: 0.80        # agent must have 80% energy to self-clone
 repro_energy_cost: 0.40          # cloning costs 40% of parent energy
 
@@ -107,7 +107,7 @@ mind_meld_rate: 0.1              # fraction of carry overwritten per step
 mind_meld_direction: older_to_younger  # or "bidirectional"
 
 # ── Phase 7.5c: Evolutionary Distillation ─────────────────────────────────
-distill_enabled: true
+distill_enabled: false         # P4b Selective Squeeze: off during raw selection test
 distill_interval: 10000          # steps between distillation events
 distill_keep_frac: 0.05          # top 5% survive
 distill_noise_std: 0.1           # Gaussian noise on cloned carries
@@ -152,7 +152,7 @@ reward_red_move: 0.04        # P4: reward red movement (hunter aggression)
 
 # Observation constraints
 red_detection_radius: 0          # 0 = blind beyond 5×5 patch; need neighbor signals (Phase 10)
-red_curriculum_stages: [80, 150, 200, 250]   # P4: lethal swarm from the start
+red_curriculum_stages: [250]       # P4b: locked at max reds (hot-resume stays at 250)
 resource_obs_noise: 0.2         # 20% Gaussian noise on resource observations
 
 brain_vote_interval: 5000

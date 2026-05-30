@@ -4354,3 +4354,21 @@ Look for **LAG-1 DIRECTION LRT** block. Scout vs blind Δ on **`red_detection_ra
 Every **`distill_interval`** env steps (default **10k**), top **`distill_keep_frac`** (5%) blues by age survive; others reset. Fires as `[step 9728] DISTILL — population`. This **reshuffles** population genetics; can mask short-term survival trends. Disable in yaml for cleaner ecology experiments if needed.
 
 — *appended 2026-05-30 (third-agent onboarding + P4 run @ ~10k)*
+
+---
+
+## Phase 10.1 — P4b “Selective Squeeze” (May 30)
+
+**Goal:** Remove the blue population safety net so deaths matter; keep **250 reds** and trained VQ weights.
+
+| Parameter | P4 | P4b |
+|-----------|----|-----|
+| `min_population` | 200 | **150** (blue auto-repro floor; `population_size` cap still **500**) |
+| `min_red_population` / `red_curriculum_stages` | 80 → … → 250 | **250** / **`[250]`** |
+| `distill_enabled` | true | **false** |
+
+**Hot-resume:** Do **not** wipe `/mnt/throng-runs/checkpoints`. Pull config + resume — only `b_params`/`r_params` restore; population restarts fresh under new floors.
+
+**Expect after resume:** blues can fall toward **~150** under pressure; `NB_GAIN↔surv` may become finite; no `[DISTILL]` lines.
+
+— *appended 2026-05-30 (P4b config)*
