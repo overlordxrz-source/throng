@@ -699,7 +699,7 @@ phase9_canvas:                 # master SOTA stack
   imagination_gamma: 0.999
 
 phase12_coevolution:           # feature/phase12-red-coevolution
-  red_comms_enabled: false
+  red_comms_enabled: true        # feature/phase12 branch default (128-d r_params)
   red_cross_attn_enabled: true
   red_vocab_size: 64
   red_corpus_enabled: false    # 12.1 — separate signal_corpus_red.jsonl

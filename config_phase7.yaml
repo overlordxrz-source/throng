@@ -205,13 +205,13 @@ phase9_canvas:
   confidence_coef: 0.05
   # Phase 11.3 — epistemic imagination gating (feature/phase11-3-epistemic-gate)
   imagination_gating_enabled: true
-  confidence_threshold: 0.02
+  confidence_threshold: 0.001
   imagination_k: 5
   imagination_gamma: 0.999
 
 # Phase 12 — adversarial co-evolution (feature/phase12-red-coevolution; off on production P11.3)
 phase12_coevolution:
-  red_comms_enabled: false
+  red_comms_enabled: true        # branch default: 128-d PredatorNetwork (matches volume r_params)
   red_cross_attn_enabled: true
   red_vocab_size: 64
   red_corpus_enabled: false      # 12.1 — signal_corpus_red.jsonl (requires red_comms_enabled)

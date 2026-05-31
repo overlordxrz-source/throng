@@ -1,7 +1,7 @@
 # Phase 12.0 — Adversarial Co-Evolution (Red Comms)
 
 **Branch:** `feature/phase12-red-coevolution`  
-**Flag:** `phase12_coevolution.red_comms_enabled` (default **false**)
+**Flag:** `phase12_coevolution.red_comms_enabled` (default **true** on `feature/phase12-red-coevolution` — matches 128-d checkpoints)
 
 ## Goal
 
@@ -35,7 +35,7 @@ Restore uses `items={"b_params": …}` only when `red_comms_enabled`.
 
 ```yaml
 phase12_coevolution:
-  red_comms_enabled: false
+  red_comms_enabled: true
   red_cross_attn_enabled: true
   red_vocab_size: 64
 ```
@@ -68,6 +68,18 @@ When enabled:
 
 CPU-only post-rollout; no `sim_step` / XLA changes.
 
+## Phase 12.2 — Red decode (`tools/decode_signals.py --red`)
+
+After ~20k steps of red corpus:
+
+```bash
+python3 tools/decode_signals.py --red /mnt/throng-runs/signal_corpus_red.jsonl --min-step <12.1_restart> --k 16
+```
+
+**Red VQ pincer test (χ²):** tokens with mean emitter `blue_dist ≤ 2` (Chase) vs `> 5` (Search); compares receiver **lag-1** N/S/E/W pursuit mix among non-hunters with `nb_hunter_token_lag1`. Significant χ² → coordination, not noise.
+
+Blue decode unchanged: `python3 tools/decode_signals.py signal_corpus.jsonl`.
+
 ## Launch (new run only)
 
-Controlled restart: enable `red_comms_enabled` + `red_corpus_enabled` on this branch. Blue decode pipeline stays on `signal_corpus.jsonl` only.
+On this branch, `red_comms_enabled` defaults **true** (128-d `r_params` on volume). Enable `red_corpus_enabled: true` when you want `signal_corpus_red.jsonl`. Blue decode stays on `signal_corpus.jsonl` only.

@@ -3,6 +3,8 @@ tools/decode_signals.py — Offline language analysis of the signal corpus.
 
 Usage:
     python tools/decode_signals.py runs/run_XXXXXXXX_XXXXXX/signal_corpus.jsonl
+    python tools/decode_signals.py --red
+    python tools/decode_signals.py --red /path/to/signal_corpus_red.jsonl --min-step 1000
 
 What this script does:
   1. Loads the corpus and prints basic stats.
@@ -39,6 +41,11 @@ except ImportError:
 
 ACTION_NAMES = {0: "N", 1: "S", 2: "E", 3: "W", 4: "STAY"}
 CONTEXT_KEYS = ["red_dist", "red_bear", "resource", "energy", "neighbors"]
+RED_CONTEXT_KEYS = ["blue_dist", "blue_bear", "resource", "energy", "neighbors"]
+RED_CORPUS_DEFAULT = "/mnt/throng-runs/signal_corpus_red.jsonl"
+# Phase 12.2 pincer test: emitter blue_dist when token was transmitted
+RED_CHASE_BLUE_DIST_MAX = 2.0
+RED_SEARCH_BLUE_DIST_MIN = 5.0
 
 
 # ── Loading ────────────────────────────────────────────────────────────────────
@@ -118,12 +125,118 @@ def load_corpus(path: str) -> dict:
     }
 
 
+def load_red_corpus(path: str) -> dict:
+    """Load Phase 12.1 red corpus (hunter / blue_dist schema)."""
+    records = []
+    with open(path) as fh:
+        for line in fh:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                records.append(json.loads(line))
+            except json.JSONDecodeError:
+                continue
+
+    if not records:
+        sys.exit(f"No valid records in {path}")
+
+    signals = np.array([r["sig"] for r in records], dtype=np.float32)
+    actions = np.array([r["action"] for r in records], dtype=np.int32)
+    hunters = np.array([r["hunter"] for r in records], dtype=bool)
+    steps = np.array([r["step"] for r in records], dtype=np.int64)
+
+    ctx = {}
+    for k in RED_CONTEXT_KEYS:
+        raw = np.array([r.get(k, float("nan")) for r in records], dtype=np.float32)
+        ctx[k] = raw
+
+    sig_dim = signals.shape[1]
+    nb_lag1_raw = [r.get("nb_hunter_sig_lag1", None) for r in records]
+    has_lag1 = any(v is not None for v in nb_lag1_raw)
+    if has_lag1:
+        nb_lag1 = np.array(
+            [v if v is not None else [float("nan")] * sig_dim for v in nb_lag1_raw],
+            dtype=np.float32,
+        )
+    else:
+        nb_lag1 = None
+
+    nb_dist_lag1_raw = [r.get("nb_hunter_dist_lag1", None) for r in records]
+    has_dist_lag1 = any(v is not None for v in nb_dist_lag1_raw)
+    if has_dist_lag1:
+        nb_dist_lag1 = np.array(
+            [v if v is not None else float("nan") for v in nb_dist_lag1_raw],
+            dtype=np.float32,
+        )
+    else:
+        nb_dist_lag1 = None
+
+    vq_tokens = np.array(
+        [r.get("vq_token", -1) for r in records], dtype=np.int32
+    )
+    nb_tok_lag1_raw = [r.get("nb_hunter_token_lag1", None) for r in records]
+    has_tok_lag1 = any(v is not None for v in nb_tok_lag1_raw)
+    if has_tok_lag1:
+        nb_tok_lag1 = np.array(
+            [v if v is not None else -1 for v in nb_tok_lag1_raw],
+            dtype=np.int32,
+        )
+    else:
+        nb_tok_lag1 = None
+
+    return {
+        "signals": signals,
+        "actions": actions,
+        "hunters": hunters,
+        "steps": steps,
+        "ctx": ctx,
+        "nb_lag1": nb_lag1,
+        "nb_dist_lag1": nb_dist_lag1,
+        "vq_tokens": vq_tokens,
+        "nb_tok_lag1": nb_tok_lag1,
+        "n": len(records),
+    }
+
+
+def _apply_step_filter(
+    data: dict,
+    min_step: int,
+    max_step: int,
+    *,
+    emitter_key: str = "scouts",
+) -> None:
+    """In-place step filter for blue (scouts) or red (hunters) corpora."""
+    keep = np.ones(len(data["steps"]), dtype=bool)
+    if min_step > 0:
+        keep &= data["steps"] >= min_step
+    if max_step > 0:
+        keep &= data["steps"] <= max_step
+    if keep.all():
+        return
+    for key in ("signals", "actions", emitter_key, "steps"):
+        data[key] = data[key][keep]
+    data["ctx"] = {k: v[keep] for k, v in data["ctx"].items()}
+    if data.get("nb_lag1") is not None:
+        data["nb_lag1"] = data["nb_lag1"][keep]
+    if data.get("nb_dist_lag1") is not None:
+        data["nb_dist_lag1"] = data["nb_dist_lag1"][keep]
+    data["vq_tokens"] = data["vq_tokens"][keep]
+    if data.get("nb_tok_lag1") is not None:
+        data["nb_tok_lag1"] = data["nb_tok_lag1"][keep]
+    data["n"] = int(keep.sum())
+
+
 # ── Per-dimension correlation table ───────────────────────────────────────────
 
-def dim_correlations(signals: np.ndarray, ctx: dict) -> np.ndarray:
+def dim_correlations(
+    signals: np.ndarray,
+    ctx: dict,
+    feat_keys: Optional[list[str]] = None,
+) -> np.ndarray:
     """Returns (signal_dim, n_features) Spearman r matrix."""
     sig_dim = signals.shape[1]
-    feat_keys = CONTEXT_KEYS
+    feat_keys = feat_keys or CONTEXT_KEYS
     mat = np.zeros((sig_dim, len(feat_keys)), dtype=np.float32)
     for fi, k in enumerate(feat_keys):
         y = ctx[k]
@@ -138,10 +251,14 @@ def dim_correlations(signals: np.ndarray, ctx: dict) -> np.ndarray:
 
 # ── Mutual information table ───────────────────────────────────────────────────
 
-def dim_mi(signals: np.ndarray, ctx: dict) -> np.ndarray:
+def dim_mi(
+    signals: np.ndarray,
+    ctx: dict,
+    feat_keys: Optional[list[str]] = None,
+) -> np.ndarray:
     """Returns (signal_dim, n_features) MI matrix."""
     sig_dim   = signals.shape[1]
-    feat_keys = CONTEXT_KEYS
+    feat_keys = feat_keys or CONTEXT_KEYS
     mat = np.zeros((sig_dim, len(feat_keys)), dtype=np.float32)
     for fi, k in enumerate(feat_keys):
         y = ctx[k]
@@ -165,16 +282,19 @@ def cluster_analysis(
     scouts:  np.ndarray,
     ctx:     dict,
     k:       int = 8,
+    feat_keys: Optional[list[str]] = None,
+    emitter_pct_label: str = "Scout",
 ) -> None:
+    feat_keys = feat_keys or CONTEXT_KEYS
     km = KMeans(n_clusters=k, random_state=42, n_init=10)
     labels = km.fit_predict(signals)
 
     print(f"\n{'─'*70}")
     print(f"  CLUSTER VOCABULARY  (k={k})")
     print(f"{'─'*70}")
-    header = (f"{'Clust':>6}  {'N':>5}  {'Scout%':>7}  "
+    header = (f"{'Clust':>6}  {'N':>5}  {emitter_pct_label + '%':>7}  "
               f"{'DomAct':>7}  "
-              + "  ".join(f"{k[:8]:>8}" for k in CONTEXT_KEYS))
+              + "  ".join(f"{k[:8]:>8}" for k in feat_keys))
     print(header)
     print("─" * len(header))
 
@@ -187,12 +307,154 @@ def cluster_analysis(
         act_counts = np.bincount(actions[mask], minlength=5)
         dom_act  = ACTION_NAMES[int(act_counts.argmax())]
         ctx_vals = []
-        for ck in CONTEXT_KEYS:
+        for ck in feat_keys:
             v = ctx[ck][mask]
             v = v[np.isfinite(v)]
             ctx_vals.append(f"{v.mean():>8.3f}" if len(v) > 0 else f"{'nan':>8}")
         print(f"  {c:>4d}  {n:>5d}  {scout_pct:>6.1f}%  "
               f"{dom_act:>7}  " + "  ".join(ctx_vals))
+
+
+def red_vq_token_pincer_test(
+    actions: np.ndarray,
+    hunters: np.ndarray,
+    ctx: dict,
+    vq_tokens: np.ndarray,
+    nb_tok_lag1: Optional[np.ndarray],
+    nb_dist_lag1: Optional[np.ndarray],
+    min_token_n: int = 25,
+    min_elig: int = 50,
+    chase_max: float = RED_CHASE_BLUE_DIST_MAX,
+    search_min: float = RED_SEARCH_BLUE_DIST_MIN,
+) -> None:
+    """
+    Phase 12.2 — Red VQ pincer test (χ²).
+
+    Chase tokens: emitted when emitter blue_dist <= chase_max (close pursuit).
+    Search tokens: emitted when emitter blue_dist > search_min (wide search).
+
+    Among receiver reds pursuing (N/S/E/W) with a lag-1 hunter token, does
+    pursuit direction differ between Chase vs Search codebook subsets?
+    """
+    from scipy.stats import chi2_contingency
+
+    A_STAY = 4
+    dir_names = {0: "N", 1: "S", 2: "E", 3: "W"}
+    dist_key = "blue_dist"
+
+    print(f"\n{'─'*70}")
+    print(f"  RED VQ PINCER TEST  (lag-1 hunter token → receiver pursuit direction)")
+    print(f"{'─'*70}")
+
+    if nb_tok_lag1 is None:
+        print("  nb_hunter_token_lag1 absent — accumulate red corpus after 12.1 restart.")
+        return
+
+    if dist_key not in ctx:
+        print(f"  {dist_key} missing from red corpus.")
+        return
+
+    valid_tok = vq_tokens >= 0
+    token_stats: dict[int, tuple[float, int]] = {}
+    for t in range(int(vq_tokens.max()) + 1 if valid_tok.any() else 0):
+        mask = valid_tok & (vq_tokens == t)
+        if int(mask.sum()) < 5:
+            continue
+        token_stats[t] = (float(ctx[dist_key][mask].mean()), int(mask.sum()))
+
+    if not token_stats:
+        print("  No vq_token field in red corpus — accumulate data after training fix.")
+        return
+
+    print(f"\n  Per-token emitter context  (mean blue_dist when token is transmitted):")
+    print(f"  {'tok':>4}  {'N':>6}  {'blue_dist':>10}")
+    print(f"  {'-'*26}")
+    for t in sorted(token_stats, key=lambda x: token_stats[x][0]):
+        mu, n = token_stats[t]
+        print(f"  {t:>4}  {n:>6}  {mu:>10.2f}")
+
+    chase_set = {
+        t for t, (mu, n) in token_stats.items()
+        if mu <= chase_max and n >= min_token_n
+    }
+    search_set = {
+        t for t, (mu, n) in token_stats.items()
+        if mu >= search_min and n >= min_token_n
+    }
+
+    # Closest vs farthest frequent tokens (pairwise sanity check)
+    t_chase = int(min(token_stats, key=lambda x: token_stats[x][0]))
+    t_search = int(max(token_stats, key=lambda x: token_stats[x][0]))
+
+    receivers = ~hunters
+    pursuing = receivers & (actions != A_STAY)
+    has_lag = nb_tok_lag1 >= 0
+    if nb_dist_lag1 is not None:
+        has_lag &= np.isfinite(nb_dist_lag1)
+    eligible = pursuing & has_lag
+
+    n_elig = int(eligible.sum())
+    print(f"\n  Receiver reds pursuing with lag-1 hunter token: {n_elig:,}")
+    print(f"  Chase tokens (mean blue_dist ≤ {chase_max}): {sorted(chase_set) or '—'}")
+    print(f"  Search tokens (mean blue_dist > {search_min}): {sorted(search_set) or '—'}")
+
+    if n_elig < min_elig:
+        print(f"  Too few eligible records (< {min_elig}) — accumulate more red corpus.")
+        return
+
+    lag_chase = np.isin(nb_tok_lag1, list(chase_set))
+    lag_search = np.isin(nb_tok_lag1, list(search_set))
+
+    if t_chase in token_stats and t_search in token_stats:
+        for label, tok in [
+            (f"CHASE (low blue_dist, tok mean≤{chase_max})", t_chase),
+            (f"SEARCH (high blue_dist, tok mean≥{search_min})", t_search),
+        ]:
+            sub = eligible & (nb_tok_lag1 == tok)
+            ns = int(sub.sum())
+            if ns < 10:
+                print(f"\n  Token {tok} ({label}): n={ns} — too few receivers")
+                continue
+            print(f"\n  Receivers with lag-1 hunter token {tok} ({label}, "
+                  f"emitter blue_dist≈{token_stats[tok][0]:.1f})  n={ns}")
+            for a, nm in dir_names.items():
+                cnt = int((actions[sub] == a).sum())
+                print(f"    {nm}: {cnt:5d}  ({100 * cnt / max(ns, 1):5.1f}%)")
+
+        sub_c = eligible & (nb_tok_lag1 == t_chase)
+        sub_s = eligible & (nb_tok_lag1 == t_search)
+        if int(sub_c.sum()) >= 10 and int(sub_s.sum()) >= 10:
+            cats = sorted(dir_names.keys())
+            table = np.zeros((2, len(cats)), dtype=np.int64)
+            for j, a in enumerate(cats):
+                table[0, j] = int((actions[sub_c] == a).sum())
+                table[1, j] = int((actions[sub_s] == a).sum())
+            chi2, p, _, _ = chi2_contingency(table)
+            print(f"\n  χ²(token {t_chase} vs {t_search} pursuit directions) = "
+                  f"{chi2:.2f}  p={p:.4f}")
+
+    if chase_set and search_set:
+        sub_c = eligible & lag_chase
+        sub_s = eligible & lag_search
+        print(f"\n  Pincer sets: chase {sorted(chase_set)}  search {sorted(search_set)}")
+        print(f"  Receivers lag-1 chase-token: {int(sub_c.sum()):,}  "
+              f"search-token: {int(sub_s.sum()):,}")
+        if int(sub_c.sum()) >= 10 and int(sub_s.sum()) >= 10:
+            cats = sorted(dir_names.keys())
+            table = np.zeros((2, len(cats)), dtype=np.int64)
+            for j, a in enumerate(cats):
+                table[0, j] = int((actions[sub_c] == a).sum())
+                table[1, j] = int((actions[sub_s] == a).sum())
+            chi2, p, _, _ = chi2_contingency(table)
+            print(f"  χ²(chase-set vs search-set pursuit directions) = {chi2:.2f}  p={p:.4f}")
+            if p < 0.05:
+                print("  → Significant: chase vs search tokens associate with "
+                      "different pursuit mix (pincer / coordination hypothesis).")
+            else:
+                print("  → Not significant at p<0.05 (may need more red corpus).")
+    else:
+        print("\n  Could not form chase/search token sets at min_token_n — "
+              "accumulate more emissions per token.")
 
 
 # ── Lag-1 partial regression (Cam's communication test) ───────────────────────
@@ -205,6 +467,9 @@ def lag1_regression(
     nb_lag1:      np.ndarray,
     nb_dist_lag1: Optional[np.ndarray],
     sig_dim:      int,
+    *,
+    red:          bool = False,
+    dist_ctrl_key: Optional[str] = None,
 ) -> None:
     """
     Partial regression test for genuine cross-agent communication.
@@ -226,38 +491,56 @@ def lag1_regression(
     from sklearn.linear_model import LogisticRegression
     from scipy.stats import chi2
 
+    title = (
+        "LAG-1 HUNTER → RECEIVER PURSUIT  (red partial regression)"
+        if red else
+        "LAG-1 COMMUNICATION TEST  (Cam's partial regression)"
+    )
+    listener = "Non-hunter" if red else "Blind"
+    emitter = "hunter" if red else "scout"
+    outcome = "pursuit" if red else "flee"
+
     print(f"\n{'─'*70}")
-    print(f"  LAG-1 COMMUNICATION TEST  (Cam's partial regression)")
+    print(f"  {title}")
     print(f"{'─'*70}")
 
-    # Filter: blind agents with valid lag-1 scout signal
+    # Filter: listeners with valid lag-1 emitter signal
     blind    = ~scouts
     has_sig  = blind & np.isfinite(nb_lag1).all(axis=1)
 
-    # Also require scout_dist_lag1 if available
+    # Also require emitter dist lag-1 if available
     if nb_dist_lag1 is not None:
         has_dist = np.isfinite(nb_dist_lag1)
         eligible = has_sig & has_dist
-        ctrl_label = "scout_red_dist_lag1"
+        ctrl_label = (
+            "hunter_blue_dist_lag1" if red else "scout_red_dist_lag1"
+        )
     else:
         eligible   = has_sig
-        ctrl_label = "blind_red_dist (fallback — scout_dist not in corpus)"
+        fallback_key = dist_ctrl_key or ("blue_dist" if red else "red_dist")
+        ctrl_label = f"{listener.lower()}_{fallback_key} (fallback)"
 
     n_eligible = int(eligible.sum())
-    print(f"  Blind agents with lag-1 scout signal + dist: {n_eligible:,} / {blind.sum():,}")
+    print(f"  {listener} agents with lag-1 {emitter} signal + dist: "
+          f"{n_eligible:,} / {blind.sum():,}")
     print(f"  Control variable: {ctrl_label}")
 
     if n_eligible < 50:
         print("  Too few eligible records (< 50) — accumulate more corpus data.")
         return
 
-    y    = (actions[eligible] != 4).astype(np.float32)  # 1 = flee, 0 = stay
+    y    = (actions[eligible] != 4).astype(np.float32)  # 1 = move, 0 = stay
+    if len(np.unique(y)) < 2:
+        print(f"  Outcome is all-{outcome} among eligible listeners — skip regression.")
+        return
+
     lag1 = nb_lag1[eligible]
 
     if nb_dist_lag1 is not None:
         ctrl = nb_dist_lag1[eligible]
     else:
-        ctrl = ctx["red_dist"][eligible]
+        fk = dist_ctrl_key or ("blue_dist" if red else "red_dist")
+        ctrl = ctx[fk][eligible]
 
     def zscore(x: np.ndarray) -> np.ndarray:
         std = x.std()
@@ -288,7 +571,7 @@ def lag1_regression(
     print(f"\n  Omnibus likelihood-ratio test  (all dims vs control):")
     print(f"    LRT χ²({lrt_df}) = {lrt_stat:.3f}   p = {lrt_p:.4f}")
     verdict = (
-        "SIGNIFICANT ← scout signal predicts flee beyond proximity"
+        f"SIGNIFICANT ← {emitter} signal predicts {outcome} beyond proximity"
         if lrt_p < 0.05 else
         "not significant — no communication above spatial confound"
     )
@@ -317,8 +600,8 @@ def lag1_regression(
         sig  = "*** SIGNIFICANT" if p1 < 0.05 else ("~ marginal" if p1 < 0.15 else "")
         print(f"  dim{d}  {beta1:>+8.4f}  {chi1:>8.3f}  {p1:>8.4f}  {sig}")
 
-    print(f"\n  Baseline flee rate: {y.mean():.3f}")
-    print(f"  β > 0 = higher scout signal → more flee  |  β < 0 = suppresses flee")
+    print(f"\n  Baseline {outcome} rate: {y.mean():.3f}")
+    print(f"  β > 0 = higher {emitter} signal → more {outcome}  |  β < 0 = suppresses")
     print(f"  Per-dim p < 0.05 = that specific dim carries communication signal")
 
 
@@ -346,6 +629,11 @@ def topographic_similarity(
     n_pairs:  int = 5000,
     n_null:   int = 200,
     seed:     int = 42,
+    *,
+    bear_key: str = "red_bear",
+    dist_key: str = "red_dist",
+    emitter_label: str = "scout",
+    listener_label: str = "blind",
 ) -> None:
     """
     TOPO_SIM with three components (Cam Q10/Q11):
@@ -388,7 +676,7 @@ def topographic_similarity(
     has_sig  = np.isfinite(nb_lag1).all(axis=1)
     elig_t   = fleeing & has_sig
     n_elig_t = int(elig_t.sum())
-    print(f"\n  [TRANSMITTED]  blind fleeing agents with lag-1: {n_elig_t:,}")
+    print(f"\n  [TRANSMITTED]  {listener_label} fleeing agents with lag-1: {n_elig_t:,}")
 
     if n_elig_t >= 100:
         t_sigs = nb_lag1[elig_t]
@@ -443,17 +731,20 @@ def topographic_similarity(
         r_t = float("nan")
         print("  Too few records.")
 
-    # ── 2. EMITTED: scout raw signal → scout red_bear ─────────────────────
-    print(f"\n  [EMITTED]  scout raw signal → red_bear (production vocabulary)")
-    scout_mask  = scouts & np.isfinite(ctx["red_bear"]) & np.isfinite(ctx["red_dist"])
-    # Only scouts that can actually see a red (red_dist < detection_radius)
-    scout_mask &= ctx["red_dist"] < 8.0
-    n_elig_e    = int(scout_mask.sum())
-    print(f"  Scout records with red visible (dist<8): {n_elig_e:,}")
+    # ── 2. EMITTED: emitter raw signal → threat/prey bearing ─────────────
+    print(f"\n  [EMITTED]  {emitter_label} raw signal → {bear_key} (production vocabulary)")
+    scout_mask = (
+        scouts
+        & np.isfinite(ctx[bear_key])
+        & np.isfinite(ctx[dist_key])
+    )
+    scout_mask &= ctx[dist_key] < 8.0
+    n_elig_e = int(scout_mask.sum())
+    print(f"  {emitter_label.capitalize()} records with target visible (dist<8): {n_elig_e:,}")
 
     if n_elig_e >= 100:
         e_sigs  = signals[scout_mask]
-        e_bear  = ctx["red_bear"][scout_mask]   # degrees 0-360
+        e_bear  = ctx[bear_key][scout_mask]   # degrees 0-360
 
         # Angular distance: min(|a-b|, 360-|a-b|) → normalize to [0, 1]
         cap = min(n_elig_e, 3000)
@@ -513,6 +804,11 @@ def categorical_vocabulary_tests(
     sig_dim: int,
     n_pairs: int = 5000,
     seed:    int = 42,
+    *,
+    bear_key: str = "red_bear",
+    dist_key: str = "red_dist",
+    emitter_label: str = "scout",
+    visible_dist_max: float = 8.0,
 ) -> None:
     """
     Three tests for discrete 4-symbol vocabulary (Cam round 7):
@@ -534,19 +830,20 @@ def categorical_vocabulary_tests(
     print(f"  CATEGORICAL VOCABULARY TESTS  (4-symbol lexicon)")
     print(f"{'─'*70}")
 
-    # Filter: scouts with a visible red
+    # Filter: emitters with visible prey/threat
     scout_vis = (scouts
-                 & np.isfinite(ctx["red_bear"])
-                 & np.isfinite(ctx["red_dist"])
-                 & (ctx["red_dist"] < 8.0))
+                 & np.isfinite(ctx[bear_key])
+                 & np.isfinite(ctx[dist_key])
+                 & (ctx[dist_key] < visible_dist_max))
     n_sv = int(scout_vis.sum())
-    print(f"\n  Scouts with visible red (dist<8): {n_sv:,}")
+    print(f"\n  {emitter_label.capitalize()}s with visible target "
+          f"({dist_key}<{visible_dist_max}): {n_sv:,}")
     if n_sv < 100:
         print("  Too few — cannot run tests.")
         return
 
     sv_sigs  = signals[scout_vis]
-    sv_bear  = ctx["red_bear"][scout_vis]
+    sv_bear  = ctx[bear_key][scout_vis]
     sv_card  = _cardinal_bin(sv_bear)
 
     rng = np.random.default_rng(seed)
@@ -574,7 +871,8 @@ def categorical_vocabulary_tests(
         print(f"  → Not significant")
 
     # ── Test 2: K-means k=4 → cluster vs cardinal direction ──────────────
-    print(f"\n  TEST 2 — K-means k=4 on scout signals, cluster vs cardinal direction")
+    print(f"\n  TEST 2 — K-means k=4 on {emitter_label} signals, "
+          f"cluster vs cardinal direction")
     from sklearn.cluster import KMeans
     from sklearn.preprocessing import StandardScaler
     X = StandardScaler().fit_transform(sv_sigs)
@@ -600,7 +898,7 @@ def categorical_vocabulary_tests(
         n_match = sum(contingency[cl, np.argmax(contingency[cl])]
                       for cl in range(4))
         pct = 100 * n_match / len(labels)
-        print(f"  {pct:.1f}% of scouts in cluster matching dominant cardinal")
+        print(f"  {pct:.1f}% of {emitter_label}s in cluster matching dominant cardinal")
         if p_chi < 1e-6:
             print(f"  → 4-symbol lexicon CONFIRMED (clusters align with cardinal threat direction)")
         else:
@@ -642,6 +940,8 @@ def lag1_direction_lrt(
     nb_lag1:      np.ndarray,
     nb_dist_lag1: Optional[np.ndarray],
     sig_dim:      int,
+    *,
+    red:          bool = False,
 ) -> None:
     """
     Multinomial direction LRT among blind agents that are fleeing.
@@ -661,8 +961,16 @@ def lag1_direction_lrt(
     A_STAY = 4
     dir_names = {0: "N", 1: "S", 2: "E", 3: "W"}
 
+    motion = "pursuit" if red else "flee"
+    listener = "Non-hunter" if red else "Blind"
+    title = (
+        f"LAG-1 DIRECTION LRT  (multinomial {motion} direction, red)"
+        if red else
+        "LAG-1 DIRECTION LRT  (multinomial flee direction)"
+    )
+
     print(f"\n{'─'*70}")
-    print(f"  LAG-1 DIRECTION LRT  (multinomial flee direction)")
+    print(f"  {title}")
     print(f"{'─'*70}")
 
     blind   = ~scouts
@@ -672,17 +980,20 @@ def lag1_direction_lrt(
     if nb_dist_lag1 is not None:
         has_dist = np.isfinite(nb_dist_lag1)
         eligible = fleeing & has_sig & has_dist
-        ctrl_label = "scout_red_dist_lag1"
+        ctrl_label = (
+            "hunter_blue_dist_lag1" if red else "scout_red_dist_lag1"
+        )
     else:
         eligible   = fleeing & has_sig
-        ctrl_label = "blind_red_dist (fallback)"
+        ctrl_label = f"{listener.lower()}_dist (fallback)"
 
     n_elig = int(eligible.sum())
     n_flee = int(fleeing.sum())
     n_blind = int(blind.sum())
 
-    print(f"  Blind agents total:   {n_blind:,}")
-    print(f"  Blind agents fleeing: {n_flee:,}  ({100*n_flee/max(n_blind,1):.1f}%  ← flee baseline)")
+    print(f"  {listener} agents total:   {n_blind:,}")
+    print(f"  {listener} agents {motion}: {n_flee:,}  "
+          f"({100*n_flee/max(n_blind,1):.1f}%  ← {motion} baseline)")
     print(f"  Eligible for LRT:     {n_elig:,}  (have lag-1 fields)")
     print(f"  Control variable:     {ctrl_label}")
 
@@ -705,7 +1016,7 @@ def lag1_direction_lrt(
     n_classes = len(np.unique(y))
     df_per_dim = n_classes - 1   # extra params when adding 1 predictor to multinomial
 
-    print(f"\n  Flee direction distribution:")
+    print(f"\n  {motion.capitalize()} direction distribution:")
     for a, nm in dir_names.items():
         cnt = int((y == a).sum())
         print(f"    {nm}: {cnt:5d}  ({100*cnt/max(n_elig,1):5.1f}%)")
@@ -740,8 +1051,173 @@ def lag1_direction_lrt(
         print(f"  dim{d}  {chi_val:>8.3f}  {p_val:>8.4f}  {sig}")
         print(f"        coefs: {coef_str}")
 
-    print(f"\n  Coef interpretation: positive coef for direction X = higher signal → more X flights")
+    verb = "pursuits" if red else "flights"
+    print(f"\n  Coef interpretation: positive coef for direction X = higher signal → more X {verb}")
     print(f"  Significant dim + coef pattern matching bearing = signal encodes direction")
+
+
+# ── Phase 12.2 red decode pipeline ─────────────────────────────────────────────
+
+def decode_red_schema(
+    data: dict,
+    *,
+    k: int = 8,
+    min_step: int = 0,
+    max_step: int = 0,
+) -> None:
+    """Full offline decode for signal_corpus_red.jsonl (Phase 12.2)."""
+    _apply_step_filter(data, min_step, max_step, emitter_key="hunters")
+
+    n = data["n"]
+    signals = data["signals"]
+    actions = data["actions"]
+    hunters = data["hunters"]
+    ctx = data["ctx"]
+    sig_dim = signals.shape[1]
+    feat_keys = RED_CONTEXT_KEYS
+
+    print(f"\n{'='*70}")
+    print(f"  RED CORPUS SUMMARY  (Phase 12.2)")
+    print(f"{'='*70}")
+    print(f"  Records  : {n:,}")
+    print(f"  Steps    : {data['steps'].min():,} – {data['steps'].max():,}")
+    print(f"  Signal dim: {sig_dim}")
+    print(f"  Hunters  : {hunters.sum():,}  ({100 * hunters.mean():.1f}%)")
+    print(
+        "  Actions  : "
+        + "  ".join(
+            f"{ACTION_NAMES[a]}={int((actions == a).sum())}" for a in range(5)
+        )
+    )
+
+    print(f"\n{'─'*70}")
+    print(f"  SIGNAL RANGE PER DIM")
+    print(f"{'─'*70}")
+    for di in range(sig_dim):
+        v = signals[:, di]
+        print(
+            f"  dim{di}: mean={v.mean():+.4f}  std={v.std():.4f}  "
+            f"min={v.min():+.4f}  max={v.max():+.4f}"
+        )
+
+    cor_mat = dim_correlations(signals, ctx, feat_keys=feat_keys)
+    print(f"\n{'─'*70}")
+    print(f"  SPEARMAN r(signal_dim, context_feature)")
+    print(f"{'─'*70}")
+    hdr = f"  {'dim':>5}  " + "  ".join(f"{k[:9]:>9}" for k in feat_keys)
+    print(hdr)
+    print("  " + "─" * (len(hdr) - 2))
+    for di in range(sig_dim):
+        vals = "  ".join(
+            f"{cor_mat[di, fi]:>+9.3f}" for fi in range(len(feat_keys))
+        )
+        print(f"  dim{di:>2}  {vals}")
+
+    mi_mat = dim_mi(signals, ctx, feat_keys=feat_keys)
+    print(f"\n{'─'*70}")
+    print(f"  MUTUAL INFORMATION I(signal_dim ; context_feature)")
+    print(f"{'─'*70}")
+    print(hdr)
+    print("  " + "─" * (len(hdr) - 2))
+    best_label = {}
+    for di in range(sig_dim):
+        vals = "  ".join(
+            f"{mi_mat[di, fi]:>9.4f}" for fi in range(len(feat_keys))
+        )
+        best_fi = int(mi_mat[di].argmax())
+        best_label[di] = (
+            feat_keys[best_fi] if mi_mat[di, best_fi] > 0.005 else "noise"
+        )
+        print(f"  dim{di:>2}  {vals}  ← {best_label[di]}")
+
+    print(f"\n{'─'*70}")
+    print(f"  DIMENSION ROLES (by peak MI)")
+    print(f"{'─'*70}")
+    for di in range(sig_dim):
+        print(f"  dim{di} → {best_label[di]}")
+
+    if hunters.any() and (~hunters).any():
+        print(f"\n{'─'*70}")
+        print(f"  HUNTER vs RECEIVER SIGNAL DIFFERENCE")
+        print(f"{'─'*70}")
+        for di in range(sig_dim):
+            mu_h = float(signals[hunters, di].mean())
+            mu_r = float(signals[~hunters, di].mean())
+            print(
+                f"  dim{di}: hunter={mu_h:+.4f}  receiver={mu_r:+.4f}  "
+                f"Δ={mu_h - mu_r:+.4f}"
+            )
+
+    cluster_analysis(
+        signals,
+        actions,
+        hunters,
+        ctx,
+        k=k,
+        feat_keys=feat_keys,
+        emitter_pct_label="Hunter",
+    )
+
+    nb_lag1 = data.get("nb_lag1")
+    nb_dist_lag1 = data.get("nb_dist_lag1")
+    if nb_lag1 is not None:
+        lag1_regression(
+            signals,
+            actions,
+            hunters,
+            ctx,
+            nb_lag1,
+            nb_dist_lag1,
+            sig_dim,
+            red=True,
+            dist_ctrl_key="blue_dist",
+        )
+        topographic_similarity(
+            signals,
+            actions,
+            hunters,
+            ctx,
+            nb_lag1,
+            sig_dim,
+            bear_key="blue_bear",
+            dist_key="blue_dist",
+            emitter_label="hunter",
+            listener_label="receiver",
+        )
+        categorical_vocabulary_tests(
+            signals,
+            hunters,
+            ctx,
+            sig_dim,
+            bear_key="blue_bear",
+            dist_key="blue_dist",
+            emitter_label="hunter",
+        )
+        lag1_direction_lrt(
+            actions, hunters, nb_lag1, nb_dist_lag1, sig_dim, red=True,
+        )
+        red_vq_token_pincer_test(
+            actions,
+            hunters,
+            ctx,
+            data["vq_tokens"],
+            data.get("nb_tok_lag1"),
+            nb_dist_lag1,
+        )
+    else:
+        print(f"\n{'─'*70}")
+        print(f"  LAG-1 RED COMMUNICATION TEST")
+        print(f"{'─'*70}")
+        print("  nb_hunter_sig_lag1 absent — restart with red_corpus_enabled.")
+
+    print(f"\n{'='*70}")
+    print("  Done (red). Interpret:")
+    print("  • dim with high MI(blue_dist) → encodes prey proximity")
+    print("  • dim with high MI(blue_bear) → encodes prey bearing")
+    print("  • hunter cluster with distinct signal → possible hunt call")
+    print("  • lag-1 β significant after hunter_blue_dist_lag1 → coordination")
+    print("  • Red VQ pincer χ²: chase tokens → different pursuit mix")
+    print(f"{'='*70}\n")
 
 
 # ── VQ token vocabulary: flee direction vs lag-1 scout token ───────────────────
@@ -1066,7 +1542,17 @@ def withdrawal_comparison(baseline_path: str, withdrawal_path: str) -> None:
 
 def main() -> None:
     ap = argparse.ArgumentParser(description="Decode Throng signal corpus")
-    ap.add_argument("corpus", help="Path to signal_corpus.jsonl")
+    ap.add_argument(
+        "corpus",
+        nargs="?",
+        default=None,
+        help="Path to signal_corpus.jsonl (blue) or signal_corpus_red.jsonl (--red)",
+    )
+    ap.add_argument(
+        "--red",
+        action="store_true",
+        help="Phase 12.2: decode red predator corpus (default path on volume)",
+    )
     ap.add_argument("--k", type=int, default=8, help="Number of clusters")
     ap.add_argument("--min-step", type=int, default=0,
                     help="Ignore records before this step")
@@ -1075,6 +1561,22 @@ def main() -> None:
     ap.add_argument("--baseline", default=None,
                     help="Pre-withdrawal corpus for comparison (skips full analysis)")
     args = ap.parse_args()
+
+    if args.red:
+        corpus_path = args.corpus or RED_CORPUS_DEFAULT
+        if args.baseline is not None:
+            sys.exit("--baseline is only supported for blue corpus decode.")
+        if not Path(corpus_path).exists():
+            sys.exit(f"Red corpus not found: {corpus_path}")
+        print(f"\nLoading RED corpus from {corpus_path} …")
+        data = load_red_corpus(corpus_path)
+        decode_red_schema(
+            data, k=args.k, min_step=args.min_step, max_step=args.max_step,
+        )
+        return
+
+    if args.corpus is None:
+        ap.error("corpus path required unless --red is set")
 
     if args.baseline is not None:
         withdrawal_comparison(args.baseline, args.corpus)
