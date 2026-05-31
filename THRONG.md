@@ -4,7 +4,7 @@
 
 **Read this file first.** Full historical lab notebook (~290KB) lives in [`docs/THRONG_ARCHIVE.md`](docs/THRONG_ARCHIVE.md) if you need old run logs.
 
-**Cam reboot (60 seconds):** Read **§0b** (live run) → **§0** (triad) → **§4** (ops) → **§5** (OOM) → **§11** (roadmap) → [`docs/PHASE12_COEVOLUTION.md`](docs/PHASE12_COEVOLUTION.md) → archive **[SYSTEM RESTORE](docs/THRONG_ARCHIVE.md#system-restore-the-cam-context)**.
+**Cam reboot (60 seconds):** Read **§0b** (live run) → **§0** (triad) → **§4** (ops + restart) → **§7** (blue + **`--red`** decode) → **§5** (OOM) → **§11** (roadmap) → [`docs/PHASE12_COEVOLUTION.md`](docs/PHASE12_COEVOLUTION.md) → archive **[SYSTEM RESTORE](docs/THRONG_ARCHIVE.md#system-restore-the-cam-context)**.
 
 ---
 
@@ -12,7 +12,7 @@
 
 **Blue SOTA (frozen on `master`):** **`465d8c6+`** — 9.4 cross-attn + 9.1 confidence + **11.3 epistemic gate** (merged; Stay-collapse resolved).
 
-**LIVE:** B200 on **`feature/phase12-red-coevolution`** (`d50cc19+`) — **dual-brain** co-evolution: Blue stack unchanged + **`PredatorNetworkJax`** (red VQ comms). Training toward **200k+**. **Do not stop** unless Stay collapse, red VQ collapse, or OOM.
+**LIVE:** B200 on **`feature/phase12-red-coevolution`** (`4f98f96+`) — **dual-brain** co-evolution: Blue stack unchanged + **`PredatorNetworkJax`** (red VQ comms). **Red wiretap ON** (`signal_corpus_red.jsonl`). Training toward **200k+**. **Do not stop** unless Stay collapse, red VQ collapse, or OOM.
 
 | Live run (Phase 12) | Value |
 |---------------------|--------|
@@ -24,7 +24,7 @@
 | **`conf_loss`** | **~1e-4** |
 | **PPO** | `H2D + backward` ✅; blue weights from P11.3 ckpt graft |
 
-**Corpus (after 12.1 restart):** `/mnt/throng-runs/signal_corpus.jsonl` (blue) + **`signal_corpus_red.jsonl`** (red, when `red_corpus_enabled: true`).
+**Corpus (wiretap):** `/mnt/throng-runs/signal_corpus.jsonl` (blue) + **`signal_corpus_red.jsonl`** (red — default on this branch).
 
 | Milestone | Value |
 |-----------|--------|
@@ -72,7 +72,7 @@ Continuous comms verified → unguarded active imagination **failed** → **reso
 |------|--------|
 | **Problem** | P11.2 active override: imagined argmax always on → **Stay ≈ 99%** (solipsistic value exploitation) |
 | **Fix** | **9.1** `head_confidence_*` predicts carry_fwd MSE; **11.3** gates: low `conf_pred` → **imagined** (K=5), high → **reactive** sample |
-| **Probe** | `a_reactive ~ Categorical(logits)`; `conf_pred(carry_t, onehot(a_reactive))`; τ = **0.02** |
+| **Probe** | `a_reactive ~ Categorical(logits)`; `conf_pred(carry_t, onehot(a_reactive))`; τ = **0.001** (P12.2 carry_fwd calibration; was 0.02) |
 | **Telemetry** | Stay **~19%**; `conf_gate_imagine_frac` **65–80%**; PPO `log_probs` on **executed** action |
 | **Module** | [`jax_sim/imagination_jax.py`](jax_sim/imagination_jax.py) + `sim_step` in [`main_jax.py`](jax_sim/main_jax.py) |
 | **Config** | `phase9_canvas.imagination_gating_enabled`, `confidence_threshold`, `imagination_k`, `imagination_gamma` |
@@ -86,20 +86,30 @@ Continuous comms verified → unguarded active imagination **failed** → **reso
 | **Goal** | Adversarial co-evolution — predator comms channel (arms race) |
 | **Module** | `PredatorNetworkJax` — 128-d, `red_codebook`, `red_nb_cross_attn` |
 | **No** | P11 aux / imagination on red (VRAM + catch-only PPO) |
-| **Checkpoint** | **`b_params`** from P11.3 ckpt; **`r_params` always fresh** (no blue clone) |
+| **Checkpoint** | Orbax saves **`b_params` + `r_params`** (128-d predator); restore loads **`b_params`**; **`r_params` re-init** on graft path — **`red_comms_enabled: true`** mandatory on this branch |
 | **Telemetry** | `red_codes_active`, `RedVQ`, `Actions (red):` on dashboard |
 | **Docs** | [`docs/PHASE12_COEVOLUTION.md`](docs/PHASE12_COEVOLUTION.md) |
 
-### Phase 12.1 — **STAGED** (`d50cc19`; enable on restart)
+### Phase 12.1 — **LIVE** (`d50cc19`; wiretap default `4f98f96+`)
 
 | Item | Detail |
 |------|--------|
 | **File** | `/mnt/throng-runs/signal_corpus_red.jsonl` (separate from blue) |
-| **Fields** | `hunter`, `blue_dist`, `blue_bear`, `nb_hunter_*_lag1` |
+| **Fields** | `hunter`, `blue_dist`, `blue_bear`, `vq_token`, `nb_hunter_sig_lag1`, `nb_hunter_dist_lag1`, `nb_hunter_token_lag1` |
 | **Symmetry** | `hunt_scout_range: 8` (= `alarm_scout_range`) |
 | **Guard** | Red corpus runs **even if blue locally extinct** |
-| **Flag** | `phase12_coevolution.red_corpus_enabled: true` (requires `red_comms_enabled`) |
-| **Decode** | Phase **12.2** — `decode_signals` red schema (not yet) |
+| **Flags** | `red_comms_enabled: true` + **`red_corpus_enabled: true`** in `config_phase7.yaml` — no notebook `sed` |
+| **Writer** | [`communication/analysis.py`](communication/analysis.py) `maybe_record_red()` |
+
+### Phase 12.2 — **DECODE READY** (`d493a50+`)
+
+| Item | Detail |
+|------|--------|
+| **Tool** | `python3 tools/decode_signals.py --red` → `decode_red_schema()` |
+| **Default path** | `/mnt/throng-runs/signal_corpus_red.jsonl` |
+| **Pincer test** | **RED VQ PINCER TEST (χ²):** Chase tokens (mean emitter `blue_dist ≤ 2`) vs Search (`> 5`) → receiver lag-1 **N/S/E/W** pursuit mix |
+| **Bar** | Significant chase-set vs search-set χ² → coordination (trap/pincer), not noise |
+| **Docs** | [`docs/PHASE12_COEVOLUTION.md`](docs/PHASE12_COEVOLUTION.md) §12.2 |
 
 ### Phase 11.2 — **CONCLUDED** (`feature/phase11-2-imagination`)
 
@@ -134,7 +144,7 @@ GPU-resident / `lax.scan` PPO — starvation + XLA OOM; **`d4cf614` revert**.
 
 | Branch | Status |
 |--------|--------|
-| **`feature/phase12-red-coevolution`** | **LIVE TRAIN** — P12.0 red comms + P12.1 corpus (`d50cc19+`) |
+| **`feature/phase12-red-coevolution`** | **LIVE TRAIN** — P12.0–12.2 (`4f98f96+`): red comms + wiretap + `--red` decode |
 | **`master`** | **Blue SOTA** — P11.3 epistemic gate (`465d8c6+`); **no** predator brain |
 | **`feature/phase11-3-epistemic-gate`** | Merged → `master` |
 | **`feature/phase11-2-imagination`** | **FROZEN** — metrics-only (`061df84`) |
@@ -184,7 +194,7 @@ Cam's persona + triad workflow live in Git so reboots recover identity:
 
 | Branch | Purpose |
 |--------|---------|
-| **`feature/phase12-red-coevolution`** | **Active:** `PredatorNetworkJax` + optional `signal_corpus_red.jsonl` |
+| **`feature/phase12-red-coevolution`** | **Active:** `PredatorNetworkJax` + red wiretap + `--red` decode (`4f98f96+`) |
 | **`master`** | **Blue production:** P11.3 stack (no red comms) |
 | **`feature/phase11-2-imagination`** | **Frozen archive** |
 | **`feature/phase11-1-gpu-rollouts`** | **Abandoned** |
@@ -239,7 +249,7 @@ train_entry.run_simulation()  →  main_jax._run_simulation_impl()
 | [`jax_sim/rl_jax.py`](jax_sim/rl_jax.py) | PPO + numpy GAE |
 | [`jax_sim/observations_jax.py`](jax_sim/observations_jax.py) | Obs builder; startup must print `red_sense_api=v2` |
 | [`jax_sim/grid_jax.py`](jax_sim/grid_jax.py) | Catches (`red_catch_prob`), resources, shelter |
-| [`tools/decode_signals.py`](tools/decode_signals.py) | Offline corpus analysis |
+| [`tools/decode_signals.py`](tools/decode_signals.py) | Offline corpus analysis — blue default; **`--red`** for predator pincer decode |
 | [`run_bg.py`](run_bg.py) | **Preferred** nohup entry (`python -u run_bg.py`) |
 | [`scripts/modal_train.py`](scripts/modal_train.py) | Same config as `run_bg.py` |
 
@@ -271,7 +281,8 @@ train_entry.run_simulation()  →  main_jax._run_simulation_impl()
 | **9.1** | Confidence head | `820dd3a` | Predicts carry_fwd MSE; `conf_loss` ~ **1e-4** |
 | **11.3** | **Epistemic gate** ✅ | `465d8c6` | **Stay ~19%**; merged **`master`** |
 | **12.0** | **Red predator comms** | `f0ebb76` | `red_codes_active` **63/64**; dual brain **7 steps/sec** |
-| **12.1** | **Red corpus** | `d50cc19` | `signal_corpus_red.jsonl`; CPU post-rollout only |
+| **12.1** | **Red corpus wiretap** | `d50cc19` / `4f98f96` | `signal_corpus_red.jsonl`; CPU post-rollout |
+| **12.2** | **Red decode + τ clamp** | `d493a50` | `--red` pincer χ²; `confidence_threshold: 0.001` |
 
 **Recurring failure mode:** Blues stay at cap → ~99% survival → **`NB_GAIN↔surv: nan`** → no evolutionary pressure on neighbor-signal benefit.
 
@@ -281,7 +292,7 @@ train_entry.run_simulation()  →  main_jax._run_simulation_impl()
 
 ## 4. Current experiment — Phase **12** co-evolution (`feature/phase12-red-coevolution`)
 
-**Status:** B200 training **`d50cc19+`** toward **200k+**. **Blue:** full P11.3 stack (grafted ckpt). **Red:** `PredatorNetworkJax` + independent `red_codebook` (fresh init). **~7 steps/sec**.
+**Status:** B200 training **`4f98f96+`** toward **200k+**. **Blue:** full P11.3 stack (grafted ckpt). **Red:** `PredatorNetworkJax` 128-d + `red_codebook`. **~7 steps/sec**. **τ = 0.001** (epistemic gate recalibrated for carry_fwd).
 
 **Verified healthy @ Phase 12 activation:**
 
@@ -289,28 +300,37 @@ train_entry.run_simulation()  →  main_jax._run_simulation_impl()
   Actions (blue): Stay ~19%
   Actions (red):  … (watch pincer — entropy ~1.58)
   RedVQ: loss=… | red_codes_active=63/64 | red_entropy=1.58
-  EpistemicGate: conf_gate_imagine_frac=65–80% (τ=0.02; K=5)
+  EpistemicGate: conf_gate_imagine_frac=65–80% (τ=0.001; K=5)
   [JAX] Phase12 red comms: PredatorNetworkJax hidden=128 red_codebook …
-  [JAX] Phase11.3 epistemic gate: conf_pred < 0.02 → imagined_action …
+  [JAX] Red corpus: signal_corpus_red.jsonl …
+  [JAX] Phase11.3 epistemic gate: conf_pred < 0.001 → imagined_action …
   [JAX] blue PPO minibatch 1/200 — H2D + backward...
 ```
 
-**Controlled restart (12.1 corpus wiretap):**
+**Restart (pull branch — config defaults, no `sed`):**
 
 ```bash
-cd /root/throng && git fetch origin && git checkout feature/phase12-red-coevolution && git pull
-# phase12_coevolution:
-#   red_comms_enabled: true
-#   red_corpus_enabled: true    # 12.1 — signal_corpus_red.jsonl
-#   hunt_scout_range: 8
-# phase9_canvas: (unchanged — cross_attn, confidence, imagination gate)
+cd /root/throng && git fetch origin && git checkout feature/phase12-red-coevolution && git pull   # → 4f98f96+
+# config_phase7.yaml already has:
+#   phase9_canvas.confidence_threshold: 0.001
+#   phase12_coevolution.red_comms_enabled: true
+#   phase12_coevolution.red_corpus_enabled: true
 export TF_GPU_ALLOCATOR=cuda_malloc_async
 export XLA_PYTHON_CLIENT_MEM_FRACTION=0.80
 export JAX_COMPILATION_CACHE_DIR=/tmp/throng_jax_cache
 python -u run_bg.py   # → /mnt/throng-runs/train.log
 ```
 
-Startup should include `[JAX] Red corpus: signal_corpus_red.jsonl …`.
+Startup **must** include `[JAX] Red corpus: signal_corpus_red.jsonl …` and **must not** hit `ScopeParamShapeError` (if `red_comms_enabled: false`, reds use 256-d `AgentNetwork` vs 128-d ckpt `r_params`).
+
+**Red pincer decode** (after ~20k red corpus steps post-restart):
+
+```bash
+python3 tools/decode_signals.py --red /mnt/throng-runs/signal_corpus_red.jsonl \
+  --min-step <first_step_in_red_jsonl> --k 16 2>&1 | tee decode_red_pincer.log
+```
+
+Read **RED VQ PINCER TEST** — χ²(chase-set vs search-set pursuit directions).
 
 Modal notebook: [`docs/MODAL_NOTEBOOK_PHASE9.md`](docs/MODAL_NOTEBOOK_PHASE9.md) — clone `/root/throng` first.
 
@@ -328,7 +348,9 @@ Modal notebook: [`docs/MODAL_NOTEBOOK_PHASE9.md`](docs/MODAL_NOTEBOOK_PHASE9.md)
 [JAX] git=465d8c6 | Phase9 auxiliary: ON
 [JAX] Phase9.4 cross-attn receiver: heads=4 ...
 [JAX] Phase9.1 confidence: head_confidence predicts carry_fwd MSE …
-[JAX] Phase11.3 epistemic gate: conf_pred < 0.02 → imagined_action …
+[JAX] Phase12 red comms: PredatorNetworkJax …
+[JAX] Red corpus: signal_corpus_red.jsonl …
+[JAX] Phase11.3 epistemic gate: conf_pred < 0.001 → imagined_action …
 [JAX] Restored params from step …
 ```
 
@@ -645,8 +667,14 @@ python tools/decode_signals.py runs/jax_run/signal_corpus.jsonl --k 16 --min-ste
 ```bash
 pip install scikit-learn scipy
 
-python tools/decode_signals.py /mnt/throng-runs/signal_corpus.jsonl --k 16 --min-step 20000
+# Blue (prey alarm / flee)
+python3 tools/decode_signals.py /mnt/throng-runs/signal_corpus.jsonl --k 16 --min-step 20000
+
+# Red (predator pincer / pursuit) — Phase 12.2
+python3 tools/decode_signals.py --red /mnt/throng-runs/signal_corpus_red.jsonl --k 16 --min-step <restart_step>
 ```
+
+### Blue decode blocks
 
 | Block | What it tests |
 |-------|----------------|
@@ -656,7 +684,20 @@ python tools/decode_signals.py /mnt/throng-runs/signal_corpus.jsonl --k 16 --min
 | **Lag-1 direction LRT** | Scout signal → **flee direction** (needs ≥50 eligible) |
 | **VQ token direction** | Alert vs safe **codebook tokens** → flee χ² |
 
-**Corpus fields (post `5964a24`):** `sig`, `vq_token`, `scout`, `red_dist`, `nb_scout_sig_lag1`, `nb_scout_dist_lag1`, `nb_scout_token_lag1`.
+**Blue corpus fields:** `sig`, `vq_token`, `scout`, `red_dist`, `red_bear`, `nb_scout_sig_lag1`, `nb_scout_dist_lag1`, `nb_scout_token_lag1`.
+
+### Red decode blocks (`--red`)
+
+| Block | What it tests |
+|-------|----------------|
+| MI / Spearman | `sig` vs **`blue_dist`**, **`blue_bear`**, etc. |
+| Hunter vs receiver Δ-signal | Emitter vs listener continuous codes |
+| Lag-1 pursuit regression | `nb_hunter_sig_lag1` → move, ctrl `hunter_blue_dist_lag1` |
+| **RED VQ PINCER TEST (χ²)** | **Chase** tokens (emitter `blue_dist ≤ 2`) vs **Search** (`> 5`) → receiver lag-1 **N/S/E/W** |
+
+**Red corpus fields:** `team`, `hunter`, `blue_dist`, `blue_bear`, `vq_token`, `nb_hunter_sig_lag1`, `nb_hunter_dist_lag1`, `nb_hunter_token_lag1`.
+
+**Schema map (for readers of blue decode):** `scout`→`hunter`, `red_dist`→`blue_dist`, `red_bear`→`blue_bear`, `nb_scout_*`→`nb_hunter_*`.
 
 **Do not** use `tools/decode_tokens.py` for JAX runs (that's for legacy `events.jsonl`).
 
@@ -751,6 +792,9 @@ phase12_coevolution:           # feature/phase12-red-coevolution
 | **`7105ddd`** | THRONG.md P11.3 victory + reboot pack |
 | **`f0ebb76`** | Phase **12.0** `PredatorNetworkJax` red VQ comms |
 | **`d50cc19`** | Phase **12.1** red corpus logging |
+| **`8c5888b`** | THRONG reboot — Phase 12 live + 214k decode |
+| **`d493a50`** | Phase **12.2** `--red` decode + τ=0.001 + `red_comms` default |
+| **`4f98f96`** | **Wiretap default** — `red_corpus_enabled: true`; docs sync |
 
 **Do not** apply Cam's regex patch on `network_jax.py` — dead-code reset is in repo.
 
@@ -772,6 +816,9 @@ phase12_coevolution:           # feature/phase12-red-coevolution
 | Checkpoint shape error | Incompatible arch — wipe ckpts only if intentional fresh run |
 | Lag-1 / scouts 0% in decode | Old corpus — train after `5964a24`; scout uses **alarm range 8** |
 | `codes_active=1/64` | `vq_dead_code_reset: true` |
+| `ScopeParamShapeError` on `r_params` | **`red_comms_enabled: false`** on P12 branch — reds init as 256-d `AgentNetwork` but ckpt has 128-d predator weights. **`git pull`** → `4f98f96+`; do not `sed` — yaml defaults fix restarts |
+| No `[JAX] Red corpus:` line | `red_corpus_enabled: false` or stale config — pull `4f98f96+` |
+| Red pincer χ² not significant | Need more `signal_corpus_red.jsonl` after wiretap restart; use `--min-step` from first red record |
 
 ---
 
@@ -779,12 +826,12 @@ phase12_coevolution:           # feature/phase12-red-coevolution
 
 ### Phase 12 — **LIVE** (`feature/phase12-red-coevolution`)
 
-1. **NOW** — B200 → **200k+**; monitor blue **Stay ~20%**, **`red_codes_active` ≥ 50/64**, `red_entropy`, `H2D + backward`.
-2. **Red wiretap** — `red_corpus_enabled: true` by default on this branch → `signal_corpus_red.jsonl`.
-3. **Decode 12.2** — extend `decode_signals.py` for red schema (`blue_dist`, `nb_hunter_*`); prove pincer / trap language.
+1. **NOW** — B200 → **200k+**; monitor blue **Stay ~20%**, **`red_codes_active` ≥ 50/64**, `red_entropy`, `H2D + backward`, **`conf_gate_imagine_frac`** under **τ=0.001**.
+2. **Accumulate red corpus** — wiretap on (`4f98f96+`) → `signal_corpus_red.jsonl` on volume.
+3. **Run pincer decode** — `python3 tools/decode_signals.py --red … --min-step <restart>`; hunt **RED VQ PINCER TEST** χ² **p < 0.05**.
 4. **Merge** to `master` only after red channel shows structure (mirror blue cardinal/LRT bar).
 
-**Done:** 12.0 predator brain (`f0ebb76`); 12.1 corpus staged (`d50cc19`). Blue decode @ **214k** confirms gate held (`decode_p11_3_214k.log`).
+**Done:** 12.0 (`f0ebb76`); 12.1 wiretap (`4f98f96`); 12.2 decode staged (`d493a50`). Blue decode @ **214k** (`decode_p11_3_214k.log`). Red decode: **pending corpus**.
 
 **Philosophy (Cam):** Environmental poverty blocked compositional language. **Symmetric 8-cell information bounds** (scout/hunter) + **dual codebooks** → adversarial arms race. Catch reward forges red comms; no shaping.
 
@@ -821,18 +868,18 @@ GPU-resident PPO — **`d4cf614` revert** on `master`.
 | [`docs/MODAL_NOTEBOOK_PHASE9.md`](docs/MODAL_NOTEBOOK_PHASE9.md) | Modal Cell 1/2/3 (clone before launch) |
 | [`docs/PHASE11_2_IMAGINATION.md`](docs/PHASE11_2_IMAGINATION.md) | P11.2 frozen — metrics-only + conclusion |
 | [`docs/PHASE11_STAGING.md`](docs/PHASE11_STAGING.md) | P11.0 carry dynamics |
-| [`docs/PHASE12_COEVOLUTION.md`](docs/PHASE12_COEVOLUTION.md) | P12.0 red comms + P12.1 corpus |
+| [`docs/PHASE12_COEVOLUTION.md`](docs/PHASE12_COEVOLUTION.md) | P12.0 comms + P12.1 wiretap + P12.2 `--red` decode |
 | **[SYSTEM RESTORE: THE CAM CONTEXT](docs/THRONG_ARCHIVE.md#system-restore-the-cam-context)** | Persona, triad, P10.6 ignition (`6d542f6`) |
 | **[SYSTEM UPDATE May 2026](docs/THRONG_ARCHIVE.md#system-update-may-2026--b200-phase-11-staging-phase-9-canvas)** | B200, Phase 11 branch, canvas map |
 
 ### Cam reboot paste
 
-> You are **Cam**. Read `THRONG.md` §0b. **Phase 12 LIVE** on B200: `feature/phase12-red-coevolution` `d50cc19+`, dual brain (`PredatorNetworkJax` + blue P11.3), **~7 steps/sec**, blue Stay **~19%**, **`red_codes_active=63/64`**, `red_entropy≈1.58`. Blue decode @ 214k: cardinal **p=1.75e-18**, lag-1 ✅, VQ ❌ (`decode_p11_3_214k.log`). **`master`** = blue-only; **do not merge** P12 until red decode. P11.2 **FROZEN** (ungated Stay≈99%). **Do not stop** live run. Horcrux: archive SYSTEM RESTORE. Docs: `docs/PHASE12_COEVOLUTION.md`.
+> You are **Cam**. Read `THRONG.md` §0b. **Phase 12 LIVE** on B200: `feature/phase12-red-coevolution` **`4f98f96+`**, dual brain (`PredatorNetworkJax` + blue P11.3), **~7 steps/sec**, blue Stay **~19%**, **τ=0.001**, **`red_codes_active=63/64`**, red wiretap **`signal_corpus_red.jsonl`**. Blue decode @ 214k: cardinal **p=1.75e-18**, lag-1 ✅, VQ ❌ (`decode_p11_3_214k.log`). Red pincer: **`decode_signals.py --red`** — chase vs search χ² (**pending corpus**). **`master`** = blue-only; **do not merge** P12 until red pincer passes. P11.2 **FROZEN**. **Do not stop** live run. Docs: `docs/PHASE12_COEVOLUTION.md`.
 
-**New Cam:** §0b → §4 → §11 → `docs/PHASE12_COEVOLUTION.md` → `decode_p11_3_214k.log`.
+**New Cam:** §0b → §4 → §7 (red decode) → §11 → `docs/PHASE12_COEVOLUTION.md`.
 
-**New Will:** Work on **`feature/phase12-red-coevolution`** only; `b_params` from ckpt, `r_params` from volume; **`red_corpus_enabled: true`** (wiretap on); never `6cf965a`.
+**New Will:** **`feature/phase12-red-coevolution` @ `4f98f96+`** only; yaml defaults **`red_comms` + `red_corpus` true**, **`confidence_threshold: 0.001`** — no notebook `sed`; never `6cf965a`; never `red_comms_enabled: false` on this branch (ScopeParamShapeError).
 
 ---
 
-*Last updated: 2026-05-31 — Phase 12 co-evolution LIVE; P11.3 blue decode @ 214k; branch `feature/phase12-red-coevolution` @ `d50cc19`.*
+*Last updated: 2026-05-31 — Phase 12 wiretap + 12.2 red decode; τ=0.001; branch `feature/phase12-red-coevolution` @ `4f98f96`.*
