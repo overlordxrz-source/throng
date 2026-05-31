@@ -17,8 +17,8 @@ from scripts.modal_train import build_cfg, run_simulation  # noqa: E402
 
 if __name__ == "__main__":
     print(
-        "run_bg.py: Phase 9.4 canvas resume (cross_attn via config_phase7.yaml; "
-        "target n_steps=250_000)",
+        "run_bg.py: Phase 12 co-evolution resume (cross_attn via config_phase7.yaml; "
+        "target n_steps=1_000_000)",
         flush=True,
     )
-    run_simulation(build_cfg(), seed=42, n_steps=250_000)
+    run_simulation(build_cfg(), seed=42, n_steps=1_000_000)
