@@ -28,7 +28,24 @@ phase9_canvas:
 ## Status
 
 - [x] Flax module + residual cross-attention scaffold
-- [ ] Confidence head (9.1) — epistemic uncertainty on `head_fwd_dyn`
+
+## Phase 9.1 — Confidence head (staged)
+
+| Item | Detail |
+|------|--------|
+| **Input** | `[carry_t, action_t]` (same projection as `head_fwd_dyn`) |
+| **Output** | `conf_pred` — scalar per agent (softplus, ≥ 0) |
+| **Target** | Per-agent carry MSE = `mean((carry_pred - carry_tp1)²)` with **`stop_gradient`** on target |
+| **Loss** | `confidence_coef * MSE(conf_pred, target)` — does not backprop into carry dynamics via target |
+| **Dashboard** | `conf_loss`, `conf_pred` on AuxLoss line when `confidence_enabled: true` |
+
+```yaml
+phase9_canvas:
+  confidence_enabled: false   # set true after pull on Modal
+  confidence_coef: 0.05
+```
 - [x] Checkpoint graft — `graft_missing_param_subtrees` + `ensure_aux_head_params` for `nb_cross_attn`
+- [x] **9.1 Confidence head** — `head_confidence_1/2` predicts carry_fwd MSE; `conf_loss` / `conf_pred` on dashboard
+- [ ] Enable `confidence_enabled: true` after P9.4 run + `git pull` (grafts new heads)
 - [ ] Full training run with `cross_attn_enabled: true` on ckpt **390**
 - [ ] Resume from 150k/390 with `cross_attn_enabled: true`

@@ -201,5 +201,7 @@ carry_fwd_coef: 0.05   # MSE on carry_{t+1}; target always stop_gradient
 phase9_canvas:
   cross_attn_enabled: false   # scaffold: set true to compile 9.4 path (new params)
   cross_attn_num_heads: 4
+  confidence_enabled: false   # 9.1 — enable after git pull post P9.4 run (grafts head_confidence_*)
+  confidence_coef: 0.05
 
 exit_on_graduation: false

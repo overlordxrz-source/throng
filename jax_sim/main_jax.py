@@ -555,6 +555,8 @@ def _run_simulation_impl(
     _p9 = config.get("phase9_canvas") or {}
     _cross_attn = bool(_p9.get("cross_attn_enabled", False))
     _cross_heads = int(_p9.get("cross_attn_num_heads", config["n_heads"]))
+    _conf_enabled = bool(_p9.get("confidence_enabled", False))
+    _conf_coef = float(_p9.get("confidence_coef", 0.05)) if _conf_enabled else 0.0
     model = AgentNetworkJax(
         hidden_dim=hidden_d,
         n_heads=config["n_heads"],
@@ -613,6 +615,11 @@ def _run_simulation_impl(
         _inspect.getsource(_rl_jax_mod.auxiliary_update)
     ):
         print("[JAX] Phase11 carry_fwd: head_fwd_dyn_1/2 → carry_{t+1} MSE (stop_grad target)")
+    if _conf_enabled:
+        print(
+            "[JAX] Phase9.1 confidence: head_confidence predicts carry_fwd MSE "
+            f"(coef={_conf_coef}, target stop_grad)"
+        )
     from jax_sim import observations_jax as _obs_mod
 
     _bo_path = _inspect.getfile(_obs_mod.build_observations_jax)
@@ -970,18 +977,20 @@ def _run_simulation_impl(
         # Auxiliary losses (forward dynamics + self-prediction) for blue
         _self_pred_coef = float(config.get("self_pred_coef", 0.1))
         fwd_key, update_key = jax.random.split(update_key)
-        b_params, b_opt_state, b_fwd_loss, b_carry_fwd_loss, b_sp_loss, b_sp_acc = auxiliary_update(
+        b_params, b_opt_state, b_fwd_loss, b_carry_fwd_loss, b_sp_loss, b_sp_acc, b_conf_loss, b_conf_pred = auxiliary_update(
             b_params, b_opt_state, b_optimizer, b_aux_apply_fn,
             _b_carries_np, _b_actions_np, _b_obs_np,
             _loc_env_start, _loc_env_end,
             _b_alive_np, fwd_key, minibatch_size=_fwd_mb,
             fwd_coef=_fwd_coef, carry_fwd_coef=_carry_fwd_coef,
-            self_pred_coef=_self_pred_coef,
+            self_pred_coef=_self_pred_coef, conf_coef=_conf_coef,
         )
         b_metrics["fwd_loss"] = b_fwd_loss
         b_metrics["carry_fwd_loss"] = b_carry_fwd_loss
         b_metrics["sp_loss"]     = b_sp_loss
         b_metrics["sp_acc"]      = b_sp_acc
+        b_metrics["conf_loss"]   = b_conf_loss
+        b_metrics["conf_pred"]   = b_conf_pred
 
         if config.get("vq_dead_code_reset", True) and "z_e" in b_batch:
             _dc_key, update_key = jax.random.split(update_key)
@@ -1031,17 +1040,19 @@ def _run_simulation_impl(
                 flush=True,
             )
         fwd_key, update_key = jax.random.split(update_key)
-        r_params, r_opt_state, r_fwd_loss, r_carry_fwd_loss, r_sp_loss, r_sp_acc = auxiliary_update(
+        r_params, r_opt_state, r_fwd_loss, r_carry_fwd_loss, r_sp_loss, r_sp_acc, r_conf_loss, r_conf_pred = auxiliary_update(
             r_params, r_opt_state, r_optimizer, r_aux_apply_fn,
             _r_carries_np, _r_actions_np, _r_obs_np,
             _loc_env_start, _loc_env_end,
             _r_alive_np, fwd_key, minibatch_size=_fwd_mb,
             fwd_coef=_fwd_coef, carry_fwd_coef=_carry_fwd_coef,
-            self_pred_coef=_self_pred_coef,
+            self_pred_coef=_self_pred_coef, conf_coef=_conf_coef,
         )
         r_metrics["fwd_loss"] = r_fwd_loss
         r_metrics["carry_fwd_loss"] = r_carry_fwd_loss
         r_metrics["sp_acc"]   = r_sp_acc
+        r_metrics["conf_loss"] = r_conf_loss
+        r_metrics["conf_pred"] = r_conf_pred
 
         if config.get("vq_dead_code_reset", True) and "z_e" in r_batch:
             _dc_key, update_key = jax.random.split(update_key)
@@ -1189,6 +1200,8 @@ def _run_simulation_impl(
             fwd_loss_val = float(b_metrics.get('fwd_loss', float('nan'))) if isinstance(b_metrics, dict) else float('nan')
             carry_fwd_val = float(b_metrics.get('carry_fwd_loss', float('nan'))) if isinstance(b_metrics, dict) else float('nan')
             sp_acc_val   = float(b_metrics.get('sp_acc',   float('nan'))) if isinstance(b_metrics, dict) else float('nan')
+            conf_loss_val = float(b_metrics.get('conf_loss', float('nan'))) if isinstance(b_metrics, dict) else float('nan')
+            conf_pred_val = float(b_metrics.get('conf_pred', float('nan'))) if isinstance(b_metrics, dict) else float('nan')
             vq_loss_val  = float(b_metrics.get('ppo_vq_loss', float('nan'))) if isinstance(b_metrics, dict) else float('nan')
             _carry_last = np.asarray(rollout_data["blue"]["carries"][-1])
             _alive_rollout = np.asarray(rollout_data["blue"]["alive"][-1]).astype(bool)
@@ -1203,9 +1216,14 @@ def _run_simulation_impl(
                 carry_entropy = float('nan')
             print(f"  Values:  mean={val_mean:.4f} | VF_loss={vf_loss:.4f} | Clip={clip_frac:.3f}")
             print(f"  Reward:  mean={rew_mean:.4f} | Entropy: {ent_val:.4f}")
+            _aux_conf = (
+                f" | conf_loss={conf_loss_val:.6f} conf_pred={conf_pred_val:.6f}"
+                if _conf_enabled
+                else ""
+            )
             print(
                 f"  AuxLoss: fwd_env={fwd_loss_val:.4f} | carry_fwd={carry_fwd_val:.4f} "
-                f"(↓0.05–0.1) | self_pred_acc={sp_acc_val:.3f} | "
+                f"(↓0.05–0.1) | self_pred_acc={sp_acc_val:.3f}{_aux_conf} | "
                 f"carry_rank={carry_rank} | carry_H={carry_entropy:.2f}"
             )
             blue_caught_rollout = 0

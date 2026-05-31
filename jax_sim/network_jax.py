@@ -27,6 +27,8 @@ AUX_HEAD_KEYS = (
     "head_self_pred",
     "head_fwd_dyn_1",
     "head_fwd_dyn_2",
+    "head_confidence_1",
+    "head_confidence_2",
 )
 
 # Top-level module keys grafted from a fresh init when missing in Orbax checkpoints.
@@ -177,6 +179,10 @@ class AgentNetworkJax(nn.Module):
         self.head_fwd_dyn_1 = nn.Dense(self.hidden_dim * 4)
         self.head_fwd_dyn_2 = nn.Dense(self.hidden_dim)
 
+        # Phase 9.1 — epistemic confidence: predict carry_fwd MSE from [carry_t, action_t]
+        self.head_confidence_1 = nn.Dense(self.hidden_dim * 4)
+        self.head_confidence_2 = nn.Dense(1)
+
         if self.cross_attn_enabled:
             self.nb_cross_attn = NeighborCrossAttention(
                 hidden_dim=d,
@@ -321,6 +327,19 @@ class AgentNetworkJax(nn.Module):
         h = nn.relu(self.head_fwd_dyn_1(fwd_inp))
         return self.head_fwd_dyn_2(h)
 
+    def predict_carry_fwd_confidence(
+        self,
+        carry_t: jnp.ndarray,
+        action_oh: jnp.ndarray,
+    ) -> jnp.ndarray:
+        """
+        Predict expected carry forward MSE from [carry_t, action_t] (Phase 9.1).
+        Returns (N,) non-negative scalars (softplus).
+        """
+        fwd_inp = jnp.concatenate([carry_t, action_oh], axis=-1)
+        h = nn.relu(self.head_confidence_1(fwd_inp))
+        return nn.softplus(self.head_confidence_2(h)).squeeze(-1)
+
     def auxiliary_heads(
         self,
         carry_t: jnp.ndarray,    # (N, hidden_dim)
@@ -333,6 +352,7 @@ class AgentNetworkJax(nn.Module):
           env_pred         (N, fwd_env_dim) — predicted flat loc_env_{t+1}
           self_pred_logits (N, 5)           — predicted action_{t+1}
           carry_pred       (N, hidden_dim)  — predicted carry_{t+1}
+          conf_pred        (N,)             — predicted carry_fwd MSE (Phase 9.1)
 
         Caller must stop_gradient loc_env_{t+1} and carry_{t+1} before loss.
         """
@@ -340,7 +360,8 @@ class AgentNetworkJax(nn.Module):
         env_pred = self.head_fwd_2(nn.relu(self.head_fwd_1(fwd_inp)))
         self_pred_logits = self.head_self_pred(carry_t)
         carry_pred = self.carry_forward_dynamics(carry_t, action_oh)
-        return env_pred, self_pred_logits, carry_pred
+        conf_pred = self.predict_carry_fwd_confidence(carry_t, action_oh)
+        return env_pred, self_pred_logits, carry_pred, conf_pred
 
 
 def init_agent_params(
