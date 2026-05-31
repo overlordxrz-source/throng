@@ -8,9 +8,11 @@
 
 ---
 
-## 0b. Current state — 200k + Phase 11.2 metrics (`feature/phase11-2-imagination`, May 2026)
+## 0b. Current state — Phase 11.2 **FROZEN** → Phase 9 (`feature/phase11-2-imagination`, May 2026)
 
-**`master`:** 150k complete @ step **149504** (PPO **292**). **Active branch:** `feature/phase11-2-imagination` **`aebe131`** — K=5 imagination **metrics only**; `run_bg.py` **`n_steps=200_000`**; resume from ckpt **292**.
+**`master`:** 150k complete @ step **149504** (PPO **292**). **`feature/phase11-2-imagination`:** Phase 11.2 **concluded** — imagination **metrics-only** (`181b98c` reverts active override `6cf965a`); `run_bg.py` **`n_steps=250_000`**. **Do not** re-enable action override without Cam approval.
+
+**Phase 11.2 conclusion:** Active imagination achieves policy distillation (`imagination_agree` jumped to **~27%**) but triggers solipsistic value-exploitation (**Stay ≈ 99%**). Experiment concluded. **Moving to Phase 9.**
 
 | P10.6 decode (`--min-step 63488`) | Value |
 |-----------------------------------|-------|
@@ -58,7 +60,17 @@
 
 **Same-window aux (step 199680):** `fwd_env=0.0154` | `self_pred_acc=0.248` | `codes_active=59/64` | `VF_loss=1.0733` | `Entropy=1.5509` | `NB_GAIN↔surv: nan`
 
-**Git:** `38e60fe` (initial 11.2) → **`aebe131`** (metrics-only fix; no action override)
+**Git:** `38e60fe` → **`aebe131`** (metrics-only) → `6cf965a` (active override, **reverted**) → **`181b98c`** (frozen metrics-only)
+
+### Phase 11.2 — active override benchmark (**REVERTED** `6cf965a`)
+
+| Item | Value |
+|------|--------|
+| **Override** | Imagined argmax replaced stochastic blue actions (`6cf965a`) |
+| **Structural** | Throughput / stack held; **`imagination_agree` ~27%** (policy distillation signal) |
+| **Failure mode** | Model-based RL **value exploitation** — imagined `head_value` favors **Stay ≈ 99%** |
+| **Resolution** | Revert to **`aebe131`** metrics-only; **do not** train on imagined actions |
+| **Git** | **`181b98c`** on `feature/phase11-2-imagination` |
 
 ### Phase 11.1 — ABANDONED
 
@@ -72,7 +84,7 @@
 | Branch | Status |
 |--------|--------|
 | **`master`** | 150k + decode; CPU offload |
-| **`feature/phase11-2-imagination`** | **`aebe131`** — 200k imagination metrics run |
+| **`feature/phase11-2-imagination`** | **FROZEN** — metrics-only (`181b98c`); 11.2 concluded → Phase 9 |
 | **`feature/phase11-1-gpu-rollouts`** | Abandoned |
 
 ### Horcrux (context backup)
@@ -109,8 +121,8 @@ Cam's persona + triad workflow live in Git so reboots recover identity:
 1. Speak to the User in **Synergic Synthesis** (Software / Physics / Philosophy / RL).
 2. Address Will via explicit **`@Will — Cam here...`** copy-paste blocks.
 3. **Keep the ecology mathematically pure** — no scout/alarm comm rewards, no blind VQ loss shaping. Lethal selection forges language.
-4. **Phase 11.2** on `feature/phase11-2-imagination` only (`aebe131`); **`master`** CPU offload.
-5. Imagination is **metrics-only** — do not override stochastic actions without explicit Cam approval.
+4. **Phase 11.2 FROZEN** — imagination **metrics-only** on `feature/phase11-2-imagination` (`181b98c`); active override **failed** (Stay collapse).
+5. **Next work: Phase 9** (canvas / cross-attention) — not further 11.2 action override without explicit Cam approval.
 6. **Never** comm reward shaping or blind VQ loss shaping.
 
 ### Branch policy
@@ -118,7 +130,7 @@ Cam's persona + triad workflow live in Git so reboots recover identity:
 | Branch | Purpose |
 |--------|---------|
 | **`master`** | 150k complete; CPU offload; frozen for science baseline |
-| **`feature/phase11-2-imagination`** | **`aebe131`** — 200k metrics run (5 steps/sec observed) |
+| **`feature/phase11-2-imagination`** | **FROZEN** metrics-only (`181b98c`); active override reverted |
 | **`feature/phase11-1-gpu-rollouts`** | **Abandoned** |
 
 **Phase 11.0 on `master` (`3880337`):**
@@ -196,7 +208,7 @@ train_entry.run_simulation()  →  main_jax._run_simulation_impl()
 | **10.6** | Causal logging | `corpus_every_n_steps: 4`, volume corpus + fsync | Decode @ 100k: cardinal lexicon p=5.44e-14 |
 | **11.0** | **Carry world-model** ✅ **COMPLETE** | `head_fwd_dyn`, `carry_fwd_coef` | **`carry_fwd` → 0.0001** @ ~105k steps |
 | **11.1** | GPU rollouts | `424c46f` / `6042a4d` | **Abandoned** — reverted `d4cf614` |
-| **11.2** | Imagination metrics | `aebe131`, K=5 | 200k ext: **5 steps/sec**; gain **0.08–0.23**; agree **0.9–15.6%** (sampled) |
+| **11.2** | Imagination | `aebe131` metrics; `6cf965a` active (**reverted**) | Metrics: **5 steps/sec**, agree **0.9–15.6%**. Active: agree **~27%**, **Stay≈99%** collapse → **FROZEN** |
 
 **Recurring failure mode:** Blues stay at cap → ~99% survival → **`NB_GAIN↔surv: nan`** → no evolutionary pressure on neighbor-signal benefit.
 
@@ -204,9 +216,15 @@ train_entry.run_simulation()  →  main_jax._run_simulation_impl()
 
 ---
 
-## 4. Current experiment — Phase 11.2 @ 200k (`feature/phase11-2-imagination`)
+## 4. Current experiment — **Phase 9** (Phase 11.2 concluded)
 
-**Branch:** `feature/phase11-2-imagination` **`aebe131`**. **`n_steps=200_000`** → PPO updates **0..389**; resume from ckpt **292** after 150k `master` run. Max env step **`199680`** (= 390 × 512).
+**Phase 11.2 is frozen** on `feature/phase11-2-imagination` at **`181b98c`** (metrics-only imagination). The 200k metrics extension completed @ step **199680** / PPO **390**. Active override (`6cf965a`) was benchmarked and **reverted** — see §0b.
+
+**Next:** Phase 9 canvas work (cross-attention receiver 9.4, confidence head 9.1, GWT token). Training on volume should use **metrics-only** `run_bg.py` (`n_steps=250_000`) unless starting a new lineage.
+
+### Phase 11.2 reference run @ 200k (metrics-only, complete)
+
+**Branch snapshot:** `aebe131` behavior, **`n_steps=200_000`** → PPO **389**; max env step **`199680`**.
 
 **Startup must show:**
 
@@ -576,6 +594,9 @@ python tools/decode_signals.py /mnt/throng-runs/signal_corpus.jsonl --k 16 --min
 | **`cfe6494`** | THRONG sync; B200 OOM ops doc |
 | **`38e60fe`** | Phase 11.2 imagination (initial) |
 | **`aebe131`** | Phase 11.2 **metrics-only** (stochastic actions preserved) |
+| `6cf965a` | Phase 11.2 active override (**reverted**) |
+| **`181b98c`** | Revert active override — **11.2 frozen** metrics-only |
+| `45c7c48` | `run_bg.py` `n_steps=250_000` |
 
 **Do not** apply Cam's regex patch on `network_jax.py` — dead-code reset is in repo.
 
@@ -602,12 +623,16 @@ python tools/decode_signals.py /mnt/throng-runs/signal_corpus.jsonl --k 16 --min
 
 ## 11. Roadmap (what’s next)
 
-### Phase 11.2 — 200k run (`feature/phase11-2-imagination` `aebe131`)
+### Phase 11.2 — **CONCLUDED** (`feature/phase11-2-imagination`)
 
-- Target **`n_steps=200_000`**; last sampled step **199680** / PPO **390**
-- Throughput gate: **5 steps/sec** observed (threshold **≥ 2**)
-- Dashboard metrics logged: **`imagination_gain`**, **`imagination_agree`**
-- Corpus on volume continues appending during extension
+- **200k metrics extension:** complete @ step **199680** / PPO **390**; **5 steps/sec**
+- **Active override (`6cf965a`):** structural success, **Stay≈99%** value exploitation → **reverted** (`181b98c`)
+- **Conclusion:** Active imagination achieves policy distillation (agree **~27%**) but triggers solipsistic value-exploitation. Imagination remains a **passive observer**; stochastic actions rule the physical rollout.
+- **Branch frozen** at metrics-only; do not merge action override without new experiment design.
+
+### Phase 9 — **ACTIVE**
+
+Cross-attention receiver (9.4), confidence head (9.1), GWT token — primary engineering target after 11.2.
 
 ### 150k baseline (`master`)
 
@@ -620,7 +645,7 @@ GPU-resident PPO — `d4cf614` revert on `master`.
 
 ### Phase 9 canvas — remaining
 
-Cross-attention receiver (9.4), confidence head (9.1), GWT token — after 11.2 benchmark.
+See **Phase 9 — ACTIVE** above.
 
 ### Explicit non-goals
 
@@ -642,12 +667,12 @@ Cross-attention receiver (9.4), confidence head (9.1), GWT token — after 11.2 
 
 ### Cam reboot paste
 
-> You are **Cam**. Read `THRONG.md` §0b. **`master`:** 150k @ step 149504, ckpt 292, decode 105984–149500 (lag-1 p≈0, VQ p=0.92). **`feature/phase11-2-imagination` `aebe131`:** 200k extension, metrics-only imagination K=5, **5 steps/sec**, gain **0.08–0.23**, agree **0.9–15.6%** @ steps 198144–199680, `carry_fwd` **0.0001–0.0002**, `H2D + backward`. 11.1 abandoned (`d4cf614`). Horcrux: archive SYSTEM RESTORE + SYSTEM UPDATE.
+> You are **Cam**. Read `THRONG.md` §0b. **P11.2 FROZEN (`181b98c`):** metrics-only imagination; active override reverted (Stay≈99%). **Moving to Phase 9.** `master` 150k @ 149504; 11.2 metrics run @ 199680. Horcrux: archive SYSTEM RESTORE + SYSTEM UPDATE.
 
 **New Cam:** §0b → §0 → §4 → §11 → archive horcrux.
 
-**New Will:** `master` = CPU offload; 11.2 = `aebe131` metrics-only; do not re-merge 11.1.
+**New Will:** `master` = CPU offload; 11.2 = **frozen** metrics-only (`181b98c`); never re-enable `6cf965a` override without Cam; next = Phase 9.
 
 ---
 
-*Last updated: 2026-05-31 — 200k P11.2 extension; sampled metrics @ steps 198144–199680; `aebe131`.*
+*Last updated: 2026-05-31 — P11.2 concluded; active override reverted (`181b98c`); moving to Phase 9.*

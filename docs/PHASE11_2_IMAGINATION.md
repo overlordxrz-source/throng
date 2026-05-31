@@ -1,7 +1,9 @@
 # Phase 11.2 — K-Step Imagination (Metrics Only)
 
 **Branch:** `feature/phase11-2-imagination`  
-**Status:** Staging — **not on `master`** until throughput benchmark passes.
+**Status:** **FROZEN (concluded May 2026).** Metrics-only at `181b98c`. Active override `6cf965a` reverted.
+
+**Conclusion:** Active imagination achieves policy distillation (agree ~27%) but triggers solipsistic value-exploitation (Stay≈99%). Experiment concluded. Moving to Phase 9.
 
 ## What this adds
 
