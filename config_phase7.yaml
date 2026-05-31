@@ -214,7 +214,7 @@ phase12_coevolution:
   red_comms_enabled: true        # branch default: 128-d PredatorNetwork (matches volume r_params)
   red_cross_attn_enabled: true
   red_vocab_size: 64
-  red_corpus_enabled: false      # 12.1 — signal_corpus_red.jsonl (requires red_comms_enabled)
+  red_corpus_enabled: true       # 12.1 wiretap — signal_corpus_red.jsonl (requires red_comms_enabled)
   hunt_scout_range: 8            # symmetric with alarm_scout_range (blue scout label)
 
 exit_on_graduation: false

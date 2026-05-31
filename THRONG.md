@@ -694,15 +694,15 @@ phase9_canvas:                 # master SOTA stack
   confidence_enabled: true
   confidence_coef: 0.05
   imagination_gating_enabled: true
-  confidence_threshold: 0.02
+  confidence_threshold: 0.001   # P12.2 — carry_fwd calibration (was 0.02)
   imagination_k: 5
   imagination_gamma: 0.999
 
 phase12_coevolution:           # feature/phase12-red-coevolution
-  red_comms_enabled: true        # feature/phase12 branch default (128-d r_params)
+  red_comms_enabled: true        # branch default (128-d r_params)
   red_cross_attn_enabled: true
   red_vocab_size: 64
-  red_corpus_enabled: false    # 12.1 — separate signal_corpus_red.jsonl
+  red_corpus_enabled: true       # 12.1 wiretap — signal_corpus_red.jsonl
   hunt_scout_range: 8
 ```
 
@@ -780,7 +780,7 @@ phase12_coevolution:           # feature/phase12-red-coevolution
 ### Phase 12 — **LIVE** (`feature/phase12-red-coevolution`)
 
 1. **NOW** — B200 → **200k+**; monitor blue **Stay ~20%**, **`red_codes_active` ≥ 50/64**, `red_entropy`, `H2D + backward`.
-2. **Enable 12.1** on restart — `red_corpus_enabled: true` → accumulate `signal_corpus_red.jsonl`.
+2. **Red wiretap** — `red_corpus_enabled: true` by default on this branch → `signal_corpus_red.jsonl`.
 3. **Decode 12.2** — extend `decode_signals.py` for red schema (`blue_dist`, `nb_hunter_*`); prove pincer / trap language.
 4. **Merge** to `master` only after red channel shows structure (mirror blue cardinal/LRT bar).
 
@@ -831,7 +831,7 @@ GPU-resident PPO — **`d4cf614` revert** on `master`.
 
 **New Cam:** §0b → §4 → §11 → `docs/PHASE12_COEVOLUTION.md` → `decode_p11_3_214k.log`.
 
-**New Will:** Work on **`feature/phase12-red-coevolution`** only; `b_params` from ckpt, `r_params` fresh; enable **`red_corpus_enabled`** only on controlled restart; never `6cf965a`.
+**New Will:** Work on **`feature/phase12-red-coevolution`** only; `b_params` from ckpt, `r_params` from volume; **`red_corpus_enabled: true`** (wiretap on); never `6cf965a`.
 
 ---
 

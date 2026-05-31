@@ -38,6 +38,8 @@ phase12_coevolution:
   red_comms_enabled: true
   red_cross_attn_enabled: true
   red_vocab_size: 64
+  red_corpus_enabled: true       # wiretap — signal_corpus_red.jsonl
+  hunt_scout_range: 8
 ```
 
 ## Dashboard
@@ -82,4 +84,6 @@ Blue decode unchanged: `python3 tools/decode_signals.py signal_corpus.jsonl`.
 
 ## Launch (new run only)
 
-On this branch, `red_comms_enabled` defaults **true** (128-d `r_params` on volume). Enable `red_corpus_enabled: true` when you want `signal_corpus_red.jsonl`. Blue decode stays on `signal_corpus.jsonl` only.
+On this branch, **`red_comms_enabled: true`** and **`red_corpus_enabled: true`** by default (128-d `r_params` + `signal_corpus_red.jsonl` wiretap). No notebook `sed` required. Blue decode stays on `signal_corpus.jsonl` only.
+
+**Epistemic gate (P12.2):** `phase9_canvas.confidence_threshold: 0.001` (carry_fwd calibration).
