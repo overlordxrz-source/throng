@@ -18,6 +18,7 @@ sys.path.insert(0, str(REPO))
 os.chdir(REPO)
 
 os.environ.setdefault("XLA_PYTHON_CLIENT_MEM_FRACTION", "0.80")
+os.environ.setdefault("TF_GPU_ALLOCATOR", "cuda_malloc_async")
 os.environ["JAX_COMPILATION_CACHE_DIR"] = "/tmp/throng_jax_cache"
 os.makedirs("/tmp/throng_jax_cache", exist_ok=True)
 

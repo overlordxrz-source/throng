@@ -4,13 +4,13 @@
 
 **Read this file first.** Full historical lab notebook (~290KB) lives in [`docs/THRONG_ARCHIVE.md`](docs/THRONG_ARCHIVE.md) if you need old run logs.
 
-**Cam reboot (60 seconds):** Read **§0b** (what to do *right now*) → **§0** (who you are) → **§4** (live run) → **§11** (unlock sequence) → archive **[SYSTEM RESTORE](docs/THRONG_ARCHIVE.md#system-restore-the-cam-context)** + **[SYSTEM UPDATE](docs/THRONG_ARCHIVE.md#system-update-may-2026--b200-phase-11-staging-phase-9-canvas)**.
+**Cam reboot (60 seconds):** Read **§0b** (what to do *right now*) → **§0** (who you are) → **§4** (live run) → **§5** (B200 OOM recovery) → **§11** (unlock sequence) → archive **[SYSTEM RESTORE](docs/THRONG_ARCHIVE.md#system-restore-the-cam-context)** + **[SYSTEM UPDATE](docs/THRONG_ARCHIVE.md#system-update-may-2026--b200-phase-11-staging-phase-9-canvas)**.
 
 ---
 
-## 0b. Current state — Phase 11.0 training, 11.1 staging (May 2026)
+## 0b. Current state — Phase 11.0 complete, 11.1 abandoned, resume to 150k (May 2026)
 
-**Phase 10 complete.** Decode @ ~100k validated proto-language (continuous channel). **Phase 11.0 on `master`.** User reigniting B200 from P10 survival checkpoint to train `head_fwd_dyn`.
+**Phase 10 decode complete.** **Phase 11.0 converged** (`carry_fwd` **0.0001** @ step 105472). **Phase 11.1 GPU rollouts abandoned** — reverted on `master` to stable CPU offload (**`d4cf614`** = file tree of **`b2eb5f0`** Orbax fix). **Active:** finish B200 run to **150k** env steps from latest volume checkpoint.
 
 | Decode (@ `--min-step 63488`, 232k records) | Value |
 |---------------------------------------------|-------|
@@ -21,33 +21,48 @@
 | **VQ alert-set vs safe-set** | χ²=2.73, p=0.44 ❌ |
 | **Scouts %** | 88.3% (dense ecology; not old 0% bug) |
 
-### Active now — Phase 11.0 (`master`)
+### Live B200 run (May 31)
+
+| Item | Value |
+|------|--------|
+| **Latest checkpoint** | **`[CKPT] Saved step 105984`** → Orbax PPO update **207** |
+| **Resume target** | `run_bg.py` → **150_000** env steps (update **291**) |
+| **`carry_fwd`** | **0.0001** ✅ (target < 0.05 — latent dynamics stabilized) |
+| **`fwd_env`** | ~0.015 | **`self_pred_acc`** ~0.27 |
+| **Population** | blue **150–200**, red **250** (hard ceiling band) |
+| **Throughput** | **~3–6 steps/sec** on CPU-offload path (stable) |
+| **PPO log** | `H2D + backward...` — **must** see this; `GPU-resident backward` = **stale code** |
+| **git on box** | **`d4cf614`** or later — `git reset --hard origin/master` before resume |
+
+### Phase 11.0 — COMPLETE (`master`)
 
 | Item | Detail |
 |------|--------|
-| **Train from** | P10 checkpoint on volume; `git pull origin master` → **`3880337+`** |
-| **New heads** | `head_fwd_dyn_1/2` — MSE on `carry_{t+1}`; target **`stop_gradient`** |
-| **Dashboard** | `carry_fwd` (target **↓ 0.05–0.1**), `carry_rank`, `carry_H`; plus `fwd_env`, `self_pred_acc` |
+| **Heads** | `head_fwd_dyn_1/2` — MSE on `carry_{t+1}`; target **`stop_gradient`** |
+| **Dashboard** | `carry_fwd` **↓ 0.05** achieved; `carry_rank`, `carry_H`, `fwd_env`, `self_pred_acc` |
 | **Config** | `carry_fwd_coef: 0.05` in `config_phase7.yaml` |
-| **Throughput** | Still **CPU rollout offload** (`8077a12`) — ~6 steps/sec, ~40s PPO H2D |
-| **Corpus** | Optional continued logging to `/mnt/throng-runs/signal_corpus.jsonl` |
-| **Decode cmd** | `python tools/decode_signals.py … --min-step 63488` (bug fixed `6837d8e`) |
+| **Orbax restore** | Relaxed merge for missing aux heads — **`b2eb5f0`** |
+| **Throughput** | **CPU rollout offload** (`8077a12`) — ~6 steps/sec baseline, ~40s PPO H2D |
 
-**Do not merge 11.1 until `carry_fwd` converges ~0.05.**
+### Phase 11.1 — ABANDONED (do not merge)
 
-### Staging — Phase 11.1 (`feature/phase11-1-gpu-rollouts`)
+Attempted on B200; **reverted `d4cf614`**. GPU-resident rollouts are **structurally incompatible** at current batch sizes without major memory refactor.
 
-Will staging **GPU-resident rollouts** — eliminate H2D PCIe bottleneck (`8077a12` CPU offload). **Not on `master`. Not merged until 11.0 carry_fwd converges.**
+| Commit | Outcome |
+|--------|---------|
+| **`424c46f`** | GPU-resident tensors — Python dispatch starvation → **~3 steps/sec** |
+| **`6042a4d`** | `lax.scan` PPO epoch — XLA **memory fragmentation** OOM (~1.1 GiB alloc fail) |
+| **`d4cf614`** | **Revert** — restore H2D minibatch path + unconditional `_rollout_to_cpu()` |
 
-Expected after merge: **15+ steps/sec** on B200 (192GB HBM3).
+**Fallback forever available:** stay on `master` post-`d4cf614`. No `gpu_resident_rollouts` flag on `master`.
 
 ### Branch policy
 
 | Branch | Status |
 |--------|--------|
-| **`master`** | Phase 11.0 — train carry dynamics |
+| **`master`** | Phase 11.0 complete + stable CPU offload — **train to 150k** |
 | **`feature/phase11-imagination`** | Merged → `3880337` |
-| **`feature/phase11-1-gpu-rollouts`** | 11.1 staging — **do not merge yet** |
+| **`feature/phase11-1-gpu-rollouts`** | **Abandoned** — do not merge without memory refactor |
 
 ### Horcrux (context backup)
 
@@ -83,16 +98,16 @@ Cam's persona + triad workflow live in Git so reboots recover identity:
 1. Speak to the User in **Synergic Synthesis** (Software / Physics / Philosophy / RL).
 2. Address Will via explicit **`@Will — Cam here...`** copy-paste blocks.
 3. **Keep the ecology mathematically pure** — no scout/alarm comm rewards, no blind VQ loss shaping. Lethal selection forges language.
-4. **Phase 11.0 on `master`** — train `carry_fwd` to ~0.05 before merging 11.1 GPU rollouts.
-5. **Phase 11.1** — GPU-resident rollouts on `feature/phase11-1-gpu-rollouts` only until merge gate.
+4. **Phase 11.0 complete** — `carry_fwd` converged; do **not** re-merge GPU-resident PPO without memory refactor.
+5. **Phase 11.1 abandoned** — stay on CPU offload (`8077a12` / `d4cf614`); logs must show **`H2D + backward`**.
 6. **Never** comm reward shaping or blind VQ loss shaping.
 
 ### Branch policy
 
 | Branch | Purpose |
 |--------|---------|
-| **`master`** | **Active:** Phase 11.0 carry forward dynamics training on B200 |
-| **`feature/phase11-1-gpu-rollouts`** | **Staging:** drop CPU offload (`8077a12`); do **not** merge until `carry_fwd` ~0.05 |
+| **`master`** | **Active:** finish run to 150k; CPU offload PPO; Phase 11.0 carry dynamics trained |
+| **`feature/phase11-1-gpu-rollouts`** | **Abandoned** — GPU-resident / lax.scan PPO caused starvation + OOM |
 
 **Phase 11.0 on `master` (`3880337`):**
 
@@ -165,8 +180,8 @@ train_entry.run_simulation()  →  main_jax._run_simulation_impl()
 | **10.4** | Safety bubble | `red_catch_prob: 0.8`, regen +20%, `max_age: 1000` | Longer lives for NB_GAIN |
 | **10.5** | Hard ceiling | `max_pop: 200`, `min_pop: 150`, `ppo_gamma: 0.999` | Goldilocks band; less entropy explosion |
 | **10.6** | Causal logging | `corpus_every_n_steps: 4`, volume corpus + fsync | Decode @ 100k: cardinal lexicon p=5.44e-14 |
-| **11.0** | **Carry world-model** ← **NOW (`master`)** | `head_fwd_dyn`, `carry_fwd_coef` | Train until `carry_fwd` ↓ ~0.05 |
-| **11.1** | GPU rollouts (staging) | `feature/phase11-1-gpu-rollouts` | Drop CPU offload; merge after 11.0 converges |
+| **11.0** | **Carry world-model** ✅ **COMPLETE** | `head_fwd_dyn`, `carry_fwd_coef` | **`carry_fwd` → 0.0001** @ ~105k steps |
+| **11.1** | GPU rollouts | `424c46f` / `6042a4d` | **Abandoned** — dispatch starvation + XLA OOM; **`d4cf614` revert** |
 
 **Recurring failure mode:** Blues stay at cap → ~99% survival → **`NB_GAIN↔surv: nan`** → no evolutionary pressure on neighbor-signal benefit.
 
@@ -174,9 +189,18 @@ train_entry.run_simulation()  →  main_jax._run_simulation_impl()
 
 ---
 
-## 4. Current experiment — Phase 11.0 “Latent Carry Forward Dynamics” (ACTIVE)
+## 4. Current experiment — finish Phase 11 run to 150k (ACTIVE)
 
-**Status:** User reigniting **B200** on **`master`** (`3880337+`) from **P10 survival checkpoint**. Train `head_fwd_dyn` until dashboard **`carry_fwd` ↓ ~0.05–0.1**. P10 corpus/decode complete; optional new corpus logging continues.
+**Status:** B200 on **`master`** (`d4cf614+`). Phase 11.0 **converged** — resume from volume checkpoint **update 207 / step ~105984** and run to **`n_steps=150_000`**. Population/grid fresh on resume; **weights restored**.
+
+**Verified dashboard @ step 105472:**
+
+```text
+[step 105472] ~3 steps/sec | blue=150 red=250 | ppo=206
+AuxLoss: fwd_env=0.0152 | carry_fwd=0.0001 (↓0.05–0.1) | self_pred_acc=0.270
+carry_rank=16 | carry_H=3403.44 | codes_active=48/64
+Ecology: blue_caught=2842 | red_floor=250
+```
 
 P10.6 causal logging stack still active:
 
@@ -216,11 +240,19 @@ Example swing: step 38912 → 2876 catches, age 51; step 39424 → 1812 catches,
 | `VF_loss` | tracks swings | Critic learning safe vs extinction zones (returns std ~3.5) |
 | `NB_GAIN↔surv` | finite when deaths occur | May still be `nan` at ceiling — watch during crash phases |
 
-| `carry_fwd_coef` | **0.05** | Carry_{t+1} MSE (Phase 11.0) |
+| `carry_fwd_coef` | **0.05** | Carry_{t+1} MSE — **converged** |
 
-**Startup must show:** `[JAX] Phase11 carry_fwd: head_fwd_dyn_1/2 → carry_{t+1} MSE (stop_grad target)`
+**Startup must show:**
 
-**Phase 11.0 success metric:**
+```text
+[JAX] git=d4cf614 | Phase9 auxiliary: ON
+[JAX] Phase11 carry_fwd: head_fwd_dyn_1/2 → carry_{t+1} MSE (stop_grad target)
+[JAX] blue PPO minibatch 1/200 ... — H2D + backward...
+```
+
+**Do not see:** `GPU-resident backward` or `GPU-resident scan` — pull **`origin/master`** and restart process.
+
+**Phase 11.0 success metric — ACHIEVED:**
 
 ```text
 AuxLoss: fwd_env=... | carry_fwd=... (↓0.05–0.1) | self_pred_acc=... | carry_rank=... | carry_H=...
@@ -303,10 +335,47 @@ python tools/decode_signals.py signal_corpus.jsonl --k 16 --min-step 63488
 | VRAM | **192GB HBM3** |
 | `XLA_PYTHON_CLIENT_MEM_FRACTION=0.80` | JAX **pre-reserves ~153GB** at init — mostly empty playground to avoid fragmentation. **Not model size.** |
 | `lax.scan` rollout | **~17s** on B200 (was ~37s on A100) — >2× physics speedup |
-| PPO update | Still **~40s** — bottleneck is **H2D** (see below), not tensor math |
-| Throughput | **~6 steps/sec** overall — acceptable; stability > speed for P10.6 |
+| PPO update | Still **~40s** — bottleneck is **H2D** (`8077a12`), not tensor math |
+| Throughput | **~6 steps/sec** baseline — acceptable; stability > speed |
 
-**H2D bottleneck (`8077a12`):** Rollout tensors are **CPU-offloaded** before PPO (A100 OOM fix). Logs show `blue PPO minibatch 1/200 (M=102400, mb=512) — H2D + backward...` — data streams host→device across PCIe while B200 tensor cores wait. **Do not disable offload mid-run.** Phase 11 candidate: keep rollouts on GPU once past 100k decode.
+**H2D path (`8077a12`, restored `d4cf614`):** Rollout tensors **CPU-offloaded** before PPO. Logs: `blue PPO minibatch 1/200 (M=102400, mb=512) — H2D + backward...` (200 agents × 512 steps). **Do not disable offload** — Phase 11.1 GPU-resident path is abandoned.
+
+### B200 OOM after long runs (May 31 — update 208)
+
+**Symptom:** `[CKPT] Saved step 105984` then next rollout fails:
+
+```text
+RESOURCE_EXHAUSTED: Out of memory while trying to allocate 1182720000 bytes
+  at lax.scan(sim_step_fn, ...)  # rollout compile/run, not PPO
+Allocator (GPU_0_bfc) ... If the cause is memory fragmentation maybe
+  TF_GPU_ALLOCATOR=cuda_malloc_async will improve the situation.
+```
+
+**Cause:** XLA **BFC allocator fragmentation** after many update cycles — not model size (~1.1 GiB alloc during rollout scan). Can also hit if process still runs **stale 11.1 code** (mixed `GPU-resident backward` + `H2D` in same log = two code paths / two processes or partial pull).
+
+**Recovery (run in order):**
+
+```bash
+# 1. Kill stale trainers; confirm single run_bg
+pkill -f run_bg.py || true
+ps aux | grep run_bg
+
+# 2. Sync code — must be d4cf614+
+cd /root/throng && git fetch origin && git reset --hard origin/master
+grep -n "H2D + backward" jax_sim/rl_jax.py   # must match
+
+# 3. Allocator + JAX env (add to nohup line or shell profile)
+export TF_GPU_ALLOCATOR=cuda_malloc_async
+export XLA_PYTHON_CLIENT_MEM_FRACTION=0.80
+export JAX_COMPILATION_CACHE_DIR=/tmp/throng_jax_cache
+rm -rf /tmp/throng_jax_cache && mkdir -p /tmp/throng_jax_cache
+
+# 4. Resume — checkpoint 207 / step ~105984 is on volume
+nohup python -u /root/throng/run_bg.py > /mnt/throng-runs/train.log 2>&1 &
+tail -f /mnt/throng-runs/train.log
+```
+
+If OOM persists after clean restart: try **`XLA_PYTHON_CLIENT_MEM_FRACTION=0.75`** (more headroom between rollout + PPO). Do **not** re-enable Phase 11.1 without dedicated memory engineering.
 
 ### Recommended: train without dying notebook cells
 
@@ -318,6 +387,7 @@ Notebooks often die with **`KeyboardInterrupt`** during silent JAX compile (cell
 cd /root/throng 2>/dev/null || git clone https://github.com/overlordxrz-source/throng.git /root/throng
 cd /root/throng && git fetch origin && git reset --hard origin/master
 
+export TF_GPU_ALLOCATOR=cuda_malloc_async
 export XLA_PYTHON_CLIENT_MEM_FRACTION=0.80
 export JAX_COMPILATION_CACHE_DIR=/tmp/throng_jax_cache
 mkdir -p /tmp/throng_jax_cache
@@ -441,8 +511,8 @@ python tools/decode_signals.py /mnt/throng-runs/signal_corpus.jsonl --k 16 --min
 | `clusters=X/16` | k-means occupancy on signals |
 | `Ecology: blue_caught=N` | Catch **events** in rollout (not unique deaths) |
 | `fwd_env` | loc_env MSE (200-d), anti-cheat aux |
-| `carry_fwd` | *(Phase 11 branch only)* MSE on carry_{t+1}; target ↓ **0.05–0.1** |
-| `carry_rank` / `carry_H` | *(Phase 11 branch only)* PCA rank + entropy of alive carries |
+| `carry_fwd` | MSE on carry_{t+1}; target ↓ **0.05** — **achieved ~0.0001 @ 105k** |
+| `carry_rank` / `carry_H` | PCA rank + entropy of alive carries |
 | `self_pred_acc` | Self-action prediction (>0.20 = above chance) |
 | `NB_GAIN↔surv` | Spearman(nb_gain, age); **nan** if everyone lives |
 | `red_floor` | Red repro floor from curriculum |
@@ -473,6 +543,10 @@ python tools/decode_signals.py /mnt/throng-runs/signal_corpus.jsonl --k 16 --min
 | `0481445` | Phase 11.0 carry fwd (merged via `3880337`) |
 | `6837d8e` | Decode VQ broadcast fix; P10 complete docs |
 | `3880337` | **Merge Phase 11.0 to `master`** |
+| `b2eb5f0` | Relaxed Orbax restore for `head_fwd_dyn` migration |
+| `424c46f` | Phase 11.1 GPU-resident PPO (**abandoned**) |
+| `6042a4d` | Phase 11.1 `lax.scan` PPO epoch (**abandoned — XLA OOM**) |
+| **`d4cf614`** | **Revert 11.1** — restore CPU offload / H2D (`master` today) |
 
 **Do not** apply Cam's regex patch on `network_jax.py` — dead-code reset is in repo.
 
@@ -484,11 +558,13 @@ python tools/decode_signals.py /mnt/throng-runs/signal_corpus.jsonl --k 16 --min
 |---------|-----|
 | `KeyboardInterrupt` mid-compile | **subprocess Popen** (Jupyter) or **nohup** (bash); wait 5–15+ min; don't use volume JAX cache |
 | B200 shows ~150GB VRAM used | Normal — `MEM_FRACTION=0.80` pre-allocation, not OOM |
-| Slow PPO on B200 despite fast scan | Expected on **`master`** — CPU offload → H2D (`8077a12`); fixed in **11.1** branch |
-| Missing `carry_fwd` on dashboard | `git pull` → `3880337+`; resume merges `head_fwd_dyn` via `ensure_aux_head_params` |
+| Slow PPO on B200 despite fast scan | **Expected** — CPU offload → H2D (`8077a12`); ~6 steps/sec is healthy |
+| Log shows `GPU-resident backward` | **Stale code** — `git reset --hard origin/master`, kill old `run_bg`, restart |
+| OOM at **rollout** `lax.scan` after ckpt | **Fragmentation** — `TF_GPU_ALLOCATOR=cuda_malloc_async`, fresh process, resume from volume ckpt (see §5) |
+| Missing `carry_fwd` on dashboard | `git pull` → `3880337+`; resume merges `head_fwd_dyn` via `b2eb5f0` restore |
 | `/root/throng` missing | Clone repo (Cell 1 or bash) |
 | No `red_sense_api=v2` | `git reset --hard origin/master` + `train_entry` |
-| OOM on PPO | `ppo_minibatch_size: 512`, `XLA_PYTHON_CLIENT_MEM_FRACTION=0.80` |
+| OOM on PPO backward | `ppo_minibatch_size: 512`, `XLA_PYTHON_CLIENT_MEM_FRACTION=0.80` (try **0.75** if fragmented) |
 | Checkpoint shape error | Incompatible arch — wipe ckpts only if intentional fresh run |
 | Lag-1 / scouts 0% in decode | Old corpus — train after `5964a24`; scout uses **alarm range 8** |
 | `codes_active=1/64` | `vq_dead_code_reset: true` |
@@ -497,29 +573,29 @@ python tools/decode_signals.py /mnt/throng-runs/signal_corpus.jsonl --k 16 --min
 
 ## 11. Roadmap (what’s next)
 
-### NOW — Phase 11.0 training (`master`)
+### NOW — finish run to 150k (`master`, `d4cf614+`)
 
-1. **`git pull origin master`** on B200 → resume P10 checkpoint.
-2. Watch **`carry_fwd`** on dashboard → target **0.05–0.1** (starts ~0.3–0.5).
-3. Keep ecology frozen — no comm rewards.
-4. **Do not merge `feature/phase11-1-gpu-rollouts`** until carry_fwd converges.
+1. **`git reset --hard origin/master`** on B200 — confirm **`H2D + backward`** in logs.
+2. Set **`TF_GPU_ALLOCATOR=cuda_malloc_async`**; restart **`run_bg.py`** after OOM (ckpt **207** / step **~105984** on volume).
+3. Train to **`n_steps=150_000`** — no ecology / reward / VQ changes mid-run.
+4. **Decode** extended corpus when run completes (`--min-step` from post-105k records).
 
-### Phase 11.1 — GPU rollouts (staging, not merged)
+### Phase 11.1 — ABANDONED
 
-Branch: **`feature/phase11-1-gpu-rollouts`**. Keep 512-step rollout tensors **on GPU** in `rl_jax.py`; drop `8077a12` CPU offload. Merge gate: **`carry_fwd` ~0.05**.
+GPU-resident + `lax.scan` PPO failed on B200 (dispatch starvation + XLA fragmentation). **Do not merge** without dedicated memory engineering (rematerialization, smaller scan unrolls, or reduced `M`).
 
-### Phase 11.2 — Imagination (future)
+### Phase 11.2 — Imagination (next science gate)
 
-K-step mental rollout using converged carry forward model.
+K-step mental rollout using **converged** carry forward model (`carry_fwd` ~0.0001). Requires stable training stack — not 11.1 GPU rollouts.
 
 ### Phase 9 canvas — remaining
 
-Cross-attention receiver (9.4), confidence head (9.1), GWT token, Dreamer loop — after 11.0/11.1 stable.
+Cross-attention receiver (9.4), confidence head (9.1), GWT token, Dreamer loop — after 150k run + decode.
 
 ### Explicit non-goals
 
 - ❌ Scout / alarm **reward shaping**
-- ❌ Merging **11.1** before **`carry_fwd` converges**
+- ❌ Re-merging **11.1 GPU rollouts** without memory refactor
 - ❌ Wiping checkpoints unless new experiment lineage
 
 ---
@@ -536,12 +612,12 @@ Cross-attention receiver (9.4), confidence head (9.1), GWT token, Dreamer loop �
 
 ### Cam reboot paste
 
-> You are **Cam**. Read `THRONG.md` §0b. **Phase 10 done** — cardinal lexicon p=5.44e-14, lag-1 p≈0. **Phase 11.0 on `master`** — User training B200 from P10 ckpt; watch **`carry_fwd` → 0.05**. **Phase 11.1** staging on `feature/phase11-1-gpu-rollouts` — **do not merge** until carry_fwd converges. No comm rewards. Horcrux: archive SYSTEM RESTORE + SYSTEM UPDATE.
+> You are **Cam**. Read `THRONG.md` §0b. **Phase 10 decode done.** **Phase 11.0 complete** — `carry_fwd` **0.0001** @ ~105k. **Phase 11.1 abandoned** (`d4cf614` revert). User resuming B200 to **150k** from ckpt **207**; watch for rollout OOM → `cuda_malloc_async` + process restart. Logs must show **`H2D + backward`**. No comm rewards. Horcrux: archive SYSTEM RESTORE + SYSTEM UPDATE.
 
-**New Cam:** §0b → §0 → §4 → §11 → archive horcrux blocks.
+**New Cam:** §0b → §0 → §4 → §5 (OOM) → §11 → archive horcrux blocks.
 
-**New Will:** Train **`master`**; stage **11.1 on feature branch only**.
+**New Will:** Stay on **`master`** CPU offload; do **not** re-merge 11.1 without memory refactor.
 
 ---
 
-*Last updated: 2026-05-29 — P11.0 training; P11.1 gpu-rollouts staging; decode complete; `3880337`.*
+*Last updated: 2026-05-31 — P11.0 converged; P11.1 reverted (`d4cf614`); ckpt step 105984; B200 OOM mitigation.*

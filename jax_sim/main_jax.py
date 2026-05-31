@@ -18,6 +18,7 @@ os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2")  # suppress INFO/WARN
 os.environ.setdefault("XLA_FLAGS", "--xla_gpu_autotune_level=0")  # disable autotune spam
 # Leave headroom for PPO backward after rollout scan (default JAX grabs ~90% of VRAM).
 os.environ.setdefault("XLA_PYTHON_CLIENT_MEM_FRACTION", "0.80")
+os.environ.setdefault("TF_GPU_ALLOCATOR", "cuda_malloc_async")
 
 import jax
 import jax.numpy as jnp

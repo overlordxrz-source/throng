@@ -16,5 +16,5 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from scripts.modal_train import build_cfg, run_simulation  # noqa: E402
 
 if __name__ == "__main__":
-    print("run_bg.py: P10.5 resume (latest Orbax ckpt on volume)", flush=True)
+    print("run_bg.py: P11 resume to 150k (latest Orbax ckpt on volume)", flush=True)
     run_simulation(build_cfg(), seed=42, n_steps=150_000)
