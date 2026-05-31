@@ -194,7 +194,10 @@ hebb_lr: 0.001
 alarm_scout_range: 8
 alarm_min_group: 20
 
-# Phase 11 staging (feature/phase11-imagination only — not on master P10.6 run)
-carry_fwd_coef: 0.05   # MSE on carry_{t+1}; target always stop_gradient
+# Phase 11.0 — carry forward dynamics (carry_{t+1} MSE, stop_gradient target)
+carry_fwd_coef: 0.05
+
+# Phase 11.1 — keep 512-step rollout tensors on GPU (B200 HBM3); false = legacy CPU offload
+gpu_resident_rollouts: true
 
 exit_on_graduation: false

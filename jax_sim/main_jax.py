@@ -601,6 +601,10 @@ def _run_simulation_impl(
         _inspect.getsource(_rl_jax_mod.auxiliary_update)
     ):
         print("[JAX] Phase11 carry_fwd: head_fwd_dyn_1/2 → carry_{t+1} MSE (stop_grad target)")
+    if bool(config.get("gpu_resident_rollouts", True)):
+        print("[JAX] Phase11.1 PPO: GPU-resident rollouts (no CPU offload / H2D)")
+    else:
+        print("[JAX] PPO: CPU rollout offload enabled (legacy A100 path)")
     from jax_sim import observations_jax as _obs_mod
 
     _bo_path = _inspect.getfile(_obs_mod.build_observations_jax)
@@ -921,6 +925,7 @@ def _run_simulation_impl(
             )
 
         # PPO update (not JIT — Python loop)
+        _gpu_resident = bool(config.get("gpu_resident_rollouts", True))
         _fwd_coef = float(config.get("fwd_coef", 0.05))
         _carry_fwd_coef = float(config.get("carry_fwd_coef", 0.05))
         _fwd_mb   = int(config.get("ppo_minibatch_size", 512))
@@ -950,6 +955,7 @@ def _run_simulation_impl(
             gamma=float(config.get("ppo_gamma", 0.99)),
             lam=float(config.get("ppo_gae_lam", 0.95)),
             team="blue",
+            gpu_resident=_gpu_resident,
         )
         if ui == start_update:
             print(
@@ -1013,6 +1019,7 @@ def _run_simulation_impl(
             gamma=float(config.get("ppo_gamma", 0.99)),
             lam=float(config.get("ppo_gae_lam", 0.95)),
             team="red",
+            gpu_resident=_gpu_resident,
         )
         if ui == start_update:
             print(

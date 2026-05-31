@@ -29,8 +29,8 @@ def compute_gae(
     """
     Pure discounted returns + advantage = returns - values (CPU numpy loop).
 
-    Rollout batches are offloaded to CPU before PPO; a JAX lax.scan here would
-    index numpy arrays with traced indices and raise TracerArrayConversionError.
+    GAE runs on CPU numpy even when PPO rollouts are GPU-resident (Phase 11.1);
+    rewards/values are (T,N) — tiny vs full obs tensor.
     """
     del lam  # kept for API compat; no value bootstrapping in this rollout setup
     rewards = np.asarray(rewards, dtype=np.float32)
@@ -204,11 +204,13 @@ def ppo_update(
     gamma: float = 0.99,
     lam: float = 0.95,
     team: str = "blue",
+    gpu_resident: bool = True,
 ) -> Tuple[Dict, Any, Dict]:
     """
     Single gradient update step using minibatches.
-    Offloads rollout data to CPU; only one minibatch lives on GPU at a time.
-    Returns (new_params, new_opt_state, metrics).
+
+    gpu_resident=True (Phase 11.1 / B200): keep rollout tensors on device; no CPU
+    offload or H2D per minibatch. gpu_resident=False: legacy A100 CPU offload path.
     """
     obs = batch["obs"]
     actions = batch["actions"]
@@ -228,40 +230,51 @@ def ppo_update(
     print(f"  [DEBUG] adv     mean={float(advantages.mean()):.4f} std={float(advantages.std()):.4f}")
     print(f"  [DEBUG] returns mean={float(returns.mean()):.4f} std={float(returns.std()):.4f}")
 
-    # Flatten (T, N, ...) -> (M, ...) and move to CPU (numpy) to free GPU VRAM.
-    # The full rollout obs alone is ~2.3GB on GPU — must be freed before backward pass.
     T, N = obs.shape[:2]
     M = T * N
-
-    def flatten_to_cpu(x):
-        if x is None: return None
-        return np.asarray(x.reshape((M,) + x.shape[2:]))
-
-    flat_obs = flatten_to_cpu(obs)
-    flat_actions = flatten_to_cpu(actions)
-    flat_log_probs = flatten_to_cpu(old_log_probs)
-    flat_adv = flatten_to_cpu(advantages)
-    flat_ret = flatten_to_cpu(returns)
-    flat_carries = flatten_to_cpu(carries)
-    flat_values = flatten_to_cpu(values)
-    flat_alive = flatten_to_cpu(alive)
-    flat_loss_vq = flatten_to_cpu(loss_vq)
-
-    # Delete GPU references so XLA can reclaim VRAM
-    del obs, actions, old_log_probs, advantages, returns, carries, values, alive, loss_vq
-    del batch
-
-    # Shuffle on CPU (no GPU allocation for permutation array)
-    rng = np.random.RandomState(int(jax.random.bits(key, dtype=jnp.uint32)))
-    perm = rng.permutation(M)
-
-    # Minibatch loop — GPU only holds params + opt_state + one minibatch + backward workspace
     minibatch_size = int(minibatch_size)
     if minibatch_size <= 0:
         raise ValueError(f"ppo_minibatch_size must be positive, got {minibatch_size}")
     n_minibatches = M // minibatch_size
 
-    # Accumulate metrics as Python floats (not 500 JAX scalar dicts)
+    if gpu_resident:
+        def flatten_dev(x):
+            if x is None:
+                return None
+            return x.reshape((M,) + x.shape[2:])
+
+        flat_obs = flatten_dev(obs)
+        flat_actions = flatten_dev(actions)
+        flat_log_probs = flatten_dev(old_log_probs)
+        flat_adv = flatten_dev(jnp.asarray(advantages))
+        flat_ret = flatten_dev(jnp.asarray(returns))
+        flat_carries = flatten_dev(carries)
+        flat_values = flatten_dev(values)
+        flat_alive = flatten_dev(alive)
+        flat_loss_vq = flatten_dev(loss_vq)
+        perm = jax.random.permutation(key, M)
+        ppo_mode = "GPU-resident backward"
+    else:
+        def flatten_to_cpu(x):
+            if x is None:
+                return None
+            return np.asarray(x.reshape((M,) + x.shape[2:]))
+
+        flat_obs = flatten_to_cpu(obs)
+        flat_actions = flatten_to_cpu(actions)
+        flat_log_probs = flatten_to_cpu(old_log_probs)
+        flat_adv = flatten_to_cpu(advantages)
+        flat_ret = flatten_to_cpu(returns)
+        flat_carries = flatten_to_cpu(carries)
+        flat_values = flatten_to_cpu(values)
+        flat_alive = flatten_to_cpu(alive)
+        flat_loss_vq = flatten_to_cpu(loss_vq)
+        del obs, actions, old_log_probs, advantages, returns, carries, values, alive, loss_vq
+        del batch
+        rng = np.random.RandomState(int(jax.random.bits(key, dtype=jnp.uint32)))
+        perm = rng.permutation(M)
+        ppo_mode = "H2D + backward"
+
     metric_sums = {}
     final_grads = None
 
@@ -271,20 +284,30 @@ def ppo_update(
         if i == 0:
             print(
                 f"  [JAX] {team} PPO minibatch 1/{n_minibatches} "
-                f"(M={M}, mb={minibatch_size}) — H2D + backward...",
+                f"(M={M}, mb={minibatch_size}) — {ppo_mode}...",
                 flush=True,
             )
 
-        # Transfer just this minibatch to GPU
-        mb_obs = jnp.array(flat_obs[idx])
-        mb_act = jnp.array(flat_actions[idx])
-        mb_lp = jnp.array(flat_log_probs[idx])
-        mb_adv = jnp.array(flat_adv[idx])
-        mb_ret = jnp.array(flat_ret[idx])
-        mb_c = jnp.array(flat_carries[idx])
-        mb_v = jnp.array(flat_values[idx])
-        mb_al = jnp.array(flat_alive[idx]) if flat_alive is not None else None
-        mb_vq = jnp.array(flat_loss_vq[idx]) if flat_loss_vq is not None else None
+        if gpu_resident:
+            mb_obs = flat_obs[idx]
+            mb_act = flat_actions[idx]
+            mb_lp = flat_log_probs[idx]
+            mb_adv = flat_adv[idx]
+            mb_ret = flat_ret[idx]
+            mb_c = flat_carries[idx]
+            mb_v = flat_values[idx]
+            mb_al = flat_alive[idx] if flat_alive is not None else None
+            mb_vq = flat_loss_vq[idx] if flat_loss_vq is not None else None
+        else:
+            mb_obs = jnp.array(flat_obs[idx])
+            mb_act = jnp.array(flat_actions[idx])
+            mb_lp = jnp.array(flat_log_probs[idx])
+            mb_adv = jnp.array(flat_adv[idx])
+            mb_ret = jnp.array(flat_ret[idx])
+            mb_c = jnp.array(flat_carries[idx])
+            mb_v = jnp.array(flat_values[idx])
+            mb_al = jnp.array(flat_alive[idx]) if flat_alive is not None else None
+            mb_vq = jnp.array(flat_loss_vq[idx]) if flat_loss_vq is not None else None
 
         params, opt_state, mb_mets, grads = _minibatch_step(
             params, opt_state, apply_fn, optimizer,
@@ -292,12 +315,10 @@ def ppo_update(
             n_layers, mb_v, clip_eps, vf_coef, ent_coef, vq_coef, mb_vq, mb_al
         )
 
-        # Accumulate as Python floats to avoid holding 500 JAX arrays
         for k, v in mb_mets.items():
             metric_sums[k] = metric_sums.get(k, 0.0) + float(v)
         final_grads = grads
 
-    # Average metrics
     metrics = {k: v / n_minibatches for k, v in metric_sums.items()}
 
     # Debug: gradient norms (using the last minibatch's gradients)

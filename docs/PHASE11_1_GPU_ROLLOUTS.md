@@ -1,30 +1,34 @@
-# Phase 11.1 — GPU-Resident Rollouts (staging)
+# Phase 11.1 — GPU-Resident Rollouts
 
-**Branch:** `feature/phase11-1-gpu-rollouts`  
-**Status:** Staging — **do not merge to `master` until Phase 11.0 `carry_fwd` ↓ ~0.05**
+**Status:** Merged to `master` after Phase 11.0 `carry_fwd` converged (< 0.05).
 
-## Problem
+## Change
 
-`8077a12` offloads rollout tensors to CPU before PPO to fit A100 15GB VRAM. On B200 (192GB), PPO logs `H2D + backward...` ~40s while `lax.scan` ~17s — PCIe bottleneck caps ~6 steps/sec.
+Replaces `8077a12` CPU rollout offload in `ppo_update()` (`rl_jax.py`).
 
-## Target
+| Mode | `gpu_resident_rollouts` | Behavior |
+|------|-------------------------|----------|
+| **B200 default** | `true` | Rollout `(T=512, N, …)` stays on device; minibatch slice in-place |
+| **A100 fallback** | `false` | Legacy CPU numpy offload + H2D per minibatch |
 
-Keep `(T=512, N, …)` rollout batch **on device** through GAE + PPO minibatches. Expect **15+ steps/sec** on B200.
+## Config
 
-## Files to change
+```yaml
+gpu_resident_rollouts: true
+```
 
-| File | Change |
-|------|--------|
-| `jax_sim/rl_jax.py` | Remove CPU numpy flatten/offload in `ppo_update`; keep arrays as JAX on GPU |
-| `jax_sim/main_jax.py` | Stop `np.asarray` carry save if aux can read device arrays; optional config flag |
-| `config_phase7.yaml` | `gpu_resident_rollouts: true` (branch only until merge) |
+## Startup log
 
-## Merge gate
+```text
+[JAX] Phase11.1 PPO: GPU-resident rollouts (no CPU offload / H2D)
+```
 
-1. Phase 11.0 training shows **`carry_fwd` ~0.05–0.1** on dashboard
-2. User/Cam approve merge
-3. Verify no OOM at `MEM_FRACTION=0.80` on B200 with full rollout on device
+PPO logs show `GPU-resident backward` instead of `H2D + backward`.
+
+## Expected
+
+Throughput **15+ steps/sec** on B200 (vs ~6 with H2D bottleneck).
 
 ## Rollback
 
-Re-enable CPU offload path if OOM — keep both paths behind config flag during staging.
+Set `gpu_resident_rollouts: false` in `config_phase7.yaml` if OOM on smaller GPUs.
