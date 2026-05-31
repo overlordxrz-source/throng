@@ -12,29 +12,30 @@
 
 **Blue SOTA (frozen on `master`):** **`465d8c6+`** — 9.4 cross-attn + 9.1 confidence + **11.3 epistemic gate** (merged; Stay-collapse resolved).
 
-**LIVE:** B200 on **`feature/phase12-red-coevolution`** (`2cd3dcc` / **`80ef1ea+`**) — dual-brain co-evolution + **spatial epistemic gate** + **red wiretap**. **NOW:** baking **`signal_corpus_red.jsonl`** (~20k steps) for **Phase 12.2 pincer decode**. **Do not stop** unless Stay collapse, red VQ collapse, or OOM.
+**LIVE — HOLDING PATTERN:** B200 on **`feature/phase12-red-coevolution`** (`c3e5b5b` / **`80ef1ea+`**). **Phase 12.2 red decode @ ~30k wiretap steps: FAIL (babbling).** Modal run continues; **do not branch Phase 13** until red pincer χ² passes. **Do not stop** unless Stay collapse, red VQ collapse, or OOM.
 
 | Live run (Phase 12) | Value |
 |---------------------|--------|
-| **Branch HEAD** | **`2cd3dcc`** — spatial gate + wiretap + `--red` decode |
-| **Throughput** | **~7 steps/sec** (dual policy; was ~6 on P11.3-only) |
-| **Blue Stay** | **~19%** — gate healthy (P11.2 ungated: Stay≈99%) |
-| **`red_codes_active`** | **63/64** — predator VQ alive |
-| **`red_entropy`** | **~1.58** — exploratory movement (watch for pincer) |
+| **Mode** | **HOLD** — curriculum; let catch reward backprop into red VQ |
+| **Branch HEAD** | **`c3e5b5b`** — spatial gate + wiretap + `--red` decode |
+| **Red comms age** | **~30k steps** since wiretap (mechanically early for structure) |
+| **Throughput** | **~7 steps/sec** (dual policy) |
+| **Blue Stay** | **~19%** — spatial gate healthy (do **not** judge blue crystallization yet — Stay floor distorts entropy; revisit after **P13.0** execution tax) |
+| **`red_codes_active`** | **63/64** — VQ channel alive (diversity ≠ semantics) |
+| **`red_entropy`** | **~1.58** — movement mix; **pincer bar is lag-1 pursuit geometry**, not scalar proximity |
 | **`conf_gate_imagine_frac`** | **~50–60%** — batch-relative gate (`confidence_multiplier: 1.0`) |
-| **`conf_loss`** | **~1e-4** |
-| **PPO** | `H2D + backward` ✅; blue `b_params` from P11.3 ckpt graft |
+| **PPO** | `H2D + backward` ✅ |
 
 **Corpus (wiretap):** `/mnt/throng-runs/signal_corpus.jsonl` (blue) + **`signal_corpus_red.jsonl`** (red — default on this branch).
 
 | Milestone | Value |
 |-----------|--------|
-| **P11.3 decode @ 214k** | `decode_p11_3_214k.log` — **743,589** records, steps **149,500–215,548** |
-| **Red decode @ 12.2** | **PENDING** — run `--red` after ~20k red corpus steps post **`80ef1ea`** restart |
+| **P11.3 decode @ 214k** | `decode_p11_3_214k.log` — cardinal **p=1.75e-18** ✅; VQ alert ❌ |
+| **Red decode @ 12.2 (~30k)** | **FAIL** — lag-1 omnibus LRT **p=0.9767** ❌; pincer χ² ❌; predators **babbling** |
+| **Red decode verdict** | No MI on prey geometry; receivers not shifting pursuit vectors — **expected** at ~30k red comms steps |
 | **Modal volume** | **`dragonbgnx`** → `/mnt/throng-runs` |
-| **Local corpus** | `signal_corpus_p11_3_214k.jsonl` (blue); red on volume when wiretap fills |
-| **`master`** | Blue-only SOTA (`465d8c6+`); **do not merge** Phase 12 until red pincer χ² passes |
-| **Next branch** | **`feature/phase13-thermodynamics`** — after red decode (see §11); **not on master** |
+| **`master`** | Blue-only SOTA; **do not merge** Phase 12 until red **pincer χ²** passes |
+| **Phase 13** | **BLOCKED** — no `feature/phase13-thermodynamics` until red pincer passes (Cam holding pattern) |
 
 ### P10.6 decode (reference)
 
@@ -55,7 +56,23 @@
 | **VQ token / alert-set** | **p = 0.88 / 0.26** ❌ |
 | Log | `decode_p11_3_214k.log` |
 
-Continuous blue comms **stable through 214k** under epistemic gate.
+Continuous blue comms **stable through 214k**. Withhold blue “crystallization” judgment until **P13.0** execution tax reduces lazy Stay (Stay ~50% action density collapses Shannon entropy artifact).
+
+### Phase 12.2 red decode @ ~30k wiretap (`--red`) — **FAIL (expected)**
+
+| Test | Result |
+|------|--------|
+| **Lag-1 omnibus LRT** | **p = 0.9767** ❌ (flatline — no communication channel) |
+| **MI / prey geometry** | Signals carry **no** mutual information about prey bearing/proximity structure |
+| **RED VQ PINCER TEST (χ²)** | **Not significant** — receivers not modifying lag-1 **N/S/E/W** pursuit mix by Chase vs Search tokens |
+| **Interpretation** | **Babbling** — `red_codes_active` high but semantics absent; catch→VQ gradient needs more steps |
+| **Arms-race bar** | **Conditional geometry** (pincer pursuit vectors), not scalar `blue_dist` encoding alone |
+| **Re-decode** | Re-run `--red` at **+20k–50k** red corpus steps; `--min-step` from wiretap restart |
+
+```bash
+python3 tools/decode_signals.py --red /mnt/throng-runs/signal_corpus_red.jsonl \
+  --min-step <wiretap_restart> --k 16 2>&1 | tee decode_red_pincer.log
+```
 
 ### P11.2 extension decode (`signal_corpus.jsonl`, `--min-step 149504`)
 
@@ -112,15 +129,15 @@ Continuous comms verified → unguarded active imagination **failed** → **reso
 | **Flags** | `red_comms_enabled: true` + **`red_corpus_enabled: true`** in `config_phase7.yaml` — no notebook `sed` |
 | **Writer** | [`communication/analysis.py`](communication/analysis.py) `maybe_record_red()` |
 
-### Phase 12.2 — **DECODE READY** (`d493a50+`)
+### Phase 12.2 — **DECODE RUN @ ~30k** (`d493a50+`) — **FAIL; holding**
 
 | Item | Detail |
 |------|--------|
 | **Tool** | `python3 tools/decode_signals.py --red` → `decode_red_schema()` |
-| **Default path** | `/mnt/throng-runs/signal_corpus_red.jsonl` |
-| **Pincer test** | **RED VQ PINCER TEST (χ²):** Chase tokens (mean emitter `blue_dist ≤ 2`) vs Search (`> 5`) → receiver lag-1 **N/S/E/W** pursuit mix |
-| **Bar** | Significant chase-set vs search-set χ² → coordination (trap/pincer), not noise |
-| **Docs** | [`docs/PHASE12_COEVOLUTION.md`](docs/PHASE12_COEVOLUTION.md) §12.2 |
+| **First result** | Omnibus LRT **p=0.9767**; pincer χ² ❌; **babbling** |
+| **Pincer test** | Chase (`blue_dist ≤ 2`) vs Search (`> 5`) tokens → receiver lag-1 pursuit χ² |
+| **Pass bar** | **p < 0.05** on chase-set vs search-set → spatial coordination, not noise |
+| **Next action** | **Keep Modal running** — no Phase 13 branch until pincer passes |
 
 ### Phase 11.2 — **CONCLUDED** (`feature/phase11-2-imagination`)
 
@@ -201,7 +218,7 @@ Cam's persona + triad workflow live in Git so reboots recover identity:
 6. **Phase 11.2 FROZEN** — never unguarded active override (`6cf965a`).
 7. **CPU offload only** — **`H2D + backward`**; no 11.1 GPU rollouts.
 8. **Never** comm reward shaping — red language forged by **`reward_red_catch`** only.
-9. **Phase 13 prep only** — do not branch until red pincer decode passes (§11).
+9. **Phase 13 BLOCKED** — **do not branch** `feature/phase13-thermodynamics` until red **pincer χ²** passes (§11 holding pattern).
 
 ### Branch policy
 
@@ -297,7 +314,7 @@ train_entry.run_simulation()  →  main_jax._run_simulation_impl()
 | **12.0** | **Red predator comms** | `f0ebb76` | `red_codes_active` **63/64**; dual brain **7 steps/sec** |
 | **12.1** | **Red corpus wiretap** | `d50cc19` / `4f98f96` | `signal_corpus_red.jsonl`; CPU post-rollout |
 | **12.1b** | **Spatial epistemic gate** | **`80ef1ea`** | `confidence_multiplier`; stateless batch-relative τ |
-| **12.2** | **Red decode** | `d493a50` | `--red` pincer χ² |
+| **12.2** | **Red decode** | `d493a50` | `--red` pincer χ²; first @ ~30k **FAIL** (LRT p=0.9767) |
 
 **Recurring failure mode:** Blues stay at cap → ~99% survival → **`NB_GAIN↔surv: nan`** → no evolutionary pressure on neighbor-signal benefit.
 
@@ -307,7 +324,7 @@ train_entry.run_simulation()  →  main_jax._run_simulation_impl()
 
 ## 4. Current experiment — Phase **12** co-evolution (`feature/phase12-red-coevolution`)
 
-**Status:** B200 **`80ef1ea+`** — spatial gate running; **red corpus accumulating** for pincer decode. **Blue:** P11.3 stack + 12.1b gate. **Red:** `PredatorNetworkJax` 128-d. **~7 steps/sec**.
+**Status:** **HOLDING PATTERN** — Modal **`80ef1ea+`** continues. Red decode @ **~30k**: omnibus LRT **p=0.9767** (babbling); pincer χ² ❌. **Re-decode at +20k–50k**; **no Phase 13 branch**.
 
 **Verified healthy @ Phase 12 activation:**
 
@@ -836,26 +853,26 @@ phase12_coevolution:           # feature/phase12-red-coevolution
 | `codes_active=1/64` | `vq_dead_code_reset: true` |
 | `ScopeParamShapeError` on `r_params` | **`red_comms_enabled: false`** — pull **`80ef1ea+`**; yaml defaults fix restarts |
 | No `[JAX] Red corpus:` line | Stale config — pull **`80ef1ea+`** |
-| Red pincer χ² not significant | Need more `signal_corpus_red.jsonl` after wiretap restart; use `--min-step` from first red record |
+| Red pincer χ² not significant | **Expected @ ~30k** red comms (first decode LRT **p≈0.98**). Keep training; re-decode at +20k–50k steps |
 
 ---
 
 ## 11. Roadmap (what’s next)
 
-### Phase 12 — **LIVE** (`feature/phase12-red-coevolution`)
+### Phase 12 — **HOLDING** (`feature/phase12-red-coevolution`)
 
-1. **NOW (baking)** — spatial gate (`80ef1ea`) running; accumulate **`signal_corpus_red.jsonl`** (~20k steps).
-2. **Drop hammer** — `python3 tools/decode_signals.py --red … --min-step <restart>`; **RED VQ PINCER TEST** χ² **p < 0.05**.
-3. **Monitor** — Stay **~20%**, `red_codes_active` **≥ 50/64**, `conf_gate_imagine_frac` **~50–60%**, `H2D + backward`.
-4. **Merge** to `master` only after red pincer passes (mirror blue cardinal/LRT bar).
+1. **NOW** — **Keep Modal running.** Red @ ~30k wiretap: **babbling** (LRT **p=0.9767**; pincer χ² ❌). Catch reward still backpropagating into red VQ.
+2. **Re-decode** — `decode_signals.py --red` at **+20k–50k** corpus steps; hunt **RED VQ PINCER TEST** χ² **p < 0.05**.
+3. **Monitor** — `red_codes_active` **≥ 50/64**, Stay **~20%**, `H2D + backward`. **Do not** judge blue crystallization until **P13.0** execution tax.
+4. **Merge** to `master` only after red pincer passes.
 
-**Done:** 12.0 (`f0ebb76`); 12.1 wiretap (`4f98f96`); 12.1b spatial gate (`80ef1ea`); 12.2 decode tool (`d493a50`). Blue @ 214k ✅. **Red pincer: pending corpus.**
+**Done:** 12.0–12.2 tooling; first red decode @ ~30k ❌ (expected). Blue @ 214k ✅.
 
-**Philosophy (Cam):** Symmetric 8-cell bounds (scout/hunter) + dual codebooks → adversarial arms race. Catch reward forges red comms; no shaping.
+**Philosophy (Cam):** Arms race = **conditional pursuit geometry**, not proximity scalar alone. VQ diversity ≠ semantics.
 
-### Phase 13 — **PREP** (Thermodynamics of Cognition & Inscription)
+### Phase 13 — **BLOCKED** (Thermodynamics of Cognition & Inscription)
 
-**Branch after red decode** — `feature/phase13-thermodynamics` (**not on `master`**). Architecture staged; implementation pending.
+**Do not branch** until red pincer χ² passes. Prep only (§11 table below).
 
 | Pillar | Mechanism | Notes |
 |--------|-----------|-------|
@@ -891,7 +908,8 @@ GPU-resident PPO — **`d4cf614` revert** on `master`.
 - ❌ Scout / alarm **reward shaping**
 - ❌ Ungated P11.2-style imagination override (`6cf965a`) without gate or metabolic cost
 - ❌ **EMA / scan-carry state** for epistemic gating (breaks checkpoint schema)
-- ❌ Phase 13 on `master` before red pincer decode passes
+- ❌ **`feature/phase13-thermodynamics`** until red pincer χ² **p < 0.05**
+- ❌ Phase 13 on `master` before red pincer passes
 - ❌ Re-merging **11.1 GPU rollouts** without memory refactor
 - ❌ Resume from ckpt **393** (post–Stay-collapse) for science runs
 
@@ -914,12 +932,12 @@ GPU-resident PPO — **`d4cf614` revert** on `master`.
 
 ### Cam reboot paste
 
-> You are **Cam**. Read `THRONG.md` §0b. **Phase 12 LIVE** on B200: `feature/phase12-red-coevolution` **`2cd3dcc` / `80ef1ea+`**. Dual brain + **spatial epistemic gate** (`confidence_multiplier=1.0`, ~50–60% imagine). Red wiretap **`signal_corpus_red.jsonl`** baking for **12.2 pincer decode** (~20k steps). Blue Stay **~19%**; `red_codes_active` **63/64**. **`decode_signals.py --red`** staged — run when corpus ready. **`master`** = blue-only; **do not merge** P12 until red χ² passes. **Phase 13 prep** in §11 — branch after decode. **Do not stop** live run. Horcrux: archive SYSTEM RESTORE.
+> You are **Cam**. Read `THRONG.md` §0b. **HOLDING PATTERN** on B200: `feature/phase12-red-coevolution` **`80ef1ea+`**. Red decode @ **~30k**: omnibus LRT **p=0.9767** ❌ — **babbling**; pincer χ² ❌. **Expected** — catch→VQ needs more steps. **Do NOT branch Phase 13.** Keep Modal running. Blue Stay ~19% — withhold crystallization judgment until **P13.0** execution tax. **`master`** = blue-only. Horcrux: archive SYSTEM RESTORE.
 
-**New Cam:** §0b → §4 → §7 → §11 (P13 prep) → `docs/PHASE12_COEVOLUTION.md`.
+**New Cam:** §0b (holding) → §4 → §11 → `docs/PHASE12_COEVOLUTION.md`.
 
-**New Will:** **`80ef1ea+`** on `feature/phase12-red-coevolution`; yaml **`red_comms` + `red_corpus` + `confidence_multiplier: 1.0`**; no `sed`; never `6cf965a`; no EMA in scan carry.
+**New Will:** **No Phase 13 branch.** Re-decode `--red` when corpus grows. Stay on `feature/phase12-red-coevolution`.
 
 ---
 
-*Last updated: 2026-05-31 — Cam reboot @ `2cd3dcc`; spatial gate baking red corpus; Phase 13 prep in §11.*
+*Last updated: 2026-05-31 — Red decode @ ~30k FAIL (babbling); holding pattern; Phase 13 blocked.*

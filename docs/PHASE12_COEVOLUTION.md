@@ -78,7 +78,17 @@ After ~20k steps of red corpus:
 python3 tools/decode_signals.py --red /mnt/throng-runs/signal_corpus_red.jsonl --min-step <12.1_restart> --k 16
 ```
 
-**Red VQ pincer test (χ²):** tokens with mean emitter `blue_dist ≤ 2` (Chase) vs `> 5` (Search); compares receiver **lag-1** N/S/E/W pursuit mix among non-hunters with `nb_hunter_token_lag1`. Significant χ² → coordination, not noise.
+**Red VQ pincer test (χ²):** tokens with mean emitter `blue_dist ≤ 2` (Chase) vs `> 5` (Search); compares receiver **lag-1** N/S/E/W pursuit mix among non-hunters with `nb_hunter_token_lag1`. Significant χ² → **spatial coordination** (conditional geometry), not scalar proximity alone.
+
+### First decode @ ~30k wiretap (May 2026) — **FAIL (expected)**
+
+| Test | Result |
+|------|--------|
+| Lag-1 omnibus LRT | **p = 0.9767** ❌ |
+| Pincer χ² (Chase vs Search) | ❌ — receivers not shifting pursuit vectors |
+| Verdict | **Babbling** — VQ alive, semantics absent; ~30k red comms steps too early |
+
+**Holding pattern:** keep Modal training; re-decode at +20k–50k steps. **Do not branch Phase 13** until pincer χ² **p < 0.05**.
 
 Blue decode unchanged: `python3 tools/decode_signals.py signal_corpus.jsonl`.
 

@@ -7,18 +7,35 @@ to **survive, signal, and pass knowledge on**. The goal is not "an agent that
 plays a game well." The goal is **emergence**: language, culture, and proto-
 cognition arising purely from selection pressure.
 
-**Current state:** Phase 8.5 → entering Phase 9. JAX simulation runs end-to-end
-on free-tier T4 GPUs. The signal channel is **live as of May 28 2026** (a
-critical bug that silently zeroed all broadcasts for ~130k steps was just
-fixed). Next: Self-Model, Forward Dynamics, and Dreamer-style deliberation.
+**Current state (May 2026):** **Phase 12 co-evolution LIVE** on Modal B200 —
+branch **`feature/phase12-red-coevolution`**. Dual brain: blue P11.3 stack +
+`PredatorNetworkJax` (red VQ comms). **Holding pattern:** first red decode @
+~30k wiretap steps **failed** (lag-1 LRT **p=0.9767** — babbling); Modal run
+continues until red **pincer χ²** passes. **Phase 13 blocked** until then.
 
-**Framework:** JAX + Flax (full `lax.scan` rollout under one `@jax.jit`)
+**Full ops / decode / roadmap:** [THRONG.md](THRONG.md) §0b (read first).
+
+**Framework:** JAX + Flax (`lax.scan` rollout, CPU-offload PPO on B200)
 **Active config:** `config_phase7.yaml`
-**Working files:** `jax_sim/` (PyTorch code in `agents/`, `environment/`,
-`main.py` is frozen legacy).
+**Active branch:** `feature/phase12-red-coevolution` (not `master` for live train)
+**Working files:** `jax_sim/` (PyTorch in `agents/`, `main.py` is legacy).
 
 For the full research log, theory, philosophy, and per-phase post-mortems see
-[THRONG.md](THRONG.md) (agent onboarding). Full historical log: [docs/THRONG_ARCHIVE.md](docs/THRONG_ARCHIVE.md).
+[THRONG.md](THRONG.md) (agent onboarding). Phase 12 co-evolution:
+[docs/PHASE12_COEVOLUTION.md](docs/PHASE12_COEVOLUTION.md). Historical log:
+[docs/THRONG_ARCHIVE.md](docs/THRONG_ARCHIVE.md).
+
+### Decode (offline)
+
+```bash
+# Blue alarm / flee (214k reference: decode_p11_3_214k.log)
+python3 tools/decode_signals.py signal_corpus.jsonl --k 16 --min-step 149500
+
+# Red pincer / pursuit (re-run as red corpus grows)
+python3 tools/decode_signals.py --red /mnt/throng-runs/signal_corpus_red.jsonl --k 16 --min-step <wiretap_restart>
+```
+
+**Pass bar (red):** RED VQ PINCER TEST χ² **p < 0.05** (Chase vs Search tokens → receiver lag-1 N/S/E/W). First run @ ~30k: **FAIL** (LRT p=0.9767).
 
 ---
 
@@ -269,7 +286,23 @@ All knobs live in `config_phase7.yaml`. The ones you actually touch:
 
 ## Roadmap
 
-### ✅ What works right now (confirmed in current run)
+**Authoritative roadmap:** [THRONG.md §11](THRONG.md#11-roadmap-whats-next).
+
+| Phase | Status |
+|-------|--------|
+| **9.x–11.3** | Merged to `master` — cross-attn, confidence, carry fwd, epistemic gate |
+| **12.0–12.2** | **LIVE** on `feature/phase12-red-coevolution` — red VQ + wiretap + `--red` decode |
+| **12.2 decode @ ~30k** | **FAIL** — babbling (LRT p=0.9767); **holding pattern** |
+| **13.0+** | **BLOCKED** — metabolic execution tax, inscription, proprio aux — **after** red pincer χ² passes |
+
+Do **not** branch `feature/phase13-thermodynamics` until red spatial coordination is proven.
+
+---
+
+## Historical roadmap (Phase 9 plan — superseded)
+
+The sections below document the original Phase 9 design intent. Most are **done**
+on `master`. See THRONG.md for current work.
 
 - Transformer brains, capacity-based brain-vote (2L → 6L).
 - Eight environment channels, dual cultural grids, scent trails, contested
