@@ -170,11 +170,10 @@ def create_optimizer(lr: float = 3e-4, max_grad_norm: float = 2.0) -> optax.Grad
     )
 
 
-@functools.partial(jax.jit, static_argnames=("apply_fn", "optimizer", "n_layers"))
-def _minibatch_step(
+def _minibatch_step_impl(
     params, opt_state, apply_fn, optimizer,
     obs, actions, old_log_probs, advantages, returns, carries,
-    n_layers, old_values, clip_eps, vf_coef, ent_coef, vq_coef, loss_vq, alive
+    n_layers, old_values, clip_eps, vf_coef, ent_coef, vq_coef, loss_vq, alive,
 ):
     grad_fn = jax.value_and_grad(ppo_loss, has_aux=True)
     (loss, metrics), grads = grad_fn(
@@ -186,6 +185,63 @@ def _minibatch_step(
     new_params = optax.apply_updates(params, updates)
     metrics["total_loss"] = loss
     return new_params, new_opt_state, metrics, grads
+
+
+@functools.partial(jax.jit, static_argnames=("apply_fn", "optimizer", "n_layers"))
+def _minibatch_step(
+    params, opt_state, apply_fn, optimizer,
+    obs, actions, old_log_probs, advantages, returns, carries,
+    n_layers, old_values, clip_eps, vf_coef, ent_coef, vq_coef, loss_vq, alive,
+):
+    return _minibatch_step_impl(
+        params, opt_state, apply_fn, optimizer,
+        obs, actions, old_log_probs, advantages, returns, carries,
+        n_layers, old_values, clip_eps, vf_coef, ent_coef, vq_coef, loss_vq, alive,
+    )
+
+
+@functools.partial(
+    jax.jit,
+    static_argnames=(
+        "apply_fn", "optimizer", "n_layers", "n_minibatches", "minibatch_size",
+        "has_alive", "has_vq",
+    ),
+)
+def _ppo_epoch_scan(
+    params, opt_state, apply_fn, optimizer,
+    flat_obs, flat_actions, flat_log_probs, flat_adv, flat_ret,
+    flat_carries, flat_values, flat_alive, flat_loss_vq,
+    perm,
+    n_layers, clip_eps, vf_coef, ent_coef, vq_coef,
+    n_minibatches, minibatch_size, has_alive, has_vq,
+):
+    """Single XLA graph: shuffle indices + all PPO minibatch grad steps via lax.scan."""
+
+    def body(carry, i):
+        params, opt_state = carry
+        start = i * minibatch_size
+        idx = lax.dynamic_slice(perm, (start,), (minibatch_size,))
+        mb_obs = flat_obs[idx]
+        mb_act = flat_actions[idx]
+        mb_lp = flat_log_probs[idx]
+        mb_adv = flat_adv[idx]
+        mb_ret = flat_ret[idx]
+        mb_c = flat_carries[idx]
+        mb_v = flat_values[idx]
+        mb_al = flat_alive[idx] if has_alive else None
+        mb_vq = flat_loss_vq[idx] if has_vq else None
+        params, opt_state, metrics, _ = _minibatch_step_impl(
+            params, opt_state, apply_fn, optimizer,
+            mb_obs, mb_act, mb_lp, mb_adv, mb_ret, mb_c,
+            n_layers, mb_v, clip_eps, vf_coef, ent_coef, vq_coef, mb_vq, mb_al,
+        )
+        return (params, opt_state), metrics
+
+    (params, opt_state), metrics_stacked = lax.scan(
+        body, (params, opt_state), jnp.arange(n_minibatches)
+    )
+    metrics = jax.tree_util.tree_map(jnp.mean, metrics_stacked)
+    return params, opt_state, metrics
 
 
 def ppo_update(
@@ -241,7 +297,7 @@ def ppo_update(
         def flatten_dev(x):
             if x is None:
                 return None
-            return x.reshape((M,) + x.shape[2:])
+            return jnp.asarray(x).reshape((M,) + x.shape[2:])
 
         flat_obs = flatten_dev(obs)
         flat_actions = flatten_dev(actions)
@@ -253,7 +309,28 @@ def ppo_update(
         flat_alive = flatten_dev(alive)
         flat_loss_vq = flatten_dev(loss_vq)
         perm = jax.random.permutation(key, M)
-        ppo_mode = "GPU-resident backward"
+        has_alive = flat_alive is not None
+        has_vq = flat_loss_vq is not None
+        if not has_alive:
+            flat_alive = jnp.zeros((M,), dtype=jnp.float32)
+        if not has_vq:
+            flat_loss_vq = jnp.zeros((M,), dtype=jnp.float32)
+        ppo_mode = "GPU-resident scan"
+        print(
+            f"  [JAX] {team} PPO epoch scan ({n_minibatches}×mb={minibatch_size}, M={M}) "
+            f"— {ppo_mode}...",
+            flush=True,
+        )
+        params, opt_state, metrics = _ppo_epoch_scan(
+            params, opt_state, apply_fn, optimizer,
+            flat_obs, flat_actions, flat_log_probs, flat_adv, flat_ret,
+            flat_carries, flat_values, flat_alive, flat_loss_vq,
+            perm,
+            n_layers, clip_eps, vf_coef, ent_coef, vq_coef,
+            n_minibatches, minibatch_size, has_alive, has_vq,
+        )
+        metrics = {k: float(v) for k, v in metrics.items()}
+        return params, opt_state, metrics
     else:
         def flatten_to_cpu(x):
             if x is None:
@@ -275,30 +352,19 @@ def ppo_update(
         perm = rng.permutation(M)
         ppo_mode = "H2D + backward"
 
-    metric_sums = {}
-    final_grads = None
+        metric_sums = {}
+        final_grads = None
 
-    for i in range(n_minibatches):
-        idx = perm[i * minibatch_size : (i + 1) * minibatch_size]
+        for i in range(n_minibatches):
+            idx = perm[i * minibatch_size : (i + 1) * minibatch_size]
 
-        if i == 0:
-            print(
-                f"  [JAX] {team} PPO minibatch 1/{n_minibatches} "
-                f"(M={M}, mb={minibatch_size}) — {ppo_mode}...",
-                flush=True,
-            )
+            if i == 0:
+                print(
+                    f"  [JAX] {team} PPO minibatch 1/{n_minibatches} "
+                    f"(M={M}, mb={minibatch_size}) — {ppo_mode}...",
+                    flush=True,
+                )
 
-        if gpu_resident:
-            mb_obs = flat_obs[idx]
-            mb_act = flat_actions[idx]
-            mb_lp = flat_log_probs[idx]
-            mb_adv = flat_adv[idx]
-            mb_ret = flat_ret[idx]
-            mb_c = flat_carries[idx]
-            mb_v = flat_values[idx]
-            mb_al = flat_alive[idx] if flat_alive is not None else None
-            mb_vq = flat_loss_vq[idx] if flat_loss_vq is not None else None
-        else:
             mb_obs = jnp.array(flat_obs[idx])
             mb_act = jnp.array(flat_actions[idx])
             mb_lp = jnp.array(flat_log_probs[idx])
@@ -309,17 +375,17 @@ def ppo_update(
             mb_al = jnp.array(flat_alive[idx]) if flat_alive is not None else None
             mb_vq = jnp.array(flat_loss_vq[idx]) if flat_loss_vq is not None else None
 
-        params, opt_state, mb_mets, grads = _minibatch_step(
-            params, opt_state, apply_fn, optimizer,
-            mb_obs, mb_act, mb_lp, mb_adv, mb_ret, mb_c,
-            n_layers, mb_v, clip_eps, vf_coef, ent_coef, vq_coef, mb_vq, mb_al
-        )
+            params, opt_state, mb_mets, grads = _minibatch_step(
+                params, opt_state, apply_fn, optimizer,
+                mb_obs, mb_act, mb_lp, mb_adv, mb_ret, mb_c,
+                n_layers, mb_v, clip_eps, vf_coef, ent_coef, vq_coef, mb_vq, mb_al
+            )
 
-        for k, v in mb_mets.items():
-            metric_sums[k] = metric_sums.get(k, 0.0) + float(v)
-        final_grads = grads
+            for k, v in mb_mets.items():
+                metric_sums[k] = metric_sums.get(k, 0.0) + float(v)
+            final_grads = grads
 
-    metrics = {k: v / n_minibatches for k, v in metric_sums.items()}
+        metrics = {k: v / n_minibatches for k, v in metric_sums.items()}
 
     # Debug: gradient norms (using the last minibatch's gradients)
     def _head_grad_norm(grads_tree, head_name):

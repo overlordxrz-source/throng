@@ -8,7 +8,7 @@ Replaces `8077a12` CPU rollout offload in `ppo_update()` (`rl_jax.py`).
 
 | Mode | `gpu_resident_rollouts` | Behavior |
 |------|-------------------------|----------|
-| **B200 default** | `true` | Rollout `(T=512, N, …)` stays on device; minibatch slice in-place |
+| **B200 default** | `true` | Rollout stays on GPU; **single `lax.scan` PPO epoch** (no Python minibatch loop) |
 | **A100 fallback** | `false` | Legacy CPU numpy offload + H2D per minibatch |
 
 ## Config
@@ -23,7 +23,7 @@ gpu_resident_rollouts: true
 [JAX] Phase11.1 PPO: GPU-resident rollouts (no CPU offload / H2D)
 ```
 
-PPO logs show `GPU-resident backward` instead of `H2D + backward`.
+PPO logs show `GPU-resident scan` instead of `H2D + backward`.
 
 ## Expected
 
