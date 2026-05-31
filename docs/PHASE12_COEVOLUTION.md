@@ -51,6 +51,23 @@ When enabled:
 
 `reward_red_catch` → Red PPO → policy/value heads → `red_nb_cross_attn` → neighbor `emb_nb(nb_sigs)` → prior step red `signal_out` (STE VQ) → `red_codebook` / `head_signal`. No extra `stop_gradient` on the signal path (value head may still detach pooled when `detach_value=True`; rollout PPO uses `detach_value=False`).
 
+## Phase 12.1 — Red corpus logging
+
+**Flags:** `red_corpus_enabled: true` (requires `red_comms_enabled: true`)
+
+| File | Path on Modal |
+|------|----------------|
+| Blue (unchanged) | `/mnt/throng-runs/signal_corpus.jsonl` |
+| Red (new) | `/mnt/throng-runs/signal_corpus_red.jsonl` |
+
+**Red record fields:** `team`, `sig`, `vq_token`, `action`, `hunter`, `blue_dist`, `blue_bear`, `nb_hunter_sig_lag1`, `nb_hunter_dist_lag1`, `nb_hunter_token_lag1`.
+
+- **`hunter`** = `blue_dist <= hunt_scout_range` (default **8**, symmetric with `alarm_scout_range`).
+- **Lag-1:** hunter reds at T−1 within Chebyshev range → listener red at T (pincer decode in 12.2).
+- Red corpus runs **even when blue population is locally zero** (post-kill search vocabulary).
+
+CPU-only post-rollout; no `sim_step` / XLA changes.
+
 ## Launch (new run only)
 
-Do **not** flip on the live P11.3 production job. Start a **new** Modal run from this branch with `red_comms_enabled: true` after Cam approves.
+Controlled restart: enable `red_comms_enabled` + `red_corpus_enabled` on this branch. Blue decode pipeline stays on `signal_corpus.jsonl` only.

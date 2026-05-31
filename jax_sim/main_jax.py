@@ -517,12 +517,37 @@ def _run_simulation_impl(
     run_name = config.get("run_name", "jax_run")
     os.makedirs(f"runs/{run_name}", exist_ok=True)
     
-    # ── Init corpus writer ──────────────────────────────────
+    # ── Init corpus writers ─────────────────────────────────
+    _p12_early = config.get("phase12_coevolution") or {}
+    _corpus_frac = float(config.get("corpus_sample_frac", 0.08))
+    _corpus_every = int(config.get("corpus_every_n_steps", 20))
     corpus_writer = SignalCorpusWriter(
         path=f"runs/{run_name}/signal_corpus.jsonl",
-        sample_frac=config.get("corpus_sample_frac", 0.08),
-        every_n_steps=config.get("corpus_every_n_steps", 20),
+        sample_frac=_corpus_frac,
+        every_n_steps=_corpus_every,
     )
+    corpus_writer_red = None
+    _red_corpus_enabled = (
+        bool(_p12_early.get("red_corpus_enabled", False))
+        and bool(_p12_early.get("red_comms_enabled", False))
+    )
+    _hunt_range = float(
+        _p12_early.get(
+            "hunt_scout_range",
+            config.get("alarm_scout_range", 8),
+        )
+    )
+    if _red_corpus_enabled:
+        corpus_writer_red = SignalCorpusWriter(
+            path=f"runs/{run_name}/signal_corpus_red.jsonl",
+            sample_frac=_corpus_frac,
+            every_n_steps=_corpus_every,
+        )
+        print(
+            f"[JAX] Red corpus: signal_corpus_red.jsonl "
+            f"(hunter = blue_dist <= hunt_scout_range={_hunt_range})",
+            flush=True,
+        )
 
     # ── Init Checkpointing ──────────────────────────────────
     ckpt_dir = config.get("checkpoint_dir") or os.path.abspath(
@@ -1006,11 +1031,15 @@ def _run_simulation_impl(
     _t_start = __import__('time').time()
     _t_last = _t_start
     all_metrics = []
-    # Lag-1 scout buffer for corpus / decode_signals direction LRT (matches main.py)
+    # Lag-1 buffers for corpus / decode (blue scouts, red hunters)
     _lag1_scout_pos = None
     _lag1_scout_sig = None
     _lag1_scout_dist = None
     _lag1_scout_tok = None
+    _lag1_hunter_pos = None
+    _lag1_hunter_sig = None
+    _lag1_hunter_dist = None
+    _lag1_hunter_tok = None
     _alarm_range = float(config.get("alarm_scout_range", 8))
     print(
         f"[JAX] corpus scout label: is_scout = (red_dist <= alarm_scout_range={_alarm_range})",
@@ -1533,11 +1562,16 @@ def _run_simulation_impl(
         b_obs_all = np.array(rollout_data["blue"]["obs"])
         r_pos_all = np.array(rollout_data["red"]["positions"])
         r_alive_all = np.array(rollout_data["red"]["alive"])
+        r_sig_all = np.array(rollout_data["red"]["signals"])
+        r_tok_all = np.array(rollout_data["red"]["token_ids"])
+        r_act_all = np.array(rollout_data["red"]["actions"])
+        r_energy_all = np.array(rollout_data["red"]["energy"])
 
         # loc_env is the 4th block in b_obs (8 channels: blue, red, wall, resource, shelter, contested, scent, puzzle)
         idx_offset = 6 + (config["neighbor_k"] * config["signal_dim"]) + (25 * config["symbol_dim"])
         idx_resource = idx_offset + (12 * 8) + 3  # 12th cell (center of 5x5), channel 3 = resource
 
+        gs_val = int(config["grid_size"])
         start_step = ui * T
         for t in range(T):
             global_step = start_step + t
@@ -1548,102 +1582,190 @@ def _run_simulation_impl(
             r_pos = r_pos_all[t]
             b_alive = b_alive_all[t]
             r_alive = r_alive_all[t]
-            
-            if not np.any(b_alive):
-                continue
-                
-            alive_idx = np.where(b_alive)[0]
-            
-            # Compute nearest red distance and bearing
-            n_alive = len(alive_idx)
-            red_dist = np.full(n_alive, 999.0)
-            red_bear = np.zeros(n_alive)
-            is_scout = np.zeros(n_alive, dtype=bool)
-            
-            active_red_idx = np.where(r_alive)[0]
-            if len(active_red_idx) > 0:
+
+            # ── Blue corpus (independent of red population) ─────────────
+            if np.any(b_alive):
+                alive_idx = np.where(b_alive)[0]
+                n_alive = len(alive_idx)
+                red_dist = np.full(n_alive, 999.0)
+                red_bear = np.zeros(n_alive)
+                is_scout = np.zeros(n_alive, dtype=bool)
+
+                active_red_idx = np.where(r_alive)[0]
+                if len(active_red_idx) > 0:
+                    pos_b_alive = b_pos[alive_idx]
+                    pos_r_active = r_pos[active_red_idx]
+                    diff = np.abs(pos_b_alive[:, None, :] - pos_r_active[None, :, :])
+                    diff = np.minimum(diff, gs_val - diff)
+                    dists = np.max(diff, axis=-1)
+                    min_idx = np.argmin(dists, axis=1)
+                    red_dist = dists[np.arange(n_alive), min_idx]
+                    is_scout = red_dist <= _alarm_range
+                    nearest_red_pos = pos_r_active[min_idx]
+                    dy = nearest_red_pos[:, 0] - pos_b_alive[:, 0]
+                    dx = nearest_red_pos[:, 1] - pos_b_alive[:, 1]
+                    dy = np.where(
+                        dy > gs_val / 2, dy - gs_val,
+                        np.where(dy < -gs_val / 2, dy + gs_val, dy),
+                    )
+                    dx = np.where(
+                        dx > gs_val / 2, dx - gs_val,
+                        np.where(dx < -gs_val / 2, dx + gs_val, dx),
+                    )
+                    red_bear = np.degrees(np.arctan2(dy, dx)) % 360.0
+
                 pos_b_alive = b_pos[alive_idx]
-                pos_r_active = r_pos[active_red_idx]
-                
-                # Pairwise torus distance
-                gs_val = config["grid_size"]
-                diff = np.abs(pos_b_alive[:, None, :] - pos_r_active[None, :, :])
-                diff = np.minimum(diff, gs_val - diff)
-                dists = np.max(diff, axis=-1)  # Chebyshev
-                
-                min_idx = np.argmin(dists, axis=1)
-                red_dist = dists[np.arange(n_alive), min_idx]
-                # Corpus scout = red within alarm range (not red_detection_radius, which is 0 when blind)
-                is_scout = red_dist <= _alarm_range
-                
-                # Bearing (simple dy/dx)
-                nearest_red_pos = pos_r_active[min_idx]
-                dy = nearest_red_pos[:, 0] - pos_b_alive[:, 0]
-                dx = nearest_red_pos[:, 1] - pos_b_alive[:, 1]
-                # Fix wraparound for bearing
-                dy = np.where(dy > gs_val/2, dy - gs_val, np.where(dy < -gs_val/2, dy + gs_val, dy))
-                dx = np.where(dx > gs_val/2, dx - gs_val, np.where(dx < -gs_val/2, dx + gs_val, dx))
-                red_bear = np.degrees(np.arctan2(dy, dx)) % 360.0
+                diff_b = np.abs(pos_b_alive[:, None, :] - pos_b_alive[None, :, :])
+                diff_b = np.minimum(diff_b, gs_val - diff_b)
+                dists_b = np.max(diff_b, axis=-1)
+                np.fill_diagonal(dists_b, 9999)
+                nb_count = np.sum(dists_b <= 4, axis=1)
+                loc_res = b_obs_all[t, alive_idx, idx_resource]
 
-            # Compute neighbor count
-            nb_count = np.zeros(n_alive)
-            pos_b_alive = b_pos[alive_idx]
-            diff_b = np.abs(pos_b_alive[:, None, :] - pos_b_alive[None, :, :])
-            diff_b = np.minimum(diff_b, config["grid_size"] - diff_b)
-            dists_b = np.max(diff_b, axis=-1)
-            np.fill_diagonal(dists_b, 9999) # Self
-            nb_count = np.sum((dists_b <= 4), axis=1)
+                nb_scout_lag1 = np.full((n_alive, _corpus_sig_dim), np.nan, dtype=np.float32)
+                nb_scout_dist_lag1 = np.full(n_alive, np.nan, dtype=np.float32)
+                nb_scout_token_lag1 = np.full(n_alive, -1, dtype=np.int32)
+                if _lag1_scout_pos is not None and len(_lag1_scout_pos) > 0:
+                    pos_b_alive_f = pos_b_alive.astype(np.float32)
+                    sp2 = _lag1_scout_pos.astype(np.float32)
+                    dd2 = np.abs(pos_b_alive_f[:, None, :] - sp2[None, :, :])
+                    dd2 = np.minimum(dd2, gs_val - dd2)
+                    sc2 = np.maximum(dd2[:, :, 0], dd2[:, :, 1])
+                    within_mask = sc2 <= _alarm_range
+                    w = within_mask.astype(np.float32)
+                    w_sum = w.sum(axis=1)
+                    has_donor = w_sum > 0
+                    if has_donor.any():
+                        nb_scout_lag1[has_donor] = (
+                            w[has_donor] @ _lag1_scout_sig
+                        ) / w_sum[has_donor, None]
+                        nb_scout_dist_lag1[has_donor] = (
+                            w[has_donor] @ _lag1_scout_dist
+                        ) / w_sum[has_donor]
+                        for i in np.where(has_donor)[0]:
+                            toks = _lag1_scout_tok[within_mask[i]].astype(np.int64)
+                            nb_scout_token_lag1[i] = int(np.bincount(toks).argmax())
 
-            # Local resource
-            loc_res = b_obs_all[t, alive_idx, idx_resource]
+                corpus_writer.maybe_record(
+                    step=global_step,
+                    alive_idx=alive_idx,
+                    signals=b_sig_all[t],
+                    token_ids=b_tok_all[t],
+                    actions=b_act_all[t],
+                    is_scout=is_scout,
+                    nearest_red_dist=red_dist,
+                    nearest_red_bear=red_bear,
+                    local_resource=loc_res,
+                    own_energy=b_energy_all[t, alive_idx],
+                    neighbor_count=nb_count,
+                    nb_scout_sig_lag1=nb_scout_lag1,
+                    nb_scout_dist_lag1=nb_scout_dist_lag1,
+                    nb_scout_token_lag1=nb_scout_token_lag1,
+                )
+                if is_scout.any():
+                    pos_b_alive_f = b_pos[alive_idx].astype(np.float32)
+                    _lag1_scout_pos = pos_b_alive_f[is_scout].copy()
+                    _lag1_scout_sig = b_sig_all[t, alive_idx[is_scout]].copy()
+                    _lag1_scout_dist = red_dist[is_scout].copy()
+                    _lag1_scout_tok = b_tok_all[t, alive_idx[is_scout]].copy()
+                else:
+                    _lag1_scout_pos = None
+                    _lag1_scout_sig = None
+                    _lag1_scout_dist = None
+                    _lag1_scout_tok = None
 
-            nb_scout_lag1 = np.full((n_alive, _corpus_sig_dim), np.nan, dtype=np.float32)
-            nb_scout_dist_lag1 = np.full(n_alive, np.nan, dtype=np.float32)
-            nb_scout_token_lag1 = np.full(n_alive, -1, dtype=np.int32)
-            if _lag1_scout_pos is not None and len(_lag1_scout_pos) > 0:
-                gs_val = int(config["grid_size"])
-                pos_b_alive = b_pos[alive_idx].astype(np.float32)
-                sp2 = _lag1_scout_pos.astype(np.float32)
-                dd2 = np.abs(pos_b_alive[:, None, :] - sp2[None, :, :])
-                dd2 = np.minimum(dd2, gs_val - dd2)
-                sc2 = np.maximum(dd2[:, :, 0], dd2[:, :, 1])
-                for ai in range(n_alive):
-                    within = sc2[ai] <= _alarm_range
-                    if within.any():
-                        nb_scout_lag1[ai] = _lag1_scout_sig[within].mean(axis=0)
-                        nb_scout_dist_lag1[ai] = float(_lag1_scout_dist[within].mean())
-                        toks = _lag1_scout_tok[within].astype(np.int64)
-                        nb_scout_token_lag1[ai] = int(np.bincount(toks).argmax())
+            # ── Red corpus (runs even if blue locally extinct) ───────────
+            if corpus_writer_red is not None and np.any(r_alive):
+                alive_idx_r = np.where(r_alive)[0]
+                n_alive_r = len(alive_idx_r)
+                blue_dist = np.full(n_alive_r, 999.0)
+                blue_bear = np.zeros(n_alive_r)
+                is_hunter = np.zeros(n_alive_r, dtype=bool)
 
-            corpus_writer.maybe_record(
-                step=global_step,
-                alive_idx=alive_idx,
-                signals=b_sig_all[t],
-                token_ids=b_tok_all[t],
-                actions=b_act_all[t],
-                is_scout=is_scout,
-                nearest_red_dist=red_dist,
-                nearest_red_bear=red_bear,
-                local_resource=loc_res,
-                own_energy=b_energy_all[t, alive_idx],
-                neighbor_count=nb_count,
-                nb_scout_sig_lag1=nb_scout_lag1,
-                nb_scout_dist_lag1=nb_scout_dist_lag1,
-                nb_scout_token_lag1=nb_scout_token_lag1,
-            )
-            if is_scout.any():
-                pos_b_alive = b_pos[alive_idx].astype(np.float32)
-                _lag1_scout_pos = pos_b_alive[is_scout].copy()
-                _lag1_scout_sig = b_sig_all[t, alive_idx[is_scout]].copy()
-                _lag1_scout_dist = red_dist[is_scout].copy()
-                _lag1_scout_tok = b_tok_all[t, alive_idx[is_scout]].copy()
-            else:
-                _lag1_scout_pos = None
-                _lag1_scout_sig = None
-                _lag1_scout_dist = None
-                _lag1_scout_tok = None
+                active_blue_idx = np.where(b_alive)[0]
+                if len(active_blue_idx) > 0:
+                    pos_r_alive = r_pos[alive_idx_r]
+                    pos_b_active = b_pos[active_blue_idx]
+                    diff_rb = np.abs(pos_r_alive[:, None, :] - pos_b_active[None, :, :])
+                    diff_rb = np.minimum(diff_rb, gs_val - diff_rb)
+                    dists_rb = np.max(diff_rb, axis=-1)
+                    min_idx_b = np.argmin(dists_rb, axis=1)
+                    blue_dist = dists_rb[np.arange(n_alive_r), min_idx_b]
+                    is_hunter = blue_dist <= _hunt_range
+                    nearest_blue_pos = pos_b_active[min_idx_b]
+                    dy = nearest_blue_pos[:, 0] - pos_r_alive[:, 0]
+                    dx = nearest_blue_pos[:, 1] - pos_r_alive[:, 1]
+                    dy = np.where(
+                        dy > gs_val / 2, dy - gs_val,
+                        np.where(dy < -gs_val / 2, dy + gs_val, dy),
+                    )
+                    dx = np.where(
+                        dx > gs_val / 2, dx - gs_val,
+                        np.where(dx < -gs_val / 2, dx + gs_val, dx),
+                    )
+                    blue_bear = np.degrees(np.arctan2(dy, dx)) % 360.0
+
+                pos_r_alive = r_pos[alive_idx_r]
+                diff_r = np.abs(pos_r_alive[:, None, :] - pos_r_alive[None, :, :])
+                diff_r = np.minimum(diff_r, gs_val - diff_r)
+                dists_r = np.max(diff_r, axis=-1)
+                np.fill_diagonal(dists_r, 9999)
+                nb_count_r = np.sum(dists_r <= 4, axis=1)
+
+                nb_hunter_lag1 = np.full((n_alive_r, _corpus_sig_dim), np.nan, dtype=np.float32)
+                nb_hunter_dist_lag1 = np.full(n_alive_r, np.nan, dtype=np.float32)
+                nb_hunter_token_lag1 = np.full(n_alive_r, -1, dtype=np.int32)
+                if _lag1_hunter_pos is not None and len(_lag1_hunter_pos) > 0:
+                    pos_r_alive_f = pos_r_alive.astype(np.float32)
+                    hp2 = _lag1_hunter_pos.astype(np.float32)
+                    dd_h = np.abs(pos_r_alive_f[:, None, :] - hp2[None, :, :])
+                    dd_h = np.minimum(dd_h, gs_val - dd_h)
+                    sc_h = np.maximum(dd_h[:, :, 0], dd_h[:, :, 1])
+                    within_h = sc_h <= _hunt_range
+                    w_h = within_h.astype(np.float32)
+                    w_h_sum = w_h.sum(axis=1)
+                    has_hunter_donor = w_h_sum > 0
+                    if has_hunter_donor.any():
+                        nb_hunter_lag1[has_hunter_donor] = (
+                            w_h[has_hunter_donor] @ _lag1_hunter_sig
+                        ) / w_h_sum[has_hunter_donor, None]
+                        nb_hunter_dist_lag1[has_hunter_donor] = (
+                            w_h[has_hunter_donor] @ _lag1_hunter_dist
+                        ) / w_h_sum[has_hunter_donor]
+                        for i in np.where(has_hunter_donor)[0]:
+                            toks = _lag1_hunter_tok[within_h[i]].astype(np.int64)
+                            nb_hunter_token_lag1[i] = int(np.bincount(toks).argmax())
+
+                corpus_writer_red.maybe_record_red(
+                    step=global_step,
+                    alive_idx=alive_idx_r,
+                    signals=r_sig_all[t],
+                    token_ids=r_tok_all[t],
+                    actions=r_act_all[t],
+                    is_hunter=is_hunter,
+                    nearest_blue_dist=blue_dist,
+                    nearest_blue_bear=blue_bear,
+                    own_energy=r_energy_all[t, alive_idx_r],
+                    neighbor_count=nb_count_r,
+                    nb_hunter_sig_lag1=nb_hunter_lag1,
+                    nb_hunter_dist_lag1=nb_hunter_dist_lag1,
+                    nb_hunter_token_lag1=nb_hunter_token_lag1,
+                )
+                if is_hunter.any():
+                    pos_r_alive_f = r_pos[alive_idx_r].astype(np.float32)
+                    _lag1_hunter_pos = pos_r_alive_f[is_hunter].copy()
+                    _lag1_hunter_sig = r_sig_all[t, alive_idx_r[is_hunter]].copy()
+                    _lag1_hunter_dist = blue_dist[is_hunter].copy()
+                    _lag1_hunter_tok = r_tok_all[t, alive_idx_r[is_hunter]].copy()
+                else:
+                    _lag1_hunter_pos = None
+                    _lag1_hunter_sig = None
+                    _lag1_hunter_dist = None
+                    _lag1_hunter_tok = None
 
         corpus_writer.flush_to_disk()
+        if corpus_writer_red is not None:
+            corpus_writer_red.flush_to_disk()
 
         # Convert metrics to Python floats for logging (skip non-scalars)
         metrics_py = {}
@@ -1680,6 +1802,8 @@ def _run_simulation_impl(
             print(f"       (Red) pg={float(r_metrics['ppo_pg_loss']):.4f} vf={float(r_metrics['ppo_vf_loss']):.4f} ent={float(r_metrics['ppo_entropy']):.4f}")
 
     corpus_writer.close()
+    if corpus_writer_red is not None:
+        corpus_writer_red.close()
     return {"blue": b_params, "red": r_params}, {"metrics": all_metrics}
 
 

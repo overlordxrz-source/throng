@@ -414,6 +414,69 @@ class SignalCorpusWriter:
             lines.append(json.dumps(rec))
         self._fh.write("\n".join(lines) + "\n")
 
+    def maybe_record_red(
+        self,
+        step:              int,
+        alive_idx:         np.ndarray,
+        signals:           np.ndarray,
+        actions:           np.ndarray,
+        is_hunter:         np.ndarray,
+        nearest_blue_dist: np.ndarray,
+        nearest_blue_bear: np.ndarray,
+        own_energy:        np.ndarray,
+        neighbor_count:    np.ndarray,
+        token_ids:         Optional[np.ndarray] = None,
+        nb_hunter_sig_lag1:  Optional[np.ndarray] = None,
+        nb_hunter_dist_lag1: Optional[np.ndarray] = None,
+        nb_hunter_token_lag1: Optional[np.ndarray] = None,
+    ) -> None:
+        """Write sampled red predator records (Phase 12.1). Separate file from blue corpus.
+
+        is_hunter: emitter had blue_dist <= hunt_scout_range when signaling.
+        nb_hunter_sig_lag1: mean signal of hunter reds within range at T-1.
+        """
+        if step - self._last_step < self.every_n_steps:
+            return
+        self._last_step = step
+        n = len(alive_idx)
+        if n == 0:
+            return
+        k = max(1, int(n * self.sample_frac))
+        sel = self._rng.choice(n, size=min(k, n), replace=False)
+        lines = []
+        for i in sel:
+            idx = int(alive_idx[i])
+            rec = {
+                "team":      "red",
+                "step":      step,
+                "agent":     idx,
+                "sig":       [round(float(v), 5) for v in signals[idx]],
+                "action":    int(actions[idx]),
+                "hunter":    bool(is_hunter[i]),
+                "blue_dist": round(float(nearest_blue_dist[i]), 3),
+                "blue_bear": round(float(nearest_blue_bear[i]), 2),
+                "energy":    round(float(own_energy[i]), 4),
+                "neighbors": round(float(neighbor_count[i]), 4),
+            }
+            if token_ids is not None:
+                rec["vq_token"] = int(token_ids[idx])
+            if nb_hunter_sig_lag1 is not None:
+                row = nb_hunter_sig_lag1[i]
+                rec["nb_hunter_sig_lag1"] = (
+                    None if not np.isfinite(row).all()
+                    else [round(float(v), 5) for v in row]
+                )
+            if nb_hunter_dist_lag1 is not None:
+                d = float(nb_hunter_dist_lag1[i])
+                rec["nb_hunter_dist_lag1"] = (
+                    None if not np.isfinite(d) else round(d, 3)
+                )
+            if nb_hunter_token_lag1 is not None:
+                tok = int(nb_hunter_token_lag1[i])
+                rec["nb_hunter_token_lag1"] = None if tok < 0 else tok
+            lines.append(json.dumps(rec))
+        self._fh.write("\n".join(lines) + "\n")
+
     def flush(self) -> None:
         self._fh.flush()
 
