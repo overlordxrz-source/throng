@@ -197,7 +197,7 @@ alarm_min_group: 20
 # Phase 11.0 — carry forward dynamics (carry_{t+1} MSE, stop_gradient target)
 carry_fwd_coef: 0.05
 
-# Phase 11.2 — K-step imagination overrides blue actions when enabled (feature branch)
+# Phase 11.2 — K-step imagination at blue action selection (feature branch; inference only)
 imagination_enabled: true
 imagination_k: 5
 imagination_gamma: 0.999
