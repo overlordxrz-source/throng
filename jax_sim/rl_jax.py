@@ -29,8 +29,8 @@ def compute_gae(
     """
     Pure discounted returns + advantage = returns - values (CPU numpy loop).
 
-    GAE runs on CPU numpy even when PPO rollouts are GPU-resident (Phase 11.1);
-    rewards/values are (T,N) — tiny vs full obs tensor.
+    Rollout batches are offloaded to CPU before PPO; a JAX lax.scan here would
+    index numpy arrays with traced indices and raise TracerArrayConversionError.
     """
     del lam  # kept for API compat; no value bootstrapping in this rollout setup
     rewards = np.asarray(rewards, dtype=np.float32)
@@ -170,10 +170,11 @@ def create_optimizer(lr: float = 3e-4, max_grad_norm: float = 2.0) -> optax.Grad
     )
 
 
-def _minibatch_step_impl(
+@functools.partial(jax.jit, static_argnames=("apply_fn", "optimizer", "n_layers"))
+def _minibatch_step(
     params, opt_state, apply_fn, optimizer,
     obs, actions, old_log_probs, advantages, returns, carries,
-    n_layers, old_values, clip_eps, vf_coef, ent_coef, vq_coef, loss_vq, alive,
+    n_layers, old_values, clip_eps, vf_coef, ent_coef, vq_coef, loss_vq, alive
 ):
     grad_fn = jax.value_and_grad(ppo_loss, has_aux=True)
     (loss, metrics), grads = grad_fn(
@@ -185,63 +186,6 @@ def _minibatch_step_impl(
     new_params = optax.apply_updates(params, updates)
     metrics["total_loss"] = loss
     return new_params, new_opt_state, metrics, grads
-
-
-@functools.partial(jax.jit, static_argnames=("apply_fn", "optimizer", "n_layers"))
-def _minibatch_step(
-    params, opt_state, apply_fn, optimizer,
-    obs, actions, old_log_probs, advantages, returns, carries,
-    n_layers, old_values, clip_eps, vf_coef, ent_coef, vq_coef, loss_vq, alive,
-):
-    return _minibatch_step_impl(
-        params, opt_state, apply_fn, optimizer,
-        obs, actions, old_log_probs, advantages, returns, carries,
-        n_layers, old_values, clip_eps, vf_coef, ent_coef, vq_coef, loss_vq, alive,
-    )
-
-
-@functools.partial(
-    jax.jit,
-    static_argnames=(
-        "apply_fn", "optimizer", "n_layers", "n_minibatches", "minibatch_size",
-        "has_alive", "has_vq",
-    ),
-)
-def _ppo_epoch_scan(
-    params, opt_state, apply_fn, optimizer,
-    flat_obs, flat_actions, flat_log_probs, flat_adv, flat_ret,
-    flat_carries, flat_values, flat_alive, flat_loss_vq,
-    perm,
-    n_layers, clip_eps, vf_coef, ent_coef, vq_coef,
-    n_minibatches, minibatch_size, has_alive, has_vq,
-):
-    """Single XLA graph: shuffle indices + all PPO minibatch grad steps via lax.scan."""
-
-    def body(carry, i):
-        params, opt_state = carry
-        start = i * minibatch_size
-        idx = lax.dynamic_slice(perm, (start,), (minibatch_size,))
-        mb_obs = flat_obs[idx]
-        mb_act = flat_actions[idx]
-        mb_lp = flat_log_probs[idx]
-        mb_adv = flat_adv[idx]
-        mb_ret = flat_ret[idx]
-        mb_c = flat_carries[idx]
-        mb_v = flat_values[idx]
-        mb_al = flat_alive[idx] if has_alive else None
-        mb_vq = flat_loss_vq[idx] if has_vq else None
-        params, opt_state, metrics, _ = _minibatch_step_impl(
-            params, opt_state, apply_fn, optimizer,
-            mb_obs, mb_act, mb_lp, mb_adv, mb_ret, mb_c,
-            n_layers, mb_v, clip_eps, vf_coef, ent_coef, vq_coef, mb_vq, mb_al,
-        )
-        return (params, opt_state), metrics
-
-    (params, opt_state), metrics_stacked = lax.scan(
-        body, (params, opt_state), jnp.arange(n_minibatches)
-    )
-    metrics = jax.tree_util.tree_map(jnp.mean, metrics_stacked)
-    return params, opt_state, metrics
 
 
 def ppo_update(
@@ -260,13 +204,11 @@ def ppo_update(
     gamma: float = 0.99,
     lam: float = 0.95,
     team: str = "blue",
-    gpu_resident: bool = True,
 ) -> Tuple[Dict, Any, Dict]:
     """
     Single gradient update step using minibatches.
-
-    gpu_resident=True (Phase 11.1 / B200): keep rollout tensors on device; no CPU
-    offload or H2D per minibatch. gpu_resident=False: legacy A100 CPU offload path.
+    Offloads rollout data to CPU; only one minibatch lives on GPU at a time.
+    Returns (new_params, new_opt_state, metrics).
     """
     obs = batch["obs"]
     actions = batch["actions"]
@@ -286,106 +228,77 @@ def ppo_update(
     print(f"  [DEBUG] adv     mean={float(advantages.mean()):.4f} std={float(advantages.std()):.4f}")
     print(f"  [DEBUG] returns mean={float(returns.mean()):.4f} std={float(returns.std()):.4f}")
 
+    # Flatten (T, N, ...) -> (M, ...) and move to CPU (numpy) to free GPU VRAM.
+    # The full rollout obs alone is ~2.3GB on GPU — must be freed before backward pass.
     T, N = obs.shape[:2]
     M = T * N
+
+    def flatten_to_cpu(x):
+        if x is None: return None
+        return np.asarray(x.reshape((M,) + x.shape[2:]))
+
+    flat_obs = flatten_to_cpu(obs)
+    flat_actions = flatten_to_cpu(actions)
+    flat_log_probs = flatten_to_cpu(old_log_probs)
+    flat_adv = flatten_to_cpu(advantages)
+    flat_ret = flatten_to_cpu(returns)
+    flat_carries = flatten_to_cpu(carries)
+    flat_values = flatten_to_cpu(values)
+    flat_alive = flatten_to_cpu(alive)
+    flat_loss_vq = flatten_to_cpu(loss_vq)
+
+    # Delete GPU references so XLA can reclaim VRAM
+    del obs, actions, old_log_probs, advantages, returns, carries, values, alive, loss_vq
+    del batch
+
+    # Shuffle on CPU (no GPU allocation for permutation array)
+    rng = np.random.RandomState(int(jax.random.bits(key, dtype=jnp.uint32)))
+    perm = rng.permutation(M)
+
+    # Minibatch loop — GPU only holds params + opt_state + one minibatch + backward workspace
     minibatch_size = int(minibatch_size)
     if minibatch_size <= 0:
         raise ValueError(f"ppo_minibatch_size must be positive, got {minibatch_size}")
     n_minibatches = M // minibatch_size
 
-    if gpu_resident:
-        def flatten_dev(x):
-            if x is None:
-                return None
-            return jnp.asarray(x).reshape((M,) + x.shape[2:])
+    # Accumulate metrics as Python floats (not 500 JAX scalar dicts)
+    metric_sums = {}
+    final_grads = None
 
-        flat_obs = flatten_dev(obs)
-        flat_actions = flatten_dev(actions)
-        flat_log_probs = flatten_dev(old_log_probs)
-        flat_adv = flatten_dev(jnp.asarray(advantages))
-        flat_ret = flatten_dev(jnp.asarray(returns))
-        flat_carries = flatten_dev(carries)
-        flat_values = flatten_dev(values)
-        flat_alive = flatten_dev(alive)
-        flat_loss_vq = flatten_dev(loss_vq)
-        perm = jax.random.permutation(key, M)
-        has_alive = flat_alive is not None
-        has_vq = flat_loss_vq is not None
-        if not has_alive:
-            flat_alive = jnp.zeros((M,), dtype=jnp.float32)
-        if not has_vq:
-            flat_loss_vq = jnp.zeros((M,), dtype=jnp.float32)
-        ppo_mode = "GPU-resident scan"
-        print(
-            f"  [JAX] {team} PPO epoch scan ({n_minibatches}×mb={minibatch_size}, M={M}) "
-            f"— {ppo_mode}...",
-            flush=True,
-        )
-        params, opt_state, metrics = _ppo_epoch_scan(
-            params, opt_state, apply_fn, optimizer,
-            flat_obs, flat_actions, flat_log_probs, flat_adv, flat_ret,
-            flat_carries, flat_values, flat_alive, flat_loss_vq,
-            perm,
-            n_layers, clip_eps, vf_coef, ent_coef, vq_coef,
-            n_minibatches, minibatch_size, has_alive, has_vq,
-        )
-        metrics = {k: float(v) for k, v in metrics.items()}
-        return params, opt_state, metrics
-    else:
-        def flatten_to_cpu(x):
-            if x is None:
-                return None
-            return np.asarray(x.reshape((M,) + x.shape[2:]))
+    for i in range(n_minibatches):
+        idx = perm[i * minibatch_size : (i + 1) * minibatch_size]
 
-        flat_obs = flatten_to_cpu(obs)
-        flat_actions = flatten_to_cpu(actions)
-        flat_log_probs = flatten_to_cpu(old_log_probs)
-        flat_adv = flatten_to_cpu(advantages)
-        flat_ret = flatten_to_cpu(returns)
-        flat_carries = flatten_to_cpu(carries)
-        flat_values = flatten_to_cpu(values)
-        flat_alive = flatten_to_cpu(alive)
-        flat_loss_vq = flatten_to_cpu(loss_vq)
-        del obs, actions, old_log_probs, advantages, returns, carries, values, alive, loss_vq
-        del batch
-        rng = np.random.RandomState(int(jax.random.bits(key, dtype=jnp.uint32)))
-        perm = rng.permutation(M)
-        ppo_mode = "H2D + backward"
-
-        metric_sums = {}
-        final_grads = None
-
-        for i in range(n_minibatches):
-            idx = perm[i * minibatch_size : (i + 1) * minibatch_size]
-
-            if i == 0:
-                print(
-                    f"  [JAX] {team} PPO minibatch 1/{n_minibatches} "
-                    f"(M={M}, mb={minibatch_size}) — {ppo_mode}...",
-                    flush=True,
-                )
-
-            mb_obs = jnp.array(flat_obs[idx])
-            mb_act = jnp.array(flat_actions[idx])
-            mb_lp = jnp.array(flat_log_probs[idx])
-            mb_adv = jnp.array(flat_adv[idx])
-            mb_ret = jnp.array(flat_ret[idx])
-            mb_c = jnp.array(flat_carries[idx])
-            mb_v = jnp.array(flat_values[idx])
-            mb_al = jnp.array(flat_alive[idx]) if flat_alive is not None else None
-            mb_vq = jnp.array(flat_loss_vq[idx]) if flat_loss_vq is not None else None
-
-            params, opt_state, mb_mets, grads = _minibatch_step(
-                params, opt_state, apply_fn, optimizer,
-                mb_obs, mb_act, mb_lp, mb_adv, mb_ret, mb_c,
-                n_layers, mb_v, clip_eps, vf_coef, ent_coef, vq_coef, mb_vq, mb_al
+        if i == 0:
+            print(
+                f"  [JAX] {team} PPO minibatch 1/{n_minibatches} "
+                f"(M={M}, mb={minibatch_size}) — H2D + backward...",
+                flush=True,
             )
 
-            for k, v in mb_mets.items():
-                metric_sums[k] = metric_sums.get(k, 0.0) + float(v)
-            final_grads = grads
+        # Transfer just this minibatch to GPU
+        mb_obs = jnp.array(flat_obs[idx])
+        mb_act = jnp.array(flat_actions[idx])
+        mb_lp = jnp.array(flat_log_probs[idx])
+        mb_adv = jnp.array(flat_adv[idx])
+        mb_ret = jnp.array(flat_ret[idx])
+        mb_c = jnp.array(flat_carries[idx])
+        mb_v = jnp.array(flat_values[idx])
+        mb_al = jnp.array(flat_alive[idx]) if flat_alive is not None else None
+        mb_vq = jnp.array(flat_loss_vq[idx]) if flat_loss_vq is not None else None
 
-        metrics = {k: v / n_minibatches for k, v in metric_sums.items()}
+        params, opt_state, mb_mets, grads = _minibatch_step(
+            params, opt_state, apply_fn, optimizer,
+            mb_obs, mb_act, mb_lp, mb_adv, mb_ret, mb_c,
+            n_layers, mb_v, clip_eps, vf_coef, ent_coef, vq_coef, mb_vq, mb_al
+        )
+
+        # Accumulate as Python floats to avoid holding 500 JAX arrays
+        for k, v in mb_mets.items():
+            metric_sums[k] = metric_sums.get(k, 0.0) + float(v)
+        final_grads = grads
+
+    # Average metrics
+    metrics = {k: v / n_minibatches for k, v in metric_sums.items()}
 
     # Debug: gradient norms (using the last minibatch's gradients)
     def _head_grad_norm(grads_tree, head_name):

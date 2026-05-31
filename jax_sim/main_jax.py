@@ -601,10 +601,6 @@ def _run_simulation_impl(
         _inspect.getsource(_rl_jax_mod.auxiliary_update)
     ):
         print("[JAX] Phase11 carry_fwd: head_fwd_dyn_1/2 → carry_{t+1} MSE (stop_grad target)")
-    if bool(config.get("gpu_resident_rollouts", True)):
-        print("[JAX] Phase11.1 PPO: GPU-resident rollouts + lax.scan epoch (no Python mb loop)")
-    else:
-        print("[JAX] PPO: CPU rollout offload enabled (legacy A100 path)")
     from jax_sim import observations_jax as _obs_mod
 
     _bo_path = _inspect.getfile(_obs_mod.build_observations_jax)
@@ -887,12 +883,9 @@ def _run_simulation_impl(
                 )
             grid, b_pop, r_pop, b_carries, r_carries, b_params, r_params = final_carry
 
-        # Legacy path: offload rollout to CPU before PPO (8077a12). GPU-resident keeps
-        # tensors on device; PPO uses lax.scan epoch in rl_jax._ppo_epoch_scan.
-        _gpu_resident_rollouts = bool(config.get("gpu_resident_rollouts", True))
-        if not _gpu_resident_rollouts:
-            rollout_data = _rollout_to_cpu(rollout_data)
-            jax.clear_caches()
+        # ── Free GPU: full (T×N) rollout must not sit on device during PPO backward
+        rollout_data = _rollout_to_cpu(rollout_data)
+        jax.clear_caches()
 
         # ── NaN debug after rollout ─────────────────────────────
         b_batch = rollout_data["blue"]
@@ -928,7 +921,6 @@ def _run_simulation_impl(
             )
 
         # PPO update (not JIT — Python loop)
-        _gpu_resident = _gpu_resident_rollouts
         _fwd_coef = float(config.get("fwd_coef", 0.05))
         _carry_fwd_coef = float(config.get("carry_fwd_coef", 0.05))
         _fwd_mb   = int(config.get("ppo_minibatch_size", 512))
@@ -958,7 +950,6 @@ def _run_simulation_impl(
             gamma=float(config.get("ppo_gamma", 0.99)),
             lam=float(config.get("ppo_gae_lam", 0.95)),
             team="blue",
-            gpu_resident=_gpu_resident,
         )
         if ui == start_update:
             print(
@@ -1022,7 +1013,6 @@ def _run_simulation_impl(
             gamma=float(config.get("ppo_gamma", 0.99)),
             lam=float(config.get("ppo_gae_lam", 0.95)),
             team="red",
-            gpu_resident=_gpu_resident,
         )
         if ui == start_update:
             print(

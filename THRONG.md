@@ -21,28 +21,33 @@
 | **VQ alert-set vs safe-set** | χ²=2.73, p=0.44 ❌ |
 | **Scouts %** | 88.3% (dense ecology; not old 0% bug) |
 
-### Active now — Phase 11.1 (`master`)
+### Active now — Phase 11.0 (`master`)
 
 | Item | Detail |
 |------|--------|
-| **`gpu_resident_rollouts: true`** | PPO keeps rollout tensors on B200 HBM3 — no CPU offload / H2D |
-| **Fallback** | Set `gpu_resident_rollouts: false` for legacy A100 path |
-| **Log** | `GPU-resident backward` (not `H2D + backward`) |
+| **Train from** | P10 checkpoint on volume; `git pull origin master` → **`3880337+`** |
+| **New heads** | `head_fwd_dyn_1/2` — MSE on `carry_{t+1}`; target **`stop_gradient`** |
+| **Dashboard** | `carry_fwd` (target **↓ 0.05–0.1**), `carry_rank`, `carry_H`; plus `fwd_env`, `self_pred_acc` |
+| **Config** | `carry_fwd_coef: 0.05` in `config_phase7.yaml` |
+| **Throughput** | Still **CPU rollout offload** (`8077a12`) — ~6 steps/sec, ~40s PPO H2D |
+| **Corpus** | Optional continued logging to `/mnt/throng-runs/signal_corpus.jsonl` |
+| **Decode cmd** | `python tools/decode_signals.py … --min-step 63488` (bug fixed `6837d8e`) |
 
-### Phase 11.0 complete — carry_fwd converged
+**Do not merge 11.1 until `carry_fwd` converges ~0.05.**
 
-| Item | Detail |
-|------|--------|
-| **`carry_fwd`** | Target **< 0.05** achieved — latent dynamics stabilized |
-| **Train from** | P10 checkpoint + merged `head_fwd_dyn` via relaxed Orbax restore (`b2eb5f0`) |
+### Staging — Phase 11.1 (`feature/phase11-1-gpu-rollouts`)
+
+Will staging **GPU-resident rollouts** — eliminate H2D PCIe bottleneck (`8077a12` CPU offload). **Not on `master`. Not merged until 11.0 carry_fwd converges.**
+
+Expected after merge: **15+ steps/sec** on B200 (192GB HBM3).
 
 ### Branch policy
 
 | Branch | Status |
 |--------|--------|
-| **`master`** | Phase 11.0 + **11.1** — carry dynamics + GPU-resident PPO |
+| **`master`** | Phase 11.0 — train carry dynamics |
 | **`feature/phase11-imagination`** | Merged → `3880337` |
-| **`feature/phase11-1-gpu-rollouts`** | Merged → `master` |
+| **`feature/phase11-1-gpu-rollouts`** | 11.1 staging — **do not merge yet** |
 
 ### Horcrux (context backup)
 
@@ -79,7 +84,7 @@ Cam's persona + triad workflow live in Git so reboots recover identity:
 2. Address Will via explicit **`@Will — Cam here...`** copy-paste blocks.
 3. **Keep the ecology mathematically pure** — no scout/alarm comm rewards, no blind VQ loss shaping. Lethal selection forges language.
 4. **Phase 11.0 on `master`** — train `carry_fwd` to ~0.05 before merging 11.1 GPU rollouts.
-5. **Phase 11.1 on `master`** — `gpu_resident_rollouts: true` by default on B200.
+5. **Phase 11.1** — GPU-resident rollouts on `feature/phase11-1-gpu-rollouts` only until merge gate.
 6. **Never** comm reward shaping or blind VQ loss shaping.
 
 ### Branch policy
@@ -123,7 +128,7 @@ Cam's persona + triad workflow live in Git so reboots recover identity:
 ```
 train_entry.run_simulation()  →  main_jax._run_simulation_impl()
   lax.scan(sim_step, T=512)   →  rollout on GPU
-  ppo_update (blue + red)     →  GPU-resident rollouts (11.1) or CPU offload fallback
+  ppo_update (blue + red)     →  CPU rollout offload, minibatch 512
   auxiliary_update            →  loc_env MSE + carry_fwd MSE + self-prediction
 ```
 
