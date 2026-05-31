@@ -29,5 +29,6 @@ phase9_canvas:
 
 - [x] Flax module + residual cross-attention scaffold
 - [ ] Confidence head (9.1) — epistemic uncertainty on `head_fwd_dyn`
-- [ ] Full training / checkpoint merge policy for new params
+- [x] Checkpoint graft — `graft_missing_param_subtrees` + `ensure_aux_head_params` for `nb_cross_attn`
+- [ ] Full training run with `cross_attn_enabled: true` on ckpt **390**
 - [ ] Resume from 150k/390 with `cross_attn_enabled: true`
