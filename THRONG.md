@@ -415,9 +415,15 @@ tail -f /mnt/throng-runs/train.log
 
 If OOM persists after clean restart: try **`XLA_PYTHON_CLIENT_MEM_FRACTION=0.75`** (more headroom between rollout + PPO). Do **not** re-enable Phase 11.1 without dedicated memory engineering.
 
+### Modal notebook — Phase 9 (copy-paste cells)
+
+**Full cells:** [`docs/MODAL_NOTEBOOK_PHASE9.md`](docs/MODAL_NOTEBOOK_PHASE9.md)
+
+Fresh Modal machines have **no** `/root/throng` until Cell 1 clones the repo. If you see `can't cd to /root/throng` or `run_bg.py: No such file`, run Cell 1 there — do not `sed` paths that do not exist yet.
+
 ### Recommended: train without dying notebook cells
 
-Notebooks often die with **`KeyboardInterrupt`** during silent JAX compile (cell timeout) — **you did not necessarily press a key**. Modal Jupyter **rejects `nohup`** — use **`subprocess.Popen`** streaming `run_bg.py` instead.
+Notebooks often die with **`KeyboardInterrupt`** during silent JAX compile (cell timeout) — **you did not necessarily press a key**. Modal Jupyter **rejects `nohup`** — use **`subprocess.Popen`** streaming `run_bg.py` instead (see `docs/MODAL_NOTEBOOK_PHASE9.md`).
 
 **Bash / SSH (nohup OK):**
 
