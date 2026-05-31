@@ -80,15 +80,20 @@ python3 tools/decode_signals.py --red /mnt/throng-runs/signal_corpus_red.jsonl -
 
 **Red VQ pincer test (χ²):** tokens with mean emitter `blue_dist ≤ 2` (Chase) vs `> 5` (Search); compares receiver **lag-1** N/S/E/W pursuit mix among non-hunters with `nb_hunter_token_lag1`. Significant χ² → **spatial coordination** (conditional geometry), not scalar proximity alone.
 
-### First decode @ ~30k wiretap (May 2026) — **FAIL (expected)**
+### First decode (May 2026) — **nucleation; holding**
 
 | Test | Result |
 |------|--------|
+| MI peak | **`energy`** (≈1.3–1.8); **`blue_dist`/`blue_bear`** ≈0.01 — **hunger babble** |
+| VQ Chase set | **None** — min token mean `blue_dist` **4.85** |
 | Lag-1 omnibus LRT | **p = 0.9767** ❌ |
-| Pincer χ² (Chase vs Search) | ❌ — receivers not shifting pursuit vectors |
-| Verdict | **Babbling** — VQ alive, semantics absent; ~30k red comms steps too early |
+| Lag-1 Direction LRT | **7 dims** **p < 0.05** ✅ (spatial gradient leaking) |
+| Token 26 vs 30 pursuit | **p = 0.0315** ✅ (discrete squeeze starting) |
+| Pincer χ² (Chase vs Search sets) | ❌ |
 
-**Holding pattern:** keep Modal training; re-decode at +20k–50k steps. **Do not branch Phase 13** until pincer χ² **p < 0.05**.
+**Run artifact:** simulation **gracefully exited @ step 250k** (legacy `run_bg.py` cap). Fixed in repo: **`a9f4aeb`** → **`n_steps=1_000_000`**. User restarting Modal from volume ckpt.
+
+**Holding pattern:** keep training; re-decode at **+50k–100k** steps or on **`blue_caught`** spike. **Do not branch Phase 13** until pincer χ² **p < 0.05**.
 
 Blue decode unchanged: `python3 tools/decode_signals.py signal_corpus.jsonl`.
 

@@ -7,11 +7,12 @@ to **survive, signal, and pass knowledge on**. The goal is not "an agent that
 plays a game well." The goal is **emergence**: language, culture, and proto-
 cognition arising purely from selection pressure.
 
-**Current state (May 2026):** **Phase 12 co-evolution LIVE** on Modal B200 —
-branch **`feature/phase12-red-coevolution`**. Dual brain: blue P11.3 stack +
-`PredatorNetworkJax` (red VQ comms). **Holding pattern:** first red decode @
-~30k wiretap steps **failed** (lag-1 LRT **p=0.9767** — babbling); Modal run
-continues until red **pincer χ²** passes. **Phase 13 blocked** until then.
+**Current state (May 2026):** **Phase 12 co-evolution** on Modal B200 —
+branch **`feature/phase12-red-coevolution`** @ **`a9f4aeb+`**. **Holding
+pattern:** red decode shows **hunger-babble** (MI→`energy`) with **7-dim spatial
+nucleation**; pincer χ² not yet passed. Run **resumed** after graceful exit @
+**250k** (`run_bg.py` now **1M** steps). **Phase 13 blocked.** User restarting
+Modal (may use local `n_steps` override).
 
 **Full ops / decode / roadmap:** [THRONG.md](THRONG.md) §0b (read first).
 
@@ -35,7 +36,16 @@ python3 tools/decode_signals.py signal_corpus.jsonl --k 16 --min-step 149500
 python3 tools/decode_signals.py --red /mnt/throng-runs/signal_corpus_red.jsonl --k 16 --min-step <wiretap_restart>
 ```
 
-**Pass bar (red):** RED VQ PINCER TEST χ² **p < 0.05** (Chase vs Search tokens → receiver lag-1 N/S/E/W). First run @ ~30k: **FAIL** (LRT p=0.9767).
+**Pass bar (red):** RED VQ PINCER TEST χ² **p < 0.05**. Current: **hunger babble**
+(MI→energy); **7 dims** lag-1 LRT **p<0.05**; token 26 vs 30 **p=0.0315**;
+omnibus LRT **p=0.9767**. Re-decode at **+50k–100k** steps.
+
+**Modal restart:**
+
+```bash
+cd /root/throng && git pull origin feature/phase12-red-coevolution   # a9f4aeb+
+python -u run_bg.py   # default n_steps=1_000_000; resume from volume ckpt
+```
 
 ---
 
@@ -292,8 +302,9 @@ All knobs live in `config_phase7.yaml`. The ones you actually touch:
 |-------|--------|
 | **9.x–11.3** | Merged to `master` — cross-attn, confidence, carry fwd, epistemic gate |
 | **12.0–12.2** | **LIVE** on `feature/phase12-red-coevolution` — red VQ + wiretap + `--red` decode |
-| **12.2 decode @ ~30k** | **FAIL** — babbling (LRT p=0.9767); **holding pattern** |
-| **13.0+** | **BLOCKED** — metabolic execution tax, inscription, proprio aux — **after** red pincer χ² passes |
+| **12.2 decode** | Nucleation — hunger MI confound; 7-dim spatial LRT |
+| **12.2b / `a9f4aeb`** | `run_bg.py` **1M** steps (was 250k graceful exit) |
+| **13.0+** | **BLOCKED** — after red pincer χ² **p < 0.05** |
 
 Do **not** branch `feature/phase13-thermodynamics` until red spatial coordination is proven.
 
