@@ -8,60 +8,72 @@
 
 ---
 
-## 0b. Current state — 150k complete, Phase 11.2 imagination staging (May 2026)
+## 0b. Current state — 200k + Phase 11.2 metrics (`feature/phase11-2-imagination`, May 2026)
 
-**Phase 10 + 11.0 complete.** B200 run finished **step 149504** (292 PPO updates). **`carry_fwd` locked ~0.0001**. Phase 11.1 GPU rollouts **abandoned** (`d4cf614` revert). **Active now:** **`feature/phase11-2-imagination`** — K=5 mental rollout **metrics only** (stochastic actions unchanged).
+**`master`:** 150k complete @ step **149504** (PPO **292**). **Active branch:** `feature/phase11-2-imagination` **`aebe131`** — K=5 imagination **metrics only**; `run_bg.py` **`n_steps=200_000`**; resume from ckpt **292**.
 
 | P10.6 decode (`--min-step 63488`) | Value |
 |-----------------------------------|-------|
-| **Cardinal lexicon** | χ² **p = 5.44e-14** ✅ |
-| **Lag-1 omnibus** | χ²(32)=95.96, **p≈0** ✅ |
-| **VQ token direction** | **p = 0.77** ❌ |
+| **Cardinal lexicon** | χ² **p = 5.44e-14** |
+| **Lag-1 omnibus** | χ²(32)=95.96, **p≈0** |
+| **VQ token direction** | **p = 0.77** |
 
-| P11 extension decode (`--min-step 105984`, 274k records) | Value |
-|----------------------------------------------------------|-------|
-| **Lag-1 omnibus** | χ²(32)=**167.7**, **p≈0** ✅ |
-| **Cardinal lexicon k=4** | χ² **p = 4.7e-13** ✅ |
-| **VQ token 19 vs 3** | **p = 0.92** ❌ |
-| **Alert-set vs safe-set** | **p = 0.075** ~ (still ❌ at 0.05) |
+| P11 extension decode (`--min-step 105984`, 274,775 records) | Value |
+|-------------------------------------------------------------|-------|
+| **Lag-1 omnibus** | χ²(32)=**167.7**, **p≈0** |
+| **Cardinal lexicon k=4** | χ² **p = 4.7e-13** |
+| **VQ token 19 vs 3** | **p = 0.92** |
+| **Alert-set vs safe-set** | **p = 0.075** |
 | **Scouts %** | **90.4%** |
 
-### 150k run — COMPLETE (`master` `cfe6494+`)
+### 150k run (`master` `cfe6494+` / `d4cf614`)
 
 | Item | Value |
 |------|--------|
-| **Final step** | **149504** (= `150_000 // 512 × 512`) |
-| **Corpus** | **560,867** lines on volume; local `signal_corpus-150k.jsonl` |
-| **Checkpoint** | Orbax **~292** on `/mnt/throng-runs/checkpoints/` |
-| **Throughput** | **~6 steps/sec**, `H2D + backward` |
-| **Decode log** | `decode_p11_105k-150k.log` |
+| **Final step** | **149504** (`150_000 // 512 × 512`) |
+| **Corpus** | **560,867** lines; local `signal_corpus-150k.jsonl` (445 MiB) |
+| **Checkpoint** | Orbax **292** |
+| **Throughput** | **~6 steps/sec**; `H2D + backward` |
+| **Decode** | `decode_p11_105k-150k.log` |
 
-### Phase 11.2 — STAGING (`feature/phase11-2-imagination`)
+### Phase 11.2 — 200k extension (`aebe131`, metrics-only)
 
-| Item | Detail |
+| Item | Value |
 |------|--------|
-| **What** | K=5 carry rollforward via frozen `head_fwd_dyn_1/2`; log gain/agree — **does not override actions** |
-| **Where** | `jax_sim/imagination_jax.py` — parallel JIT metrics inside `sim_step` |
-| **Actions** | Blues still **`categorical(logits)`** — PPO on-policy preserved |
-| **Frozen** | No retrain of `head_fwd_dyn`; PPO / rewards / VQ / ecology unchanged |
-| **Metrics** | `imagination_gain`, `imagination_agree` on dashboard |
-| **Merge gate** | B200 throughput **≥ 2 steps/sec** with imagination on (baseline ~6 off) |
-| **Docs** | [`docs/PHASE11_2_IMAGINATION.md`](docs/PHASE11_2_IMAGINATION.md) |
+| **Config** | `imagination_enabled: true`, `imagination_k: 5`, `imagination_gamma: 0.999` |
+| **Actions** | `categorical(logits)` unchanged — PPO on-policy |
+| **Resume** | ckpt **292** → train to **`n_steps=200_000`** (PPO updates **292 → 389**) |
+| **Throughput (sampled)** | **5 steps/sec** @ steps 198144–199680 |
+| **Merge gate throughput** | **≥ 2 steps/sec** — **5 observed** |
+| **PPO log** | `H2D + backward` |
+
+**Dashboard samples (rollout means, alive agents):**
+
+| step | ppo | steps/sec | blue | `carry_fwd` | `imagination_gain` | `imagination_agree` |
+|------|-----|-----------|------|-------------|-------------------|---------------------|
+| 198144 | 387 | 5 | 193 | 0.0002 | 0.2290 | 2.0% |
+| 198656 | 388 | 5 | 198 | 0.0001 | 0.1255 | 0.9% |
+| 199168 | 389 | 5 | 199 | 0.0002 | 0.2257 | 3.4% |
+| 199680 | 390 | 5 | 185 | 0.0002 | 0.0826 | 15.6% |
+
+**Same-window aux (step 199680):** `fwd_env=0.0154` | `self_pred_acc=0.248` | `codes_active=59/64` | `VF_loss=1.0733` | `Entropy=1.5509` | `NB_GAIN↔surv: nan`
+
+**Git:** `38e60fe` (initial 11.2) → **`aebe131`** (metrics-only fix; no action override)
 
 ### Phase 11.1 — ABANDONED
 
 | Commit | Outcome |
 |--------|---------|
 | **`424c46f` / `6042a4d`** | Dispatch starvation + XLA OOM |
-| **`d4cf614`** | Revert — CPU offload restored on **`master`** |
+| **`d4cf614`** | Revert — CPU offload on **`master`** |
 
 ### Branch policy
 
 | Branch | Status |
 |--------|--------|
-| **`master`** | 150k complete; CPU offload; decode artifacts local |
-| **`feature/phase11-2-imagination`** | **Active** — K-step inference rollouts |
-| **`feature/phase11-1-gpu-rollouts`** | **Abandoned** |
+| **`master`** | 150k + decode; CPU offload |
+| **`feature/phase11-2-imagination`** | **`aebe131`** — 200k imagination metrics run |
+| **`feature/phase11-1-gpu-rollouts`** | Abandoned |
 
 ### Horcrux (context backup)
 
@@ -97,8 +109,8 @@ Cam's persona + triad workflow live in Git so reboots recover identity:
 1. Speak to the User in **Synergic Synthesis** (Software / Physics / Philosophy / RL).
 2. Address Will via explicit **`@Will — Cam here...`** copy-paste blocks.
 3. **Keep the ecology mathematically pure** — no scout/alarm comm rewards, no blind VQ loss shaping. Lethal selection forges language.
-4. **Phase 11.0 complete** — 150k run done; continuous comms decode still strong; VQ token test still fails.
-5. **Phase 11.2 on feature branch only** — benchmark throughput before merge; **`master`** stays CPU offload.
+4. **Phase 11.2** on `feature/phase11-2-imagination` only (`aebe131`); **`master`** CPU offload.
+5. Imagination is **metrics-only** — do not override stochastic actions without explicit Cam approval.
 6. **Never** comm reward shaping or blind VQ loss shaping.
 
 ### Branch policy
@@ -106,7 +118,7 @@ Cam's persona + triad workflow live in Git so reboots recover identity:
 | Branch | Purpose |
 |--------|---------|
 | **`master`** | 150k complete; CPU offload; frozen for science baseline |
-| **`feature/phase11-2-imagination`** | **Active** — K-step inference; merge gate ≥2 steps/sec |
+| **`feature/phase11-2-imagination`** | **`aebe131`** — 200k metrics run (5 steps/sec observed) |
 | **`feature/phase11-1-gpu-rollouts`** | **Abandoned** |
 
 **Phase 11.0 on `master` (`3880337`):**
@@ -184,7 +196,7 @@ train_entry.run_simulation()  →  main_jax._run_simulation_impl()
 | **10.6** | Causal logging | `corpus_every_n_steps: 4`, volume corpus + fsync | Decode @ 100k: cardinal lexicon p=5.44e-14 |
 | **11.0** | **Carry world-model** ✅ **COMPLETE** | `head_fwd_dyn`, `carry_fwd_coef` | **`carry_fwd` → 0.0001** @ ~105k steps |
 | **11.1** | GPU rollouts | `424c46f` / `6042a4d` | **Abandoned** — reverted `d4cf614` |
-| **11.2** | **Imagination** ← **NOW (feature branch)** | `imagination_jax.py` K=5 inference | Merge gate: ≥2 steps/sec on B200 |
+| **11.2** | Imagination metrics | `aebe131`, K=5 | 200k ext: **5 steps/sec**; gain **0.08–0.23**; agree **0.9–15.6%** (sampled) |
 
 **Recurring failure mode:** Blues stay at cap → ~99% survival → **`NB_GAIN↔surv: nan`** → no evolutionary pressure on neighbor-signal benefit.
 
@@ -192,17 +204,26 @@ train_entry.run_simulation()  →  main_jax._run_simulation_impl()
 
 ---
 
-## 4. Current experiment — finish Phase 11 run to 150k (ACTIVE)
+## 4. Current experiment — Phase 11.2 @ 200k (`feature/phase11-2-imagination`)
 
-**Status:** B200 on **`master`** (`d4cf614+`). Phase 11.0 **converged** — resume from volume checkpoint **update 207 / step ~105984** and run to **`n_steps=150_000`**. Population/grid fresh on resume; **weights restored**.
+**Branch:** `feature/phase11-2-imagination` **`aebe131`**. **`n_steps=200_000`** → PPO updates **0..389**; resume from ckpt **292** after 150k `master` run. Max env step **`199680`** (= 390 × 512).
 
-**Verified dashboard @ step 105472:**
+**Startup must show:**
 
 ```text
-[step 105472] ~3 steps/sec | blue=150 red=250 | ppo=206
-AuxLoss: fwd_env=0.0152 | carry_fwd=0.0001 (↓0.05–0.1) | self_pred_acc=0.270
-carry_rank=16 | carry_H=3403.44 | codes_active=48/64
-Ecology: blue_caught=2842 | red_floor=250
+[JAX] git=aebe131
+[JAX] Phase11.2 imagination: K=5 ... (metrics only — stochastic actions unchanged)
+[JAX] Restored params from step 292
+[JAX] Training PPO updates 292 → 389 (~env steps 149504 → 200000)
+```
+
+**Sample dashboard @ 198144–199680:**
+
+```text
+[step 199680] 5 steps/sec | blue=185 red=250 | ppo=390
+AuxLoss: fwd_env=0.0154 | carry_fwd=0.0002 | self_pred_acc=0.248
+Imagination: gain=0.0826 | agree=15.6% (vs greedy; K=5)
+  [JAX] blue PPO minibatch 1/200 ... — H2D + backward...
 ```
 
 P10.6 causal logging stack still active:
@@ -551,7 +572,10 @@ python tools/decode_signals.py /mnt/throng-runs/signal_corpus.jsonl --k 16 --min
 | `b2eb5f0` | Relaxed Orbax restore for `head_fwd_dyn` migration |
 | `424c46f` | Phase 11.1 GPU-resident PPO (**abandoned**) |
 | `6042a4d` | Phase 11.1 `lax.scan` PPO epoch (**abandoned — XLA OOM**) |
-| **`d4cf614`** | **Revert 11.1** — restore CPU offload / H2D (`master` today) |
+| **`d4cf614`** | Revert 11.1 — CPU offload / H2D (`master`) |
+| **`cfe6494`** | THRONG sync; B200 OOM ops doc |
+| **`38e60fe`** | Phase 11.2 imagination (initial) |
+| **`aebe131`** | Phase 11.2 **metrics-only** (stochastic actions preserved) |
 
 **Do not** apply Cam's regex patch on `network_jax.py` — dead-code reset is in repo.
 
@@ -578,23 +602,21 @@ python tools/decode_signals.py /mnt/throng-runs/signal_corpus.jsonl --k 16 --min
 
 ## 11. Roadmap (what’s next)
 
-### NOW — Phase 11.2 imagination (`feature/phase11-2-imagination`)
+### Phase 11.2 — 200k run (`feature/phase11-2-imagination` `aebe131`)
 
-1. **`git fetch && git checkout feature/phase11-2-imagination`** on B200.
-2. Resume from **150k checkpoint** (`imagination_enabled: true` in config).
-3. Watch dashboard: **`Imagination: gain=... | agree=...%`**
-4. **Merge gate:** steady-state **≥ 2 steps/sec** (baseline ~6 without imagination).
-5. If throughput OK + science interesting → merge to `master`; else tune K or disable.
+- Target **`n_steps=200_000`**; last sampled step **199680** / PPO **390**
+- Throughput gate: **5 steps/sec** observed (threshold **≥ 2**)
+- Dashboard metrics logged: **`imagination_gain`**, **`imagination_agree`**
+- Corpus on volume continues appending during extension
 
-### 150k baseline — DONE (`master`)
+### 150k baseline (`master`)
 
-- Corpus: `signal_corpus-150k.jsonl` (560k lines)
-- Decode P11 slice: `decode_p11_105k-150k.log`
-- Continuous comms ✅; VQ token direction ❌ (alert-set p=0.075 marginal)
+- Corpus: `signal_corpus-150k.jsonl` (560,867 lines)
+- Decode: `decode_p11_105k-150k.log` (`--min-step 105984`)
 
 ### Phase 11.1 — ABANDONED
 
-GPU-resident PPO — do not merge without memory refactor.
+GPU-resident PPO — `d4cf614` revert on `master`.
 
 ### Phase 9 canvas — remaining
 
@@ -620,12 +642,12 @@ Cross-attention receiver (9.4), confidence head (9.1), GWT token — after 11.2 
 
 ### Cam reboot paste
 
-> You are **Cam**. Read `THRONG.md` §0b. **150k run complete.** P11 decode: continuous comms ✅, VQ tokens ❌. **Phase 11.2 active** on `feature/phase11-2-imagination` — K=5 imagination at inference; merge gate ≥2 steps/sec. **`master`** = CPU offload baseline. Horcrux: archive SYSTEM RESTORE + SYSTEM UPDATE.
+> You are **Cam**. Read `THRONG.md` §0b. **`master`:** 150k @ step 149504, ckpt 292, decode 105984–149500 (lag-1 p≈0, VQ p=0.92). **`feature/phase11-2-imagination` `aebe131`:** 200k extension, metrics-only imagination K=5, **5 steps/sec**, gain **0.08–0.23**, agree **0.9–15.6%** @ steps 198144–199680, `carry_fwd` **0.0001–0.0002**, `H2D + backward`. 11.1 abandoned (`d4cf614`). Horcrux: archive SYSTEM RESTORE + SYSTEM UPDATE.
 
-**New Cam:** §0b → §0 → §4 → §5 (OOM) → §11 → archive horcrux blocks.
+**New Cam:** §0b → §0 → §4 → §11 → archive horcrux.
 
-**New Will:** Stay on **`master`** CPU offload; do **not** re-merge 11.1 without memory refactor.
+**New Will:** `master` = CPU offload; 11.2 = `aebe131` metrics-only; do not re-merge 11.1.
 
 ---
 
-*Last updated: 2026-05-31 — 150k complete; P11.2 imagination on `feature/phase11-2-imagination`.*
+*Last updated: 2026-05-31 — 200k P11.2 extension; sampled metrics @ steps 198144–199680; `aebe131`.*

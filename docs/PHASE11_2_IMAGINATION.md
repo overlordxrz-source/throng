@@ -48,7 +48,18 @@ Imagination: gain=0.0123 | agree=67.3% (vs greedy; K=5)
 | Metric | Meaning |
 |--------|---------|
 | `imagination_gain` | Mean imagined return − greedy-action imagined return (alive agents) |
-| `imagination_agree` | % steps imagined argmax == `argmax(logits)` (greedy policy) |
+| `imagination_agree` | % rollout-mean: imagined argmax == `argmax(logits)` |
+
+## Observed metrics (200k extension, B200)
+
+| step | ppo | steps/sec | `imagination_gain` | `imagination_agree` |
+|------|-----|-----------|-------------------|---------------------|
+| 198144 | 387 | 5 | 0.2290 | 2.0% |
+| 198656 | 388 | 5 | 0.1255 | 0.9% |
+| 199168 | 389 | 5 | 0.2257 | 3.4% |
+| 199680 | 390 | 5 | 0.0826 | 15.6% |
+
+Git: **`aebe131`**. Resume ckpt **292**. `carry_fwd` **0.0001–0.0002** in same window.
 
 ## Param names (checkpoint)
 
@@ -59,8 +70,8 @@ Frozen for metrics pass — must exist in restored checkpoint:
 
 ## Merge gate
 
-1. **Throughput:** ≥ **2 steps/sec** on B200 with `imagination_enabled: true` (baseline ~6 without)
-2. First compile of `imagine()` may take minutes — steady-state matters
+1. **Throughput:** ≥ **2 steps/sec** on B200 with `imagination_enabled: true`
+2. **Observed (200k extension, steps 198144–199680):** **5 steps/sec**
 
 ## Rollback
 
