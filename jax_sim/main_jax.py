@@ -551,6 +551,9 @@ def _run_simulation_impl(
     # ── Init model ──────────────────────────────────────────
     _loc_env_start, _loc_env_end = loc_env_flat_bounds(config)
     _fwd_env_dim = compute_fwd_env_dim(config)
+    _p9 = config.get("phase9_canvas") or {}
+    _cross_attn = bool(_p9.get("cross_attn_enabled", False))
+    _cross_heads = int(_p9.get("cross_attn_num_heads", config["n_heads"]))
     model = AgentNetworkJax(
         hidden_dim=hidden_d,
         n_heads=config["n_heads"],
@@ -563,6 +566,8 @@ def _run_simulation_impl(
         vq_dead_code_reset=bool(config.get("vq_dead_code_reset", True)),
         memory_slots=config.get("memory_slots", 0),
         fwd_env_dim=_fwd_env_dim,
+        cross_attn_enabled=_cross_attn,
+        cross_attn_num_heads=_cross_heads,
     )
     model_apply = make_model_apply(model)
 
@@ -598,6 +603,11 @@ def _run_simulation_impl(
         _phase9 = "OFF — git pull required"
     print(f"[JAX] code: {_main_path}")
     print(f"[JAX] git={_git_sha} | Phase9 auxiliary: {_phase9}")
+    if _cross_attn:
+        print(
+            f"[JAX] Phase9.4 cross-attn receiver: heads={_cross_heads} "
+            f"(Q=self+carry, KV=neighbor signals → 1 Other token)"
+        )
     if hasattr(_rl_jax_mod, "auxiliary_update") and "carry_fwd_coef" in str(
         _inspect.getsource(_rl_jax_mod.auxiliary_update)
     ):

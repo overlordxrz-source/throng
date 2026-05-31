@@ -128,6 +128,8 @@ class AgentNetworkJax(nn.Module):
     max_layers: int = 6
     memory_slots: int = 0
     fwd_env_dim: int = 200   # W × 8 flattened loc_env (set from config in main_jax)
+    cross_attn_enabled: bool = False
+    cross_attn_num_heads: int = 4
 
     def setup(self):
         d = self.hidden_dim
@@ -171,6 +173,12 @@ class AgentNetworkJax(nn.Module):
         # Latent forward dynamics (Phase 11 / 9.2): carry_{t+1} from [carry_t, action_t]
         self.head_fwd_dyn_1 = nn.Dense(self.hidden_dim * 4)
         self.head_fwd_dyn_2 = nn.Dense(self.hidden_dim)
+
+        if self.cross_attn_enabled:
+            self.nb_cross_attn = NeighborCrossAttention(
+                hidden_dim=d,
+                num_heads=self.cross_attn_num_heads,
+            )
 
     def __call__(
         self,
@@ -216,8 +224,14 @@ class AgentNetworkJax(nn.Module):
         loc_cult_slow = obs[:, idx:idx + W * sym_d].reshape(N, W, sym_d)
 
         # Embed tokens
-        t1 = self.emb_own(own_state)[:, None, :]  # (N, 1, d)
-        t2 = self.emb_nb(nb_sigs)                 # (N, K, d)
+        self_encoded = self.emb_own(own_state)    # (N, d)
+        t1 = self_encoded[:, None, :]             # (N, 1, d)
+        nb_kv = self.emb_nb(nb_sigs)              # (N, K, d)
+        if self.cross_attn_enabled:
+            processed = self.nb_cross_attn(self_encoded, carries, nb_kv)
+            t2 = processed[:, None, :]            # (N, 1, d) — attended Other
+        else:
+            t2 = nb_kv                            # (N, K, d) — per-neighbor tokens
         t3 = self.emb_sym(loc_sym)                # (N, W, d)
         t4 = self.emb_env(loc_env)                # (N, W, d)
         t5 = self.emb_sig(own_sig)[:, None, :]    # (N, 1, d)
@@ -421,6 +435,41 @@ def ensure_aux_head_params(
             flat[k] = aux_flat[k]
             print("[JAX] Merged fresh auxiliary-head params into restored checkpoint")
     return sanitize_agent_params(freeze(flat))
+
+
+class NeighborCrossAttention(nn.Module):
+    """
+    Phase 9.4 — Cross-Attention Receiver.
+
+    Query: encoded self (own_state embedding + carry).
+    Key/Value: neighbor signal embeddings (the swarm \"Other\").
+    Output: self_encoded + attention_out (residual on self).
+    """
+
+    hidden_dim: int
+    num_heads: int
+
+    @nn.compact
+    def __call__(
+        self,
+        self_encoded: jnp.ndarray,
+        carry: jnp.ndarray,
+        neighbor_kv: jnp.ndarray,
+    ) -> jnp.ndarray:
+        """
+        self_encoded: (N, d)
+        carry: (N, d)
+        neighbor_kv: (N, K, d) — embedded neighbor signals
+        Returns processed_signals: (N, d)
+        """
+        q = nn.LayerNorm(name="q_norm")(self_encoded + carry)[:, None, :]
+        attn_out = nn.MultiHeadDotProductAttention(
+            num_heads=self.num_heads,
+            qkv_features=self.hidden_dim,
+            out_features=self.hidden_dim,
+            name="nb_cross_mha",
+        )(q, neighbor_kv)
+        return self_encoded + attn_out.squeeze(1)
 
 
 class TransformerBlock(nn.Module):

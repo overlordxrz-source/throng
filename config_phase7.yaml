@@ -197,4 +197,9 @@ alarm_min_group: 20
 # Phase 11 staging (feature/phase11-imagination only — not on master P10.6 run)
 carry_fwd_coef: 0.05   # MSE on carry_{t+1}; target always stop_gradient
 
+# Phase 9 canvas (feature/phase9-canvas) — cross-attention receiver for neighbor signals
+phase9_canvas:
+  cross_attn_enabled: false   # scaffold: set true to compile 9.4 path (new params)
+  cross_attn_num_heads: 4
+
 exit_on_graduation: false
