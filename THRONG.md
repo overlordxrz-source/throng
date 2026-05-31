@@ -4,7 +4,7 @@
 
 **Read this file first.** Full historical lab notebook (~290KB) lives in [`docs/THRONG_ARCHIVE.md`](docs/THRONG_ARCHIVE.md) if you need old run logs.
 
-**Cam reboot (60 seconds):** Read **§0b** (live run) → **§0** (triad) → **§4** (ops + restart) → **§7** (blue + **`--red`** decode) → **§5** (OOM) → **§11** (roadmap) → [`docs/PHASE12_COEVOLUTION.md`](docs/PHASE12_COEVOLUTION.md) → archive **[SYSTEM RESTORE](docs/THRONG_ARCHIVE.md#system-restore-the-cam-context)**.
+**Cam reboot (60 seconds):** Read **§0b** (live run) → **§0** (triad) → **§4** (ops + restart) → **§7** (blue + **`--red`** decode) → **§11** (roadmap + **Phase 13 prep**) → [`docs/PHASE12_COEVOLUTION.md`](docs/PHASE12_COEVOLUTION.md).
 
 ---
 
@@ -12,27 +12,29 @@
 
 **Blue SOTA (frozen on `master`):** **`465d8c6+`** — 9.4 cross-attn + 9.1 confidence + **11.3 epistemic gate** (merged; Stay-collapse resolved).
 
-**LIVE:** B200 on **`feature/phase12-red-coevolution`** (`4f98f96+`) — **dual-brain** co-evolution: Blue stack unchanged + **`PredatorNetworkJax`** (red VQ comms). **Red wiretap ON** (`signal_corpus_red.jsonl`). Training toward **200k+**. **Do not stop** unless Stay collapse, red VQ collapse, or OOM.
+**LIVE:** B200 on **`feature/phase12-red-coevolution`** (`2cd3dcc` / **`80ef1ea+`**) — dual-brain co-evolution + **spatial epistemic gate** + **red wiretap**. **NOW:** baking **`signal_corpus_red.jsonl`** (~20k steps) for **Phase 12.2 pincer decode**. **Do not stop** unless Stay collapse, red VQ collapse, or OOM.
 
 | Live run (Phase 12) | Value |
 |---------------------|--------|
+| **Branch HEAD** | **`2cd3dcc`** — spatial gate + wiretap + `--red` decode |
 | **Throughput** | **~7 steps/sec** (dual policy; was ~6 on P11.3-only) |
-| **Blue Stay** | **~19%** — P11.3 gate healthy (P11.2 ungated: Stay≈99%) |
+| **Blue Stay** | **~19%** — gate healthy (P11.2 ungated: Stay≈99%) |
 | **`red_codes_active`** | **63/64** — predator VQ alive |
 | **`red_entropy`** | **~1.58** — exploratory movement (watch for pincer) |
-| **`conf_gate_imagine_frac`** | **~65–80%** (blue epistemic gate) |
+| **`conf_gate_imagine_frac`** | **~50–60%** — batch-relative gate (`confidence_multiplier: 1.0`) |
 | **`conf_loss`** | **~1e-4** |
-| **PPO** | `H2D + backward` ✅; blue weights from P11.3 ckpt graft |
+| **PPO** | `H2D + backward` ✅; blue `b_params` from P11.3 ckpt graft |
 
 **Corpus (wiretap):** `/mnt/throng-runs/signal_corpus.jsonl` (blue) + **`signal_corpus_red.jsonl`** (red — default on this branch).
 
 | Milestone | Value |
 |-----------|--------|
 | **P11.3 decode @ 214k** | `decode_p11_3_214k.log` — **743,589** records, steps **149,500–215,548** |
+| **Red decode @ 12.2** | **PENDING** — run `--red` after ~20k red corpus steps post **`80ef1ea`** restart |
 | **Modal volume** | **`dragonbgnx`** → `/mnt/throng-runs` |
-| **Local corpus** | `signal_corpus_p11_3_214k.jsonl` (blue decode) |
-| **`master`** | Blue-only SOTA; **do not** merge Phase 12 until co-evolution decode passes |
-| **Repo graph** | `graphify-out/graph.html` (914 nodes) |
+| **Local corpus** | `signal_corpus_p11_3_214k.jsonl` (blue); red on volume when wiretap fills |
+| **`master`** | Blue-only SOTA (`465d8c6+`); **do not merge** Phase 12 until red pincer χ² passes |
+| **Next branch** | **`feature/phase13-thermodynamics`** — after red decode (see §11); **not on master** |
 
 ### P10.6 decode (reference)
 
@@ -66,18 +68,27 @@ Continuous blue comms **stable through 214k** under epistemic gate.
 
 Continuous comms verified → unguarded active imagination **failed** → **resolved** by **9.1 + 11.3** (see below).
 
-### Phase 11.3 — **SUCCESS** (merged to `master`, `465d8c6`)
+### Phase 11.3 — **SUCCESS on `master`** (`465d8c6`)
 
 | Item | Detail |
 |------|--------|
-| **Problem** | P11.2 active override: imagined argmax always on → **Stay ≈ 99%** (solipsistic value exploitation) |
-| **Fix** | **9.1** `head_confidence_*` predicts carry_fwd MSE; **11.3** gates: low `conf_pred` → **imagined** (K=5), high → **reactive** sample |
-| **Probe** | `a_reactive ~ Categorical(logits)`; `conf_pred(carry_t, onehot(a_reactive))`; **batch-relative** τ = `mean(conf|alive) × confidence_multiplier` (default **1.0**) |
-| **Telemetry** | Stay **~19%**; `conf_gate_imagine_frac` **65–80%**; PPO `log_probs` on **executed** action |
+| **Problem** | P11.2 active override: imagined argmax always on → **Stay ≈ 99%** |
+| **Fix (master)** | **9.1** confidence head + **11.3** static gate: low `conf_pred` → imagined (K=5) |
+| **On P12 branch** | **Superseded by 12.1b spatial gate** — see below (`80ef1ea`) |
 | **Module** | [`jax_sim/imagination_jax.py`](jax_sim/imagination_jax.py) + `sim_step` in [`main_jax.py`](jax_sim/main_jax.py) |
-| **Config** | `imagination_gating_enabled`, **`confidence_multiplier`** (1.0), `imagination_k`, `imagination_gamma` |
+| **PPO** | `log_probs` on **executed** action (reactive policy, gated execution) |
 
-**Victory condition met:** epistemic gate prevents P11.2 collapse while keeping imagination on the decision path.
+### Phase 12.1b — **LIVE spatial gate** (`80ef1ea`)
+
+| Item | Detail |
+|------|--------|
+| **Problem** | Static `confidence_threshold` mismatched carry_fwd magnitude after P12 restart |
+| **Fix** | **Stateless batch-relative gate** — no EMA, no scan-carry mutation |
+| **Rule** | `dynamic_tau = mean(conf_pred \| alive) × confidence_multiplier` |
+| **Imagine when** | `conf_pred < dynamic_tau` (more predictable than scaled swarm average) |
+| **Config** | `phase9_canvas.confidence_multiplier: 1.0` (replaces `confidence_threshold`) |
+| **Expected** | `conf_gate_imagine_frac` **~50–60%**; Stay **~19%** |
+| **Endgame (P13)** | Replace threshold with **metabolic cost of K-step imagination** — see §11 |
 
 ### Phase 12.0 — **LIVE** (`feature/phase12-red-coevolution`, `f0ebb76`)
 
@@ -90,7 +101,7 @@ Continuous comms verified → unguarded active imagination **failed** → **reso
 | **Telemetry** | `red_codes_active`, `RedVQ`, `Actions (red):` on dashboard |
 | **Docs** | [`docs/PHASE12_COEVOLUTION.md`](docs/PHASE12_COEVOLUTION.md) |
 
-### Phase 12.1 — **LIVE** (`d50cc19`; wiretap default `4f98f96+`)
+### Phase 12.1 — **LIVE wiretap** (`d50cc19` / `4f98f96+`)
 
 | Item | Detail |
 |------|--------|
@@ -144,8 +155,9 @@ GPU-resident / `lax.scan` PPO — starvation + XLA OOM; **`d4cf614` revert**.
 
 | Branch | Status |
 |--------|--------|
-| **`feature/phase12-red-coevolution`** | **LIVE TRAIN** — P12.0–12.2 (`4f98f96+`): red comms + wiretap + `--red` decode |
-| **`master`** | **Blue SOTA** — P11.3 epistemic gate (`465d8c6+`); **no** predator brain |
+| **`feature/phase12-red-coevolution`** | **LIVE TRAIN** — P12.0–12.2 (`2cd3dcc` / `80ef1ea+`): spatial gate + wiretap + `--red` decode |
+| **`master`** | **Blue SOTA** — P11.3 static gate (`465d8c6+`); **no** predator brain |
+| **`feature/phase13-thermodynamics`** | **PREP** — branch after red pincer decode; **not started** |
 | **`feature/phase11-3-epistemic-gate`** | Merged → `master` |
 | **`feature/phase11-2-imagination`** | **FROZEN** — metrics-only (`061df84`) |
 | **`feature/phase11-1-gpu-rollouts`** | **Abandoned** |
@@ -185,17 +197,19 @@ Cam's persona + triad workflow live in Git so reboots recover identity:
 2. Address Will via explicit **`@Will — Cam here...`** copy-paste blocks.
 3. **Keep the ecology mathematically pure** — no scout/alarm comm rewards, no blind VQ loss shaping. Lethal selection forges language.
 4. **Phase 12 LIVE on `feature/phase12-red-coevolution`** — dual brain; **do not merge** to `master` until red decode proves co-evolution.
-5. **Phase 11.3 on `master`** — blue epistemic gate; never unguarded P11.2 active override (`6cf965a`).
-6. **Phase 11.2 FROZEN** — Stay-collapse resolved by **9.1 + 11.3** on blue path only.
+5. **Phase 12.1b spatial gate** on live branch — `confidence_multiplier: 1.0`; **no EMA** in scan carry.
+6. **Phase 11.2 FROZEN** — never unguarded active override (`6cf965a`).
 7. **CPU offload only** — **`H2D + backward`**; no 11.1 GPU rollouts.
 8. **Never** comm reward shaping — red language forged by **`reward_red_catch`** only.
+9. **Phase 13 prep only** — do not branch until red pincer decode passes (§11).
 
 ### Branch policy
 
 | Branch | Purpose |
 |--------|---------|
-| **`feature/phase12-red-coevolution`** | **Active:** `PredatorNetworkJax` + red wiretap + `--red` decode (`4f98f96+`) |
-| **`master`** | **Blue production:** P11.3 stack (no red comms) |
+| **`feature/phase12-red-coevolution`** | **Active:** spatial gate + wiretap + `--red` decode (`2cd3dcc` / `80ef1ea+`) |
+| **`master`** | **Blue production:** P11.3 static gate (no red comms) |
+| **`feature/phase13-thermodynamics`** | **Prep** — after red pincer decode; not branched yet |
 | **`feature/phase11-2-imagination`** | **Frozen archive** |
 | **`feature/phase11-1-gpu-rollouts`** | **Abandoned** |
 
@@ -234,7 +248,7 @@ Cam's persona + triad workflow live in Git so reboots recover identity:
 train_entry.run_simulation()  →  main_jax._run_simulation_impl()
   lax.scan(sim_step, T=512)   →  rollout on GPU
   NeighborCrossAttention (9.4) → 1 "Other" token
-  Phase 12.1 (blues): reactive sample → conf_pred → imagine if conf < mean(conf|alive)×mult
+  Phase 12.1b (blues): reactive → conf_pred → imagine if conf < mean(conf|alive)×mult (stateless)
   executed_a → env + PPO log_probs (reactive policy, gated execution)
   ppo_update (blue + red)     →  CPU rollout offload, minibatch 512
   auxiliary_update            →  loc_env + carry_fwd + self-pred + conf (9.1)
@@ -245,7 +259,7 @@ train_entry.run_simulation()  →  main_jax._run_simulation_impl()
 | [`jax_sim/train_entry.py`](jax_sim/train_entry.py) | **Always import here** — evicts stale modules after `git pull` |
 | [`jax_sim/main_jax.py`](jax_sim/main_jax.py) | Training loop, ecology, dashboard, checkpoints, corpus |
 | [`jax_sim/network_jax.py`](jax_sim/network_jax.py) | Transformer + VQ; **`NeighborCrossAttention`** (Phase 9.4) |
-| [`jax_sim/imagination_jax.py`](jax_sim/imagination_jax.py) | Phase **11.3** K-step imagined argmax (`head_fwd_dyn` + `value_from_carry`) |
+| [`jax_sim/imagination_jax.py`](jax_sim/imagination_jax.py) | K-step imagined argmax (`head_fwd_dyn` + `value_from_carry`); gated in `sim_step` |
 | [`jax_sim/rl_jax.py`](jax_sim/rl_jax.py) | PPO + numpy GAE |
 | [`jax_sim/observations_jax.py`](jax_sim/observations_jax.py) | Obs builder; startup must print `red_sense_api=v2` |
 | [`jax_sim/grid_jax.py`](jax_sim/grid_jax.py) | Catches (`red_catch_prob`), resources, shelter |
@@ -282,7 +296,7 @@ train_entry.run_simulation()  →  main_jax._run_simulation_impl()
 | **11.3** | **Epistemic gate** ✅ | `465d8c6` | **Stay ~19%**; merged **`master`** |
 | **12.0** | **Red predator comms** | `f0ebb76` | `red_codes_active` **63/64**; dual brain **7 steps/sec** |
 | **12.1** | **Red corpus wiretap** | `d50cc19` / `4f98f96` | `signal_corpus_red.jsonl`; CPU post-rollout |
-| **12.1b** | **Spatial epistemic gate** | (this commit) | Stateless batch-relative `confidence_multiplier` |
+| **12.1b** | **Spatial epistemic gate** | **`80ef1ea`** | `confidence_multiplier`; stateless batch-relative τ |
 | **12.2** | **Red decode** | `d493a50` | `--red` pincer χ² |
 
 **Recurring failure mode:** Blues stay at cap → ~99% survival → **`NB_GAIN↔surv: nan`** → no evolutionary pressure on neighbor-signal benefit.
@@ -293,7 +307,7 @@ train_entry.run_simulation()  →  main_jax._run_simulation_impl()
 
 ## 4. Current experiment — Phase **12** co-evolution (`feature/phase12-red-coevolution`)
 
-**Status:** B200 training **`4f98f96+`** toward **200k+**. **Blue:** full P11.3 stack (grafted ckpt). **Red:** `PredatorNetworkJax` 128-d + `red_codebook`. **~7 steps/sec**. **Epistemic gate:** batch-relative (`confidence_multiplier: 1.0`).
+**Status:** B200 **`80ef1ea+`** — spatial gate running; **red corpus accumulating** for pincer decode. **Blue:** P11.3 stack + 12.1b gate. **Red:** `PredatorNetworkJax` 128-d. **~7 steps/sec**.
 
 **Verified healthy @ Phase 12 activation:**
 
@@ -311,7 +325,7 @@ train_entry.run_simulation()  →  main_jax._run_simulation_impl()
 **Restart (pull branch — config defaults, no `sed`):**
 
 ```bash
-cd /root/throng && git fetch origin && git checkout feature/phase12-red-coevolution && git pull   # → 4f98f96+
+cd /root/throng && git fetch origin && git checkout feature/phase12-red-coevolution && git pull   # → 2cd3dcc / 80ef1ea+
 # config_phase7.yaml already has:
 #   phase9_canvas.confidence_multiplier: 1.0
 #   phase12_coevolution.red_comms_enabled: true
@@ -721,7 +735,7 @@ python3 tools/decode_signals.py --red /mnt/throng-runs/signal_corpus_red.jsonl -
 | `imagination_gain` | Best imagined return − greedy imagined return (rollout telemetry) |
 | `imagination_agree` | % **imagined == reactive** (alive agents) |
 | `conf_gate_imagine_frac` | % agents on imagine path (`conf_pred < dynamic τ`) |
-| `EpistemicGate:` | Dashboard line combining agree + gate fraction + τ, K |
+| `EpistemicGate:` | Dashboard: `imagination_agree` + `conf_gate_imagine_frac` + **mult**, K |
 | `RedVQ:` / `red_codes_active` | Predator VQ loss + unique tokens / 64 |
 | `Actions (red):` | Red movement distribution (pincer signature) |
 
@@ -795,8 +809,10 @@ phase12_coevolution:           # feature/phase12-red-coevolution
 | **`d50cc19`** | Phase **12.1** red corpus logging |
 | **`8c5888b`** | THRONG reboot — Phase 12 live + 214k decode |
 | **`d493a50`** | Phase **12.2** `--red` decode + `red_comms` default |
-| **`80ef1ea`** | Phase **12.1** spatial epistemic gate (`confidence_multiplier`) |
-| **`4f98f96`** | **Wiretap default** — `red_corpus_enabled: true`; docs sync |
+| **`80ef1ea`** | Phase **12.1b** spatial epistemic gate (`confidence_multiplier`) |
+| **`4f98f96`** | Wiretap default — `red_corpus_enabled: true` |
+| **`b2a40b4`** | THRONG P12 reboot pack |
+| **`2cd3dcc`** | THRONG spatial-gate Cam reboot sync |
 
 **Do not** apply Cam's regex patch on `network_jax.py` — dead-code reset is in repo.
 
@@ -818,8 +834,8 @@ phase12_coevolution:           # feature/phase12-red-coevolution
 | Checkpoint shape error | Incompatible arch — wipe ckpts only if intentional fresh run |
 | Lag-1 / scouts 0% in decode | Old corpus — train after `5964a24`; scout uses **alarm range 8** |
 | `codes_active=1/64` | `vq_dead_code_reset: true` |
-| `ScopeParamShapeError` on `r_params` | **`red_comms_enabled: false`** on P12 branch — reds init as 256-d `AgentNetwork` but ckpt has 128-d predator weights. **`git pull`** → `4f98f96+`; do not `sed` — yaml defaults fix restarts |
-| No `[JAX] Red corpus:` line | `red_corpus_enabled: false` or stale config — pull `4f98f96+` |
+| `ScopeParamShapeError` on `r_params` | **`red_comms_enabled: false`** — pull **`80ef1ea+`**; yaml defaults fix restarts |
+| No `[JAX] Red corpus:` line | Stale config — pull **`80ef1ea+`** |
 | Red pincer χ² not significant | Need more `signal_corpus_red.jsonl` after wiretap restart; use `--min-step` from first red record |
 
 ---
@@ -828,14 +844,34 @@ phase12_coevolution:           # feature/phase12-red-coevolution
 
 ### Phase 12 — **LIVE** (`feature/phase12-red-coevolution`)
 
-1. **NOW** — B200 → **200k+**; monitor blue **Stay ~20%**, **`red_codes_active` ≥ 50/64**, `red_entropy`, `H2D + backward`, **`conf_gate_imagine_frac`** ~50–60% with **mult=1.0**.
-2. **Accumulate red corpus** — wiretap on (`4f98f96+`) → `signal_corpus_red.jsonl` on volume.
-3. **Run pincer decode** — `python3 tools/decode_signals.py --red … --min-step <restart>`; hunt **RED VQ PINCER TEST** χ² **p < 0.05**.
-4. **Merge** to `master` only after red channel shows structure (mirror blue cardinal/LRT bar).
+1. **NOW (baking)** — spatial gate (`80ef1ea`) running; accumulate **`signal_corpus_red.jsonl`** (~20k steps).
+2. **Drop hammer** — `python3 tools/decode_signals.py --red … --min-step <restart>`; **RED VQ PINCER TEST** χ² **p < 0.05**.
+3. **Monitor** — Stay **~20%**, `red_codes_active` **≥ 50/64**, `conf_gate_imagine_frac` **~50–60%**, `H2D + backward`.
+4. **Merge** to `master` only after red pincer passes (mirror blue cardinal/LRT bar).
 
-**Done:** 12.0 (`f0ebb76`); 12.1 wiretap (`4f98f96`); 12.2 decode staged (`d493a50`). Blue decode @ **214k** (`decode_p11_3_214k.log`). Red decode: **pending corpus**.
+**Done:** 12.0 (`f0ebb76`); 12.1 wiretap (`4f98f96`); 12.1b spatial gate (`80ef1ea`); 12.2 decode tool (`d493a50`). Blue @ 214k ✅. **Red pincer: pending corpus.**
 
-**Philosophy (Cam):** Environmental poverty blocked compositional language. **Symmetric 8-cell information bounds** (scout/hunter) + **dual codebooks** → adversarial arms race. Catch reward forges red comms; no shaping.
+**Philosophy (Cam):** Symmetric 8-cell bounds (scout/hunter) + dual codebooks → adversarial arms race. Catch reward forges red comms; no shaping.
+
+### Phase 13 — **PREP** (Thermodynamics of Cognition & Inscription)
+
+**Branch after red decode** — `feature/phase13-thermodynamics` (**not on `master`**). Architecture staged; implementation pending.
+
+| Pillar | Mechanism | Notes |
+|--------|-----------|-------|
+| **13.0 Metabolic cognition** | Deduct `delta × K` energy when **executed action == imagined** | Insert in `sim_step` after resource gain, before `energy_decay`; **`jnp.clip(0,1)`**; no scan-carry / EMA |
+| **13.1 Drop spatial gate** | RL + starvation (`repro_energy_thresh: 0.95`) selects think vs act | Replaces `confidence_multiplier` threshold math |
+| **13.2 Inscription grid** | Decaying traces (~100-step) agents write to map | Mirror `scent_trails`; external referents for location language |
+| **13.3 Proprio aux loss** | Predict `energy`, position from carry | Extend `auxiliary_heads` + `auxiliary_update`; graft on restore |
+
+**Injection sketch (13.0):**
+
+```python
+cog_cost = (b_actions == b_a_imagined).astype(f32) * alive * (delta * K)
+b_pop = b_pop.replace(energy=jnp.clip(b_pop.energy - cog_cost, 0.0, 1.0))
+```
+
+Config target: `imagination_metabolic_delta: 0.0004–0.001` (total **0.002–0.005** per use at K=5).
 
 ### Phase 11.3 — **COMPLETE** (on `master`)
 
@@ -853,7 +889,9 @@ GPU-resident PPO — **`d4cf614` revert** on `master`.
 ### Explicit non-goals
 
 - ❌ Scout / alarm **reward shaping**
-- ❌ Ungated P11.2-style imagination override (`6cf965a` pattern) — use **11.3 epistemic gate** only
+- ❌ Ungated P11.2-style imagination override (`6cf965a`) without gate or metabolic cost
+- ❌ **EMA / scan-carry state** for epistemic gating (breaks checkpoint schema)
+- ❌ Phase 13 on `master` before red pincer decode passes
 - ❌ Re-merging **11.1 GPU rollouts** without memory refactor
 - ❌ Resume from ckpt **393** (post–Stay-collapse) for science runs
 
@@ -876,12 +914,12 @@ GPU-resident PPO — **`d4cf614` revert** on `master`.
 
 ### Cam reboot paste
 
-> You are **Cam**. Read `THRONG.md` §0b. **Phase 12 LIVE** on B200: `feature/phase12-red-coevolution` **`80ef1ea+`**, dual brain + **batch-relative epistemic gate** (`confidence_multiplier=1.0`), blue Stay **~19%**, **`red_codes_active=63/64`**, red wiretap. Red pincer: **`decode_signals.py --red`**. **`master`** = blue-only; **do not merge** P12 until red pincer passes. **Do not stop** live run.
+> You are **Cam**. Read `THRONG.md` §0b. **Phase 12 LIVE** on B200: `feature/phase12-red-coevolution` **`2cd3dcc` / `80ef1ea+`**. Dual brain + **spatial epistemic gate** (`confidence_multiplier=1.0`, ~50–60% imagine). Red wiretap **`signal_corpus_red.jsonl`** baking for **12.2 pincer decode** (~20k steps). Blue Stay **~19%**; `red_codes_active` **63/64**. **`decode_signals.py --red`** staged — run when corpus ready. **`master`** = blue-only; **do not merge** P12 until red χ² passes. **Phase 13 prep** in §11 — branch after decode. **Do not stop** live run. Horcrux: archive SYSTEM RESTORE.
 
-**New Cam:** §0b → §4 → §7 (red decode) → §11 → `docs/PHASE12_COEVOLUTION.md`.
+**New Cam:** §0b → §4 → §7 → §11 (P13 prep) → `docs/PHASE12_COEVOLUTION.md`.
 
-**New Will:** **`feature/phase12-red-coevolution`**; yaml **`red_comms` + `red_corpus` true**, **`confidence_multiplier: 1.0`**; no notebook `sed`; never `6cf965a`; never `red_comms_enabled: false` (ScopeParamShapeError).
+**New Will:** **`80ef1ea+`** on `feature/phase12-red-coevolution`; yaml **`red_comms` + `red_corpus` + `confidence_multiplier: 1.0`**; no `sed`; never `6cf965a`; no EMA in scan carry.
 
 ---
 
-*Last updated: 2026-05-31 — spatial epistemic gate `80ef1ea`; wiretap + red decode; branch `feature/phase12-red-coevolution`.*
+*Last updated: 2026-05-31 — Cam reboot @ `2cd3dcc`; spatial gate baking red corpus; Phase 13 prep in §11.*
