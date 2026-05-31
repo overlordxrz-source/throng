@@ -648,6 +648,49 @@ def _run_simulation_impl(
         abstract_tree = {"b_params": b_params, "r_params": r_params}
         try:
             restored = ckpt_mngr.restore(_ckpt_latest, items=abstract_tree)
+        except ValueError as exc:
+            msg = str(exc)
+            if "do not match" in msg:
+                print(
+                    "[JAX] Orbax strict match failed (schema evolution). "
+                    "Merging new heads manually...",
+                    flush=True,
+                )
+                from flax.core import freeze, unfreeze
+
+                raw_restored = ckpt_mngr.restore(_ckpt_latest)
+                target_dict = unfreeze(abstract_tree)
+                source_dict = unfreeze(raw_restored)
+                for agent_type in ("b_params", "r_params"):
+                    if agent_type not in source_dict or agent_type not in target_dict:
+                        continue
+                    src_agent = unfreeze(source_dict[agent_type])
+                    tgt_agent = unfreeze(target_dict[agent_type])
+                    for new_key in AUX_HEAD_KEYS:
+                        if new_key in tgt_agent and new_key not in src_agent:
+                            src_agent[new_key] = tgt_agent[new_key]
+                            print(
+                                f"[JAX] Injected randomly initialized {new_key} "
+                                f"into {agent_type}",
+                                flush=True,
+                            )
+                    source_dict[agent_type] = freeze(src_agent)
+                restored = freeze(source_dict)
+            elif "not compatible" in msg or "stored shape" in msg:
+                print(
+                    f"[JAX] Checkpoint step {_ckpt_latest} incompatible with current model "
+                    f"(architecture changed) — re-init from scratch.",
+                    flush=True,
+                )
+                print("[JAX] Delete old ckpts: rm -rf /mnt/throng-runs/checkpoints")
+                r_params = sanitize_agent_params(
+                    init_agent_params(model, keys[5], dummy_carry, dummy_obs, n_layers)
+                )
+                start_update = 0
+                restored = None
+            else:
+                raise
+        if restored is not None:
             b_params = sanitize_agent_params(
                 ensure_aux_head_params(
                     model, restored["b_params"], keys[3], hidden_d,
@@ -665,20 +708,6 @@ def _run_simulation_impl(
                 f"[JAX] Restored params from step {start_update}. Population starts fresh.",
                 flush=True,
             )
-        except ValueError as exc:
-            if "not compatible" in str(exc) or "stored shape" in str(exc):
-                print(
-                    f"[JAX] Checkpoint step {_ckpt_latest} incompatible with current model "
-                    f"(architecture changed) — re-init from scratch.",
-                    flush=True,
-                )
-                print("[JAX] Delete old ckpts: rm -rf /mnt/throng-runs/checkpoints")
-                r_params = sanitize_agent_params(
-                    init_agent_params(model, keys[5], dummy_carry, dummy_obs, n_layers)
-                )
-                start_update = 0
-            else:
-                raise
     else:
         print("[JAX] No checkpoint on volume — training from update 0.", flush=True)
         print(
