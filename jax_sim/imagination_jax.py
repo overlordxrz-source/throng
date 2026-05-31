@@ -1,9 +1,9 @@
 """
-jax_sim/imagination_jax.py — Phase 11.2 K-step mental rollout (inference only).
+jax_sim/imagination_jax.py — Phase 11.2 K-step mental rollout (metrics only).
 
 For each candidate action, roll carry forward K steps with frozen head_fwd_dyn_1/2,
-score discounted sum of head_value(carry_k), pick argmax. Runs outside lax.scan
-rollout as a separate JIT kernel vectorized over agents × actions.
+score discounted sum of head_value(carry_k). Returns dashboard metrics only —
+does NOT override stochastic action selection (PPO behavior policy unchanged).
 """
 
 from __future__ import annotations
@@ -22,7 +22,7 @@ def make_imagination_fn(
     K: int = 5,
     gamma: float = 0.999,
 ) -> Callable:
-    """Return jitted (params, carries, action_logits, alive) -> (actions, gain, agree)."""
+    """Return jitted (params, carries, action_logits, alive) -> (gain, agree)."""
 
     def _carry_dyn(params, carry, action_oh):
         return model.apply(
@@ -45,11 +45,11 @@ def make_imagination_fn(
         carries: jnp.ndarray,
         action_logits: jnp.ndarray,
         alive: jnp.ndarray,
-    ) -> Tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
+    ) -> Tuple[jnp.ndarray, jnp.ndarray]:
         """
-        params: frozen blue agent params (stop_gradient in sim_step).
-        carries: (N, hidden_dim) pre-action recurrent state.
-        Returns imagined actions, per-agent gain, per-agent agree (0/1).
+        Frozen carry-dynamics rollouts for telemetry only.
+        gain: best imagined return − greedy-action imagined return (per agent).
+        agree: 1 if imagined argmax == greedy argmax(logits), else 0.
         """
         n_agents = carries.shape[0]
         greedy = jnp.argmax(action_logits, axis=-1)
@@ -78,7 +78,6 @@ def make_imagination_fn(
         alive_f = alive.astype(jnp.float32)
         gain = gain * alive_f
         agree = agree * alive_f
-        imagined = jnp.where(alive, imagined, greedy)
-        return imagined, gain, agree
+        return gain, agree
 
     return imagine

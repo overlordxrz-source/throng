@@ -224,17 +224,17 @@ def make_sim_step(config: Dict, model: AgentNetworkJax, model_apply=None):
             signals=jnp.where(r_pop.alive[:, None], r_signal_out, 0.0)
         )
 
-        # ── Sample actions (blue: optional K-step imagination at inference) ──
+        # ── Sample actions (stochastic policy; imagination is metrics-only) ──
+        b_action_keys = jax.random.split(key_act, b_pop.max_pop)
         r_action_keys = jax.random.split(key_act, r_pop.max_pop)
+        b_actions = jax.vmap(jax.random.categorical)(b_action_keys, b_action_logits)
         r_actions = jax.vmap(jax.random.categorical)(r_action_keys, r_action_logits)
 
         if _imagine_fn is not None:
-            b_actions, b_im_gain, b_im_agree = _imagine_fn(
+            b_im_gain, b_im_agree = _imagine_fn(
                 b_params_sg, b_carries, b_action_logits, b_pop.alive
             )
         else:
-            b_action_keys = jax.random.split(key_act, b_pop.max_pop)
-            b_actions = jax.vmap(jax.random.categorical)(b_action_keys, b_action_logits)
             b_im_gain = jnp.zeros((b_pop.max_pop,), dtype=jnp.float32)
             b_im_agree = jnp.zeros((b_pop.max_pop,), dtype=jnp.float32)
 
@@ -627,7 +627,7 @@ def _run_simulation_impl(
         _ig = float(config.get("imagination_gamma", config.get("ppo_gamma", 0.999)))
         print(
             f"[JAX] Phase11.2 imagination: K={_ik} carry_dyn rollouts, γ={_ig} "
-            f"(inference only; frozen head_fwd_dyn)"
+            f"(metrics only — stochastic actions unchanged; frozen head_fwd_dyn)"
         )
     from jax_sim import observations_jax as _obs_mod
 

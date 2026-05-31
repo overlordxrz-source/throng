@@ -10,7 +10,7 @@
 
 ## 0b. Current state — 150k complete, Phase 11.2 imagination staging (May 2026)
 
-**Phase 10 + 11.0 complete.** B200 run finished **step 149504** (292 PPO updates). **`carry_fwd` locked ~0.0001**. Phase 11.1 GPU rollouts **abandoned** (`d4cf614` revert). **Active now:** **`feature/phase11-2-imagination`** — K=5 mental rollout at blue inference.
+**Phase 10 + 11.0 complete.** B200 run finished **step 149504** (292 PPO updates). **`carry_fwd` locked ~0.0001**. Phase 11.1 GPU rollouts **abandoned** (`d4cf614` revert). **Active now:** **`feature/phase11-2-imagination`** — K=5 mental rollout **metrics only** (stochastic actions unchanged).
 
 | P10.6 decode (`--min-step 63488`) | Value |
 |-----------------------------------|-------|
@@ -40,8 +40,9 @@
 
 | Item | Detail |
 |------|--------|
-| **What** | K=5 carry rollforward via frozen `head_fwd_dyn_1/2`; pick action maximizing Σ γ^k V(carry_k) |
-| **Where** | `jax_sim/imagination_jax.py` — JIT at blue action selection inside `sim_step` |
+| **What** | K=5 carry rollforward via frozen `head_fwd_dyn_1/2`; log gain/agree — **does not override actions** |
+| **Where** | `jax_sim/imagination_jax.py` — parallel JIT metrics inside `sim_step` |
+| **Actions** | Blues still **`categorical(logits)`** — PPO on-policy preserved |
 | **Frozen** | No retrain of `head_fwd_dyn`; PPO / rewards / VQ / ecology unchanged |
 | **Metrics** | `imagination_gain`, `imagination_agree` on dashboard |
 | **Merge gate** | B200 throughput **≥ 2 steps/sec** with imagination on (baseline ~6 off) |
@@ -142,7 +143,7 @@ Cam's persona + triad workflow live in Git so reboots recover identity:
 ```
 train_entry.run_simulation()  →  main_jax._run_simulation_impl()
   lax.scan(sim_step, T=512)   →  rollout on GPU
-  [11.2] imagine K=5 per blue action  →  frozen head_fwd_dyn + head_value (feature branch)
+  [11.2] imagine K=5 metrics only  →  frozen head_fwd_dyn + head_value (actions still stochastic)
   ppo_update (blue + red)     →  CPU rollout offload, minibatch 512
   auxiliary_update            →  loc_env MSE + carry_fwd MSE + self-prediction
 ```
