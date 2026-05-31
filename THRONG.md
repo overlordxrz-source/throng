@@ -72,10 +72,10 @@ Continuous comms verified → unguarded active imagination **failed** → **reso
 |------|--------|
 | **Problem** | P11.2 active override: imagined argmax always on → **Stay ≈ 99%** (solipsistic value exploitation) |
 | **Fix** | **9.1** `head_confidence_*` predicts carry_fwd MSE; **11.3** gates: low `conf_pred` → **imagined** (K=5), high → **reactive** sample |
-| **Probe** | `a_reactive ~ Categorical(logits)`; `conf_pred(carry_t, onehot(a_reactive))`; τ = **0.001** (P12.2 carry_fwd calibration; was 0.02) |
+| **Probe** | `a_reactive ~ Categorical(logits)`; `conf_pred(carry_t, onehot(a_reactive))`; **batch-relative** τ = `mean(conf|alive) × confidence_multiplier` (default **1.0**) |
 | **Telemetry** | Stay **~19%**; `conf_gate_imagine_frac` **65–80%**; PPO `log_probs` on **executed** action |
 | **Module** | [`jax_sim/imagination_jax.py`](jax_sim/imagination_jax.py) + `sim_step` in [`main_jax.py`](jax_sim/main_jax.py) |
-| **Config** | `phase9_canvas.imagination_gating_enabled`, `confidence_threshold`, `imagination_k`, `imagination_gamma` |
+| **Config** | `imagination_gating_enabled`, **`confidence_multiplier`** (1.0), `imagination_k`, `imagination_gamma` |
 
 **Victory condition met:** epistemic gate prevents P11.2 collapse while keeping imagination on the decision path.
 
@@ -234,7 +234,7 @@ Cam's persona + triad workflow live in Git so reboots recover identity:
 train_entry.run_simulation()  →  main_jax._run_simulation_impl()
   lax.scan(sim_step, T=512)   →  rollout on GPU
   NeighborCrossAttention (9.4) → 1 "Other" token
-  Phase 11.3 (blues): reactive sample → conf_pred probe → K=5 imagine if conf < τ
+  Phase 12.1 (blues): reactive sample → conf_pred → imagine if conf < mean(conf|alive)×mult
   executed_a → env + PPO log_probs (reactive policy, gated execution)
   ppo_update (blue + red)     →  CPU rollout offload, minibatch 512
   auxiliary_update            →  loc_env + carry_fwd + self-pred + conf (9.1)
@@ -282,7 +282,8 @@ train_entry.run_simulation()  →  main_jax._run_simulation_impl()
 | **11.3** | **Epistemic gate** ✅ | `465d8c6` | **Stay ~19%**; merged **`master`** |
 | **12.0** | **Red predator comms** | `f0ebb76` | `red_codes_active` **63/64**; dual brain **7 steps/sec** |
 | **12.1** | **Red corpus wiretap** | `d50cc19` / `4f98f96` | `signal_corpus_red.jsonl`; CPU post-rollout |
-| **12.2** | **Red decode + τ clamp** | `d493a50` | `--red` pincer χ²; `confidence_threshold: 0.001` |
+| **12.1b** | **Spatial epistemic gate** | (this commit) | Stateless batch-relative `confidence_multiplier` |
+| **12.2** | **Red decode** | `d493a50` | `--red` pincer χ² |
 
 **Recurring failure mode:** Blues stay at cap → ~99% survival → **`NB_GAIN↔surv: nan`** → no evolutionary pressure on neighbor-signal benefit.
 
@@ -292,7 +293,7 @@ train_entry.run_simulation()  →  main_jax._run_simulation_impl()
 
 ## 4. Current experiment — Phase **12** co-evolution (`feature/phase12-red-coevolution`)
 
-**Status:** B200 training **`4f98f96+`** toward **200k+**. **Blue:** full P11.3 stack (grafted ckpt). **Red:** `PredatorNetworkJax` 128-d + `red_codebook`. **~7 steps/sec**. **τ = 0.001** (epistemic gate recalibrated for carry_fwd).
+**Status:** B200 training **`4f98f96+`** toward **200k+**. **Blue:** full P11.3 stack (grafted ckpt). **Red:** `PredatorNetworkJax` 128-d + `red_codebook`. **~7 steps/sec**. **Epistemic gate:** batch-relative (`confidence_multiplier: 1.0`).
 
 **Verified healthy @ Phase 12 activation:**
 
@@ -300,10 +301,10 @@ train_entry.run_simulation()  →  main_jax._run_simulation_impl()
   Actions (blue): Stay ~19%
   Actions (red):  … (watch pincer — entropy ~1.58)
   RedVQ: loss=… | red_codes_active=63/64 | red_entropy=1.58
-  EpistemicGate: conf_gate_imagine_frac=65–80% (τ=0.001; K=5)
+  EpistemicGate: conf_gate_imagine_frac=~50–60% (mult=1.0 batch-relative; K=5)
   [JAX] Phase12 red comms: PredatorNetworkJax hidden=128 red_codebook …
   [JAX] Red corpus: signal_corpus_red.jsonl …
-  [JAX] Phase11.3 epistemic gate: conf_pred < 0.001 → imagined_action …
+  [JAX] Phase12.1 spatial epistemic gate: conf_pred < mean(conf|alive)*mult → imagined …
   [JAX] blue PPO minibatch 1/200 — H2D + backward...
 ```
 
@@ -312,7 +313,7 @@ train_entry.run_simulation()  →  main_jax._run_simulation_impl()
 ```bash
 cd /root/throng && git fetch origin && git checkout feature/phase12-red-coevolution && git pull   # → 4f98f96+
 # config_phase7.yaml already has:
-#   phase9_canvas.confidence_threshold: 0.001
+#   phase9_canvas.confidence_multiplier: 1.0
 #   phase12_coevolution.red_comms_enabled: true
 #   phase12_coevolution.red_corpus_enabled: true
 export TF_GPU_ALLOCATOR=cuda_malloc_async
@@ -719,7 +720,7 @@ python3 tools/decode_signals.py --red /mnt/throng-runs/signal_corpus_red.jsonl -
 | `red_floor` | Red repro floor from curriculum |
 | `imagination_gain` | Best imagined return − greedy imagined return (rollout telemetry) |
 | `imagination_agree` | % **imagined == reactive** (alive agents) |
-| `conf_gate_imagine_frac` | % agents with `conf_pred < τ` (imagine path) |
+| `conf_gate_imagine_frac` | % agents on imagine path (`conf_pred < dynamic τ`) |
 | `EpistemicGate:` | Dashboard line combining agree + gate fraction + τ, K |
 | `RedVQ:` / `red_codes_active` | Predator VQ loss + unique tokens / 64 |
 | `Actions (red):` | Red movement distribution (pincer signature) |
@@ -735,7 +736,7 @@ phase9_canvas:                 # master SOTA stack
   confidence_enabled: true
   confidence_coef: 0.05
   imagination_gating_enabled: true
-  confidence_threshold: 0.001   # P12.2 — carry_fwd calibration (was 0.02)
+  confidence_multiplier: 1.0    # batch-relative: imagine if conf < mean(conf|alive)*mult
   imagination_k: 5
   imagination_gamma: 0.999
 
@@ -826,7 +827,7 @@ phase12_coevolution:           # feature/phase12-red-coevolution
 
 ### Phase 12 — **LIVE** (`feature/phase12-red-coevolution`)
 
-1. **NOW** — B200 → **200k+**; monitor blue **Stay ~20%**, **`red_codes_active` ≥ 50/64**, `red_entropy`, `H2D + backward`, **`conf_gate_imagine_frac`** under **τ=0.001**.
+1. **NOW** — B200 → **200k+**; monitor blue **Stay ~20%**, **`red_codes_active` ≥ 50/64**, `red_entropy`, `H2D + backward`, **`conf_gate_imagine_frac`** ~50–60% with **mult=1.0**.
 2. **Accumulate red corpus** — wiretap on (`4f98f96+`) → `signal_corpus_red.jsonl` on volume.
 3. **Run pincer decode** — `python3 tools/decode_signals.py --red … --min-step <restart>`; hunt **RED VQ PINCER TEST** χ² **p < 0.05**.
 4. **Merge** to `master` only after red channel shows structure (mirror blue cardinal/LRT bar).
@@ -878,7 +879,7 @@ GPU-resident PPO — **`d4cf614` revert** on `master`.
 
 **New Cam:** §0b → §4 → §7 (red decode) → §11 → `docs/PHASE12_COEVOLUTION.md`.
 
-**New Will:** **`feature/phase12-red-coevolution` @ `4f98f96+`** only; yaml defaults **`red_comms` + `red_corpus` true**, **`confidence_threshold: 0.001`** — no notebook `sed`; never `6cf965a`; never `red_comms_enabled: false` on this branch (ScopeParamShapeError).
+**New Will:** **`feature/phase12-red-coevolution`**; yaml **`red_comms` + `red_corpus` true**, **`confidence_multiplier: 1.0`**; no notebook `sed`; never `6cf965a`; never `red_comms_enabled: false` (ScopeParamShapeError).
 
 ---
 

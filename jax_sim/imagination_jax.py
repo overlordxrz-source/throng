@@ -2,7 +2,7 @@
 jax_sim/imagination_jax.py — Phase 11.3 K-step mental rollout for epistemic gating.
 
 Rolls carry forward K steps with frozen head_fwd_dyn, scores discounted head_value(carry_k).
-Returns imagined argmax actions for gating (low conf_pred → imagined, high → reactive).
+Returns imagined argmax actions for gating (conf_pred below batch-relative τ → imagined).
 """
 
 from __future__ import annotations

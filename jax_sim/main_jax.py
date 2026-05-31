@@ -187,7 +187,7 @@ def make_sim_step(
     _n_layers = config["n_layers"]
     _p9 = config.get("phase9_canvas") or {}
     _img_gate_enabled = bool(_p9.get("imagination_gating_enabled", False))
-    _conf_thresh = float(_p9.get("confidence_threshold", 0.02))
+    _conf_multiplier = float(_p9.get("confidence_multiplier", 1.0))
     _imagination_k = int(_p9.get("imagination_k", 5))
     _imagination_gamma = float(
         _p9.get("imagination_gamma", config.get("ppo_gamma", 0.999))
@@ -260,9 +260,11 @@ def make_sim_step(
             b_a_imagined, b_im_gain, _b_im_agree_greedy = _imagine_fn(
                 b_params_sg, b_carries, b_action_logits, b_pop.alive
             )
-            b_gate_imagine = b_conf_pred < _conf_thresh
-            b_actions = jnp.where(b_gate_imagine, b_a_imagined, b_actions_reactive)
             b_alive_f = b_pop.alive.astype(jnp.float32)
+            mean_conf = jnp.sum(b_conf_pred * b_alive_f) / (jnp.sum(b_alive_f) + 1e-8)
+            dynamic_tau = mean_conf * _conf_multiplier
+            b_gate_imagine = b_conf_pred < dynamic_tau
+            b_actions = jnp.where(b_gate_imagine, b_a_imagined, b_actions_reactive)
             b_imagination_agree = (
                 (b_a_imagined == b_actions_reactive).astype(jnp.float32) * b_alive_f
             )
@@ -728,12 +730,12 @@ def _run_simulation_impl(
         )
     _img_gate = bool(_p9.get("imagination_gating_enabled", False))
     if _img_gate:
-        _tau = float(_p9.get("confidence_threshold", 0.02))
+        _mult = float(_p9.get("confidence_multiplier", 1.0))
         _ik = int(_p9.get("imagination_k", 5))
         _ig = float(_p9.get("imagination_gamma", config.get("ppo_gamma", 0.999)))
         print(
-            f"[JAX] Phase11.3 epistemic gate: conf_pred < {_tau} → imagined_action "
-            f"(reactive probe sample); else reactive | K={_ik} γ={_ig}"
+            f"[JAX] Phase12.1 spatial epistemic gate: conf_pred < mean(conf|alive)*{_mult} "
+            f"→ imagined_action (batch-relative, stateless); else reactive | K={_ik} γ={_ig}"
         )
     from jax_sim import observations_jax as _obs_mod
 
@@ -1459,11 +1461,11 @@ def _run_simulation_impl(
                     if _alive_roll.any():
                         im_agree_val = float(_im_a[_alive_roll].mean()) * 100.0
                         conf_gate_val = float(_cg[_alive_roll].mean()) * 100.0
-                _tau = float((_p9 or {}).get("confidence_threshold", 0.02))
+                _mult = float((_p9 or {}).get("confidence_multiplier", 1.0))
                 print(
                     f"  EpistemicGate: imagination_agree={im_agree_val:.1f}% "
                     f"| conf_gate_imagine_frac={conf_gate_val:.1f}% "
-                    f"(τ={_tau}; K={int((_p9 or {}).get('imagination_k', 5))})"
+                    f"(mult={_mult} batch-relative; K={int((_p9 or {}).get('imagination_k', 5))})"
                 )
             print(f"{'='*70}\n")
 

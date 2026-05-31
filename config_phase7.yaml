@@ -205,7 +205,7 @@ phase9_canvas:
   confidence_coef: 0.05
   # Phase 11.3 — epistemic imagination gating (feature/phase11-3-epistemic-gate)
   imagination_gating_enabled: true
-  confidence_threshold: 0.001
+  confidence_multiplier: 1.0   # batch-relative gate: imagine if conf < mean(conf|alive)*mult
   imagination_k: 5
   imagination_gamma: 0.999
 

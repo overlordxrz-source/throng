@@ -86,4 +86,4 @@ Blue decode unchanged: `python3 tools/decode_signals.py signal_corpus.jsonl`.
 
 On this branch, **`red_comms_enabled: true`** and **`red_corpus_enabled: true`** by default (128-d `r_params` + `signal_corpus_red.jsonl` wiretap). No notebook `sed` required. Blue decode stays on `signal_corpus.jsonl` only.
 
-**Epistemic gate (P12.2):** `phase9_canvas.confidence_threshold: 0.001` (carry_fwd calibration).
+**Epistemic gate (P12.1):** `phase9_canvas.confidence_multiplier: 1.0` — stateless batch-relative gate: `use_imagination = conf_pred < mean(conf|alive) * mult` (no EMA; scan carry unchanged).
