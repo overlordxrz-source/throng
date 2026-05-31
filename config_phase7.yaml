@@ -209,4 +209,10 @@ phase9_canvas:
   imagination_k: 5
   imagination_gamma: 0.999
 
+# Phase 12 — adversarial co-evolution (feature/phase12-red-coevolution; off on production P11.3)
+phase12_coevolution:
+  red_comms_enabled: false
+  red_cross_attn_enabled: true
+  red_vocab_size: 64
+
 exit_on_graduation: false

@@ -9,6 +9,9 @@ from jax_sim.grid_jax import GridState, get_local_patches, get_neighbour_signals
 from jax_sim.population_jax import PopState
 
 RED_SENSE_API_VERSION = 2
+# Phase 12: Red obs uses same flat layout; nb_sigs = K nearest *alive* agents on the pop
+# (caller passes r_pop → red–red wire only). Blues do not read red signals in this step.
+RED_NEIGHBOR_SIGNAL_API_VERSION = 1
 
 
 def _mask_loc_env_red_channel(
@@ -64,6 +67,7 @@ def build_observations_jax(
 
     own_state = jnp.stack([norm_age, mat_frac, energy, nl_norm, norm_x, norm_y], axis=1)
 
+    # Team-isolated by PopState: blues pass b_pop, reds pass r_pop (Phase 12 co-evolution).
     nb_sigs = get_neighbour_signals(
         pop.positions, pop.signals, pop.alive, K, gs,
     )

@@ -92,24 +92,26 @@ def dead_code_reset_codebook_params(
     z_e: jnp.ndarray,
     vocab_size: int,
     rng: jax.Array,
+    codebook_key: str = "codebook",
 ) -> Any:
     """
   Persist dead-code reset into the codebook embedding (runs after PPO on CPU/GPU).
 
   token_ids: (M,) int — tokens used in the rollout window (alive agents only).
   z_e: (M, signal_dim) matching encoder outputs for those rows.
+  codebook_key: ``codebook`` (blue) or ``red_codebook`` (Phase 12 predator).
     """
     if z_e.shape[0] == 0:
         return params
     flat = unfreeze(params)
-    cb = flat["codebook"]["embedding"]
+    cb = flat[codebook_key]["embedding"]
     usage = jnp.bincount(token_ids, length=vocab_size)
     dead_mask = usage == 0
     n_pool = z_e.shape[0]
     rand_idx = jax.random.randint(rng, (vocab_size,), 0, n_pool)
     replacement = jax.lax.stop_gradient(z_e[rand_idx])
-    flat["codebook"] = {
-        **flat["codebook"],
+    flat[codebook_key] = {
+        **flat[codebook_key],
         "embedding": jnp.where(dead_mask[:, None], replacement, cb),
     }
     # Match container type — optax Adam state must stay aligned with params tree.
@@ -366,6 +368,220 @@ class AgentNetworkJax(nn.Module):
     def value_from_carry(self, carry: jnp.ndarray) -> jnp.ndarray:
         """Latent value readout for K-step imagination (carry-only; frozen at inference)."""
         return self.head_value(carry).squeeze(-1)
+
+
+# Predator (Red) comms — separate codebook + cross-attn; no P11 aux / imagination heads.
+PREDATOR_GRAFT_TOP_KEYS = ("red_codebook", "red_nb_cross_attn")
+
+
+class PredatorNetworkJax(nn.Module):
+    """
+    Lean predator policy (Phase 12): VQ comms + optional red_nb_cross_attn.
+    No carry_fwd, confidence, or imagination heads — catch PPO forges language.
+    """
+
+    hidden_dim: int = 128
+    neighbor_k: int = 6
+    local_obs_radius: int = 2
+    n_heads: int = 4
+    n_layers: int = 4
+    signal_dim: int = 32
+    symbol_dim: int = 16
+    vocab_size: int = 64
+    vq_beta: float = 0.25
+    vq_dead_code_reset: bool = True
+    max_layers: int = 6
+    memory_slots: int = 0
+    cross_attn_enabled: bool = True
+    cross_attn_num_heads: int = 4
+
+    def setup(self):
+        d = self.hidden_dim
+        sym_d = self.symbol_dim
+        K = self.neighbor_k
+        W = (2 * self.local_obs_radius + 1) ** 2
+
+        self.emb_own = nn.Dense(d)
+        self.emb_nb = nn.Dense(d)
+        self.emb_sym = nn.Dense(d)
+        self.emb_env = nn.Dense(d)
+        self.emb_sig = nn.Dense(d)
+        self.emb_mem = nn.Dense(d)
+        self.emb_cult = nn.Dense(d)
+        self.pos_enc = nn.Embed(num_embeddings=256, features=d)
+        self.blocks = [
+            TransformerBlock(d, self.n_heads) for _ in range(self.max_layers)
+        ]
+        self.final_norm = nn.LayerNorm()
+        self.head_action = nn.Dense(5)
+        self.head_signal = nn.Dense(self.signal_dim)
+        self.red_codebook = nn.Embed(self.vocab_size, self.signal_dim)
+        self.head_symbol = nn.Dense(sym_d)
+        self.head_value = nn.Dense(
+            1,
+            kernel_init=nn.initializers.normal(0.01),
+            bias_init=nn.initializers.zeros,
+        )
+        self.head_tom = nn.Dense(5)
+        self.head_culture_fast = nn.Dense(sym_d)
+        self.head_culture_slow = nn.Dense(sym_d)
+        if self.cross_attn_enabled:
+            self.red_nb_cross_attn = NeighborCrossAttention(
+                hidden_dim=d,
+                num_heads=self.cross_attn_num_heads,
+            )
+
+    def __call__(
+        self,
+        carries: jnp.ndarray,
+        obs: jnp.ndarray,
+        n_layers: int,
+        nb_gain: Optional[jnp.ndarray] = None,
+        detach_value: bool = False,
+    ) -> Tuple[jnp.ndarray, Tuple]:
+        del nb_gain
+        N = obs.shape[0]
+        sym_d = self.symbol_dim
+        K = self.neighbor_k
+        W = (2 * self.local_obs_radius + 1) ** 2
+
+        own_state = obs[:, :6]
+        nb_sigs = obs[:, 6 : 6 + K * self.signal_dim].reshape(N, K, self.signal_dim)
+        loc_sym = obs[:, 6 + K * self.signal_dim : 6 + K * self.signal_dim + W * sym_d].reshape(
+            N, W, sym_d
+        )
+        env_ch = 8
+        loc_env = obs[
+            :,
+            6 + K * self.signal_dim + W * sym_d : 6 + K * self.signal_dim + W * sym_d + W * env_ch,
+        ].reshape(N, W, env_ch)
+        own_sig = obs[
+            :,
+            6
+            + K * self.signal_dim
+            + W * sym_d
+            + W * env_ch : 6
+            + K * self.signal_dim
+            + W * sym_d
+            + W * env_ch
+            + self.signal_dim,
+        ]
+
+        idx = 6 + K * self.signal_dim + W * sym_d + W * env_ch + self.signal_dim
+        if self.memory_slots > 0:
+            mem = obs[:, idx : idx + self.memory_slots * (self.signal_dim + 2)].reshape(
+                N, self.memory_slots, self.signal_dim + 2
+            )
+            idx += self.memory_slots * (self.signal_dim + 2)
+        else:
+            mem = None
+
+        loc_cult_fast = obs[:, idx : idx + W * sym_d].reshape(N, W, sym_d)
+        idx += W * sym_d
+        loc_cult_slow = obs[:, idx : idx + W * sym_d].reshape(N, W, sym_d)
+
+        self_encoded = self.emb_own(own_state)
+        t1 = self_encoded[:, None, :]
+        nb_kv = self.emb_nb(nb_sigs)
+        if self.cross_attn_enabled:
+            processed = self.red_nb_cross_attn(self_encoded, carries, nb_kv)
+            t2 = processed[:, None, :]
+        else:
+            t2 = nb_kv
+        t3 = self.emb_sym(loc_sym)
+        t4 = self.emb_env(loc_env)
+        t5 = self.emb_sig(own_sig)[:, None, :]
+        tokens = [t1, t2, t3, t4, t5]
+        if mem is not None:
+            tokens.append(self.emb_mem(mem))
+        tokens.append(self.emb_cult(loc_cult_fast))
+        tokens.append(self.emb_cult(loc_cult_slow))
+
+        x = jnp.concatenate(tokens, axis=1)
+        T = x.shape[1]
+        pos_ids = jnp.arange(T)
+        x = x + self.pos_enc(pos_ids)[None, :, :]
+        x = x + carries[:, None, :]
+
+        for i in range(n_layers):
+            x = self.blocks[i](x)
+
+        pooled = self.final_norm(x.mean(axis=1))
+        new_carries = 0.9 * carries + 0.1 * pooled
+
+        value_input = jax.lax.stop_gradient(pooled) if detach_value else pooled
+
+        action_logits = self.head_action(pooled) / 2.0
+        z_e = self.head_signal(pooled)
+        codebook_w = self.red_codebook.embedding
+        signal_out, token_ids, loss_vq = vector_quantize_signals(
+            z_e,
+            codebook_w,
+            beta=self.vq_beta,
+            dead_code_reset=self.vq_dead_code_reset,
+        )
+        symbol_write = self.head_symbol(pooled)
+        values = self.head_value(value_input).squeeze(-1)
+        tom_logits = self.head_tom(pooled)[:, None, :]
+        tom_logits = jnp.broadcast_to(tom_logits, (N, K, 5))
+        culture_fast = self.head_culture_fast(pooled)
+        culture_slow = self.head_culture_slow(pooled)
+
+        return new_carries, (
+            action_logits,
+            signal_out,
+            symbol_write,
+            values,
+            tom_logits,
+            token_ids,
+            loss_vq,
+            z_e,
+            culture_fast,
+            culture_slow,
+        )
+
+
+def init_predator_params(
+    model: PredatorNetworkJax,
+    rng: jax.Array,
+    carry: jnp.ndarray,
+    obs: jnp.ndarray,
+    n_layers: int,
+) -> Any:
+    return sanitize_agent_params(model.init(rng, carry, obs, n_layers)["params"])
+
+
+def ensure_predator_params(
+    model: PredatorNetworkJax,
+    params: Any,
+    rng: jax.Array,
+    hidden_dim: int,
+    obs_dim: int,
+    n_layers: int,
+) -> Any:
+    """Fill missing red_codebook / red_nb_cross_attn when resuming older predator ckpts."""
+    flat = unfreeze(params)
+    needs_codebook = "red_codebook" not in flat or (
+        "head_signal" in flat
+        and flat["head_signal"]["kernel"].shape[-1] != model.signal_dim
+    )
+    needs_cross = bool(
+        getattr(model, "cross_attn_enabled", False) and "red_nb_cross_attn" not in flat
+    )
+    if not needs_codebook and not needs_cross:
+        return params
+    carry = jnp.zeros((1, hidden_dim))
+    obs = jnp.zeros((1, obs_dim))
+    fresh = model.init(rng, carry, obs, n_layers)["params"]
+    fresh_flat = unfreeze(fresh)
+    if needs_codebook:
+        for k in ("red_codebook", "head_signal"):
+            flat[k] = fresh_flat[k]
+        print("[JAX] Merged fresh red_codebook + head_signal into predator params")
+    if needs_cross and "red_nb_cross_attn" in fresh_flat:
+        flat["red_nb_cross_attn"] = fresh_flat["red_nb_cross_attn"]
+        print("[JAX] Merged fresh red_nb_cross_attn (Phase 12) into predator params")
+    return sanitize_agent_params(freeze(flat))
 
 
 def init_agent_params(

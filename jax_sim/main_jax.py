@@ -45,17 +45,24 @@ from jax_sim.population_jax import (
 from jax_sim.network_jax import (
     AgentNetworkJax,
     AUX_HEAD_KEYS,
+    PredatorNetworkJax,
     ensure_aux_head_params,
+    ensure_predator_params,
     graft_missing_param_subtrees,
     dead_code_reset_codebook_params,
     init_agent_params,
+    init_predator_params,
     make_model_apply,
     params_apply_variables,
     sanitize_agent_params,
 )
 from jax_sim.rl_jax import compute_gae, ppo_loss, create_optimizer, ppo_update, auxiliary_update
 from agents.network_torch import compute_obs_dim_torch, compute_fwd_env_dim, loc_env_flat_bounds
-from jax_sim.observations_jax import RED_SENSE_API_VERSION, build_observations_jax
+from jax_sim.observations_jax import (
+    RED_NEIGHBOR_SIGNAL_API_VERSION,
+    RED_SENSE_API_VERSION,
+    build_observations_jax,
+)
 
 
 # ── Config defaults ─────────────────────────────────────────────────────────
@@ -132,11 +139,17 @@ def _rollout_to_cpu(rollout_data: Dict) -> Dict:
 
 # ── Single simulation step (for scan) ──────────────────────────────────────
 
-def make_sim_step(config: Dict, model: AgentNetworkJax, model_apply=None):
+def make_sim_step(
+    config: Dict,
+    model: AgentNetworkJax,
+    model_apply=None,
+    r_model_apply=None,
+):
     """Factory: returns a jittable step function.
     Params are passed through carry to avoid stale closure capture."""
     if model_apply is None:
         model_apply = make_model_apply(model)
+    _r_apply = r_model_apply if r_model_apply is not None else model_apply
     gs = config["grid_size"]
     K = config["neighbor_k"]
     r = config["local_obs_radius"]
@@ -215,7 +228,7 @@ def make_sim_step(config: Dict, model: AgentNetworkJax, model_apply=None):
 
         # ── Forward passes ──────────────────────────────────────
         b_new_c, b_outs = model_apply(b_params_sg, b_carries, b_obs, _n_layers)
-        r_new_c, r_outs = model_apply(r_params_sg, r_carries, r_obs, _n_layers)
+        r_new_c, r_outs = _r_apply(r_params_sg, r_carries, r_obs, _n_layers)
 
         b_action_logits, b_signal_out, b_sym_w, b_vals, b_tom, b_token_ids, b_loss_vq, b_z_e, b_cult_f, b_cult_s = b_outs
         r_action_logits, r_signal_out, r_sym_w, r_vals, r_tom, r_token_ids, r_loss_vq, r_z_e, r_cult_f, r_cult_s = r_outs
@@ -586,8 +599,13 @@ def _run_simulation_impl(
     _red_stages = list(config.get("red_curriculum_stages", [80, 150, 200, 250]))
     _red_start_n = int(config.get("min_red_population", _red_stages[0]))
     _red_start_n = min(_red_start_n, max_pop_red)
+    _p12 = config.get("phase12_coevolution") or {}
+    _red_comms = bool(_p12.get("red_comms_enabled", False))
+    red_hidden_d = int(config.get("red_hidden_dim", hidden_d // 2))
+    r_pop_hidden = red_hidden_d if _red_comms else hidden_d
+
     r_pop = init_population(
-        max_pop_red, hidden_d, config["signal_dim"], gs, team_id=1,
+        max_pop_red, r_pop_hidden, config["signal_dim"], gs, team_id=1,
         key=keys[2], n_agents=_red_start_n, memory_slots=config.get("memory_slots", 0),
     )
 
@@ -599,6 +617,8 @@ def _run_simulation_impl(
     _cross_heads = int(_p9.get("cross_attn_num_heads", config["n_heads"]))
     _conf_enabled = bool(_p9.get("confidence_enabled", False))
     _conf_coef = float(_p9.get("confidence_coef", 0.05)) if _conf_enabled else 0.0
+    _red_cross = bool(_p12.get("red_cross_attn_enabled", True)) if _red_comms else False
+    _red_vocab = int(_p12.get("red_vocab_size", config.get("vocab_size", 64)))
     model = AgentNetworkJax(
         hidden_dim=hidden_d,
         n_heads=config["n_heads"],
@@ -615,6 +635,25 @@ def _run_simulation_impl(
         cross_attn_num_heads=_cross_heads,
     )
     model_apply = make_model_apply(model)
+    model_red = None
+    r_model_apply = None
+    if _red_comms:
+        model_red = PredatorNetworkJax(
+            hidden_dim=red_hidden_d,
+            neighbor_k=config["neighbor_k"],
+            local_obs_radius=config["local_obs_radius"],
+            n_heads=config["n_heads"],
+            n_layers=n_layers,
+            signal_dim=config["signal_dim"],
+            symbol_dim=config["symbol_dim"],
+            vocab_size=_red_vocab,
+            vq_beta=float(config.get("vq_beta", 0.25)),
+            vq_dead_code_reset=bool(config.get("vq_dead_code_reset", True)),
+            memory_slots=config.get("memory_slots", 0),
+            cross_attn_enabled=_red_cross,
+            cross_attn_num_heads=_cross_heads,
+        )
+        r_model_apply = make_model_apply(model_red)
 
     # Compute exact obs_dim and init model
     obs_dim = compute_obs_dim_torch(config)
@@ -682,6 +721,12 @@ def _run_simulation_impl(
             "Run: cd /root/throng && git fetch origin && git reset --hard origin/master"
         )
     print(f"[JAX] red_sense_api=v{RED_SENSE_API_VERSION} (observations_jax)")
+    if _red_comms:
+        print(
+            f"[JAX] Phase12 red comms: PredatorNetworkJax hidden={red_hidden_d} "
+            f"red_codebook vocab={_red_vocab} cross_attn={_red_cross} "
+            f"heads={_cross_heads} | red_neighbor_api=v{RED_NEIGHBOR_SIGNAL_API_VERSION}"
+        )
 
     # ── Red curriculum state ─────────────────────────────────
     red_curriculum_stages = list(config.get("red_curriculum_stages", [6, 15, 30, 75]))
@@ -697,6 +742,7 @@ def _run_simulation_impl(
 
     dummy_obs = jnp.zeros((1, obs_dim))
     dummy_carry = jnp.zeros((1, hidden_d))
+    dummy_carry_red = jnp.zeros((1, r_pop_hidden))
     _ckpt_latest = ckpt_mngr.latest_step()
     start_update = 0
     if _ckpt_latest is not None:
@@ -712,10 +758,25 @@ def _run_simulation_impl(
         b_params = sanitize_agent_params(
             init_agent_params(model, keys[3], dummy_carry, dummy_obs, n_layers)
         )
-        # Same architecture as blue; restore overwrites — skip 2nd full model.init compile.
-        r_params = jax.tree_util.tree_map(jnp.copy, b_params)
-        print("[JAX] model.init done — restoring checkpoint weights...", flush=True)
-        abstract_tree = {"b_params": b_params, "r_params": r_params}
+        if _red_comms:
+            r_params = sanitize_agent_params(
+                init_predator_params(
+                    model_red, keys[5], dummy_carry_red, dummy_obs, n_layers
+                )
+            )
+            print(
+                "[JAX] model.init done (blue template + fresh predator) — "
+                "restoring checkpoint...",
+                flush=True,
+            )
+        else:
+            r_params = jax.tree_util.tree_map(jnp.copy, b_params)
+            print("[JAX] model.init done — restoring checkpoint weights...", flush=True)
+        abstract_tree = (
+            {"b_params": b_params}
+            if _red_comms
+            else {"b_params": b_params, "r_params": r_params}
+        )
         try:
             restored = ckpt_mngr.restore(_ckpt_latest, items=abstract_tree)
         except ValueError as exc:
@@ -731,7 +792,8 @@ def _run_simulation_impl(
                 raw_restored = ckpt_mngr.restore(_ckpt_latest)
                 target_dict = unfreeze(abstract_tree)
                 source_dict = unfreeze(raw_restored)
-                for agent_type in ("b_params", "r_params"):
+                _restore_agents = ("b_params",) if _red_comms else ("b_params", "r_params")
+                for agent_type in _restore_agents:
                     if agent_type not in source_dict or agent_type not in target_dict:
                         continue
                     src_agent = unfreeze(source_dict[agent_type])
@@ -752,9 +814,16 @@ def _run_simulation_impl(
                     flush=True,
                 )
                 print("[JAX] Delete old ckpts: rm -rf /mnt/throng-runs/checkpoints")
-                r_params = sanitize_agent_params(
-                    init_agent_params(model, keys[5], dummy_carry, dummy_obs, n_layers)
-                )
+                if _red_comms:
+                    r_params = sanitize_agent_params(
+                        init_predator_params(
+                            model_red, keys[5], dummy_carry_red, dummy_obs, n_layers
+                        )
+                    )
+                else:
+                    r_params = sanitize_agent_params(
+                        init_agent_params(model, keys[5], dummy_carry, dummy_obs, n_layers)
+                    )
                 start_update = 0
                 restored = None
             else:
@@ -766,12 +835,24 @@ def _run_simulation_impl(
                     obs_dim=obs_dim, n_layers=n_layers,
                 )
             )
-            r_params = sanitize_agent_params(
-                ensure_aux_head_params(
-                    model, restored["r_params"], keys[5], hidden_d,
-                    obs_dim=obs_dim, n_layers=n_layers,
+            if _red_comms:
+                r_params = sanitize_agent_params(
+                    init_predator_params(
+                        model_red, keys[5], dummy_carry_red, dummy_obs, n_layers
+                    )
                 )
-            )
+                print(
+                    "[JAX] Phase 12: b_params from checkpoint; r_params fresh "
+                    "(predator comms — not loading legacy shared r_params)",
+                    flush=True,
+                )
+            else:
+                r_params = sanitize_agent_params(
+                    ensure_aux_head_params(
+                        model, restored["r_params"], keys[5], hidden_d,
+                        obs_dim=obs_dim, n_layers=n_layers,
+                    )
+                )
             start_update = int(_ckpt_latest)
             print(
                 f"[JAX] Restored params from step {start_update}. Population starts fresh.",
@@ -787,10 +868,18 @@ def _run_simulation_impl(
         b_params = sanitize_agent_params(
             init_agent_params(model, keys[3], dummy_carry, dummy_obs, n_layers)
         )
-        r_params = sanitize_agent_params(
-            init_agent_params(model, keys[5], dummy_carry, dummy_obs, n_layers)
-        )
-        print("[JAX] model.init done (blue + red).", flush=True)
+        if _red_comms:
+            r_params = sanitize_agent_params(
+                init_predator_params(
+                    model_red, keys[5], dummy_carry_red, dummy_obs, n_layers
+                )
+            )
+            print("[JAX] model.init done (blue + fresh predator).", flush=True)
+        else:
+            r_params = sanitize_agent_params(
+                init_agent_params(model, keys[5], dummy_carry, dummy_obs, n_layers)
+            )
+            print("[JAX] model.init done (blue + red).", flush=True)
     from flax.core import unfreeze as _unfreeze_params
     _bp = _unfreeze_params(b_params)
     _emb_ok = "kernel" in _bp.get("emb_own", {})
@@ -862,7 +951,7 @@ def _run_simulation_impl(
 
     # ── Carries ─────────────────────────────────────────────
     b_carries = jnp.zeros((max_pop, hidden_d))
-    r_carries = jnp.zeros((max_pop_red, hidden_d))
+    r_carries = jnp.zeros((max_pop_red, r_pop_hidden))
 
     # ── Training loop ───────────────────────────────────────
     n_updates = n_steps // T
@@ -890,7 +979,12 @@ def _run_simulation_impl(
     def _rebuild_sim_step(cur_n_layers):
         cfg_copy = dict(config)
         cfg_copy["n_layers"] = cur_n_layers
-        return make_sim_step(cfg_copy, model, model_apply)
+        return make_sim_step(
+            cfg_copy,
+            model,
+            model_apply,
+            r_model_apply=r_model_apply if _red_comms else None,
+        )
 
     sim_step_fn = _rebuild_sim_step(n_layers)
     if use_pmap:
@@ -1073,8 +1167,9 @@ def _run_simulation_impl(
         _r_obs_np = np.asarray(r_batch["obs"])
         _r_alive_np   = np.asarray(r_batch["alive"]) if "alive" in r_batch else None
         _t_rppo0 = __import__("time").time()
+        _r_ppo_apply = r_model_apply if _red_comms else model_apply
         r_params, r_opt_state, r_metrics = ppo_update(
-            r_params, r_opt_state, r_optimizer, model_apply,
+            r_params, r_opt_state, r_optimizer, _r_ppo_apply,
             r_batch, n_layers, update_key,
             clip_eps=float(config.get("ppo_clip_eps", config.get("ppo_clip", 0.2))),
             vf_coef=float(config.get("ppo_value_coef", 0.25)),
@@ -1090,33 +1185,41 @@ def _run_simulation_impl(
                 f"  [JAX] Red PPO done in {__import__('time').time() - _t_rppo0:.1f}s",
                 flush=True,
             )
-        fwd_key, update_key = jax.random.split(update_key)
-        r_params, r_opt_state, r_fwd_loss, r_carry_fwd_loss, r_sp_loss, r_sp_acc, r_conf_loss, r_conf_pred = auxiliary_update(
-            r_params, r_opt_state, r_optimizer, r_aux_apply_fn,
-            _r_carries_np, _r_actions_np, _r_obs_np,
-            _loc_env_start, _loc_env_end,
-            _r_alive_np, fwd_key, minibatch_size=_fwd_mb,
-            fwd_coef=_fwd_coef, carry_fwd_coef=_carry_fwd_coef,
-            self_pred_coef=_self_pred_coef, conf_coef=_conf_coef,
-        )
-        r_metrics["fwd_loss"] = r_fwd_loss
-        r_metrics["carry_fwd_loss"] = r_carry_fwd_loss
-        r_metrics["sp_acc"]   = r_sp_acc
-        r_metrics["conf_loss"] = r_conf_loss
-        r_metrics["conf_pred"] = r_conf_pred
+        if not _red_comms:
+            fwd_key, update_key = jax.random.split(update_key)
+            r_params, r_opt_state, r_fwd_loss, r_carry_fwd_loss, r_sp_loss, r_sp_acc, r_conf_loss, r_conf_pred = auxiliary_update(
+                r_params, r_opt_state, r_optimizer, r_aux_apply_fn,
+                _r_carries_np, _r_actions_np, _r_obs_np,
+                _loc_env_start, _loc_env_end,
+                _r_alive_np, fwd_key, minibatch_size=_fwd_mb,
+                fwd_coef=_fwd_coef, carry_fwd_coef=_carry_fwd_coef,
+                self_pred_coef=_self_pred_coef, conf_coef=_conf_coef,
+            )
+            r_metrics["fwd_loss"] = r_fwd_loss
+            r_metrics["carry_fwd_loss"] = r_carry_fwd_loss
+            r_metrics["sp_acc"] = r_sp_acc
+            r_metrics["conf_loss"] = r_conf_loss
+            r_metrics["conf_pred"] = r_conf_pred
 
         if config.get("vq_dead_code_reset", True) and "z_e" in r_batch:
             _dc_key, update_key = jax.random.split(update_key)
             _tok = jnp.asarray(r_batch["token_ids"]).reshape(-1)
             _ze = jnp.asarray(r_batch["z_e"]).reshape(-1, int(config["signal_dim"]))
             _alive = jnp.asarray(r_batch["alive"]).reshape(-1).astype(bool)
+            _r_vocab = _red_vocab if _red_comms else int(config["vocab_size"])
+            _cb_key = "red_codebook" if _red_comms else "codebook"
             r_params = dead_code_reset_codebook_params(
                 r_params,
                 _tok[_alive],
                 _ze[_alive],
-                int(config["vocab_size"]),
+                _r_vocab,
                 _dc_key,
+                codebook_key=_cb_key,
             )
+            if _red_comms:
+                r_params = ensure_predator_params(
+                    model_red, r_params, _dc_key, red_hidden_d, obs_dim, n_layers
+                )
 
         # ── Brain Vote (capacity-based, runs after PPO) ──────────
         _bv_ent = float(b_metrics.get('ppo_entropy', 0)) if isinstance(b_metrics, dict) else 0
@@ -1187,6 +1290,29 @@ def _run_simulation_impl(
                 act_str = f"N={act_pct[1]:.0f}% S={act_pct[2]:.0f}% E={act_pct[3]:.0f}% W={act_pct[4]:.0f}% Stay={act_pct[0]:.0f}%"
             else:
                 act_str = "no alive agents"
+
+            red_act_str = "N/A"
+            red_codes_str = "N/A"
+            r_alive_mask_final = np.array(r_pop.alive) if r_pop is not None else np.zeros(0, dtype=bool)
+            if "actions" in rollout_data["red"]:
+                r_act_all = np.array(rollout_data["red"]["actions"])
+                r_alive_all = np.array(rollout_data["red"]["alive"]).astype(bool)
+                r_alive_actions = r_act_all[r_alive_all]
+                if len(r_alive_actions) > 0:
+                    r_counts = np.bincount(r_alive_actions, minlength=5)
+                    r_pct = r_counts / r_counts.sum() * 100
+                    red_act_str = (
+                        f"N={r_pct[1]:.0f}% S={r_pct[2]:.0f}% E={r_pct[3]:.0f}% "
+                        f"W={r_pct[4]:.0f}% Stay={r_pct[0]:.0f}%"
+                    )
+                else:
+                    red_act_str = "no alive reds"
+            if _red_comms and "token_ids" in rollout_data["red"]:
+                r_tok_last = np.array(rollout_data["red"]["token_ids"])[-1]
+                if r_alive_mask_final.sum() > 0:
+                    red_codes_str = (
+                        f"{len(np.unique(r_tok_last[r_alive_mask_final]))}/{_red_vocab}"
+                    )
             
             # Energy stats
             alive_mask_final = b_pop_np.alive
@@ -1243,7 +1369,15 @@ def _run_simulation_impl(
             # Print concise dashboard
             print(f"\n{'='*70}")
             print(f"[step {step_val:>7}] {steps_sec:.0f} steps/sec | blue={b_alive_now} red={r_alive_now} | ppo={ui+1}")
-            print(f"  Actions: {act_str}")
+            print(f"  Actions (blue): {act_str}")
+            if _red_comms:
+                red_vq_val = float(r_metrics.get("ppo_vq_loss", float("nan")))
+                red_ent_val = float(r_metrics.get("ppo_entropy", float("nan")))
+                print(f"  Actions (red):  {red_act_str}")
+                print(
+                    f"  RedVQ: loss={red_vq_val:.4f} | red_codes_active={red_codes_str} "
+                    f"| red_entropy={red_ent_val:.4f}"
+                )
             print(f"  Energy:  mean={e_mean:.3f} std={e_std:.3f} | Age: mean={age_mean:.0f} max={age_max:.0f}")
             vf_loss = float(b_metrics.get('ppo_vf_loss', 0)) if isinstance(b_metrics, dict) else 0
             ent_val = float(b_metrics.get('ppo_entropy', 0)) if isinstance(b_metrics, dict) else 0
