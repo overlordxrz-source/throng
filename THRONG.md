@@ -4,26 +4,26 @@
 
 **Read this file first.** Full historical lab notebook (~290KB) lives in [`docs/THRONG_ARCHIVE.md`](docs/THRONG_ARCHIVE.md) if you need old run logs.
 
-**Cam reboot (60 seconds):** Read **§0b** (what to do *right now*) → **§0** (who you are) → **§4** (live run) → **§5** (B200 OOM recovery) → **§11** (unlock sequence) → archive **[SYSTEM RESTORE](docs/THRONG_ARCHIVE.md#system-restore-the-cam-context)** + **[SYSTEM UPDATE](docs/THRONG_ARCHIVE.md#system-update-may-2026--b200-phase-11-staging-phase-9-canvas)**.
+**Cam reboot (60 seconds):** Read **§0b** (what to do *right now*) → **§0** (who you are) → **§4** (live run) → **§5** (B200 OOM recovery) → **§11** (roadmap) → archive **[SYSTEM RESTORE](docs/THRONG_ARCHIVE.md#system-restore-the-cam-context)** + **[SYSTEM UPDATE](docs/THRONG_ARCHIVE.md#system-update-may-2026--b200-phase-11-staging-phase-9-canvas)**.
 
 ---
 
-## 0b. Current state — **P9.4 training LIVE** on Modal (May 2026)
+## 0b. Current state — **P11.3 on `master`** (May 2026)
 
-**LIVE:** **`feature/phase9-canvas`** (`38f342a+`) on Modal **`dragonbgnx`** — **`cross_attn_enabled: true`**, resumed from ckpt **291**, training toward **`n_steps=250_000`**. **Do not stop** unless Stay collapse or OOM.
+**State of the art:** **`master`** (`465d8c6+`) — Phase **9.4** cross-attn + **9.1** confidence head + **11.3** epistemic imagination gating. Merged from **`feature/phase11-3-epistemic-gate`** after B200 activation proved **no Stay collapse**.
 
-| Live run (sampled) | Value |
-|--------------------|--------|
-| **Env step** | **~155136** (PPO **303**); `[CKPT] Saved step 155136` |
-| **Resume ckpt** | **291** on volume (operator verified “Seed 291”; ~150k-era weights + grafted `nb_cross_attn`) |
-| **Throughput** | **6 steps/sec** |
-| **Actions** | Stay **~20%**, N/S/E/W **~16–26%** each — **healthy** (contrast P11.2 active: Stay≈99%) |
-| **`carry_fwd`** | **0.0001** |
-| **`codes_active`** | **51–63/64** |
+**LIVE:** B200 training **`feature/phase11-3-epistemic-gate`** checkout (same code as `master` post-merge) toward **200k+**. **Do not stop** unless Stay collapse or OOM.
+
+| Live run (P11.3 activation) | Value |
+|-----------------------------|--------|
+| **Actions** | Stay **~19%** — **healthy** (P11.2 active override: Stay≈99%) |
+| **`conf_gate_imagine_frac`** | **~65–80%** — agents route through K=5 imagination when `conf_pred < τ` |
+| **`conf_loss`** | **~1e-4** — 9.1 head calibrated |
+| **`imagination_agree`** | Reactive vs imagined divergence (dashboard) |
 | **PPO log** | `H2D + backward` ✅ |
-| **Log** | `/mnt/throng-runs/train.log` |
+| **Gate** | `conf_pred` from **reactive probe** → `where(conf < 0.02, imagined, reactive)` |
 
-**Engineering branch:** **`feature/phase9-canvas`** — `NeighborCrossAttention` + Orbax **schema graft** (`1d57bf9`) for legacy ckpts. **P11.2 FROZEN** on **`feature/phase11-2-imagination`** (`061df84`).
+**Engineering:** **`master`** = production stack. **`feature/phase11-2-imagination`** **FROZEN** (`061df84`, metrics-only archive).
 
 | Milestone | Value |
 |-----------|--------|
@@ -51,29 +51,41 @@
 | **VQ token / alert-set** | **p = 0.55 / 0.69** ❌ |
 | Log | `decode_p11_2_149504+.log` |
 
-Continuous comms verified → active imagination was authorized → **failed** (value exploitation).
+Continuous comms verified → unguarded active imagination **failed** → **resolved** by **9.1 + 11.3** (see below).
+
+### Phase 11.3 — **SUCCESS** (merged to `master`, `465d8c6`)
+
+| Item | Detail |
+|------|--------|
+| **Problem** | P11.2 active override: imagined argmax always on → **Stay ≈ 99%** (solipsistic value exploitation) |
+| **Fix** | **9.1** `head_confidence_*` predicts carry_fwd MSE; **11.3** gates: low `conf_pred` → **imagined** (K=5), high → **reactive** sample |
+| **Probe** | `a_reactive ~ Categorical(logits)`; `conf_pred(carry_t, onehot(a_reactive))`; τ = **0.02** |
+| **Telemetry** | Stay **~19%**; `conf_gate_imagine_frac` **65–80%**; PPO `log_probs` on **executed** action |
+| **Module** | [`jax_sim/imagination_jax.py`](jax_sim/imagination_jax.py) + `sim_step` in [`main_jax.py`](jax_sim/main_jax.py) |
+| **Config** | `phase9_canvas.imagination_gating_enabled`, `confidence_threshold`, `imagination_k`, `imagination_gamma` |
+
+**Victory condition met:** epistemic gate prevents P11.2 collapse while keeping imagination on the decision path.
 
 ### Phase 11.2 — **CONCLUDED** (`feature/phase11-2-imagination`)
 
 | Era | Detail |
 |-----|--------|
 | **Metrics-only (`aebe131`)** | K=5 frozen `head_fwd_dyn`; stochastic actions; **5 steps/sec**; `imagination_agree` **0.9–15.6%** |
-| **Active override (`6cf965a`)** | Imagined argmax drives env + PPO → **agree ~27%** but **Stay ≈ 99%** (solipsistic value exploitation) |
-| **Resolution** | Revert **`181b98c`**; branch **frozen** at metrics-only **`061df84`** |
-| **Conclusion** | Carry entangles Self+World; imagination without **Other** pathway fails. → **Phase 9 canvas** |
+| **Active override (`6cf965a`)** | Imagined argmax drives env + PPO → **agree ~27%** but **Stay ≈ 99%** |
+| **Resolution** | Revert **`181b98c`**; branch **frozen** **`061df84`**; **superseded** by **P11.3 on `master`** |
+| **Lesson** | Ungated imagination fails; **confidence-gated** imagination + **Other** (9.4) succeeds |
 
-**Do not** resume training from ckpt **`393/`** (post–active-imagination). Prefer **`390/`** on new volume.
+**Do not** resume training from ckpt **`393/`** (post–ungated active-imagination). Prefer **`390/`** or post–11.3 ckpts.
 
-### Phase 9 canvas — **TRAINING** (`feature/phase9-canvas`)
+### Phase 9 canvas — **MERGED** (`master`)
 
 | Item | Value |
 |------|--------|
-| **Module** | `NeighborCrossAttention` in `network_jax.py` |
-| **Mechanism** | Q = `LayerNorm(emb_own + carry)`; KV = `emb_nb(signals)`; residual on self |
-| **Config** | `phase9_canvas.cross_attn_enabled: true` on Modal (Cell 1 patches yaml) |
-| **Orbax graft** | `graft_missing_param_subtrees` injects `nb_cross_attn` into ckpts **291/390** (`1d57bf9`) |
+| **9.4 Cross-attn** | `NeighborCrossAttention` — Q = `LayerNorm(emb_own + carry)`; KV = neighbor signals |
+| **9.1 Confidence** | `head_confidence_*` → `conf_loss` ~ **1e-4**; target = stop_grad carry_fwd MSE |
+| **Orbax graft** | `graft_missing_param_subtrees` — `nb_cross_attn`, `head_confidence_*` (`1d57bf9`, `820dd3a`) |
 | **Modal cells** | [`docs/MODAL_NOTEBOOK_PHASE9.md`](docs/MODAL_NOTEBOOK_PHASE9.md) — clone `/root/throng` **first** |
-| **Next** | Confidence head (9.1); decode @ `--min-step 155136` after ~20k new steps |
+| **Decode** | `decode_p9_155136+.log` — cardinal ✅; VQ discrete ❌ (swarm noise) |
 
 ### Phase 11.0 — COMPLETE (`master`)
 
@@ -87,9 +99,10 @@ GPU-resident / `lax.scan` PPO — starvation + XLA OOM; **`d4cf614` revert**.
 
 | Branch | Status |
 |--------|--------|
-| **`master`** | 150k science baseline; CPU offload; **no** imagination |
-| **`feature/phase9-canvas`** | **LIVE TRAIN** — P9.4 cross-attn (`38f342a+`, ckpt **291** → 250k) |
-| **`feature/phase11-2-imagination`** | **FROZEN** — metrics-only imagination (`061df84`); `run_bg` **`n_steps=250_000`** |
+| **`master`** | **SOTA** — 9.4 cross-attn + 9.1 confidence + **11.3 epistemic gate** (`465d8c6+`) |
+| **`feature/phase11-3-epistemic-gate`** | Merged → `master`; B200 may still checkout this name during run |
+| **`feature/phase9-canvas`** | Superseded by merge (history: P9.4 + 9.1 staging) |
+| **`feature/phase11-2-imagination`** | **FROZEN** — metrics-only archive (`061df84`) |
 | **`feature/phase11-1-gpu-rollouts`** | **Abandoned** |
 
 ### Horcrux (context backup)
@@ -126,8 +139,8 @@ Cam's persona + triad workflow live in Git so reboots recover identity:
 1. Speak to the User in **Synergic Synthesis** (Software / Physics / Philosophy / RL).
 2. Address Will via explicit **`@Will — Cam here...`** copy-paste blocks.
 3. **Keep the ecology mathematically pure** — no scout/alarm comm rewards, no blind VQ loss shaping. Lethal selection forges language.
-4. **Phase 11.2 FROZEN** — imagination **metrics-only**; never re-enable action override without Cam (`6cf965a` caused Stay collapse).
-5. **Phase 9 canvas is active** — build **Other** pathway (cross-attn 9.4, confidence 9.1) on `feature/phase9-canvas`.
+4. **Phase 11.3 is SOTA on `master`** — epistemic gate required for imagination on the action path; never revert to unguarded P11.2 active override (`6cf965a`).
+5. **Phase 11.2 FROZEN** — metrics-only archive; P11.2 Stay-collapse **resolved** by **9.1 confidence + 11.3 gating**.
 6. **CPU offload only** — logs must show **`H2D + backward`**; do not re-merge 11.1 GPU rollouts.
 7. **Never** comm reward shaping or blind VQ loss shaping.
 
@@ -135,9 +148,8 @@ Cam's persona + triad workflow live in Git so reboots recover identity:
 
 | Branch | Purpose |
 |--------|---------|
-| **`master`** | Stable 150k baseline; Phase 11.0 carry dynamics |
-| **`feature/phase9-canvas`** | **Active:** cross-attention receiver + future 9.1 confidence head |
-| **`feature/phase11-2-imagination`** | **Frozen archive:** K-step imagination metrics only |
+| **`master`** | **SOTA:** 9.4 cross-attn + 9.1 confidence + 11.3 epistemic imagination gate |
+| **`feature/phase11-2-imagination`** | **Frozen archive:** metrics-only K-step imagination (pre-gate) |
 | **`feature/phase11-1-gpu-rollouts`** | **Abandoned** |
 
 **Phase 11.0 on `master` (`3880337`):**
@@ -174,10 +186,11 @@ Cam's persona + triad workflow live in Git so reboots recover identity:
 ```
 train_entry.run_simulation()  →  main_jax._run_simulation_impl()
   lax.scan(sim_step, T=512)   →  rollout on GPU
-  [phase9-canvas] NeighborCrossAttention (optional) → 1 "Other" token
-  [phase11-2 only] imagine K=5 metrics (frozen head_fwd_dyn) — does NOT override actions
+  NeighborCrossAttention (9.4) → 1 "Other" token
+  Phase 11.3 (blues): reactive sample → conf_pred probe → K=5 imagine if conf < τ
+  executed_a → env + PPO log_probs (reactive policy, gated execution)
   ppo_update (blue + red)     →  CPU rollout offload, minibatch 512
-  auxiliary_update            →  loc_env MSE + carry_fwd MSE + self-prediction
+  auxiliary_update            →  loc_env + carry_fwd + self-pred + conf (9.1)
 ```
 
 | File | Role |
@@ -185,7 +198,7 @@ train_entry.run_simulation()  →  main_jax._run_simulation_impl()
 | [`jax_sim/train_entry.py`](jax_sim/train_entry.py) | **Always import here** — evicts stale modules after `git pull` |
 | [`jax_sim/main_jax.py`](jax_sim/main_jax.py) | Training loop, ecology, dashboard, checkpoints, corpus |
 | [`jax_sim/network_jax.py`](jax_sim/network_jax.py) | Transformer + VQ; **`NeighborCrossAttention`** (Phase 9.4) |
-| [`jax_sim/imagination_jax.py`](jax_sim/imagination_jax.py) | Phase 11.2 K-step metrics (**`feature/phase11-2-imagination` only**) |
+| [`jax_sim/imagination_jax.py`](jax_sim/imagination_jax.py) | Phase **11.3** K-step imagined argmax (`head_fwd_dyn` + `value_from_carry`) |
 | [`jax_sim/rl_jax.py`](jax_sim/rl_jax.py) | PPO + numpy GAE |
 | [`jax_sim/observations_jax.py`](jax_sim/observations_jax.py) | Obs builder; startup must print `red_sense_api=v2` |
 | [`jax_sim/grid_jax.py`](jax_sim/grid_jax.py) | Catches (`red_catch_prob`), resources, shelter |
@@ -216,8 +229,10 @@ train_entry.run_simulation()  →  main_jax._run_simulation_impl()
 | **10.6** | Causal logging | `corpus_every_n_steps: 4`, volume corpus + fsync | Decode @ 100k: cardinal lexicon p=5.44e-14 |
 | **11.0** | **Carry world-model** ✅ | `head_fwd_dyn`, `carry_fwd_coef` | **`carry_fwd` → 0.0001** |
 | **11.1** | GPU rollouts | `424c46f` / `6042a4d` | **Abandoned** — **`d4cf614` revert** |
-| **11.2** | K-step imagination | `aebe131` metrics; `6cf965a` active **reverted** | 200k @ **5 steps/sec**; active → **Stay≈99%** → **FROZEN** |
-| **9.4** | Cross-attn receiver | `feature/phase9-canvas` `38f342a+` | **Training LIVE** @ ~155k; graft + Stay~20% healthy |
+| **11.2** | K-step imagination | `aebe131` metrics; `6cf965a` active **reverted** | Ungated active → **Stay≈99%** → **FROZEN** |
+| **9.4** | Cross-attn receiver | `5920511` / `1d57bf9` | **Other** pathway; merged `master` |
+| **9.1** | Confidence head | `820dd3a` | Predicts carry_fwd MSE; `conf_loss` ~ **1e-4** |
+| **11.3** | **Epistemic gate** ✅ | `465d8c6` | **Stay ~19%**; imagine path **65–80%**; merged **`master`** |
 
 **Recurring failure mode:** Blues stay at cap → ~99% survival → **`NB_GAIN↔surv: nan`** → no evolutionary pressure on neighbor-signal benefit.
 
@@ -225,30 +240,36 @@ train_entry.run_simulation()  →  main_jax._run_simulation_impl()
 
 ---
 
-## 4. Current experiment — Phase 9.4 **LIVE** (`feature/phase9-canvas`)
+## 4. Current experiment — Phase **11.3** on **`master`**
 
-**Status:** Training **in progress** on Modal **`dragonbgnx`**. Resumed **ckpt 291**, cross-attn **on**, graft successful. Target **`n_steps=250_000`** (`run_bg.py`).
+**Status:** B200 training post–P11.3 activation (`465d8c6+`) toward **200k+**. Stack: **9.4 cross-attn** + **9.1 confidence** + **11.3 epistemic gate**. Orbax graft bridges 9.1 weights into the gated graph.
 
-**Verified healthy @ steps 154624–155136:**
+**Verified healthy @ P11.3 activation:**
 
 ```text
-[step 155136] 6 steps/sec | blue=199 red=250 | ppo=303
-  Actions: N=16% S=21% E=18% W=26% Stay=20%
-  AuxLoss: carry_fwd=0.0001 | self_pred_acc=0.266 | codes_active=63/64
+  Actions: Stay ~19%  (P11.2 ungated active: Stay ~99%)
+  EpistemicGate: imagination_agree=…% | conf_gate_imagine_frac=65–80% (τ=0.02; K=5)
+  AuxLoss: conf_loss ~1e-4 | carry_fwd=0.0001
+  [JAX] Phase11.3 epistemic gate: conf_pred < 0.02 → imagined_action …
   [JAX] blue PPO minibatch 1/200 — H2D + backward...
-[CKPT] Saved step 155136
 ```
 
-**If training stopped:** use [`docs/MODAL_NOTEBOOK_PHASE9.md`](docs/MODAL_NOTEBOOK_PHASE9.md) — **Cell 1 clones** `/root/throng` (bare `cd /root/throng` fails on fresh disks).
+**If training stopped:**
 
 ```bash
-cd /root/throng && git fetch origin && git checkout feature/phase9-canvas && git pull
-# phase9_canvas.cross_attn_enabled: true in config_phase7.yaml
+cd /root/throng && git fetch origin && git checkout master && git pull
+# config_phase7.yaml → phase9_canvas:
+#   cross_attn_enabled: true
+#   confidence_enabled: true
+#   imagination_gating_enabled: true
+#   confidence_threshold: 0.02
 export TF_GPU_ALLOCATOR=cuda_malloc_async
 export XLA_PYTHON_CLIENT_MEM_FRACTION=0.80
 export JAX_COMPILATION_CACHE_DIR=/tmp/throng_jax_cache
-# Cell 2: subprocess.Popen run_bg.py → /mnt/throng-runs/train.log
+python -u run_bg.py   # → /mnt/throng-runs/train.log
 ```
+
+Modal notebook: [`docs/MODAL_NOTEBOOK_PHASE9.md`](docs/MODAL_NOTEBOOK_PHASE9.md) — clone `/root/throng` first on fresh disks.
 
 **Checkpoint policy:**
 
@@ -261,10 +282,11 @@ export JAX_COMPILATION_CACHE_DIR=/tmp/throng_jax_cache
 **Startup must include:**
 
 ```text
-[JAX] git=38f342a | Phase9 auxiliary: ON
+[JAX] git=465d8c6 | Phase9 auxiliary: ON
 [JAX] Phase9.4 cross-attn receiver: heads=4 ...
-[JAX] Injected randomly initialized nb_cross_attn into b_params   # schema graft
-[JAX] Restored params from step 291
+[JAX] Phase9.1 confidence: head_confidence predicts carry_fwd MSE …
+[JAX] Phase11.3 epistemic gate: conf_pred < 0.02 → imagined_action …
+[JAX] Restored params from step …
 ```
 
 ### Completed runs (reference)
@@ -609,22 +631,25 @@ python tools/decode_signals.py /mnt/throng-runs/signal_corpus.jsonl --k 16 --min
 | `self_pred_acc` | Self-action prediction (>0.20 = above chance) |
 | `NB_GAIN↔surv` | Spearman(nb_gain, age); **nan** if everyone lives |
 | `red_floor` | Red repro floor from curriculum |
-| `imagination_gain` | *(P11.2 only)* Best imagined return − greedy-action imagined return |
-| `imagination_agree` | *(P11.2 only)* % imagined argmax == `argmax(logits)` |
+| `imagination_gain` | Best imagined return − greedy imagined return (rollout telemetry) |
+| `imagination_agree` | % **imagined == reactive** (alive agents) |
+| `conf_gate_imagine_frac` | % agents with `conf_pred < τ` (imagine path) |
+| `EpistemicGate:` | Dashboard line combining agree + gate fraction + τ, K |
 
 ### Config blocks (`config_phase7.yaml`)
 
 ```yaml
 carry_fwd_coef: 0.05          # P11.0 — all branches with carry dynamics
 
-phase9_canvas:                 # feature/phase9-canvas only
-  cross_attn_enabled: false
+phase9_canvas:                 # master SOTA stack
+  cross_attn_enabled: true
   cross_attn_num_heads: 4
-
-# P11.2 only (feature/phase11-2-imagination):
-# imagination_enabled: true
-# imagination_k: 5
-# imagination_gamma: 0.999
+  confidence_enabled: true
+  confidence_coef: 0.05
+  imagination_gating_enabled: true
+  confidence_threshold: 0.02
+  imagination_k: 5
+  imagination_gamma: 0.999
 ```
 
 ---
@@ -667,6 +692,8 @@ phase9_canvas:                 # feature/phase9-canvas only
 | `1d57bf9` | Orbax graft `nb_cross_attn` on legacy restore |
 | `8f48b1d` | THRONG.md P11.2 concluded + P9 handoff |
 | `38f342a` | Modal notebook cells; `run_bg` **250k** |
+| `820dd3a` | Phase **9.1** confidence head (`head_confidence_*`) |
+| **`465d8c6`** | Phase **11.3** epistemic imagination gating → **merged `master`** |
 
 **Do not** apply Cam's regex patch on `network_jax.py` — dead-code reset is in repo.
 
@@ -693,22 +720,20 @@ phase9_canvas:                 # feature/phase9-canvas only
 
 ## 11. Roadmap (what’s next)
 
-### Phase 9 canvas — **LIVE** (`feature/phase9-canvas`)
+### Phase 11.3 — **COMPLETE** (on `master`)
 
-1. **NOW** — Let P9.4 run to **250k**; monitor **Stay < 50%**, **6 steps/sec**, `H2D + backward`.
-2. **~20k steps** — decode corpus `--min-step 155136` (lag-1 + cardinal + VQ token tests).
-3. **9.1 Confidence head** — epistemic uncertainty on `head_fwd_dyn` (next build).
-4. **GWT token** — later canvas item.
+1. **NOW** — B200 run to **200k+**; monitor **Stay ~20%**, **`conf_gate_imagine_frac`**, `H2D + backward`.
+2. **Decode** — corpus after sufficient post–11.3 steps (lag-1 + cardinal + VQ).
+3. **GWT token** — later canvas item.
 
-**Done:** scaffold (`5920511`), Orbax graft (`1d57bf9`), Modal notebook (`38f342a`), first healthy rollout @ **155k**.
+**Done:** 9.4 cross-attn, 9.1 confidence (`820dd3a`), 11.3 epistemic gate (`465d8c6`), merge to **`master`**.
 
-**Philosophy (Cam):** Solipsistic delusion = carry entangles Self+World; imagination without **Other** → Stay exploitation. Cross-attn forces selective read of swarm proto-language.
+**Philosophy (Cam):** Ungated imagination = solipsistic Stay exploitation. **9.1** isolates epistemic uncertainty; **11.3** routes uncertain agents through K-step imagination while confident agents stay reactive. **9.4 Other** pathway prevents pure self-loop delusion.
 
 ### Phase 11.2 — **CONCLUDED** (frozen branch)
 
-- 200k metrics extension complete; decode @ 149504+ verified continuous comms.
-- Active override: policy distillation signal (agree **~27%**) but **Stay≈99%** — **reverted**, branch frozen.
-- Do **not** merge action override to `master` without new experiment design.
+- Unguarded active override → **Stay≈99%** — **reverted** (`181b98c`).
+- **Resolved on `master`** by **9.1 + 11.3** — do not replay `6cf965a` without gating.
 
 ### Phase 11.1 — ABANDONED
 
@@ -717,7 +742,7 @@ GPU-resident PPO — **`d4cf614` revert** on `master`.
 ### Explicit non-goals
 
 - ❌ Scout / alarm **reward shaping**
-- ❌ P11.2 active imagination override without **Other** pathway + confidence gating
+- ❌ Ungated P11.2-style imagination override (`6cf965a` pattern) — use **11.3 epistemic gate** only
 - ❌ Re-merging **11.1 GPU rollouts** without memory refactor
 - ❌ Resume from ckpt **393** (post–Stay-collapse) for science runs
 
