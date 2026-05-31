@@ -351,7 +351,7 @@ Modal notebook: [`docs/MODAL_NOTEBOOK_PHASE9.md`](docs/MODAL_NOTEBOOK_PHASE9.md)
 [JAX] Phase9.1 confidence: head_confidence predicts carry_fwd MSE …
 [JAX] Phase12 red comms: PredatorNetworkJax …
 [JAX] Red corpus: signal_corpus_red.jsonl …
-[JAX] Phase11.3 epistemic gate: conf_pred < 0.001 → imagined_action …
+[JAX] Phase12.1 spatial epistemic gate: conf_pred < mean(conf|alive)*mult → imagined …
 [JAX] Restored params from step …
 ```
 
@@ -794,7 +794,8 @@ phase12_coevolution:           # feature/phase12-red-coevolution
 | **`f0ebb76`** | Phase **12.0** `PredatorNetworkJax` red VQ comms |
 | **`d50cc19`** | Phase **12.1** red corpus logging |
 | **`8c5888b`** | THRONG reboot — Phase 12 live + 214k decode |
-| **`d493a50`** | Phase **12.2** `--red` decode + τ=0.001 + `red_comms` default |
+| **`d493a50`** | Phase **12.2** `--red` decode + `red_comms` default |
+| **`80ef1ea`** | Phase **12.1** spatial epistemic gate (`confidence_multiplier`) |
 | **`4f98f96`** | **Wiretap default** — `red_corpus_enabled: true`; docs sync |
 
 **Do not** apply Cam's regex patch on `network_jax.py` — dead-code reset is in repo.
@@ -875,7 +876,7 @@ GPU-resident PPO — **`d4cf614` revert** on `master`.
 
 ### Cam reboot paste
 
-> You are **Cam**. Read `THRONG.md` §0b. **Phase 12 LIVE** on B200: `feature/phase12-red-coevolution` **`4f98f96+`**, dual brain (`PredatorNetworkJax` + blue P11.3), **~7 steps/sec**, blue Stay **~19%**, **τ=0.001**, **`red_codes_active=63/64`**, red wiretap **`signal_corpus_red.jsonl`**. Blue decode @ 214k: cardinal **p=1.75e-18**, lag-1 ✅, VQ ❌ (`decode_p11_3_214k.log`). Red pincer: **`decode_signals.py --red`** — chase vs search χ² (**pending corpus**). **`master`** = blue-only; **do not merge** P12 until red pincer passes. P11.2 **FROZEN**. **Do not stop** live run. Docs: `docs/PHASE12_COEVOLUTION.md`.
+> You are **Cam**. Read `THRONG.md` §0b. **Phase 12 LIVE** on B200: `feature/phase12-red-coevolution` **`80ef1ea+`**, dual brain + **batch-relative epistemic gate** (`confidence_multiplier=1.0`), blue Stay **~19%**, **`red_codes_active=63/64`**, red wiretap. Red pincer: **`decode_signals.py --red`**. **`master`** = blue-only; **do not merge** P12 until red pincer passes. **Do not stop** live run.
 
 **New Cam:** §0b → §4 → §7 (red decode) → §11 → `docs/PHASE12_COEVOLUTION.md`.
 
@@ -883,4 +884,4 @@ GPU-resident PPO — **`d4cf614` revert** on `master`.
 
 ---
 
-*Last updated: 2026-05-31 — Phase 12 wiretap + 12.2 red decode; τ=0.001; branch `feature/phase12-red-coevolution` @ `4f98f96`.*
+*Last updated: 2026-05-31 — spatial epistemic gate `80ef1ea`; wiretap + red decode; branch `feature/phase12-red-coevolution`.*
