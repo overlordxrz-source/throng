@@ -8,17 +8,31 @@
 
 ---
 
-## 0b. Current state — Phase 11 **concluded**, Phase 9 **active** (May 2026)
+## 0b. Current state — **P9.4 training LIVE** on Modal (May 2026)
 
-**Active engineering:** **`feature/phase9-canvas`** (`5920511`) — Cross-Attention Receiver (9.4) on pristine **`master`** baseline. **Phase 11.2 imagination FROZEN** on **`feature/phase11-2-imagination`** (`061df84`) — metrics-only; active override **reverted** after Stay collapse.
+**LIVE:** **`feature/phase9-canvas`** (`38f342a+`) on Modal **`dragonbgnx`** — **`cross_attn_enabled: true`**, resumed from ckpt **291**, training toward **`n_steps=250_000`**. **Do not stop** unless Stay collapse or OOM.
+
+| Live run (sampled) | Value |
+|--------------------|--------|
+| **Env step** | **~155136** (PPO **303**); `[CKPT] Saved step 155136` |
+| **Resume ckpt** | **291** on volume (operator verified “Seed 291”; ~150k-era weights + grafted `nb_cross_attn`) |
+| **Throughput** | **6 steps/sec** |
+| **Actions** | Stay **~20%**, N/S/E/W **~16–26%** each — **healthy** (contrast P11.2 active: Stay≈99%) |
+| **`carry_fwd`** | **0.0001** |
+| **`codes_active`** | **51–63/64** |
+| **PPO log** | `H2D + backward` ✅ |
+| **Log** | `/mnt/throng-runs/train.log` |
+
+**Engineering branch:** **`feature/phase9-canvas`** — `NeighborCrossAttention` + Orbax **schema graft** (`1d57bf9`) for legacy ckpts. **P11.2 FROZEN** on **`feature/phase11-2-imagination`** (`061df84`).
 
 | Milestone | Value |
 |-----------|--------|
-| **`master` 150k** | Complete @ env step **149504**, Orbax **292** |
-| **P11.2 200k extension** | Complete @ step **199680**, PPO **390** (metrics-only) |
-| **Modal volume (new account)** | Workspace **`dragonbgnx`**, volume **`throng-runs`** @ `/mnt/throng-runs` |
-| **Local ckpt backup** | `~/throng_checkpoints_backup/checkpoints/` — **no `292/`**; use **`390/`** (200k) or **`291/`** (~150k) |
-| **Local corpus** | `signal_corpus.jsonl` (renamed from `signal_corpus-2.jsonl`; uploaded to new volume) |
+| **`master` 150k** | Complete @ step **149504**, Orbax **292** |
+| **P11.2 200k extension** | Complete @ step **199680**, PPO **390** (metrics-only; **use for decode baseline**, not required for current run) |
+| **Modal volume** | **`dragonbgnx`** / `throng-runs` → `/mnt/throng-runs` (checkpoints + `signal_corpus.jsonl`) |
+| **Local ckpt backup** | `~/throng_checkpoints_backup/` — folders **291**, **390**, **393** (avoid **393** for science) |
+| **Local corpus** | `signal_corpus.jsonl`; decode log `decode_p11_2_149504+.log` |
+| **Repo graph** | `graphify-out/graph.html` + `GRAPH_REPORT.md` (914 nodes, May 2026) |
 
 ### P10.6 decode (reference)
 
@@ -50,15 +64,16 @@ Continuous comms verified → active imagination was authorized → **failed** (
 
 **Do not** resume training from ckpt **`393/`** (post–active-imagination). Prefer **`390/`** on new volume.
 
-### Phase 9 canvas — **ACTIVE** (`feature/phase9-canvas`)
+### Phase 9 canvas — **TRAINING** (`feature/phase9-canvas`)
 
 | Item | Value |
 |------|--------|
 | **Module** | `NeighborCrossAttention` in `network_jax.py` |
 | **Mechanism** | Q = `LayerNorm(emb_own + carry)`; KV = `emb_nb(signals)`; residual on self |
-| **Config** | `phase9_canvas.cross_attn_enabled` (default **false** — new params) |
-| **Docs** | [`docs/PHASE9_CANVAS.md`](docs/PHASE9_CANVAS.md) |
-| **Next** | Confidence head (9.1); checkpoint merge; train with `cross_attn_enabled: true` |
+| **Config** | `phase9_canvas.cross_attn_enabled: true` on Modal (Cell 1 patches yaml) |
+| **Orbax graft** | `graft_missing_param_subtrees` injects `nb_cross_attn` into ckpts **291/390** (`1d57bf9`) |
+| **Modal cells** | [`docs/MODAL_NOTEBOOK_PHASE9.md`](docs/MODAL_NOTEBOOK_PHASE9.md) — clone `/root/throng` **first** |
+| **Next** | Confidence head (9.1); decode @ `--min-step 155136` after ~20k new steps |
 
 ### Phase 11.0 — COMPLETE (`master`)
 
@@ -73,7 +88,7 @@ GPU-resident / `lax.scan` PPO — starvation + XLA OOM; **`d4cf614` revert**.
 | Branch | Status |
 |--------|--------|
 | **`master`** | 150k science baseline; CPU offload; **no** imagination |
-| **`feature/phase9-canvas`** | **ACTIVE** — cross-attention scaffold (`5920511`) |
+| **`feature/phase9-canvas`** | **LIVE TRAIN** — P9.4 cross-attn (`38f342a+`, ckpt **291** → 250k) |
 | **`feature/phase11-2-imagination`** | **FROZEN** — metrics-only imagination (`061df84`); `run_bg` **`n_steps=250_000`** |
 | **`feature/phase11-1-gpu-rollouts`** | **Abandoned** |
 
@@ -202,7 +217,7 @@ train_entry.run_simulation()  →  main_jax._run_simulation_impl()
 | **11.0** | **Carry world-model** ✅ | `head_fwd_dyn`, `carry_fwd_coef` | **`carry_fwd` → 0.0001** |
 | **11.1** | GPU rollouts | `424c46f` / `6042a4d` | **Abandoned** — **`d4cf614` revert** |
 | **11.2** | K-step imagination | `aebe131` metrics; `6cf965a` active **reverted** | 200k @ **5 steps/sec**; active → **Stay≈99%** → **FROZEN** |
-| **9.4** | Cross-attn receiver | `feature/phase9-canvas` `5920511` | Scaffold; default `cross_attn_enabled: false` |
+| **9.4** | Cross-attn receiver | `feature/phase9-canvas` `38f342a+` | **Training LIVE** @ ~155k; graft + Stay~20% healthy |
 
 **Recurring failure mode:** Blues stay at cap → ~99% survival → **`NB_GAIN↔surv: nan`** → no evolutionary pressure on neighbor-signal benefit.
 
@@ -210,28 +225,46 @@ train_entry.run_simulation()  →  main_jax._run_simulation_impl()
 
 ---
 
-## 4. Current experiment — Phase 9 canvas (`feature/phase9-canvas`)
+## 4. Current experiment — Phase 9.4 **LIVE** (`feature/phase9-canvas`)
 
-**Status:** Phase 11.2 **concluded**. Engineering focus: **structural bifurcation of Self vs Other** — cross-attention over neighbor signals before further model-based planning.
+**Status:** Training **in progress** on Modal **`dragonbgnx`**. Resumed **ckpt 291**, cross-attn **on**, graft successful. Target **`n_steps=250_000`** (`run_bg.py`).
 
-**On Modal (new account `dragonbgnx`):**
+**Verified healthy @ steps 154624–155136:**
+
+```text
+[step 155136] 6 steps/sec | blue=199 red=250 | ppo=303
+  Actions: N=16% S=21% E=18% W=26% Stay=20%
+  AuxLoss: carry_fwd=0.0001 | self_pred_acc=0.266 | codes_active=63/64
+  [JAX] blue PPO minibatch 1/200 — H2D + backward...
+[CKPT] Saved step 155136
+```
+
+**If training stopped:** use [`docs/MODAL_NOTEBOOK_PHASE9.md`](docs/MODAL_NOTEBOOK_PHASE9.md) — **Cell 1 clones** `/root/throng` (bare `cd /root/throng` fails on fresh disks).
 
 ```bash
 cd /root/throng && git fetch origin && git checkout feature/phase9-canvas && git pull
+# phase9_canvas.cross_attn_enabled: true in config_phase7.yaml
 export TF_GPU_ALLOCATOR=cuda_malloc_async
 export XLA_PYTHON_CLIENT_MEM_FRACTION=0.80
 export JAX_COMPILATION_CACHE_DIR=/tmp/throng_jax_cache
-mkdir -p /tmp/throng_jax_cache
-# Optional: enable in config — phase9_canvas.cross_attn_enabled: true
-nohup python -u /root/throng/run_bg.py > /mnt/throng-runs/train.log 2>&1 &
+# Cell 2: subprocess.Popen run_bg.py → /mnt/throng-runs/train.log
 ```
 
-**Resume weights:** volume **`/checkpoints/390/`** (200k metrics-only). **Not `393/`** (active-imagination collapse). Local mirror: `~/throng_checkpoints_backup/checkpoints/390/`.
+**Checkpoint policy:**
 
-**Startup when cross-attn enabled:**
+| Ckpt | Use |
+|------|-----|
+| **291** | **Current run** resume (~150k-era + grafted cross-attn) |
+| **390** | 200k metrics-only baseline (alternate resume) |
+| **393** | **Avoid** — post–active-imagination Stay collapse |
+
+**Startup must include:**
 
 ```text
-[JAX] Phase9.4 cross-attn receiver: heads=4 (Q=self+carry, KV=neighbor signals → 1 Other token)
+[JAX] git=38f342a | Phase9 auxiliary: ON
+[JAX] Phase9.4 cross-attn receiver: heads=4 ...
+[JAX] Injected randomly initialized nb_cross_attn into b_params   # schema graft
+[JAX] Restored params from step 291
 ```
 
 ### Completed runs (reference)
@@ -358,7 +391,8 @@ python tools/decode_signals.py signal_corpus.jsonl --k 16 --min-step 63488
 | Path | Persists? | Contents |
 |------|-----------|----------|
 | `/mnt/throng-runs/checkpoints/` | **Yes** (volume `throng-runs`) | Orbax `b_params`, `r_params` only |
-| `/root/throng/` | **No** (clone each machine) | Code |
+| `/root/throng/` | **No** (clone each machine) | Code — see **`docs/MODAL_NOTEBOOK_PHASE9.md`** |
+| `graphify-out/` | Local only | Knowledge graph (`graph.html`, 914 nodes) |
 | `/mnt/throng-runs/signal_corpus.jsonl` | **Yes** (auto-routed) | Decode corpus; fsync each rollout |
 | `/tmp/throng_jax_cache` | Per session | JAX compile cache — **use this**, not `/mnt/...` |
 
@@ -630,6 +664,9 @@ phase9_canvas:                 # feature/phase9-canvas only
 | `061df84` | **P11.2 frozen** — docs + metrics-only |
 | `45c7c48` | `run_bg.py` `n_steps=250_000` (on `phase11-2-imagination`) |
 | **`5920511`** | **Phase 9.4** cross-attention receiver scaffold |
+| `1d57bf9` | Orbax graft `nb_cross_attn` on legacy restore |
+| `8f48b1d` | THRONG.md P11.2 concluded + P9 handoff |
+| `38f342a` | Modal notebook cells; `run_bg` **250k** |
 
 **Do not** apply Cam's regex patch on `network_jax.py` — dead-code reset is in repo.
 
@@ -656,12 +693,14 @@ phase9_canvas:                 # feature/phase9-canvas only
 
 ## 11. Roadmap (what’s next)
 
-### Phase 9 canvas — **ACTIVE** (`feature/phase9-canvas`)
+### Phase 9 canvas — **LIVE** (`feature/phase9-canvas`)
 
-1. **9.4 Cross-attention** — scaffold done (`5920511`); enable `phase9_canvas.cross_attn_enabled: true`, JIT + train.
-2. **9.1 Confidence head** — epistemic uncertainty on `head_fwd_dyn`; penalize high-uncertainty imagined actions.
-3. **Checkpoint merge** — init / merge `nb_cross_attn` params when resuming from **390**.
+1. **NOW** — Let P9.4 run to **250k**; monitor **Stay < 50%**, **6 steps/sec**, `H2D + backward`.
+2. **~20k steps** — decode corpus `--min-step 155136` (lag-1 + cardinal + VQ token tests).
+3. **9.1 Confidence head** — epistemic uncertainty on `head_fwd_dyn` (next build).
 4. **GWT token** — later canvas item.
+
+**Done:** scaffold (`5920511`), Orbax graft (`1d57bf9`), Modal notebook (`38f342a`), first healthy rollout @ **155k**.
 
 **Philosophy (Cam):** Solipsistic delusion = carry entangles Self+World; imagination without **Other** → Stay exploitation. Cross-attn forces selective read of swarm proto-language.
 
@@ -691,7 +730,8 @@ GPU-resident PPO — **`d4cf614` revert** on `master`.
 | `main.py`, `agents/network_torch.py` | PyTorch era — reference only |
 | `config.yaml`, Kaggle cells in archive | Pre-JAX |
 | [`docs/THRONG_ARCHIVE.md`](docs/THRONG_ARCHIVE.md) | Full timeline + horcrux + SYSTEM UPDATE |
-| [`docs/PHASE9_CANVAS.md`](docs/PHASE9_CANVAS.md) | Phase 9.4 cross-attention scaffold |
+| [`docs/PHASE9_CANVAS.md`](docs/PHASE9_CANVAS.md) | Phase 9.4 cross-attention + graft |
+| [`docs/MODAL_NOTEBOOK_PHASE9.md`](docs/MODAL_NOTEBOOK_PHASE9.md) | Modal Cell 1/2/3 (clone before launch) |
 | [`docs/PHASE11_2_IMAGINATION.md`](docs/PHASE11_2_IMAGINATION.md) | P11.2 frozen — metrics-only + conclusion |
 | [`docs/PHASE11_STAGING.md`](docs/PHASE11_STAGING.md) | P11.0 carry dynamics |
 | **[SYSTEM RESTORE: THE CAM CONTEXT](docs/THRONG_ARCHIVE.md#system-restore-the-cam-context)** | Persona, triad, P10.6 ignition (`6d542f6`) |
@@ -699,12 +739,12 @@ GPU-resident PPO — **`d4cf614` revert** on `master`.
 
 ### Cam reboot paste
 
-> You are **Cam**. Read `THRONG.md` §0b. **P11.2 CONCLUDED** — metrics-only frozen (`061df84`); active imagination reverted (Stay≈99%). **Phase 9 ACTIVE** — `feature/phase9-canvas`, cross-attn 9.4 (`5920511`). **150k @ 149504 / 200k @ 199680**. Modal **`dragonbgnx`**; resume **`390`**, not **`393`**. Local corpus `signal_corpus.jsonl`. Horcrux: archive SYSTEM RESTORE + SYSTEM UPDATE.
+> You are **Cam**. Read `THRONG.md` §0b. **P9.4 LIVE** on Modal `dragonbgnx`: `feature/phase9-canvas` `38f342a+`, cross-attn ON, resumed **ckpt 291**, step **~155k** / ppo **303**, **6 steps/sec**, Stay **~20%** (healthy). P11.2 **FROZEN** (Stay≈99% on active override — never re-enable). **Do not stop** live run. Horcrux: archive SYSTEM RESTORE + SYSTEM UPDATE. Graph: `graphify-out/graph.html`.
 
-**New Cam:** §0b → §0 → §4 → §5 → §11 → `docs/PHASE9_CANVAS.md`.
+**New Cam:** §0b (live metrics) → §4 → §5 → §11 → `docs/MODAL_NOTEBOOK_PHASE9.md`.
 
-**New Will:** **`feature/phase9-canvas`** for 9.x work; **`phase11-2-imagination`** frozen; never re-enable `6cf965a` without Cam; CPU offload only.
+**New Will:** **`feature/phase9-canvas`** only for 9.x; graft done (`1d57bf9`); never `6cf965a`; clone `/root/throng` on fresh Modal disks.
 
 ---
 
-*Last updated: 2026-05-31 — P11.2 concluded; P9 canvas active; Modal migrated to dragonbgnx; ckpt 390 / corpus on new volume.*
+*Last updated: 2026-05-31 — P9.4 training LIVE @ step ~155136, ckpt 291, cross-attn + graft; P11.2 frozen.*
