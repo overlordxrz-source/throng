@@ -203,5 +203,10 @@ phase9_canvas:
   cross_attn_num_heads: 4
   confidence_enabled: false   # 9.1 — enable after git pull post P9.4 run (grafts head_confidence_*)
   confidence_coef: 0.05
+  # Phase 11.3 — epistemic imagination gating (feature/phase11-3-epistemic-gate)
+  imagination_gating_enabled: true
+  confidence_threshold: 0.02
+  imagination_k: 5
+  imagination_gamma: 0.999
 
 exit_on_graduation: false

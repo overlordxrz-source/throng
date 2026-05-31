@@ -172,6 +172,19 @@ def make_sim_step(config: Dict, model: AgentNetworkJax, model_apply=None):
     _resource_max = float(config.get("resource_max", 1.0))
     _resource_spawn_boost = float(config.get("resource_spawn_boost", 0.2))
     _n_layers = config["n_layers"]
+    _p9 = config.get("phase9_canvas") or {}
+    _img_gate_enabled = bool(_p9.get("imagination_gating_enabled", False))
+    _conf_thresh = float(_p9.get("confidence_threshold", 0.02))
+    _imagination_k = int(_p9.get("imagination_k", 5))
+    _imagination_gamma = float(
+        _p9.get("imagination_gamma", config.get("ppo_gamma", 0.999))
+    )
+    _imagine_fn = None
+    if _img_gate_enabled:
+        from jax_sim.imagination_jax import make_imagination_fn
+        _imagine_fn = make_imagination_fn(
+            model, K=_imagination_k, gamma=_imagination_gamma
+        )
     from jax_sim import observations_jax as _obs
 
     @jax.jit
@@ -215,11 +228,37 @@ def make_sim_step(config: Dict, model: AgentNetworkJax, model_apply=None):
             signals=jnp.where(r_pop.alive[:, None], r_signal_out, 0.0)
         )
 
-        # ── Sample actions ──────────────────────────────────────
+        # ── Sample actions (Phase 11.3 epistemic gate on blues) ──
         b_action_keys = jax.random.split(key_act, b_pop.max_pop)
         r_action_keys = jax.random.split(key_act, r_pop.max_pop)
-        b_actions = jax.vmap(jax.random.categorical)(b_action_keys, b_action_logits)
+        b_actions_reactive = jax.vmap(jax.random.categorical)(b_action_keys, b_action_logits)
         r_actions = jax.vmap(jax.random.categorical)(r_action_keys, r_action_logits)
+
+        if _imagine_fn is not None:
+            action_oh_table = jnp.eye(5, dtype=b_carries.dtype)
+            b_action_oh_reactive = action_oh_table[b_actions_reactive]
+            b_conf_pred = model.apply(
+                params_apply_variables(b_params_sg),
+                b_carries,
+                b_action_oh_reactive,
+                method=model.predict_carry_fwd_confidence,
+            )
+            b_conf_pred = jax.lax.stop_gradient(b_conf_pred)
+            b_a_imagined, b_im_gain, _b_im_agree_greedy = _imagine_fn(
+                b_params_sg, b_carries, b_action_logits, b_pop.alive
+            )
+            b_gate_imagine = b_conf_pred < _conf_thresh
+            b_actions = jnp.where(b_gate_imagine, b_a_imagined, b_actions_reactive)
+            b_alive_f = b_pop.alive.astype(jnp.float32)
+            b_imagination_agree = (
+                (b_a_imagined == b_actions_reactive).astype(jnp.float32) * b_alive_f
+            )
+            b_conf_gate_frac = b_gate_imagine.astype(jnp.float32) * b_alive_f
+        else:
+            b_actions = b_actions_reactive
+            b_im_gain = jnp.zeros((b_pop.max_pop,), dtype=jnp.float32)
+            b_imagination_agree = jnp.zeros((b_pop.max_pop,), dtype=jnp.float32)
+            b_conf_gate_frac = jnp.zeros((b_pop.max_pop,), dtype=jnp.float32)
 
         # ── Update episodic memory buffer ───────────────────────
         b_nb_flat = b_obs[:, 6 : 6 + K * sig_d]
@@ -402,6 +441,9 @@ def make_sim_step(config: Dict, model: AgentNetworkJax, model_apply=None):
             "energy": b_pop.energy,
             "alive": b_pop.alive,
             "blue_caught": caught_b.astype(jnp.float32),
+            "imagination_gain": b_im_gain,
+            "imagination_agree": b_imagination_agree,
+            "conf_gate_imagine_frac": b_conf_gate_frac,
         }
         r_rollout = {
             "obs": r_obs, "actions": r_actions, "log_probs": r_log_probs_taken,
@@ -619,6 +661,15 @@ def _run_simulation_impl(
         print(
             "[JAX] Phase9.1 confidence: head_confidence predicts carry_fwd MSE "
             f"(coef={_conf_coef}, target stop_grad)"
+        )
+    _img_gate = bool(_p9.get("imagination_gating_enabled", False))
+    if _img_gate:
+        _tau = float(_p9.get("confidence_threshold", 0.02))
+        _ik = int(_p9.get("imagination_k", 5))
+        _ig = float(_p9.get("imagination_gamma", config.get("ppo_gamma", 0.999)))
+        print(
+            f"[JAX] Phase11.3 epistemic gate: conf_pred < {_tau} → imagined_action "
+            f"(reactive probe sample); else reactive | K={_ik} γ={_ig}"
         )
     from jax_sim import observations_jax as _obs_mod
 
@@ -1235,6 +1286,22 @@ def _run_simulation_impl(
                 f"red_floor={red_curriculum_stages[red_curriculum_idx]} "
                 f"sustain={red_sustain_count}/{red_sustain_needed} | brain={n_layers}L"
             )
+            if bool((_p9 or {}).get("imagination_gating_enabled", False)):
+                im_agree_val = float("nan")
+                conf_gate_val = float("nan")
+                if "imagination_agree" in rollout_data["blue"]:
+                    _im_a = np.asarray(rollout_data["blue"]["imagination_agree"])
+                    _cg = np.asarray(rollout_data["blue"]["conf_gate_imagine_frac"])
+                    _alive_roll = np.asarray(rollout_data["blue"]["alive"]).astype(bool)
+                    if _alive_roll.any():
+                        im_agree_val = float(_im_a[_alive_roll].mean()) * 100.0
+                        conf_gate_val = float(_cg[_alive_roll].mean()) * 100.0
+                _tau = float((_p9 or {}).get("confidence_threshold", 0.02))
+                print(
+                    f"  EpistemicGate: imagination_agree={im_agree_val:.1f}% "
+                    f"| conf_gate_imagine_frac={conf_gate_val:.1f}% "
+                    f"(τ={_tau}; K={int((_p9 or {}).get('imagination_k', 5))})"
+                )
             print(f"{'='*70}\n")
 
         # ── Evolutionary Distillation (CPU, Outer Loop) ─────────
