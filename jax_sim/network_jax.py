@@ -325,6 +325,10 @@ class AgentNetworkJax(nn.Module):
         carry_pred = self.carry_forward_dynamics(carry_t, action_oh)
         return env_pred, self_pred_logits, carry_pred
 
+    def value_from_carry(self, carry: jnp.ndarray) -> jnp.ndarray:
+        """Latent value readout for K-step imagination (carry-only; frozen at inference)."""
+        return self.head_value(carry).squeeze(-1)
+
 
 def init_agent_params(
     model: AgentNetworkJax,

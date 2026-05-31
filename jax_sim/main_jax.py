@@ -173,6 +173,16 @@ def make_sim_step(config: Dict, model: AgentNetworkJax, model_apply=None):
     _n_layers = config["n_layers"]
     from jax_sim import observations_jax as _obs
 
+    _imagination_enabled = bool(config.get("imagination_enabled", False))
+    _imagination_k = int(config.get("imagination_k", 5))
+    _imagination_gamma = float(config.get("imagination_gamma", config.get("ppo_gamma", 0.999)))
+    _imagine_fn = None
+    if _imagination_enabled:
+        from jax_sim.imagination_jax import make_imagination_fn
+        _imagine_fn = make_imagination_fn(
+            model, K=_imagination_k, gamma=_imagination_gamma
+        )
+
     @jax.jit
     def sim_step(carry, step_key):
         """
@@ -214,11 +224,19 @@ def make_sim_step(config: Dict, model: AgentNetworkJax, model_apply=None):
             signals=jnp.where(r_pop.alive[:, None], r_signal_out, 0.0)
         )
 
-        # ── Sample actions ──────────────────────────────────────
-        b_action_keys = jax.random.split(key_act, b_pop.max_pop)
+        # ── Sample actions (blue: optional K-step imagination at inference) ──
         r_action_keys = jax.random.split(key_act, r_pop.max_pop)
-        b_actions = jax.vmap(jax.random.categorical)(b_action_keys, b_action_logits)
         r_actions = jax.vmap(jax.random.categorical)(r_action_keys, r_action_logits)
+
+        if _imagine_fn is not None:
+            b_actions, b_im_gain, b_im_agree = _imagine_fn(
+                b_params_sg, b_carries, b_action_logits, b_pop.alive
+            )
+        else:
+            b_action_keys = jax.random.split(key_act, b_pop.max_pop)
+            b_actions = jax.vmap(jax.random.categorical)(b_action_keys, b_action_logits)
+            b_im_gain = jnp.zeros((b_pop.max_pop,), dtype=jnp.float32)
+            b_im_agree = jnp.zeros((b_pop.max_pop,), dtype=jnp.float32)
 
         # ── Update episodic memory buffer ───────────────────────
         b_nb_flat = b_obs[:, 6 : 6 + K * sig_d]
@@ -401,6 +419,8 @@ def make_sim_step(config: Dict, model: AgentNetworkJax, model_apply=None):
             "energy": b_pop.energy,
             "alive": b_pop.alive,
             "blue_caught": caught_b.astype(jnp.float32),
+            "imagination_gain": b_im_gain,
+            "imagination_agree": b_im_agree,
         }
         r_rollout = {
             "obs": r_obs, "actions": r_actions, "log_probs": r_log_probs_taken,
@@ -602,6 +622,13 @@ def _run_simulation_impl(
         _inspect.getsource(_rl_jax_mod.auxiliary_update)
     ):
         print("[JAX] Phase11 carry_fwd: head_fwd_dyn_1/2 → carry_{t+1} MSE (stop_grad target)")
+    if bool(config.get("imagination_enabled", False)):
+        _ik = int(config.get("imagination_k", 5))
+        _ig = float(config.get("imagination_gamma", config.get("ppo_gamma", 0.999)))
+        print(
+            f"[JAX] Phase11.2 imagination: K={_ik} carry_dyn rollouts, γ={_ig} "
+            f"(inference only; frozen head_fwd_dyn)"
+        )
     from jax_sim import observations_jax as _obs_mod
 
     _bo_path = _inspect.getfile(_obs_mod.build_observations_jax)
@@ -1191,6 +1218,15 @@ def _run_simulation_impl(
             else:
                 carry_rank = 0
                 carry_entropy = float('nan')
+            im_gain_val = float('nan')
+            im_agree_val = float('nan')
+            if "imagination_gain" in rollout_data["blue"]:
+                _im_g = np.asarray(rollout_data["blue"]["imagination_gain"])
+                _im_a = np.asarray(rollout_data["blue"]["imagination_agree"])
+                _alive_t = np.asarray(rollout_data["blue"]["alive"]).astype(bool)
+                if _alive_t.any():
+                    im_gain_val = float(_im_g[_alive_t].mean())
+                    im_agree_val = float(_im_a[_alive_t].mean()) * 100.0
             print(f"  Values:  mean={val_mean:.4f} | VF_loss={vf_loss:.4f} | Clip={clip_frac:.3f}")
             print(f"  Reward:  mean={rew_mean:.4f} | Entropy: {ent_val:.4f}")
             print(
@@ -1207,6 +1243,11 @@ def _run_simulation_impl(
                 f"red_floor={red_curriculum_stages[red_curriculum_idx]} "
                 f"sustain={red_sustain_count}/{red_sustain_needed} | brain={n_layers}L"
             )
+            if bool(config.get("imagination_enabled", False)):
+                print(
+                    f"  Imagination: gain={im_gain_val:.4f} | agree={im_agree_val:.1f}% "
+                    f"(vs greedy; K={int(config.get('imagination_k', 5))})"
+                )
             print(f"{'='*70}\n")
 
         # ── Evolutionary Distillation (CPU, Outer Loop) ─────────

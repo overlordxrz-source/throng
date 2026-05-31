@@ -45,5 +45,6 @@ AuxLoss: fwd_env=... | carry_fwd=... (↓0.05–0.1) | self_pred_acc=... | carry
 
 ## Next after carry fwd converges
 
-- Phase 11.1: GPU-resident rollouts (drop CPU offload on B200)
-- Phase 9.3: Dreamer imagination loop (K-step mental rollout using carry fwd head)
+- ~~Phase 11.1: GPU-resident rollouts~~ — **abandoned** (`d4cf614` revert)
+- **Phase 11.2:** K-step imagination — [`docs/PHASE11_2_IMAGINATION.md`](PHASE11_2_IMAGINATION.md) on `feature/phase11-2-imagination`
+- Phase 9.3: Dreamer loop (after 11.2 throughput gate)
