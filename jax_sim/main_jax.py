@@ -46,6 +46,7 @@ from jax_sim.network_jax import (
     AgentNetworkJax,
     AUX_HEAD_KEYS,
     ensure_aux_head_params,
+    graft_missing_param_subtrees,
     dead_code_reset_codebook_params,
     init_agent_params,
     make_model_apply,
@@ -677,14 +678,13 @@ def _run_simulation_impl(
                         continue
                     src_agent = unfreeze(source_dict[agent_type])
                     tgt_agent = unfreeze(target_dict[agent_type])
-                    for new_key in AUX_HEAD_KEYS:
-                        if new_key in tgt_agent and new_key not in src_agent:
-                            src_agent[new_key] = tgt_agent[new_key]
-                            print(
-                                f"[JAX] Injected randomly initialized {new_key} "
-                                f"into {agent_type}",
-                                flush=True,
-                            )
+                    injected_paths = graft_missing_param_subtrees(src_agent, tgt_agent)
+                    for path in injected_paths:
+                        print(
+                            f"[JAX] Injected randomly initialized {path} "
+                            f"into {agent_type}",
+                            flush=True,
+                        )
                     source_dict[agent_type] = freeze(src_agent)
                 restored = freeze(source_dict)
             elif "not compatible" in msg or "stored shape" in msg:

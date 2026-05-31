@@ -18,7 +18,7 @@ import jax.numpy as jnp
 from flax import linen as nn
 from flax.core import freeze, unfreeze
 from flax.core.frozen_dict import FrozenDict
-from typing import Any, Optional, Tuple
+from typing import Any, List, Optional, Tuple
 
 # Params created only in auxiliary_heads (not touched by __call__ during init).
 AUX_HEAD_KEYS = (
@@ -28,6 +28,9 @@ AUX_HEAD_KEYS = (
     "head_fwd_dyn_1",
     "head_fwd_dyn_2",
 )
+
+# Top-level module keys grafted from a fresh init when missing in Orbax checkpoints.
+CHECKPOINT_GRAFT_TOP_KEYS = AUX_HEAD_KEYS + ("nb_cross_attn",)
 
 
 def vector_quantize_signals(
@@ -373,6 +376,41 @@ def make_model_apply(model: AgentNetworkJax):
     return apply_fn
 
 
+def _is_nested_param_dict(node: Any) -> bool:
+    """True if this dict is a Flax submodule collection (not a single kernel/bias leaf)."""
+    if not isinstance(node, dict):
+        return False
+    return any(isinstance(v, dict) for v in node.values())
+
+
+def graft_missing_param_subtrees(
+    source: dict,
+    template: dict,
+    prefix: str = "",
+) -> List[str]:
+    """
+    Copy parameter subtrees present in ``template`` but missing from ``source``.
+
+    Recurses into nested Flax modules (e.g. ``nb_cross_attn/q_norm``, ``nb_cross_mha``).
+    Returns dotted paths of injected top-level or nested keys for logging.
+    """
+    injected: List[str] = []
+    for key, tgt_val in template.items():
+        path = f"{prefix}/{key}" if prefix else str(key)
+        if key not in source:
+            source[key] = jax.tree_util.tree_map(lambda x: x, tgt_val)
+            injected.append(path)
+            continue
+        src_val = source[key]
+        if (
+            isinstance(tgt_val, dict)
+            and isinstance(src_val, dict)
+            and _is_nested_param_dict(tgt_val)
+        ):
+            injected.extend(graft_missing_param_subtrees(src_val, tgt_val, path))
+    return injected
+
+
 def sanitize_agent_params(params: Any) -> Any:
     """
     Fix param trees corrupted by merging full Flax variable dicts.
@@ -415,7 +453,10 @@ def ensure_aux_head_params(
             and flat["head_signal"]["kernel"].shape[-1] != model.signal_dim
         )
     )
-    if all(k in flat for k in AUX_HEAD_KEYS) and not needs_vq:
+    needs_cross_attn = bool(
+        getattr(model, "cross_attn_enabled", False) and "nb_cross_attn" not in flat
+    )
+    if all(k in flat for k in AUX_HEAD_KEYS) and not needs_vq and not needs_cross_attn:
         return params
     carry = jnp.zeros((1, hidden_dim))
     if needs_vq and obs_dim > 0:
@@ -433,7 +474,14 @@ def ensure_aux_head_params(
     for k in AUX_HEAD_KEYS:
         if k not in flat:
             flat[k] = aux_flat[k]
-            print("[JAX] Merged fresh auxiliary-head params into restored checkpoint")
+            print(f"[JAX] Merged fresh {k} params into restored checkpoint")
+    if needs_cross_attn and obs_dim > 0:
+        obs = jnp.zeros((1, obs_dim))
+        fresh = model.init(rng, carry, obs, n_layers)["params"]
+        fresh_flat = unfreeze(fresh)
+        if "nb_cross_attn" in fresh_flat:
+            flat["nb_cross_attn"] = fresh_flat["nb_cross_attn"]
+            print("[JAX] Merged fresh nb_cross_attn (Phase 9.4) into restored checkpoint")
     return sanitize_agent_params(freeze(flat))
 
 
