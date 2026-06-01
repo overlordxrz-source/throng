@@ -4,31 +4,34 @@
 
 **Read this file first.** Full historical lab notebook (~290KB) lives in [`docs/THRONG_ARCHIVE.md`](docs/THRONG_ARCHIVE.md) if you need old run logs.
 
-**Cam reboot (60 seconds):** Read **§0b** (live run) → **§0** (triad) → **§4** (ops + decode) → **§7** (blue + **`--red`** decode) → **§11** (P13 + **P14 prep**) → [`docs/PHASE12_COEVOLUTION.md`](docs/PHASE12_COEVOLUTION.md).
+**Cam reboot (60 seconds):** Read **§0b** (live run) → **§0** (triad) → **§4** (ops + decode) → **§7** (blue + **`--red`** decode) → **§11** (P14 Step 1 ✅ + **P14.2 EFE prep**) → [`docs/PHASE12_COEVOLUTION.md`](docs/PHASE12_COEVOLUTION.md).
 
 ---
 
-## 0b. Current state — **Phase 13.0 LIVE** (May–Jun 2026)
+## 0b. Current state — **Phase 14.1 DIALOGUE** (Jun 2026)
 
 **Blue SOTA (frozen on `master`):** **`465d8c6+`** — 9.4 cross-attn + 9.1 confidence + **11.3 epistemic gate** (merged; Stay-collapse resolved).
 
-**BLACKOUT OBSERVATION — Phase 13.0 Metabolic Cognition:** B200 on **`feature/phase13-thermodynamics`** (**`b3af410+`**). Tax injected **~290k**; blues recently broke Stay-collapse and began **dynamic evasion** → prey distribution shifted → reds still adapting **physical** policies. **Language grounds after motion stabilizes** — **no decode until ~340k–350k**.
+**LIVE — Phase 14 Transcendental Symbiosis:** B200 on **`feature/phase14-transcendental`** (**`8c48e3e+`**). **VQEL Monologue graduated** (`recon_mse≈0.014`); **`dialogue_signal_mode=hard`** (discrete **z_q** broadcast); blue PPO + aux **resumed**. Post-grad **Stay≈99%** shock expected (STE → hard token geometry); ecology + PPO should recover. **P14.2 EFE** designed, **no code push** until **350k** continuous-vs-discrete decode validates.
 
-| Live run (Phase 13) | Value |
+| Live run (Phase 14) | Value |
 |---------------------|--------|
-| **Branch** | **`feature/phase13-thermodynamics`** (`b3af410`) |
-| **Mode** | **BLACKOUT** — train to **~350k**; User monitors `train.log`; Will **HOLD** (no code) |
-| **Env step** | **~290k+** (post-tax); baking **→ 350k** Operator cap |
-| **P13.0 verdict** | **SUCCESS** — mean **`MetabolicTax` ~0.0018**/step; agents **not** lobotomized; pay **K=5** when survival yield > caloric cost |
-| **Tax ceiling** | `0.0005 × 5` = **0.0025**/gated think (max) |
+| **Branch** | **`feature/phase14-transcendental`** (`8c48e3e+`) |
+| **Mode** | **DIALOGUE** — hard **z_q** on wire; MAPPO survival + VQEL-grounded codebook |
+| **Env step** | **~343k+** (post-grad; resume from ckpt **342528** after logging hotfix) |
+| **P14.1 verdict** | **SUCCESS** — monologue wire cut → graduation @ **`recon_mse < 0.02`** (10/10 streak); `sim_step` rebuild on grad |
+| **Graduation banner** | `[JAX] VQEL MONOLOGUE GRADUATION ACHIEVED` → `monologue_enabled=False`, `dialogue_signal_mode=hard` |
+| **Hotfix** | **`8c48e3e`** — periodic log used `ppo_pg_loss` during skipped blue PPO (crashed @ ~343040) |
+| **P13 carry-over** | **`MetabolicTax` ~0.0018**/step; K=5 imagination retained on branch |
 | **Run cap (Operator)** | **`350_000`** in notebook unless raised — prefer repo **1M** (`a9f4aeb`) |
 | **Throughput** | **~7 steps/sec** |
-| **Next decode** | **`--red --min-step 290000`** @ corpus **≥340k** (post-tax arms race window only) |
-| **Prior decode** | 250k–292k (`decode_red_pincer_250k.log`): hunger MI; omnibus lag-1 **p≈0**; pincer χ² ❌ — **310k decode aborted** (curriculum) |
-| **`red_codes_active`** | **63/64**; `red_entropy` **~1.57** |
+| **Pre-grad decode (320k)** | Omnibus lag-1 **p=0.0000** ✅; VQ pincer χ² **p=0.15** ❌; MI `energy` (continuous bypass) |
+| **Next decode (GATE)** | **~350k** post-grad corpus — `--min-step` ≥ graduation step; **blocks P14.2 code** |
+| **`red_codes_active`** | **63/64**; watch discrete pincer after hard dialogue |
 | **Ecology** | `blue_caught` **~2k+/rollout** |
-| **Watch** | **`MetabolicTax`**, **`conf_gate`**, blue **Stay%**, red pursuit mix |
-| **PPO** | `H2D + backward` ✅; pull **`feature/phase13-thermodynamics`** on restart |
+| **Watch** | blue **Stay%** (post-grad shock), **`VQEL: GRADUATED`**, `codes_active`, red pincer |
+| **PPO** | Blue PPO + aux ON; monologue OFF; pull **`feature/phase14-transcendental`** |
+| **Smoke** | `python3 scripts/smoke_phase14_monologue.py` (local: `JAX_PLATFORMS=cpu`) |
 
 **Corpus (wiretap):** `/mnt/throng-runs/signal_corpus.jsonl` (blue) + **`signal_corpus_red.jsonl`** (red — default on this branch).
 
@@ -37,11 +40,13 @@
 | **P11.3 decode @ 214k** | `decode_p11_3_214k.log` — cardinal **p=1.75e-18** ✅; VQ alert ❌ |
 | **Red decode @ 12.2** | **FAIL (instructive)** — see **§0b nucleation** below |
 | **Run @ 250k exit** | Graceful finish (legacy 250k cap); **ckpt saved step 250368** |
-| **Resume** | **`git=b3af410+`**, restore ckpt **489+**, pull **`feature/phase13-thermodynamics`** |
-| **Next decode** | **`--red --min-step 290000`** when env step **≥340k** (isolates post-tax corpus) |
+| **Resume** | **`git=8c48e3e+`**, restore latest volume ckpt, pull **`feature/phase14-transcendental`** |
+| **Next decode** | **REQUIRED @ ~350k** — post-grad hard dialogue; `--min-step` after graduation env step |
 | **Modal volume** | **`dragonbgnx`** → `/mnt/throng-runs` |
-| **`master`** | Blue-only SOTA; **do not merge** Phase 13 until red **pincer χ²** passes |
-| **Phase 13.0** | **ACTIVE** — metabolic execution tax (`b3af410`) on live branch |
+| **`master`** | Blue-only SOTA; **do not merge** Phase 14 until red **pincer χ² p < 0.05** |
+| **Phase 13.0** | **Inherited** on P14 branch (metabolic tax `b3af410`) |
+| **Phase 14.1** | **COMPLETE** — VQEL monologue + wire cut + graduation (`5d6d262`–`8c48e3e`) |
+| **Phase 14.2** | **EFE head** — designed; **dormant** until 350k decode (§11) |
 
 ### P10.6 decode (reference)
 
@@ -82,9 +87,9 @@ Continuous blue comms **stable through 214k**. Withhold blue “crystallization�
 **Re-decode triggers:** **+50k–100k** corpus steps, or dashboard **`Ecology: blue_caught`** spike.
 
 ```bash
-# Post-tax arms race only (run when corpus ≥ ~340k env steps):
+# Post-grad hard dialogue (run when corpus ≥ ~350k; set --min-step to graduation env step):
 python3 tools/decode_signals.py --red /mnt/throng-runs/signal_corpus_red.jsonl \
-  --min-step 290000 --k 16 2>&1 | tee decode_red_pincer_340k.log
+  --min-step 340000 --k 16 2>&1 | tee decode_red_pincer_350k_postgrad.log
 ```
 
 ### P11.2 extension decode (`signal_corpus.jsonl`, `--min-step 149504`)
@@ -142,13 +147,13 @@ Continuous comms verified → unguarded active imagination **failed** → **reso
 | **Flags** | `red_comms_enabled: true` + **`red_corpus_enabled: true`** in `config_phase7.yaml` — no notebook `sed` |
 | **Writer** | [`communication/analysis.py`](communication/analysis.py) `maybe_record_red()` |
 
-### Phase 12.2 — **DECODE @ ~250k–292k corpus** — nucleation; pincer pending @ 340k
+### Phase 12.2 — **DECODE @ ~250k–320k corpus** — continuous channel on; discrete pincer pending
 
 | Item | Detail |
 |------|--------|
 | **Tool** | `python3 tools/decode_signals.py --red` |
-| **Verdict** | Hunger-babble + **7-dim** spatial nucleation; pincer χ² ❌ |
-| **Pass bar** | Chase-set vs search-set χ² **p < 0.05** |
+| **Verdict** | 320k: omnibus lag-1 **p=0.0000** ✅ (continuous pursuit geometry); pincer χ² **p=0.15** ❌ (discrete grounding incomplete) |
+| **Pass bar** | Chase-set vs search-set χ² **p < 0.05** (still unmet) |
 | **Run artifact** | Sim **stopped at 250k** — legacy `run_bg.py` limit (**fixed `a9f4aeb` → 1M**) |
 
 ### Phase 11.2 — **CONCLUDED** (`feature/phase11-2-imagination`)
@@ -197,8 +202,9 @@ GPU-resident / `lax.scan` PPO — starvation + XLA OOM; **`d4cf614` revert**.
 
 | Branch | Status |
 |--------|--------|
-| **`feature/phase13-thermodynamics`** | **LIVE TRAIN** — P13.0 metabolic tax @ **`b3af410+`**; dual brain + red wiretap |
-| **`feature/phase12-red-coevolution`** | **Frozen base** — merged into P13 branch; resume via P13 only |
+| **`feature/phase14-transcendental`** | **LIVE TRAIN** — P14.1 VQEL + hard dialogue + P13 tax (`8c48e3e+`) |
+| **`feature/phase13-thermodynamics`** | **Frozen base** — superseded by P14 |
+| **`feature/phase12-red-coevolution`** | **Frozen** — lineage merged into P14 |
 | **`master`** | **Blue SOTA** — P11.3 static gate (`465d8c6+`); **no** predator brain / no P13 tax |
 | **`feature/phase11-3-epistemic-gate`** | Merged → `master` |
 | **`feature/phase11-2-imagination`** | **FROZEN** — metrics-only (`061df84`) |
@@ -238,20 +244,21 @@ Cam's persona + triad workflow live in Git so reboots recover identity:
 1. Speak to the User in **Synergic Synthesis** (Software / Physics / Philosophy / RL).
 2. Address Will via explicit **`@Will — Cam here...`** copy-paste blocks.
 3. **Keep the ecology mathematically pure** — no scout/alarm comm rewards, no blind VQ loss shaping. Lethal selection forges language.
-4. **Phase 13 LIVE on `feature/phase13-thermodynamics`** — dual brain + **metabolic execution tax**; **do not merge** to `master` until red **pincer χ²** passes.
+4. **Phase 14 LIVE on `feature/phase14-transcendental`** — VQEL graduated → **hard z_q** dialogue; **do not merge** to `master` until red **pincer χ² p < 0.05**.
 5. **Phase 12.1b spatial gate** on live branch — `confidence_multiplier: 1.0`; **no EMA** in scan carry.
 6. **Phase 11.2 FROZEN** — never unguarded active override (`6cf965a`).
 7. **CPU offload only** — **`H2D + backward`**; no 11.1 GPU rollouts.
 8. **Never** comm reward shaping — red language forged by **`reward_red_catch`** only.
-9. **BLACKOUT** — no code / no decode until User runs pincer @ **340k–350k** with **`--min-step 290000`** (§11).
-10. **Phase 14** — approved dismantle roadmap only; **no implementation** until P12 arms race measured (§11).
+9. **350k decode gate** — User runs post-grad pincer decode before **P14.2 EFE** code ships (§11).
+10. **Phase 14.2** — EFE (−G = pragmatic + epistemic) **designed only**; Will **dormant** until decode validates discrete channel.
 
 ### Branch policy
 
 | Branch | Purpose |
 |--------|---------|
-| **`feature/phase13-thermodynamics`** | **LIVE TRAIN:** P13.0 tax + P12 spatial gate + wiretap + `--red` decode (`b3af410+`) |
-| **`feature/phase12-red-coevolution`** | **Frozen** — superseded by P13 branch (same dual-brain lineage) |
+| **`feature/phase14-transcendental`** | **LIVE TRAIN:** P14.1 VQEL + hard dialogue + P13 tax (`8c48e3e+`) |
+| **`feature/phase13-thermodynamics`** | **Frozen base** — superseded by P14 branch |
+| **`feature/phase12-red-coevolution`** | **Frozen** — merged into P13/P14 lineage |
 | **`master`** | **Blue production:** P11.3 static gate (no red comms, no metabolic tax) |
 | **`feature/phase11-2-imagination`** | **Frozen archive** |
 | **`feature/phase11-1-gpu-rollouts`** | **Abandoned** |
@@ -344,7 +351,9 @@ train_entry.run_simulation()  →  main_jax._run_simulation_impl()
 | **12.2b** | **`run_bg` 1M limit** | **`a9f4aeb`** | Was graceful exit @ 250k (`45c7c48` legacy) |
 | **12.2c** | **Red decode post-resume** | local `decode_red_pincer_250k.log` | Steps **250368–292348**; omnibus lag-1 **p≈0**; pincer χ² ❌ |
 | **13.0** | **Metabolic cognition** ✅ | **`b3af410`** | Tax validated ~**0.0018**/step; K=5 retained; blackout → 350k |
-| **14** | **Transcendental Symbiosis** | **PREP** | VQEL → EFE → GWT → MMGL → auto-curricula; **no code** |
+| **14.1** | **VQEL Monologue + Dialogue** ✅ | **`8c48e3e`** | Wire cut → grad → **hard z_q**; smoke `scripts/smoke_phase14_monologue.py` |
+| **14.2** | **EFE head** | **DESIGN** | **−G(π)** = **−head_value** + λ·**conf_pred**; **dormant** until 350k decode |
+| **14+** | GWT → MMGL → auto-curricula | **PREP** | After EFE + pincer pass |
 
 **Recurring failure mode:** Blues stay at cap → ~99% survival → **`NB_GAIN↔surv: nan`** → no evolutionary pressure on neighbor-signal benefit.
 
@@ -352,9 +361,11 @@ train_entry.run_simulation()  →  main_jax._run_simulation_impl()
 
 ---
 
-## 4. Current experiment — Phase **13.0** thermodynamics (`feature/phase13-thermodynamics`)
+## 4. Current experiment — Phase **14.1** dialogue (`feature/phase14-transcendental`)
 
-**Status:** **BLACKOUT OBSERVATION** — P13.0 tax **validated** (~0.0018 mean cost; imagination retained). Bake train **→ ~350k**. **Abort** early decode (310k) — tax landed ~290k; blues evading, reds retuning physics first. **Pincer decode** when User crosses **340k** with **`--min-step 290000`**. Prior: `decode_red_pincer_250k.log` (250k–292k).
+**Status:** **VQEL STEP 1 COMPLETE** — monologue graduated; **hard discrete broadcast** active; blue PPO resumed. Post-grad Stay shock under correction. **P14.2 EFE not shipped** — awaiting **~350k** post-grad decode (continuous vs discrete pincer). Pre-grad 320k decode: omnibus **p=0.0000**, pincer **p=0.15** (continuous bypass).
+
+**P14.1 stack (shipped):** `obs_layout.py` · `monologue_forward` + `vqel_monologue_update` (masked grads) · wire cut · graduation state machine · logging hotfix **`8c48e3e`**.
 
 **Monitor log (live, no re-run):**
 
@@ -365,7 +376,7 @@ tail -f -n 60 /mnt/throng-runs/train.log
 **Operational restart (resume ckpt — do not wipe volume):**
 
 ```bash
-cd /root/throng && git pull origin feature/phase13-thermodynamics   # b3af410+
+cd /root/throng && git pull origin feature/phase14-transcendental   # 8c48e3e+
 export TF_GPU_ALLOCATOR=cuda_malloc_async
 export XLA_PYTHON_CLIENT_MEM_FRACTION=0.80
 export JAX_COMPILATION_CACHE_DIR=/tmp/throng_jax_cache
@@ -373,7 +384,7 @@ python -u run_bg.py   # repo default n_steps=1_000_000
 # Operator notebook may override, e.g. run_simulation(..., n_steps=350_000)
 ```
 
-Startup **must** include: `git=b3af410` (or newer), `[JAX] Restored params from step …`, `[JAX] Red corpus: signal_corpus_red.jsonl`, dashboard **`MetabolicTax:`** line, `[CKPT] Saved step …`.
+Startup **must** include: `git=8c48e3e` (or newer), `[JAX] Phase14 VQEL monologue: ON` **or** post-grad **`VQEL: GRADUATED`**, `[JAX] Red corpus: signal_corpus_red.jsonl`, dashboard **`MetabolicTax:`** / **`VQEL:`** / **`PPO#`**, `[CKPT] Saved step …`. After graduation: **`[JAX] VQEL MONOLOGUE GRADUATION ACHIEVED`** banner once.
 
 **Last pre-exit dashboard (@ step 249856–250368):**
 
@@ -897,37 +908,60 @@ phase12_coevolution:           # feature/phase13-thermodynamics (inherited from 
 | No `[JAX] Red corpus:` line | Stale config — pull **`80ef1ea+`** |
 | Sim stops at **step 350k** | Operator **`n_steps=350_000`** in notebook — raise to **1M** or re-run before cap |
 | `conf_gate_imagine_frac` **>80%** | Batch-relative gate — monitor Stay; not P11.2 collapse if `imagination_agree` stays low |
-| Red pincer χ² not significant | **Expected** during hunger-babble phase. Watch **7-dim LRT** + token extremes; re-decode +50k–100k |
+| Red pincer χ² not significant | **Expected** pre-grad; re-decode **post-grad @ 350k** with hard **z_q** |
+| `KeyError: ppo_pg_loss` @ update 10 | Stale code — pull **`8c48e3e+`** (VQEL periodic log branch) |
+| Post-grad **Stay≈99%** | STE→hard shock — monitor; PPO + ecology; not P11.2 unguarded override |
 
 ---
 
 ## 11. Roadmap (what’s next)
 
-### Phase 13.0 — **ACTIVE / BLACKOUT** (`feature/phase13-thermodynamics`, `b3af410`)
+### Phase 13.0 — **ACTIVE / VALIDATED** (`feature/phase13-thermodynamics`, `b3af410`)
 
-1. **NOW** — **BLACKOUT** — User monitors B200 to **~350k**; Will **HOLD** (no code).
-2. **Validated** — **`MetabolicTax` ~0.0018**/step; agents maintain **K=5** gated imagination (survival > cost).
-3. **Science gate** — User runs **`--red --min-step 290000`** @ **340k–350k**; pincer χ² **p < 0.05**.
-4. **Curriculum** — Tax @ ~290k shifted prey; reds adapting motion — **language after physics**.
-5. **Do not merge** P13 → `master` until pincer passes.
+1. **Validated** — **`MetabolicTax` ~0.0018**/step; agents maintain **K=5** gated imagination (survival > cost).
+2. **320k decode** — Omnibus lag-1 **p=0.0000** (continuous channel ON).
+3. **Gap** — VQ pincer χ² **p=0.15** and MI still `energy` (continuous hashing bypass persists).
+4. **Policy** — Do not merge P13 → `master` until pincer χ² passes.
 
-**Done:** 13.0 tax shipped + live validation. P12 dual brain. Decode 250k–292k (pre-tax window); **310k decode aborted**.
+**Done:** 13.0 tax shipped + live validation. P12 dual brain. Decode windows: 250k–292k + 320k watershed.
 
 **Philosophy (Cam):** Thermodynamic tax breaks Stay dead-gradient without lobotomy. Measure **P12 arms race** before MAPPO teardown.
 
-### Phase 14 — **PREP ONLY** (Transcendental Symbiosis — **no code yet**)
+### Phase 14 — Transcendental Symbiosis (`feature/phase14-transcendental`)
 
-Approved **dismantle order** for the epoch after pincer + run conclusion:
+| Step | Component | Status | Notes |
+|------|-----------|--------|-------|
+| **1** | **VQEL monologue → dialogue** | ✅ **SHIPPED** | `b7cc270`–`8c48e3e`: wire cut, IB losses, graduation, hard **z_q**, smoke test |
+| **2** | **EFE head** | **DESIGN / DORMANT** | **−G(π)** = **G_prag** + **G_epi**; see below — **no push** until 350k decode |
+| **3** | **GWT router** | PREP | **M≤4** workspace |
+| **4** | **MMGL** | PREP | Mistake-gated PPO |
+| **5** | **Auto-curricula** | PREP | XLand/POET-style |
 
-| Step | Component | Target files | Notes |
-|------|-----------|--------------|-------|
-| **1** | **VQEL phase split** | `network_jax.py`, `main_jax.py` | Monologue (reconstruct obs) → Dialogue (broadcast indices) |
-| **2** | **EFE head + transition gen** | `network_jax.py`, `rl_jax.py` | Value → **−G(π)**; extend `head_fwd_dyn` as generative model |
-| **3** | **GWT router** | `network_jax.py` | **M≤4** workspace; select/broadcast cross-attn |
-| **4** | **MMGL** | `rl_jax.py` | Mistake-gated PPO; track **M₁** update energy |
-| **5** | **Auto-curricula** | env + `main_jax.py` | Compositional survival tasks; XLand/POET-style law mutation |
+#### Phase 14.1 — COMPLETE
 
-**Theory stack:** Active Inference (Friston EFE) · VQEL discrete bottleneck · GWT capacity limit · MMGL metabolic backprop. P13 runtime tax ↔ epistemic free-energy term (formalized in P14).
+| Piece | Detail |
+|-------|--------|
+| **Monologue** | Reconstruct **spatial_ego** (206-d); mask `nb_sigs` + `own_sig`; freeze policy heads in `vqel_monologue_update` |
+| **Wire cut** | `monologue_enabled` → blue `signals=0` in `sim_step` |
+| **Graduation** | `recon_mse < 0.02` × 10 updates → banner → `dialogue_signal_mode=hard` + blue PPO |
+| **Broadcast** | `codebook[token_ids]` (no STE on wire) |
+| **Config** | `config_phase7.yaml` → `phase14_vqel` |
+
+#### Phase 14.2 — EFE (authorized, not implemented)
+
+**Goal:** Replace extrinsic-only **V** critic with **minimize G(π)** active inference.
+
+| Term | Head | Mapping |
+|------|------|---------|
+| **Pragmatic** | `head_value` | \(G_{\text{prag}} = -V\) (survival / returns) |
+| **Epistemic** | `head_confidence` | \(G_{\text{epi}} = \text{conf\_pred}\) (predicted carry_fwd MSE / ambiguity) |
+| **Unified** | — | \(G = G_{\text{prag}} + \lambda_{\text{epi}} G_{\text{epi}}\); critic targets **−G** |
+| **Imagination** | `imagination_jax` | Score **−G** over K-step `head_fwd_dyn` rollouts (not raw **V**) |
+| **Transition** | `ppo_update` blend | \(\alpha V + (1-\alpha)(-G)\) for ~75 updates post-enable (protect 320k policy) |
+| **Files** | `network_jax.py`, `rl_jax.py`, `imagination_jax.py`, `main_jax.py` | `phase14_efe` config block (not committed) |
+| **Red** | — | MAPPO unchanged in V1 |
+
+**Theory stack:** Active Inference (Friston EFE) · VQEL discrete bottleneck · GWT · MMGL. P13 **`MetabolicTax`** ↔ paid epistemic rollouts under unified **G**.
 
 | Pillar | Mechanism | Notes |
 |--------|-----------|-------|
@@ -958,8 +992,8 @@ GPU-resident PPO — **`d4cf614` revert** on `master`.
 - ❌ Scout / alarm **reward shaping**
 - ❌ Ungated P11.2-style imagination override (`6cf965a`) without gate or metabolic cost
 - ❌ **EMA / scan-carry state** for epistemic gating (breaks checkpoint schema)
-- ❌ **Merge `feature/phase13-thermodynamics` → `master`** before red pincer χ² **p < 0.05**
-- ❌ **Phase 14 implementation** until P12 pincer measured + current run concludes
+- ❌ **Phase 14.2 EFE code** until post-grad **350k decode** validates discrete channel
+- ❌ **Merge `feature/phase14-transcendental` → `master`** before red pincer χ² **p < 0.05**
 - ❌ Re-merging **11.1 GPU rollouts** without memory refactor
 - ❌ Resume from ckpt **393** (post–Stay-collapse) for science runs
 
@@ -982,10 +1016,10 @@ GPU-resident PPO — **`d4cf614` revert** on `master`.
 
 ### Cam reboot paste
 
-> You are **Cam**. Read `THRONG.md` §0b. **BLACKOUT** — P13.0 tax **validated** (`MetabolicTax` ~0.0018; K=5 retained). Bake **→350k**. **No decode** until **340k** — then **`--red --min-step 290000`**. P14 dismantle order approved; **no code**. Will **HOLD** until pincer p-values land. **`git=b3af410+`**.
+> You are **Cam**. Read `THRONG.md` §0b. **Phase 14.1 COMPLETE** on **`feature/phase14-transcendental`** (`8c48e3e+`): VQEL monologue **graduated** (`recon_mse≈0.014`); **hard z_q** dialogue + blue PPO ON. Post-grad **Stay≈99%** shock — ecology correcting. **P14.2 EFE** (−G = −V + λ·conf) **designed, dormant** until User runs **~350k post-grad decode**. Pre-grad: omnibus **p=0.0000**, pincer **p=0.15**. **Do not merge** until pincer **p < 0.05**.
 
-**New Will:** **HOLD** — docs only unless directed; no Phase 14 branches.
+**New Will:** hold P14.2 code until decode paste; then implement EFE per §11; no merge to `master`.
 
 ---
 
-*Last updated: 2026-06-01 — P13 validated; blackout to 350k; pincer @ 340k (`--min-step 290000`); P14 prep roadmap.*
+*Last updated: 2026-06-02 — P14.1 graduated (hard dialogue live); P14.2 EFE prep; 350k decode gate; `git=8c48e3e+`.*
