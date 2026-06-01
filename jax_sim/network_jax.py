@@ -681,6 +681,19 @@ def make_model_apply(model: AgentNetworkJax):
     return apply_fn
 
 
+def make_vqel_monologue_apply(model: AgentNetworkJax):
+    """Return apply bound to ``monologue_forward`` (Phase 14.1b)."""
+    def apply_fn(params, carries, obs, n_layers):
+        return model.apply(
+            params_apply_variables(params),
+            carries,
+            obs,
+            n_layers,
+            method=model.monologue_forward,
+        )
+    return apply_fn
+
+
 def _is_nested_param_dict(node: Any) -> bool:
     """True if this dict is a Flax submodule collection (not a single kernel/bias leaf)."""
     if not isinstance(node, dict):

@@ -53,10 +53,18 @@ from jax_sim.network_jax import (
     init_agent_params,
     init_predator_params,
     make_model_apply,
+    make_vqel_monologue_apply,
     params_apply_variables,
     sanitize_agent_params,
 )
-from jax_sim.rl_jax import compute_gae, ppo_loss, create_optimizer, ppo_update, auxiliary_update
+from jax_sim.rl_jax import (
+    compute_gae,
+    ppo_loss,
+    create_optimizer,
+    ppo_update,
+    auxiliary_update,
+    vqel_monologue_update,
+)
 from agents.network_torch import compute_obs_dim_torch, compute_fwd_env_dim, loc_env_flat_bounds
 from jax_sim.observations_jax import (
     RED_NEIGHBOR_SIGNAL_API_VERSION,
@@ -676,6 +684,13 @@ def _run_simulation_impl(
         cross_attn_num_heads=_cross_heads,
     )
     model_apply = make_model_apply(model)
+    vqel_monologue_apply = make_vqel_monologue_apply(model)
+    _p14 = config.get("phase14_vqel") or {}
+    _vqel_monologue = bool(_p14.get("monologue_enabled", False))
+    _vqel_recon_coef = float(_p14.get("recon_coef", 1.0))
+    _vqel_hash_coef = float(_p14.get("hash_penalty_coef", 0.5))
+    _vqel_vq_coef = float(_p14.get("vq_coef_monologue", 1.0))
+    _vqel_lr = float(_p14.get("monologue_lr", 3.0e-5))
     model_red = None
     r_model_apply = None
     if _red_comms:
@@ -988,6 +1003,16 @@ def _run_simulation_impl(
     b_optimizer = create_optimizer(config["ppo_lr"], config["ppo_max_grad_norm"])
     r_optimizer = create_optimizer(config["ppo_lr"], config["ppo_max_grad_norm"])
     b_opt_state = b_optimizer.init(b_params)
+    b_vqel_optimizer = None
+    b_vqel_opt_state = None
+    if _vqel_monologue:
+        b_vqel_optimizer = create_optimizer(_vqel_lr, config["ppo_max_grad_norm"])
+        b_vqel_opt_state = b_vqel_optimizer.init(b_params)
+        print(
+            f"[JAX] Phase14 VQEL monologue: ON (lr={_vqel_lr}, "
+            f"recon={_vqel_recon_coef}, hash={_vqel_hash_coef}, vq={_vqel_vq_coef}) "
+            "— blue PPO/aux skipped; policy heads frozen"
+        )
     r_opt_state = r_optimizer.init(r_params)
 
     # ── Carries ─────────────────────────────────────────────
@@ -1139,48 +1164,73 @@ def _run_simulation_impl(
                 "often 3–10+ min on first update; do not Stop.",
                 flush=True,
             )
-        print("  [DEBUG] --- Blue PPO Update ---")
         b_batch = rollout_data["blue"]
-        # Save carries on CPU before ppo_update deletes them (needed for fwd dynamics)
         _b_carries_np = np.asarray(b_batch["carries"])
         _b_actions_np = np.asarray(b_batch["actions"])
         _b_obs_np = np.asarray(b_batch["obs"])
-        _b_alive_np   = np.asarray(b_batch["alive"]) if "alive" in b_batch else None
-        _t_ppo0 = __import__("time").time()
-        b_params, b_opt_state, b_metrics = ppo_update(
-            b_params, b_opt_state, b_optimizer, model_apply,
-            b_batch, n_layers, update_key,
-            clip_eps=float(config.get("ppo_clip_eps", config.get("ppo_clip", 0.2))),
-            vf_coef=float(config.get("ppo_value_coef", 0.25)),
-            ent_coef=float(config.get("ppo_entropy_coef", 0.02)),
-            vq_coef=float(config.get("vq_loss_coef", 0.1)),
-            minibatch_size=_fwd_mb,
-            gamma=float(config.get("ppo_gamma", 0.99)),
-            lam=float(config.get("ppo_gae_lam", 0.95)),
-            team="blue",
-        )
-        if ui == start_update:
-            print(
-                f"  [JAX] Blue PPO done in {__import__('time').time() - _t_ppo0:.1f}s",
-                flush=True,
+        _b_alive_np = np.asarray(b_batch["alive"]) if "alive" in b_batch else None
+
+        if _vqel_monologue:
+            print("  [DEBUG] --- Blue VQEL Monologue Update ---")
+            vqel_key, update_key = jax.random.split(update_key)
+            _t_vqel0 = __import__("time").time()
+            b_params, b_vqel_opt_state, b_metrics = vqel_monologue_update(
+                b_params,
+                b_vqel_opt_state,
+                b_vqel_optimizer,
+                vqel_monologue_apply,
+                _b_obs_np,
+                _b_carries_np,
+                n_layers,
+                alive_np=_b_alive_np,
+                key=vqel_key,
+                minibatch_size=_fwd_mb,
+                recon_coef=_vqel_recon_coef,
+                hash_penalty_coef=_vqel_hash_coef,
+                vq_coef=_vqel_vq_coef,
             )
-        # Auxiliary losses (forward dynamics + self-prediction) for blue
-        _self_pred_coef = float(config.get("self_pred_coef", 0.1))
-        fwd_key, update_key = jax.random.split(update_key)
-        b_params, b_opt_state, b_fwd_loss, b_carry_fwd_loss, b_sp_loss, b_sp_acc, b_conf_loss, b_conf_pred = auxiliary_update(
-            b_params, b_opt_state, b_optimizer, b_aux_apply_fn,
-            _b_carries_np, _b_actions_np, _b_obs_np,
-            _loc_env_start, _loc_env_end,
-            _b_alive_np, fwd_key, minibatch_size=_fwd_mb,
-            fwd_coef=_fwd_coef, carry_fwd_coef=_carry_fwd_coef,
-            self_pred_coef=_self_pred_coef, conf_coef=_conf_coef,
-        )
-        b_metrics["fwd_loss"] = b_fwd_loss
-        b_metrics["carry_fwd_loss"] = b_carry_fwd_loss
-        b_metrics["sp_loss"]     = b_sp_loss
-        b_metrics["sp_acc"]      = b_sp_acc
-        b_metrics["conf_loss"]   = b_conf_loss
-        b_metrics["conf_pred"]   = b_conf_pred
+            if ui == start_update:
+                print(
+                    f"  [JAX] Blue VQEL monologue done in "
+                    f"{__import__('time').time() - _t_vqel0:.1f}s",
+                    flush=True,
+                )
+        else:
+            print("  [DEBUG] --- Blue PPO Update ---")
+            _t_ppo0 = __import__("time").time()
+            b_params, b_opt_state, b_metrics = ppo_update(
+                b_params, b_opt_state, b_optimizer, model_apply,
+                b_batch, n_layers, update_key,
+                clip_eps=float(config.get("ppo_clip_eps", config.get("ppo_clip", 0.2))),
+                vf_coef=float(config.get("ppo_value_coef", 0.25)),
+                ent_coef=float(config.get("ppo_entropy_coef", 0.02)),
+                vq_coef=float(config.get("vq_loss_coef", 0.1)),
+                minibatch_size=_fwd_mb,
+                gamma=float(config.get("ppo_gamma", 0.99)),
+                lam=float(config.get("ppo_gae_lam", 0.95)),
+                team="blue",
+            )
+            if ui == start_update:
+                print(
+                    f"  [JAX] Blue PPO done in {__import__('time').time() - _t_ppo0:.1f}s",
+                    flush=True,
+                )
+            _self_pred_coef = float(config.get("self_pred_coef", 0.1))
+            fwd_key, update_key = jax.random.split(update_key)
+            b_params, b_opt_state, b_fwd_loss, b_carry_fwd_loss, b_sp_loss, b_sp_acc, b_conf_loss, b_conf_pred = auxiliary_update(
+                b_params, b_opt_state, b_optimizer, b_aux_apply_fn,
+                _b_carries_np, _b_actions_np, _b_obs_np,
+                _loc_env_start, _loc_env_end,
+                _b_alive_np, fwd_key, minibatch_size=_fwd_mb,
+                fwd_coef=_fwd_coef, carry_fwd_coef=_carry_fwd_coef,
+                self_pred_coef=_self_pred_coef, conf_coef=_conf_coef,
+            )
+            b_metrics["fwd_loss"] = b_fwd_loss
+            b_metrics["carry_fwd_loss"] = b_carry_fwd_loss
+            b_metrics["sp_loss"] = b_sp_loss
+            b_metrics["sp_acc"] = b_sp_acc
+            b_metrics["conf_loss"] = b_conf_loss
+            b_metrics["conf_pred"] = b_conf_pred
 
         if config.get("vq_dead_code_reset", True) and "z_e" in b_batch:
             _dc_key, update_key = jax.random.split(update_key)
@@ -1456,6 +1506,14 @@ def _run_simulation_impl(
                 f"(↓0.05–0.1) | self_pred_acc={sp_acc_val:.3f}{_aux_conf} | "
                 f"carry_rank={carry_rank} | carry_H={carry_entropy:.2f}"
             )
+            if _vqel_monologue:
+                _vr = float(b_metrics.get("vqel_recon_mse", float("nan")))
+                _vh = float(b_metrics.get("vqel_hash_penalty", float("nan")))
+                _vt = float(b_metrics.get("vqel_total_loss", float("nan")))
+                print(
+                    f"  VQEL: recon_mse={_vr:.5f} | hash_penalty={_vh:.5f} "
+                    f"| total={_vt:.5f}"
+                )
             blue_caught_rollout = 0
             if "blue_caught" in rollout_data["blue"]:
                 blue_caught_rollout = int(np.asarray(rollout_data["blue"]["blue_caught"]).sum())

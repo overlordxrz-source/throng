@@ -476,3 +476,223 @@ def fwd_dynamics_update(params, opt_state, optimizer, fwd_apply_fn,
     import functools as _ft
     raise NotImplementedError("fwd_dynamics_update requires obs_np and loc_env bounds; use auxiliary_update")
     return p, o, fl
+
+
+# ── Phase 14.1b: VQEL monologue (reconstruction + information bottleneck) ───
+
+VQEL_FROZEN_TOP_KEYS = frozenset({
+    "head_action",
+    "head_value",
+    "head_fwd_dyn_1",
+    "head_fwd_dyn_2",
+    "head_fwd_1",
+    "head_fwd_2",
+    "head_self_pred",
+    "head_confidence_1",
+    "head_confidence_2",
+    "head_symbol",
+    "head_tom",
+    "head_culture_fast",
+    "head_culture_slow",
+})
+
+
+def _vqel_trainable_mask(params: Dict) -> Dict:
+    """Zero gradients for policy / aux heads; allow transformer + VQ + monologue decoder."""
+    def _mask_at_path(path, leaf):
+        if path:
+            top = path[0].key if hasattr(path[0], "key") else str(path[0])
+            if top in VQEL_FROZEN_TOP_KEYS:
+                return jnp.zeros_like(leaf)
+        return jnp.ones_like(leaf)
+
+    return jax.tree_util.tree_map_with_path(_mask_at_path, params)
+
+
+def compute_vqel_losses(
+    spatial_hat: jnp.ndarray,
+    spatial_ego: jnp.ndarray,
+    loss_vq: jnp.ndarray,
+    z_e: jnp.ndarray,
+    z_q: jnp.ndarray,
+    alive: jnp.ndarray = None,
+    recon_coef: float = 1.0,
+    hash_penalty_coef: float = 0.5,
+    vq_coef: float = 1.0,
+) -> Tuple[jnp.ndarray, Dict]:
+    """
+    Phase 14.1b combined monologue loss.
+
+    L_recon: MSE(decode(z_q), stop_grad(spatial_ego))
+    L_hash: commitment-style ||z_e - z_q||^2 (Voronoi squeeze), scaled by hash_penalty_coef
+    L_vq:  standard VQ codebook + commitment from vector_quantize_signals
+    """
+    target = jax.lax.stop_gradient(spatial_ego)
+    recon_per = jnp.mean(jnp.square(spatial_hat - target), axis=-1)
+
+    z_q_sg = jax.lax.stop_gradient(z_q)
+    hash_per = jnp.sum(jnp.square(z_e - z_q_sg), axis=-1)
+
+    if alive is not None:
+        mask = alive.astype(jnp.float32)
+        denom = mask.sum() + 1e-8
+        vqel_recon_mse = (recon_per * mask).sum() / denom
+        vqel_hash_penalty = (hash_per * mask).sum() / denom
+        vqel_vq_loss = (loss_vq * mask).sum() / denom
+    else:
+        denom = float(spatial_hat.shape[0])
+        vqel_recon_mse = jnp.mean(recon_per)
+        vqel_hash_penalty = jnp.mean(hash_per)
+        vqel_vq_loss = jnp.mean(loss_vq)
+
+    total = (
+        recon_coef * vqel_recon_mse
+        + hash_penalty_coef * vqel_hash_penalty
+        + vq_coef * vqel_vq_loss
+    )
+    metrics = {
+        "vqel_recon_mse": vqel_recon_mse,
+        "vqel_hash_penalty": vqel_hash_penalty,
+        "vqel_vq_loss": vqel_vq_loss,
+        "vqel_total_loss": total,
+    }
+    return total, metrics
+
+
+def vqel_monologue_loss(
+    params: Dict,
+    monologue_apply_fn: Any,
+    carries: jnp.ndarray,
+    obs: jnp.ndarray,
+    n_layers: int,
+    alive: jnp.ndarray = None,
+    recon_coef: float = 1.0,
+    hash_penalty_coef: float = 0.5,
+    vq_coef: float = 1.0,
+) -> Tuple[jnp.ndarray, Dict]:
+    """Evaluate monologue forward + VQEL losses (differentiable)."""
+    carries = jax.lax.stop_gradient(carries)
+    obs = jax.lax.stop_gradient(obs)
+
+    _z_q, _tok, spatial_hat, spatial_ego, loss_vq, z_e = monologue_apply_fn(
+        params, carries, obs, n_layers
+    )
+    z_q = z_e + jax.lax.stop_gradient(_z_q - z_e)
+
+    return compute_vqel_losses(
+        spatial_hat,
+        spatial_ego,
+        loss_vq,
+        z_e,
+        z_q,
+        alive=alive,
+        recon_coef=recon_coef,
+        hash_penalty_coef=hash_penalty_coef,
+        vq_coef=vq_coef,
+    )
+
+
+@functools.partial(
+    jax.jit,
+    static_argnames=(
+        "monologue_apply_fn",
+        "optimizer",
+        "n_layers",
+        "recon_coef",
+        "hash_penalty_coef",
+        "vq_coef",
+    ),
+)
+def _vqel_monologue_minibatch_step(
+    params,
+    opt_state,
+    monologue_apply_fn,
+    optimizer,
+    carries,
+    obs,
+    n_layers,
+    alive,
+    recon_coef,
+    hash_penalty_coef,
+    vq_coef,
+):
+    grad_fn = jax.value_and_grad(vqel_monologue_loss, has_aux=True)
+    (loss, metrics), grads = grad_fn(
+        params,
+        monologue_apply_fn,
+        carries,
+        obs,
+        n_layers,
+        alive=alive,
+        recon_coef=recon_coef,
+        hash_penalty_coef=hash_penalty_coef,
+        vq_coef=vq_coef,
+    )
+    mask = _vqel_trainable_mask(params)
+    grads = jax.tree_util.tree_map(lambda g, m: g * m, grads, mask)
+    updates, new_opt_state = optimizer.update(grads, opt_state, params)
+    new_params = optax.apply_updates(params, updates)
+    metrics = dict(metrics)
+    metrics["vqel_total_loss"] = loss
+    return new_params, new_opt_state, metrics
+
+
+def vqel_monologue_update(
+    params: Dict,
+    opt_state: Any,
+    optimizer: optax.GradientTransformation,
+    monologue_apply_fn: Any,
+    obs_np: np.ndarray,
+    carries_np: np.ndarray,
+    n_layers: int,
+    alive_np: np.ndarray = None,
+    key: jax.Array = None,
+    minibatch_size: int = 512,
+    recon_coef: float = 1.0,
+    hash_penalty_coef: float = 0.5,
+    vq_coef: float = 1.0,
+) -> Tuple[Dict, Any, Dict]:
+    """
+    Minibatched VQEL monologue update with masked gradients (policy heads frozen).
+
+    Returns (new_params, new_opt_state, metrics) with vqel_recon_mse and vqel_hash_penalty.
+    """
+    T, N = obs_np.shape[:2]
+    M = T * N
+    hidden_dim = carries_np.shape[-1]
+
+    flat_obs = np.asarray(obs_np.reshape(M, obs_np.shape[-1]))
+    flat_carries = np.asarray(carries_np.reshape(M, hidden_dim))
+    if alive_np is not None:
+        flat_alive = np.asarray(alive_np.reshape(M)).astype(np.float32)
+    else:
+        flat_alive = np.ones(M, dtype=np.float32)
+
+    if key is None:
+        key = jax.random.PRNGKey(0)
+    rng = np.random.RandomState(int(jax.random.bits(key, dtype=jnp.uint32)))
+    perm = rng.permutation(M)
+    minibatch_size = int(minibatch_size)
+    n_mb = max(1, M // minibatch_size)
+
+    metric_sums: Dict[str, float] = {}
+    for i in range(n_mb):
+        idx = perm[i * minibatch_size : (i + 1) * minibatch_size]
+        params, opt_state, mb_mets = _vqel_monologue_minibatch_step(
+            params,
+            opt_state,
+            monologue_apply_fn,
+            optimizer,
+            jnp.array(flat_carries[idx]),
+            jnp.array(flat_obs[idx]),
+            n_layers,
+            jnp.array(flat_alive[idx]),
+            recon_coef,
+            hash_penalty_coef,
+            vq_coef,
+        )
+        for k, v in mb_mets.items():
+            metric_sums[k] = metric_sums.get(k, 0.0) + float(v)
+
+    metrics = {k: v / n_mb for k, v in metric_sums.items()}
+    return params, opt_state, metrics

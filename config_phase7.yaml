@@ -219,4 +219,12 @@ phase12_coevolution:
   red_corpus_enabled: true       # 12.1 wiretap — signal_corpus_red.jsonl (requires red_comms_enabled)
   hunt_scout_range: 8            # symmetric with alarm_scout_range (blue scout label)
 
+# Phase 14.1b — VQEL monologue (feature/phase14-transcendental)
+phase14_vqel:
+  monologue_enabled: true        # true: blue VQEL update only (skips blue PPO/aux)
+  monologue_lr: 0.00003          # low LR to protect 320k MAPPO policy in shared trunk
+  recon_coef: 1.0
+  hash_penalty_coef: 0.5
+  vq_coef_monologue: 1.0
+
 exit_on_graduation: false
