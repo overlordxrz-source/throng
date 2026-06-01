@@ -203,6 +203,9 @@ def make_sim_step(
     _imagination_gamma = float(
         _p9.get("imagination_gamma", config.get("ppo_gamma", 0.999))
     )
+    _p14 = config.get("phase14_vqel") or {}
+    _vqel_monologue = bool(_p14.get("monologue_enabled", False))
+    _dialogue_signal_mode = str(_p14.get("dialogue_signal_mode", "ste")).lower()
     _imagine_fn = None
     if _img_gate_enabled:
         from jax_sim.imagination_jax import make_imagination_fn
@@ -244,9 +247,17 @@ def make_sim_step(
         b_action_logits, b_signal_out, b_sym_w, b_vals, b_tom, b_token_ids, b_loss_vq, b_z_e, b_cult_f, b_cult_s = b_outs
         r_action_logits, r_signal_out, r_sym_w, r_vals, r_tom, r_token_ids, r_loss_vq, r_z_e, r_cult_f, r_cult_s = r_outs
 
-        # ── Write VQ signals (STE forward ≡ discrete z_q) for neighbours ──
+        # ── Write VQ signals for neighbours ──
+        # Phase 14.1c: monologue = wire cut (silence); post-graduation "hard" = discrete z_q only.
+        if _vqel_monologue:
+            b_sig_broadcast = jnp.zeros_like(b_signal_out)
+        elif _dialogue_signal_mode == "hard":
+            _cb = b_params_sg["codebook"]["embedding"]
+            b_sig_broadcast = _cb[b_token_ids]
+        else:
+            b_sig_broadcast = b_signal_out
         b_pop = b_pop.replace(
-            signals=jnp.where(b_pop.alive[:, None], b_signal_out, 0.0)
+            signals=jnp.where(b_pop.alive[:, None], b_sig_broadcast, 0.0)
         )
         r_pop = r_pop.replace(
             signals=jnp.where(r_pop.alive[:, None], r_signal_out, 0.0)
@@ -687,10 +698,14 @@ def _run_simulation_impl(
     vqel_monologue_apply = make_vqel_monologue_apply(model)
     _p14 = config.get("phase14_vqel") or {}
     _vqel_monologue = bool(_p14.get("monologue_enabled", False))
+    _dialogue_signal_mode = str(_p14.get("dialogue_signal_mode", "ste")).lower()
     _vqel_recon_coef = float(_p14.get("recon_coef", 1.0))
     _vqel_hash_coef = float(_p14.get("hash_penalty_coef", 0.5))
     _vqel_vq_coef = float(_p14.get("vq_coef_monologue", 1.0))
     _vqel_lr = float(_p14.get("monologue_lr", 3.0e-5))
+    _graduate_recon_mse = float(_p14.get("graduate_recon_mse", 0.02))
+    _graduate_consecutive = int(_p14.get("graduate_consecutive_updates", 10))
+    _vqel_grad_streak = 0
     model_red = None
     r_model_apply = None
     if _red_comms:
@@ -1011,8 +1026,14 @@ def _run_simulation_impl(
         print(
             f"[JAX] Phase14 VQEL monologue: ON (lr={_vqel_lr}, "
             f"recon={_vqel_recon_coef}, hash={_vqel_hash_coef}, vq={_vqel_vq_coef}) "
-            "— blue PPO/aux skipped; policy heads frozen"
+            "— blue PPO/aux skipped; policy heads frozen; blue broadcast=WIRE CUT (silence)"
         )
+        print(
+            f"[JAX] Phase14 graduation: recon_mse < {_graduate_recon_mse} for "
+            f"{_graduate_consecutive} consecutive updates → dialogue hard + blue PPO resume"
+        )
+    elif _dialogue_signal_mode == "hard":
+        print("[JAX] Phase14 dialogue_signal_mode=hard (discrete z_q broadcast on blue wire)")
     r_opt_state = r_optimizer.init(r_params)
 
     # ── Carries ─────────────────────────────────────────────
@@ -1045,6 +1066,10 @@ def _run_simulation_impl(
     def _rebuild_sim_step(cur_n_layers):
         cfg_copy = dict(config)
         cfg_copy["n_layers"] = cur_n_layers
+        p14_live = dict(cfg_copy.get("phase14_vqel") or {})
+        p14_live["monologue_enabled"] = _vqel_monologue
+        p14_live["dialogue_signal_mode"] = _dialogue_signal_mode
+        cfg_copy["phase14_vqel"] = p14_live
         return make_sim_step(
             cfg_copy,
             model,
@@ -1195,6 +1220,34 @@ def _run_simulation_impl(
                     f"{__import__('time').time() - _t_vqel0:.1f}s",
                     flush=True,
                 )
+            _recon_mse = float(b_metrics.get("vqel_recon_mse", float("inf")))
+            if _recon_mse < _graduate_recon_mse:
+                _vqel_grad_streak += 1
+            else:
+                _vqel_grad_streak = 0
+            if _vqel_grad_streak >= _graduate_consecutive:
+                print("\n" + "=" * 70, flush=True)
+                print(
+                    "[JAX] VQEL MONOLOGUE GRADUATION ACHIEVED",
+                    flush=True,
+                )
+                print(
+                    f"  recon_mse={_recon_mse:.5f} < {_graduate_recon_mse} for "
+                    f"{_graduate_consecutive} consecutive updates",
+                    flush=True,
+                )
+                print(
+                    "  → monologue_enabled=False | dialogue_signal_mode=hard | blue PPO resumed",
+                    flush=True,
+                )
+                print("=" * 70 + "\n", flush=True)
+                _vqel_monologue = False
+                _dialogue_signal_mode = "hard"
+                _vqel_grad_streak = 0
+                if config.get("phase14_vqel") is not None:
+                    config["phase14_vqel"]["monologue_enabled"] = False
+                    config["phase14_vqel"]["dialogue_signal_mode"] = "hard"
+                sim_step_fn = _rebuild_sim_step(n_layers)
         else:
             print("  [DEBUG] --- Blue PPO Update ---")
             _t_ppo0 = __import__("time").time()
@@ -1512,8 +1565,11 @@ def _run_simulation_impl(
                 _vt = float(b_metrics.get("vqel_total_loss", float("nan")))
                 print(
                     f"  VQEL: recon_mse={_vr:.5f} | hash_penalty={_vh:.5f} "
-                    f"| total={_vt:.5f}"
+                    f"| total={_vt:.5f} | grad_streak={_vqel_grad_streak}/"
+                    f"{_graduate_consecutive} (target < {_graduate_recon_mse})"
                 )
+            elif _dialogue_signal_mode == "hard":
+                print("  VQEL: GRADUATED — hard z_q dialogue broadcast | blue PPO active")
             blue_caught_rollout = 0
             if "blue_caught" in rollout_data["blue"]:
                 blue_caught_rollout = int(np.asarray(rollout_data["blue"]["blue_caught"]).sum())
