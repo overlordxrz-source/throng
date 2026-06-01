@@ -19,6 +19,7 @@ from flax import linen as nn
 from flax.core import freeze, unfreeze
 from flax.core.frozen_dict import FrozenDict
 from typing import Any, List, Optional, Tuple
+from jax_sim.obs_layout import make_obs_layout
 
 # Params created only in auxiliary_heads (not touched by __call__ during init).
 AUX_HEAD_KEYS = (
@@ -32,7 +33,11 @@ AUX_HEAD_KEYS = (
 )
 
 # Top-level module keys grafted from a fresh init when missing in Orbax checkpoints.
-CHECKPOINT_GRAFT_TOP_KEYS = AUX_HEAD_KEYS + ("nb_cross_attn",)
+CHECKPOINT_GRAFT_TOP_KEYS = AUX_HEAD_KEYS + (
+    "nb_cross_attn",
+    "head_vqel_recon_1",
+    "head_vqel_recon_2",
+)
 
 
 def vector_quantize_signals(
@@ -137,6 +142,9 @@ class AgentNetworkJax(nn.Module):
     fwd_env_dim: int = 200   # W × 8 flattened loc_env (set from config in main_jax)
     cross_attn_enabled: bool = False
     cross_attn_num_heads: int = 4
+    neighbor_k: int = 6
+    local_cells: int = 25
+    env_channels: int = 8
 
     def setup(self):
         d = self.hidden_dim
@@ -184,12 +192,35 @@ class AgentNetworkJax(nn.Module):
         # Phase 9.1 — epistemic confidence: predict carry_fwd MSE from [carry_t, action_t]
         self.head_confidence_1 = nn.Dense(self.hidden_dim * 4)
         self.head_confidence_2 = nn.Dense(1)
+        # Phase 14.1a scaffold — keep decoder shallow so codebook carries semantics.
+        self.head_vqel_recon_1 = nn.Dense(self.hidden_dim)
+        self.head_vqel_recon_2 = nn.Dense(self._obs_layout().spatial_ego_dim)
 
         if self.cross_attn_enabled:
             self.nb_cross_attn = NeighborCrossAttention(
                 hidden_dim=d,
                 num_heads=self.cross_attn_num_heads,
             )
+
+    def _obs_layout(self):
+        return make_obs_layout(
+            signal_dim=self.signal_dim,
+            symbol_dim=self.symbol_dim,
+            memory_slots=self.memory_slots,
+            neighbor_k=self.neighbor_k,
+            local_cells=self.local_cells,
+            env_channels=self.env_channels,
+        )
+
+    def extract_spatial_ego(self, obs: jnp.ndarray) -> jnp.ndarray:
+        """
+        Phase 14.1a target: own_state + local env channels (flattened).
+        This is the monologue reconstruction target before social dialogue.
+        """
+        layout = self._obs_layout()
+        own_state = obs[:, layout.own_state_start : layout.own_state_end]
+        loc_env_flat = obs[:, layout.loc_env_start : layout.loc_env_end]
+        return jnp.concatenate([own_state, loc_env_flat], axis=-1)
 
     def __call__(
         self,
@@ -210,22 +241,30 @@ class AgentNetworkJax(nn.Module):
         N = obs.shape[0]
         d = self.hidden_dim
         sym_d = self.symbol_dim
-        K = 6  # neighbour_k (hardcoded for speed; should come from config)
-        W = 25  # (2*r+1)**2 with r=2 (5x5 patch)
+        layout = self._obs_layout()
+        K = layout.neighbor_k
+        W = layout.local_cells
 
         # Split observation vector
-        own_state = obs[:, :6]
-        nb_sigs = obs[:, 6:6 + K * self.signal_dim].reshape(N, K, self.signal_dim)
-        loc_sym = obs[:, 6 + K * self.signal_dim:6 + K * self.signal_dim + W * sym_d].reshape(N, W, sym_d)
-        env_ch = 8
-        loc_env = obs[:, 6 + K * self.signal_dim + W * sym_d:6 + K * self.signal_dim + W * sym_d + W * env_ch].reshape(N, W, env_ch)
-        own_sig = obs[:, 6 + K * self.signal_dim + W * sym_d + W * env_ch:6 + K * self.signal_dim + W * sym_d + W * env_ch + self.signal_dim]
+        own_state = obs[:, layout.own_state_start : layout.own_state_end]
+        nb_sigs = obs[:, layout.nb_sigs_start : layout.nb_sigs_end].reshape(
+            N, K, self.signal_dim
+        )
+        loc_sym = obs[:, layout.loc_sym_start : layout.loc_sym_end].reshape(
+            N, W, sym_d
+        )
+        loc_env = obs[:, layout.loc_env_start : layout.loc_env_end].reshape(
+            N, W, layout.env_channels
+        )
+        own_sig = obs[:, layout.own_sig_start : layout.own_sig_end]
 
-        idx = 6 + K * self.signal_dim + W * sym_d + W * env_ch + self.signal_dim
+        idx = layout.mem_start
 
         # Optional memory buffer
         if self.memory_slots > 0:
-            mem = obs[:, idx:idx + self.memory_slots * (self.signal_dim + 2)].reshape(N, self.memory_slots, self.signal_dim + 2)
+            mem = obs[:, idx : idx + self.memory_slots * (self.signal_dim + 2)].reshape(
+                N, self.memory_slots, self.signal_dim + 2
+            )
             idx += self.memory_slots * (self.signal_dim + 2)
         else:
             mem = None
@@ -297,11 +336,36 @@ class AgentNetworkJax(nn.Module):
         if self.is_initializing():
             _action_oh = jnp.zeros((N, 5), dtype=obs.dtype)
             self.auxiliary_heads(carries, _action_oh)
+            _zq_seed = jnp.zeros_like(z_e)
+            self.head_vqel_recon_2(nn.relu(self.head_vqel_recon_1(_zq_seed)))
 
         return new_carries, (
             action_logits, signal_out, symbol_write, values,
             tom_logits, token_ids, loss_vq, z_e, culture_fast, culture_slow,
         )
+
+    def monologue_forward(
+        self,
+        carries: jnp.ndarray,
+        obs: jnp.ndarray,
+        n_layers: int,
+    ) -> tuple:
+        """
+        Phase 14.1a scaffold: reconstruct spatial ego state through discrete codebook.
+        Returns (z_q, token_ids, spatial_ego_hat, spatial_ego_target, loss_vq, z_e).
+        """
+        layout = self._obs_layout()
+        obs_masked = obs.at[:, layout.nb_sigs_start : layout.nb_sigs_end].set(0.0)
+        obs_masked = obs_masked.at[:, layout.own_sig_start : layout.own_sig_end].set(0.0)
+
+        _, outs = self(carries, obs_masked, n_layers)
+        token_ids = outs[5]
+        loss_vq = outs[6]
+        z_e = outs[7]
+        z_q = z_e + jax.lax.stop_gradient(outs[1] - z_e)
+        spatial_ego_hat = self.head_vqel_recon_2(nn.relu(self.head_vqel_recon_1(z_q)))
+        spatial_ego_target = self.extract_spatial_ego(obs)
+        return z_q, token_ids, spatial_ego_hat, spatial_ego_target, loss_vq, z_e
 
     def forward_dynamics(
         self,
@@ -685,7 +749,7 @@ def ensure_aux_head_params(
     obs_dim: int = 0,
     n_layers: int = 4,
 ) -> Any:
-    """Fill missing auxiliary-head / VQ params when resuming an older checkpoint."""
+    """Fill missing auxiliary-head / VQ / monologue params when resuming."""
     flat = unfreeze(params)
     needs_vq = (
         "codebook" not in flat
@@ -697,7 +761,15 @@ def ensure_aux_head_params(
     needs_cross_attn = bool(
         getattr(model, "cross_attn_enabled", False) and "nb_cross_attn" not in flat
     )
-    if all(k in flat for k in AUX_HEAD_KEYS) and not needs_vq and not needs_cross_attn:
+    needs_vqel_recon = (
+        "head_vqel_recon_1" not in flat or "head_vqel_recon_2" not in flat
+    )
+    if (
+        all(k in flat for k in AUX_HEAD_KEYS)
+        and not needs_vq
+        and not needs_cross_attn
+        and not needs_vqel_recon
+    ):
         return params
     carry = jnp.zeros((1, hidden_dim))
     if needs_vq and obs_dim > 0:
@@ -707,6 +779,13 @@ def ensure_aux_head_params(
         for k in ("codebook", "head_signal"):
             flat[k] = fresh_flat[k]
         print("[JAX] Merged fresh VQ params (codebook, head_signal) into restored checkpoint")
+    if needs_vqel_recon and obs_dim > 0:
+        obs = jnp.zeros((1, obs_dim))
+        fresh = model.init(rng, carry, obs, n_layers)["params"]
+        fresh_flat = unfreeze(fresh)
+        for k in ("head_vqel_recon_1", "head_vqel_recon_2"):
+            flat[k] = fresh_flat[k]
+        print("[JAX] Merged fresh VQEL monologue decoder heads into restored checkpoint")
     action_oh = jnp.zeros((1, 5), dtype=jnp.float32)
     aux_only = model.init(
         rng, carry, action_oh, method=model.auxiliary_heads
