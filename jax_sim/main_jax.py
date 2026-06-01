@@ -1937,9 +1937,26 @@ def _run_simulation_impl(
                            f" oL={metrics_py.get('nan_old_log_probs',0):.0f}"
                            f" adv={metrics_py.get('nan_advantages',0):.0f}"
                            f" ratio={metrics_py.get('nan_ratio',0):.0f}")
-            print(f"  PPO#{ui+1} pop={alive_count} pg={metrics_py['ppo_pg_loss']:.4f} "
-                  f"vf={metrics_py['ppo_vf_loss']:.4f} ent={metrics_py['ppo_entropy']:.4f} {nan_dbg}")
-            print(f"       (Red) pg={float(r_metrics['ppo_pg_loss']):.4f} vf={float(r_metrics['ppo_vf_loss']):.4f} ent={float(r_metrics['ppo_entropy']):.4f}")
+            if _vqel_monologue:
+                print(
+                    f"  VQEL#{ui+1} pop={alive_count} "
+                    f"recon={metrics_py.get('vqel_recon_mse', float('nan')):.4f} "
+                    f"hash={metrics_py.get('vqel_hash_penalty', float('nan')):.4f} "
+                    f"total={metrics_py.get('vqel_total_loss', float('nan')):.4f} "
+                    f"streak={_vqel_grad_streak}/{_graduate_consecutive} {nan_dbg}"
+                )
+            else:
+                print(
+                    f"  PPO#{ui+1} pop={alive_count} "
+                    f"pg={metrics_py.get('ppo_pg_loss', 0.0):.4f} "
+                    f"vf={metrics_py.get('ppo_vf_loss', 0.0):.4f} "
+                    f"ent={metrics_py.get('ppo_entropy', 0.0):.4f} {nan_dbg}"
+                )
+            print(
+                f"       (Red) pg={float(r_metrics.get('ppo_pg_loss', 0.0)):.4f} "
+                f"vf={float(r_metrics.get('ppo_vf_loss', 0.0)):.4f} "
+                f"ent={float(r_metrics.get('ppo_entropy', 0.0)):.4f}"
+            )
 
     corpus_writer.close()
     if corpus_writer_red is not None:
