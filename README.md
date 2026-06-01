@@ -7,11 +7,11 @@ to **survive, signal, and pass knowledge on**. The goal is not "an agent that
 plays a game well." The goal is **emergence**: language, culture, and proto-
 cognition arising purely from selection pressure.
 
-**Current state (May 2026):** **Phase 12 holding pattern** on Modal B200 —
-branch **`feature/phase12-red-coevolution`** @ **`ac71407+`**. **Resumed @ ~250k**
-(ckpt **489**); Operator training to **`n_steps=350_000`** (repo default **1M**).
-Red decode: **hunger-babble** + **7-dim spatial nucleation**; pincer χ² not passed.
-**Phase 13 blocked.**
+**Current state (Jun 2026):** **Phase 13.0 Metabolic Cognition** on Modal B200 —
+branch **`feature/phase13-thermodynamics`** @ **`b3af410+`** (`f8cfe58` docs).
+Dual brain (P12) + **execution tax** on epistemic imagination (`0.0005×5` =
+**0.0025** energy per gated think). Training **~292k+**; **red pincer decode @ ~340k**.
+Prior decode 250k–292k: hunger MI + omnibus lag-1 ✅; pincer χ² ❌.
 
 **Full ops / decode / roadmap:** [THRONG.md](THRONG.md) §0b (read first).
 
@@ -23,7 +23,7 @@ tail -f -n 60 /mnt/throng-runs/train.log
 
 **Framework:** JAX + Flax (`lax.scan` rollout, CPU-offload PPO on B200)
 **Active config:** `config_phase7.yaml`
-**Active branch:** `feature/phase12-red-coevolution` (not `master` for live train)
+**Active branch:** `feature/phase13-thermodynamics` (not `master` for live train)
 **Working files:** `jax_sim/` (PyTorch in `agents/`, `main.py` is legacy).
 
 For the full research log, theory, philosophy, and per-phase post-mortems see
@@ -41,14 +41,14 @@ python3 tools/decode_signals.py signal_corpus.jsonl --k 16 --min-step 149500
 python3 tools/decode_signals.py --red /mnt/throng-runs/signal_corpus_red.jsonl --k 16 --min-step <wiretap_restart>
 ```
 
-**Pass bar (red):** RED VQ PINCER TEST χ² **p < 0.05**. First decode: hunger MI confound;
-**7 dims** LRT **p<0.05**; token 26 vs 30 **p=0.0315**; omnibus **p=0.9767**.
-**Re-decode @ ~300k–350k** env steps.
+**Pass bar (red):** RED VQ PINCER TEST χ² **p < 0.05**. Post-resume decode (250k–292k):
+hunger MI confound; omnibus lag-1 **p≈0**; pincer χ² ❌ (`decode_red_pincer_250k.log`).
+**Re-decode @ ~340k** env steps.
 
 **Modal (resume — do not wipe ckpts):**
 
 ```bash
-cd /root/throng && git pull origin feature/phase12-red-coevolution   # ac71407+
+cd /root/throng && git pull origin feature/phase13-thermodynamics   # b3af410+
 python -u run_bg.py   # repo default n_steps=1_000_000
 # notebook override example: n_steps=350_000 → exits @ 350k
 ```
@@ -306,11 +306,12 @@ All knobs live in `config_phase7.yaml`. The ones you actually touch:
 
 | Phase | Status |
 |-------|--------|
-| **12 LIVE** | Resumed **250k→350k**; ckpt **489**; ~7 steps/sec |
-| **12.2 decode** | Nucleation (hunger MI); pincer χ² ❌ |
-| **13.0+** | **BLOCKED** until pincer **p < 0.05** |
+| **12** | **COMPLETE** — dual brain, wiretap, spatial gate (frozen on P12 branch) |
+| **12.2 decode** | Nucleation @ 250k–292k; pincer χ² ❌ |
+| **13.0 LIVE** | Metabolic execution tax (`b3af410`); watch **`MetabolicTax`**, Stay% |
+| **13.1+** | Drop spatial gate, inscription, proprio — after Stay stabilizes |
 
-Do **not** branch `feature/phase13-thermodynamics` until red spatial coordination is proven.
+Do **not** merge **`feature/phase13-thermodynamics` → `master`** until red pincer χ² **p < 0.05**.
 
 ---
 

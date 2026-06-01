@@ -35,7 +35,7 @@
 | **P11.3 decode @ 214k** | `decode_p11_3_214k.log` — cardinal **p=1.75e-18** ✅; VQ alert ❌ |
 | **Red decode @ 12.2** | **FAIL (instructive)** — see **§0b nucleation** below |
 | **Run @ 250k exit** | Graceful finish (legacy 250k cap); **ckpt saved step 250368** |
-| **Resume** | **`git=ac71407`**, restore ckpt **489**, local **`n_steps=350_000`** |
+| **Resume** | **`git=b3af410+`**, restore ckpt **489+**, pull **`feature/phase13-thermodynamics`** |
 | **Next decode** | **`--red`** @ **~340k** env steps (`--min-step` = wiretap restart) |
 | **Modal volume** | **`dragonbgnx`** → `/mnt/throng-runs` |
 | **`master`** | Blue-only SOTA; **do not merge** Phase 13 until red **pincer χ²** passes |
@@ -864,6 +864,7 @@ phase12_coevolution:           # feature/phase13-thermodynamics (inherited from 
 | **`a9f4aeb`** | **`run_bg.py` → 1M steps** (fix graceful exit @ 250k) |
 | **`7552de3`** | THRONG holding-pattern docs (pre-P13 override) |
 | **`b3af410`** | **Phase 13.0** metabolic cognition tax (`feature/phase13-thermodynamics`) |
+| **`f8cfe58`** | THRONG Horcrux — P13.0 LIVE, pincer @ 340k |
 
 **Do not** apply Cam's regex patch on `network_jax.py` — dead-code reset is in repo.
 
