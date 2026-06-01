@@ -189,6 +189,9 @@ def make_sim_step(
     _img_gate_enabled = bool(_p9.get("imagination_gating_enabled", False))
     _conf_multiplier = float(_p9.get("confidence_multiplier", 1.0))
     _imagination_k = int(_p9.get("imagination_k", 5))
+    _imagination_metabolic_delta = float(
+        _p9.get("imagination_metabolic_delta", 0.0005)
+    )
     _imagination_gamma = float(
         _p9.get("imagination_gamma", config.get("ppo_gamma", 0.999))
     )
@@ -269,11 +272,13 @@ def make_sim_step(
                 (b_a_imagined == b_actions_reactive).astype(jnp.float32) * b_alive_f
             )
             b_conf_gate_frac = b_gate_imagine.astype(jnp.float32) * b_alive_f
+            b_used_imagination = b_gate_imagine
         else:
             b_actions = b_actions_reactive
             b_im_gain = jnp.zeros((b_pop.max_pop,), dtype=jnp.float32)
             b_imagination_agree = jnp.zeros((b_pop.max_pop,), dtype=jnp.float32)
             b_conf_gate_frac = jnp.zeros((b_pop.max_pop,), dtype=jnp.float32)
+            b_used_imagination = jnp.zeros((b_pop.max_pop,), dtype=jnp.bool_)
 
         # ── Update episodic memory buffer ───────────────────────
         b_nb_flat = b_obs[:, 6 : 6 + K * sig_d]
@@ -326,16 +331,6 @@ def make_sim_step(
         spawn_mask = jax.random.bernoulli(res_key, regen_rate, (gs, gs))
         new_res = grid.resources + spawn_mask.astype(jnp.float32) * _resource_spawn_boost
         grid = grid.replace(resources=jnp.clip(new_res, 0.0, _resource_max))
-
-        # ── Energy decay ────────────────────────────────────────
-        b_pop = b_pop.replace(energy=jnp.clip(b_pop.energy - _energy_decay, 0.0, 1.0))
-        r_pop = r_pop.replace(energy=jnp.clip(r_pop.energy - _energy_decay, 0.0, 1.0))
-
-        # ── Starvation ──────────────────────────────────────────
-        b_starved = b_pop.alive & (b_pop.energy < _starv_thresh)
-        r_starved = r_pop.alive & (r_pop.energy < _starv_thresh)
-        b_pop = kill_agents(b_pop, b_starved)
-        r_pop = kill_agents(r_pop, r_starved)
 
         # ── Age ─────────────────────────────────────────────────
         b_pop = b_pop.replace(ages=b_pop.ages + 1)
@@ -400,6 +395,24 @@ def make_sim_step(
         grid = grid.replace(puzzle_active=p_act, puzzle_cooldown=p_cool, puzzle_grid=p_grid)
         b_pop = b_pop.replace(energy=jnp.clip(b_pop.energy + p_rew * 0.5, 0.0, 1.0))
 
+        # ── Phase 13.0 metabolic cognition tax (after gains/catches, before decay) ──
+        cog_cost = (
+            b_used_imagination.astype(jnp.float32)
+            * b_pop.alive.astype(jnp.float32)
+            * (_imagination_metabolic_delta * _imagination_k)
+        )
+        b_pop = b_pop.replace(energy=jnp.clip(b_pop.energy - cog_cost, 0.0, 1.0))
+
+        # ── Energy decay ────────────────────────────────────────
+        b_pop = b_pop.replace(energy=jnp.clip(b_pop.energy - _energy_decay, 0.0, 1.0))
+        r_pop = r_pop.replace(energy=jnp.clip(r_pop.energy - _energy_decay, 0.0, 1.0))
+
+        # ── Starvation (after metabolic tax + decay) ────────────
+        b_starved = b_pop.alive & (b_pop.energy < _starv_thresh)
+        r_starved = r_pop.alive & (r_pop.energy < _starv_thresh)
+        b_pop = kill_agents(b_pop, b_starved)
+        r_pop = kill_agents(r_pop, r_starved)
+
         # ── Rewards (all from config) ───────────────────────────
         b_rew = jnp.where(b_pop.alive, _reward_blue_alive, 0.0)
         b_rew = b_rew + 0.02 * b_pop.energy
@@ -459,6 +472,7 @@ def make_sim_step(
             "imagination_gain": b_im_gain,
             "imagination_agree": b_imagination_agree,
             "conf_gate_imagine_frac": b_conf_gate_frac,
+            "imagination_metabolic_cost": cog_cost,
         }
         r_rollout = {
             "obs": r_obs, "actions": r_actions, "log_probs": r_log_probs_taken,
@@ -1467,6 +1481,16 @@ def _run_simulation_impl(
                     f"| conf_gate_imagine_frac={conf_gate_val:.1f}% "
                     f"(mult={_mult} batch-relative; K={int((_p9 or {}).get('imagination_k', 5))})"
                 )
+                if "imagination_metabolic_cost" in rollout_data["blue"]:
+                    _mc = np.asarray(rollout_data["blue"]["imagination_metabolic_cost"])
+                    _alive_mc = np.asarray(rollout_data["blue"]["alive"]).astype(bool)
+                    if _alive_mc.any():
+                        _delta = float((_p9 or {}).get("imagination_metabolic_delta", 0.0005))
+                        _k = int((_p9 or {}).get("imagination_k", 5))
+                        print(
+                            f"  MetabolicTax: mean_cost={float(_mc[_alive_mc].mean()):.5f} "
+                            f"(delta={_delta} K={_k} max={_delta * _k:.4f}/think)"
+                        )
             print(f"{'='*70}\n")
 
         # ── Evolutionary Distillation (CPU, Outer Loop) ─────────

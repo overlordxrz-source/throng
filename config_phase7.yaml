@@ -208,6 +208,8 @@ phase9_canvas:
   confidence_multiplier: 1.0   # batch-relative gate: imagine if conf < mean(conf|alive)*mult
   imagination_k: 5
   imagination_gamma: 0.999
+  # Phase 13.0 — metabolic cost per K-step thought (total = delta * K per gate use)
+  imagination_metabolic_delta: 0.0005
 
 # Phase 12 — adversarial co-evolution (feature/phase12-red-coevolution; off on production P11.3)
 phase12_coevolution:
