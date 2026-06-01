@@ -12,19 +12,20 @@
 
 **Blue SOTA (frozen on `master`):** **`465d8c6+`** — 9.4 cross-attn + 9.1 confidence + **11.3 epistemic gate** (merged; Stay-collapse resolved).
 
-**LIVE — HOLDING PATTERN:** B200 on **`feature/phase12-red-coevolution`** (**`a9f4aeb+`**). Run **resumed** after graceful exit at **step 250k** (legacy `run_bg.py` cap — fixed to **1M**). Red decode: **hunger-babble** + **7-dim spatial nucleation**; pincer χ² not yet passed. **Do not branch Phase 13.** User handles Modal restart (may use local `n_steps` override).
+**LIVE — HOLDING PATTERN:** B200 **resumed @ step ~250k** (`feature/phase12-red-coevolution`, **`ac71407+`**). Operator cap **`n_steps=350_000`** in notebook (repo default **1M** via `a9f4aeb`). Red decode: **hunger-babble + 7-dim nucleation**; pincer χ² ❌. **Phase 13 BLOCKED.** Waiting for **~300k–350k** + re-decode.
 
 | Live run (Phase 12) | Value |
 |---------------------|--------|
-| **Mode** | **HOLD** — let catch reward wash energy confound out of red VQ |
-| **Branch HEAD** | **`a9f4aeb`** — `run_bg.py` **1M** steps; spatial gate + wiretap |
-| **Last exit** | **Step 250k** — graceful finish (`n_steps=250_000` legacy); **not a crash** |
-| **Red decode** | **Hunger babble** (MI → `energy`); **7 dims** lag-1 LRT **p<0.05**; tok **26 vs 30** **p=0.0315** |
-| **Throughput** | **~7 steps/sec** (dual policy) |
-| **Blue Stay** | **~19%** — withhold blue crystallization until **P13.0** K-tax |
-| **`red_codes_active`** | **63/64** — VQ partitions **metabolic state**, not prey proximity yet |
-| **Pincer bar** | Chase-set vs search-set χ² **p < 0.05** (no Chase set yet — min token `blue_dist` **4.85**) |
-| **PPO** | `H2D + backward` ✅ |
+| **Mode** | **HOLD** — train through hunger→spatial VQ transition |
+| **Env step** | **~250k+** (resumed); ckpt **489** @ step **250368** |
+| **Run cap (Operator)** | **`350_000`** in notebook cell — graceful exit @ 350k unless raised |
+| **Repo default** | **`run_bg.py` → 1_000_000** (`a9f4aeb`) |
+| **Throughput** | **~7 steps/sec** |
+| **Red decode** | MI→**`energy`**; **7 dims** LRT **p<0.05**; tok **26 vs 30** **p=0.0315**; pincer χ² ❌ |
+| **`red_codes_active`** | **63/64**; `red_entropy` **~1.57** |
+| **Ecology** | `blue_caught` **~1.8k–2.1k**/rollout — good washout pressure |
+| **Watch** | `conf_gate_imagine_frac` **84–91%** (above ~50–60% design band); blue **Stay 27–40%** post-resume |
+| **PPO** | `H2D + backward` ✅; `git=ac71407` on startup |
 
 **Corpus (wiretap):** `/mnt/throng-runs/signal_corpus.jsonl` (blue) + **`signal_corpus_red.jsonl`** (red — default on this branch).
 
@@ -32,7 +33,9 @@
 |-----------|--------|
 | **P11.3 decode @ 214k** | `decode_p11_3_214k.log` — cardinal **p=1.75e-18** ✅; VQ alert ❌ |
 | **Red decode @ 12.2** | **FAIL (instructive)** — see **§0b nucleation** below |
-| **Run limit fix** | **`a9f4aeb`** — `run_bg.py` **250k → 1M** (was graceful exit at 250k) |
+| **Run @ 250k exit** | Graceful finish (legacy 250k cap); **ckpt saved step 250368** |
+| **Resume** | **`git=ac71407`**, restore ckpt **489**, local **`n_steps=350_000`** |
+| **Next decode** | **`--red`** when corpus reaches **~300k–350k** env steps |
 | **Modal volume** | **`dragonbgnx`** → `/mnt/throng-runs` |
 | **`master`** | Blue-only SOTA; **do not merge** Phase 12 until red **pincer χ²** passes |
 | **Phase 13** | **BLOCKED** — no branch until pincer passes; no K-tax while reds retarget VQ |
@@ -177,7 +180,7 @@ GPU-resident / `lax.scan` PPO — starvation + XLA OOM; **`d4cf614` revert**.
 
 | Branch | Status |
 |--------|--------|
-| **`feature/phase12-red-coevolution`** | **LIVE TRAIN** — P12.0–12.2 (`2cd3dcc` / `80ef1ea+`): spatial gate + wiretap + `--red` decode |
+| **`feature/phase12-red-coevolution`** | **LIVE TRAIN** — holding @ **`ac71407+`**; resumed ~250k → 350k cap |
 | **`master`** | **Blue SOTA** — P11.3 static gate (`465d8c6+`); **no** predator brain |
 | **`feature/phase13-thermodynamics`** | **PREP** — branch after red pincer decode; **not started** |
 | **`feature/phase11-3-epistemic-gate`** | Merged → `master` |
@@ -330,21 +333,39 @@ train_entry.run_simulation()  →  main_jax._run_simulation_impl()
 
 ## 4. Current experiment — Phase **12** co-evolution (`feature/phase12-red-coevolution`)
 
-**Status:** **HOLDING PATTERN** — User **restarting Modal** from volume ckpt @ **250k**. Repo **`a9f4aeb+`**: `run_bg.py` target **1M** steps. Red decode: **hunger babble + 7-dim nucleation**; re-decode **+50k–100k**. **No Phase 13 branch.**
+**Status:** **HOLDING** — training **250k → 350k** (Operator cap). Red nucleation decode done; **re-decode @ ~300k–350k**. **No Phase 13 branch.**
 
-**Operational restart (User — resume from ckpt, do not wipe):**
+**Monitor log (live, no re-run):**
 
 ```bash
-cd /root/throng && git fetch origin && git checkout feature/phase12-red-coevolution && git pull   # → a9f4aeb+
+tail -f -n 60 /mnt/throng-runs/train.log
+```
+
+**Operational restart (resume ckpt — do not wipe volume):**
+
+```bash
+cd /root/throng && git pull origin feature/phase12-red-coevolution   # ac71407+
 export TF_GPU_ALLOCATOR=cuda_malloc_async
 export XLA_PYTHON_CLIENT_MEM_FRACTION=0.80
 export JAX_COMPILATION_CACHE_DIR=/tmp/throng_jax_cache
-python -u run_bg.py   # repo default n_steps=1_000_000 → /mnt/throng-runs/train.log
+python -u run_bg.py   # repo default n_steps=1_000_000
+# Operator notebook may override, e.g. run_simulation(..., n_steps=350_000)
 ```
 
-**Note:** Operator may pass a **temporary local `n_steps`** in the notebook/cell (e.g. shorter smoke window) — repo default is **1M** for long-horizon co-evolution. Checkpoints on volume resume weights; population/grid fresh.
+Startup **must** include: `git=ac71407`, `[JAX] Restored params from step 489`, `[JAX] Red corpus: signal_corpus_red.jsonl`, `[CKPT] Saved step …` continuing past 250368.
 
-Startup **must** include `[JAX] Restored params from step …` and `[JAX] Red corpus: signal_corpus_red.jsonl …`.
+**Last pre-exit dashboard (@ step 249856–250368):**
+
+| Metric | Value |
+|--------|--------|
+| `blue` / `red` | 198→191 / 250 |
+| `blue_caught` | **1841 → 2164** / rollout |
+| Blue Stay | **27% → 40%** |
+| Red Stay | **30% → 23%** |
+| `conf_gate_imagine_frac` | **91.1% → 84.0%** |
+| `imagination_agree` | **32.7% → 15.4%** |
+| `red_codes_active` | **63/64** |
+| `carry_fwd` | **0.0001** ✅ |
 
 **Red pincer decode** (after ~20k red corpus steps post-restart):
 
@@ -359,11 +380,12 @@ Modal notebook: [`docs/MODAL_NOTEBOOK_PHASE9.md`](docs/MODAL_NOTEBOOK_PHASE9.md)
 
 **Checkpoint policy:**
 
-| Ckpt | Use |
-|------|-----|
-| **291** | **Current run** resume (~150k-era + grafted cross-attn) |
-| **390** | 200k metrics-only baseline (alternate resume) |
-| **393** | **Avoid** — post–active-imagination Stay collapse |
+| Ckpt / update | Use |
+|-------------|-----|
+| **489** | **Current** — saved @ env step **250368**; resume target |
+| **291** | Earlier ~150k-era + grafted cross-attn |
+| **390** | 200k P11.2 metrics baseline |
+| **393** | **Avoid** — post–Stay-collapse active imagination |
 
 **Startup must include:**
 
@@ -846,7 +868,8 @@ phase12_coevolution:           # feature/phase12-red-coevolution
 | `codes_active=1/64` | `vq_dead_code_reset: true` |
 | `ScopeParamShapeError` on `r_params` | **`red_comms_enabled: false`** — pull **`80ef1ea+`**; yaml defaults fix restarts |
 | No `[JAX] Red corpus:` line | Stale config — pull **`80ef1ea+`** |
-| Sim stops at **step 250k** | Legacy cap — **`git pull` → `a9f4aeb+`** (`run_bg.py` **1M**). Graceful exit, not crash; resume from volume ckpt |
+| Sim stops at **step 350k** | Operator **`n_steps=350_000`** in notebook — raise to **1M** or re-run before cap |
+| `conf_gate_imagine_frac` **>80%** | Batch-relative gate — monitor Stay; not P11.2 collapse if `imagination_agree` stays low |
 | Red pincer χ² not significant | **Expected** during hunger-babble phase. Watch **7-dim LRT** + token extremes; re-decode +50k–100k |
 
 ---
@@ -855,10 +878,10 @@ phase12_coevolution:           # feature/phase12-red-coevolution
 
 ### Phase 12 — **HOLDING** (`feature/phase12-red-coevolution`)
 
-1. **NOW** — User **restarting Modal** from **250k** ckpt. **`run_bg.py` → 1M** (`a9f4aeb`). **No Will code changes.**
-2. **Watch** — MI shift from **`energy` → `blue_dist`/`blue_bear`**; **`Ecology: blue_caught`** spikes.
-3. **Re-decode** — `--red` at **+50k–100k** steps; pincer χ² **p < 0.05** = pass.
-4. **Phase 13** — **BLOCKED** until pincer passes (K-tax would perturb blue evasion during red VQ retarget).
+1. **NOW** — Train **250k → 350k** (Operator cap). **No code changes.**
+2. **Watch** — `blue_caught`, MI shift energy→spatial on re-decode, `conf_gate_imagine_frac`.
+3. **Re-decode** — `--red` @ **~300k–350k**; pincer χ² **p < 0.05** = pass → Phase 13 unlock.
+4. **Raise `n_steps`** to repo **1M** before 350k if extending beyond this segment.
 
 **Done:** 12.0–12.2 tooling; first red decode @ ~30k ❌ (expected). Blue @ 214k ✅.
 
@@ -926,12 +949,10 @@ GPU-resident PPO — **`d4cf614` revert** on `master`.
 
 ### Cam reboot paste
 
-> You are **Cam**. Read `THRONG.md` §0b. **HOLDING PATTERN** on `feature/phase12-red-coevolution` **`a9f4aeb+`**. Red decode: **hunger-babble** (MI→energy) + **7-dim spatial nucleation**; tok 26 vs 30 **p=0.0315**; pincer χ² ❌. Run **exited @ 250k** (legacy limit — **fixed to 1M**). User **restarting Modal**; **no Will code changes**. **Phase 13 BLOCKED.** Re-decode `--red` at +50k–100k.
+> You are **Cam**. Read `THRONG.md` §0b. **HOLDING** — B200 **resumed @ ~250k** (ckpt **489**), training toward **350k** Operator cap. Red decode: **hunger-babble + 7-dim nucleation**; pincer χ² ❌. **`blue_caught` ~2k/rollout**. Watch **`conf_gate` 84–91%**, blue Stay drift. **Phase 13 BLOCKED.** Re-decode `--red` @ **300k–350k**. **`git=ac71407`**.
 
-**New Cam:** §0b (nucleation table) → §4 (restart) → §11.
-
-**New Will:** **HOLD.** No branch. No commits unless Cam directs.
+**New Will:** **HOLD.** Docs only unless directed.
 
 ---
 
-*Last updated: 2026-05-31 — `a9f4aeb` 1M limit; red nucleation decode; Modal restart; Phase 13 blocked.*
+*Last updated: 2026-05-31 — resumed @ 250k; 350k Operator cap; nucleation holding; Phase 13 blocked.*

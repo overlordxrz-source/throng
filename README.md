@@ -7,14 +7,19 @@ to **survive, signal, and pass knowledge on**. The goal is not "an agent that
 plays a game well." The goal is **emergence**: language, culture, and proto-
 cognition arising purely from selection pressure.
 
-**Current state (May 2026):** **Phase 12 co-evolution** on Modal B200 —
-branch **`feature/phase12-red-coevolution`** @ **`a9f4aeb+`**. **Holding
-pattern:** red decode shows **hunger-babble** (MI→`energy`) with **7-dim spatial
-nucleation**; pincer χ² not yet passed. Run **resumed** after graceful exit @
-**250k** (`run_bg.py` now **1M** steps). **Phase 13 blocked.** User restarting
-Modal (may use local `n_steps` override).
+**Current state (May 2026):** **Phase 12 holding pattern** on Modal B200 —
+branch **`feature/phase12-red-coevolution`** @ **`ac71407+`**. **Resumed @ ~250k**
+(ckpt **489**); Operator training to **`n_steps=350_000`** (repo default **1M**).
+Red decode: **hunger-babble** + **7-dim spatial nucleation**; pincer χ² not passed.
+**Phase 13 blocked.**
 
 **Full ops / decode / roadmap:** [THRONG.md](THRONG.md) §0b (read first).
+
+**Monitor (live):**
+
+```bash
+tail -f -n 60 /mnt/throng-runs/train.log
+```
 
 **Framework:** JAX + Flax (`lax.scan` rollout, CPU-offload PPO on B200)
 **Active config:** `config_phase7.yaml`
@@ -36,15 +41,16 @@ python3 tools/decode_signals.py signal_corpus.jsonl --k 16 --min-step 149500
 python3 tools/decode_signals.py --red /mnt/throng-runs/signal_corpus_red.jsonl --k 16 --min-step <wiretap_restart>
 ```
 
-**Pass bar (red):** RED VQ PINCER TEST χ² **p < 0.05**. Current: **hunger babble**
-(MI→energy); **7 dims** lag-1 LRT **p<0.05**; token 26 vs 30 **p=0.0315**;
-omnibus LRT **p=0.9767**. Re-decode at **+50k–100k** steps.
+**Pass bar (red):** RED VQ PINCER TEST χ² **p < 0.05**. First decode: hunger MI confound;
+**7 dims** LRT **p<0.05**; token 26 vs 30 **p=0.0315**; omnibus **p=0.9767**.
+**Re-decode @ ~300k–350k** env steps.
 
-**Modal restart:**
+**Modal (resume — do not wipe ckpts):**
 
 ```bash
-cd /root/throng && git pull origin feature/phase12-red-coevolution   # a9f4aeb+
-python -u run_bg.py   # default n_steps=1_000_000; resume from volume ckpt
+cd /root/throng && git pull origin feature/phase12-red-coevolution   # ac71407+
+python -u run_bg.py   # repo default n_steps=1_000_000
+# notebook override example: n_steps=350_000 → exits @ 350k
 ```
 
 ---
@@ -300,11 +306,9 @@ All knobs live in `config_phase7.yaml`. The ones you actually touch:
 
 | Phase | Status |
 |-------|--------|
-| **9.x–11.3** | Merged to `master` — cross-attn, confidence, carry fwd, epistemic gate |
-| **12.0–12.2** | **LIVE** on `feature/phase12-red-coevolution` — red VQ + wiretap + `--red` decode |
-| **12.2 decode** | Nucleation — hunger MI confound; 7-dim spatial LRT |
-| **12.2b / `a9f4aeb`** | `run_bg.py` **1M** steps (was 250k graceful exit) |
-| **13.0+** | **BLOCKED** — after red pincer χ² **p < 0.05** |
+| **12 LIVE** | Resumed **250k→350k**; ckpt **489**; ~7 steps/sec |
+| **12.2 decode** | Nucleation (hunger MI); pincer χ² ❌ |
+| **13.0+** | **BLOCKED** until pincer **p < 0.05** |
 
 Do **not** branch `feature/phase13-thermodynamics` until red spatial coordination is proven.
 
