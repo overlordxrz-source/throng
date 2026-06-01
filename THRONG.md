@@ -4,7 +4,7 @@
 
 **Read this file first.** Full historical lab notebook (~290KB) lives in [`docs/THRONG_ARCHIVE.md`](docs/THRONG_ARCHIVE.md) if you need old run logs.
 
-**Cam reboot (60 seconds):** Read **§0b** (live run) → **§0** (triad) → **§4** (ops + restart) → **§7** (blue + **`--red`** decode) → **§11** (roadmap + **Phase 13**) → [`docs/PHASE12_COEVOLUTION.md`](docs/PHASE12_COEVOLUTION.md).
+**Cam reboot (60 seconds):** Read **§0b** (live run) → **§0** (triad) → **§4** (ops + decode) → **§7** (blue + **`--red`** decode) → **§11** (P13 + **P14 prep**) → [`docs/PHASE12_COEVOLUTION.md`](docs/PHASE12_COEVOLUTION.md).
 
 ---
 
@@ -12,20 +12,22 @@
 
 **Blue SOTA (frozen on `master`):** **`465d8c6+`** — 9.4 cross-attn + 9.1 confidence + **11.3 epistemic gate** (merged; Stay-collapse resolved).
 
-**LIVE — Phase 13.0 Metabolic Cognition:** B200 on **`feature/phase13-thermodynamics`** (**`b3af410+`**). Dual brain (P12) + **execution tax** on epistemic imagination (`delta×K` = **0.0025**/think). Training past **~292k**; **red pincer decode @ ~340k** is next science gate. Prior red decode (250k–292k): hunger MI + omnibus lag-1 **p≈0** ✅; pincer χ² ❌.
+**BLACKOUT OBSERVATION — Phase 13.0 Metabolic Cognition:** B200 on **`feature/phase13-thermodynamics`** (**`b3af410+`**). Tax injected **~290k**; blues recently broke Stay-collapse and began **dynamic evasion** → prey distribution shifted → reds still adapting **physical** policies. **Language grounds after motion stabilizes** — **no decode until ~340k–350k**.
 
 | Live run (Phase 13) | Value |
 |---------------------|--------|
 | **Branch** | **`feature/phase13-thermodynamics`** (`b3af410`) |
-| **Mode** | **TRAIN** — break blue Stay-collapse via metabolic cost of thought |
-| **Env step** | **~292k+** (post-resume); ckpt **489** @ **250368** baseline |
+| **Mode** | **BLACKOUT** — train to **~350k**; User monitors `train.log`; Will **HOLD** (no code) |
+| **Env step** | **~290k+** (post-tax); baking **→ 350k** Operator cap |
+| **P13.0 verdict** | **SUCCESS** — mean **`MetabolicTax` ~0.0018**/step; agents **not** lobotomized; pay **K=5** when survival yield > caloric cost |
+| **Tax ceiling** | `0.0005 × 5` = **0.0025**/gated think (max) |
 | **Run cap (Operator)** | **`350_000`** in notebook unless raised — prefer repo **1M** (`a9f4aeb`) |
 | **Throughput** | **~7 steps/sec** |
-| **Metabolic tax** | `imagination_metabolic_delta: 0.0005` × `K=5` → **0.0025**/gated think; dashboard **`MetabolicTax:`** |
-| **Red decode** | MI→**`energy`**; omnibus lag-1 **p≈0** @ 250k–292k; pincer χ² ❌ — **re-decode @ ~340k** |
+| **Next decode** | **`--red --min-step 290000`** @ corpus **≥340k** (post-tax arms race window only) |
+| **Prior decode** | 250k–292k (`decode_red_pincer_250k.log`): hunger MI; omnibus lag-1 **p≈0**; pincer χ² ❌ — **310k decode aborted** (curriculum) |
 | **`red_codes_active`** | **63/64**; `red_entropy` **~1.57** |
 | **Ecology** | `blue_caught` **~2k+/rollout** |
-| **Watch** | **`MetabolicTax`**, **`conf_gate_imagine_frac`**, blue **Stay%** (tax should suppress lazy imagine→Stay) |
+| **Watch** | **`MetabolicTax`**, **`conf_gate`**, blue **Stay%**, red pursuit mix |
 | **PPO** | `H2D + backward` ✅; pull **`feature/phase13-thermodynamics`** on restart |
 
 **Corpus (wiretap):** `/mnt/throng-runs/signal_corpus.jsonl` (blue) + **`signal_corpus_red.jsonl`** (red — default on this branch).
@@ -36,7 +38,7 @@
 | **Red decode @ 12.2** | **FAIL (instructive)** — see **§0b nucleation** below |
 | **Run @ 250k exit** | Graceful finish (legacy 250k cap); **ckpt saved step 250368** |
 | **Resume** | **`git=b3af410+`**, restore ckpt **489+**, pull **`feature/phase13-thermodynamics`** |
-| **Next decode** | **`--red`** @ **~340k** env steps (`--min-step` = wiretap restart) |
+| **Next decode** | **`--red --min-step 290000`** when env step **≥340k** (isolates post-tax corpus) |
 | **Modal volume** | **`dragonbgnx`** → `/mnt/throng-runs` |
 | **`master`** | Blue-only SOTA; **do not merge** Phase 13 until red **pincer χ²** passes |
 | **Phase 13.0** | **ACTIVE** — metabolic execution tax (`b3af410`) on live branch |
@@ -80,8 +82,9 @@ Continuous blue comms **stable through 214k**. Withhold blue “crystallization�
 **Re-decode triggers:** **+50k–100k** corpus steps, or dashboard **`Ecology: blue_caught`** spike.
 
 ```bash
+# Post-tax arms race only (run when corpus ≥ ~340k env steps):
 python3 tools/decode_signals.py --red /mnt/throng-runs/signal_corpus_red.jsonl \
-  --min-step <wiretap_restart> --k 16 2>&1 | tee decode_red_pincer.log
+  --min-step 290000 --k 16 2>&1 | tee decode_red_pincer_340k.log
 ```
 
 ### P11.2 extension decode (`signal_corpus.jsonl`, `--min-step 149504`)
@@ -177,15 +180,17 @@ Continuous comms verified → unguarded active imagination **failed** → **reso
 
 GPU-resident / `lax.scan` PPO — starvation + XLA OOM; **`d4cf614` revert**.
 
-### Phase 13.0 — **LIVE** (`feature/phase13-thermodynamics`, `b3af410`)
+### Phase 13.0 — **LIVE / VALIDATED** (`feature/phase13-thermodynamics`, `b3af410`)
 
 | Item | Detail |
 |------|--------|
 | **Goal** | Break blue **Stay-collapse** / dead-gradient — impose **thermodynamic cost** on cognition |
 | **Mechanism** | Alive blues with **`b_gate_imagine`** pay **`imagination_metabolic_delta × K`** energy per step |
-| **Config** | `phase9_canvas.imagination_metabolic_delta: 0.0005` (× K=5 → **0.0025**/think) |
+| **Config** | `phase9_canvas.imagination_metabolic_delta: 0.0005` (× K=5 → **0.0025**/think max) |
 | **Placement** | After resource/catch/puzzle gains; before **`energy_decay`**; starvation after decay |
 | **Telemetry** | `imagination_metabolic_cost` + dashboard **`MetabolicTax:`** |
+| **Measured win** | **`MetabolicTax` ~0.0018**/step — agents **keep** K=5 imagination (pragmatic yield > epistemic cost); **no lobotomy** |
+| **Theory link** | Runtime tax = pragmatic hack; Phase **14 EFE** epistemic term = formal target (§11) |
 | **Inherits** | P12 dual brain, spatial gate, red wiretap — branch from **`feature/phase12-red-coevolution`** |
 
 ### Branch policy
@@ -238,7 +243,8 @@ Cam's persona + triad workflow live in Git so reboots recover identity:
 6. **Phase 11.2 FROZEN** — never unguarded active override (`6cf965a`).
 7. **CPU offload only** — **`H2D + backward`**; no 11.1 GPU rollouts.
 8. **Never** comm reward shaping — red language forged by **`reward_red_catch`** only.
-9. **Red pincer decode @ ~340k** — chase-set vs search-set χ² **p < 0.05** is the co-evolution pass bar (§11).
+9. **BLACKOUT** — no code / no decode until User runs pincer @ **340k–350k** with **`--min-step 290000`** (§11).
+10. **Phase 14** — approved dismantle roadmap only; **no implementation** until P12 arms race measured (§11).
 
 ### Branch policy
 
@@ -337,7 +343,8 @@ train_entry.run_simulation()  →  main_jax._run_simulation_impl()
 | **12.2** | **Red decode** | `d493a50` | Nucleation decode; hunger MI confound |
 | **12.2b** | **`run_bg` 1M limit** | **`a9f4aeb`** | Was graceful exit @ 250k (`45c7c48` legacy) |
 | **12.2c** | **Red decode post-resume** | local `decode_red_pincer_250k.log` | Steps **250368–292348**; omnibus lag-1 **p≈0**; pincer χ² ❌ |
-| **13.0** | **Metabolic cognition** ✅ | **`b3af410`** | `delta×K` tax on `b_gate_imagine`; **`MetabolicTax`** telemetry |
+| **13.0** | **Metabolic cognition** ✅ | **`b3af410`** | Tax validated ~**0.0018**/step; K=5 retained; blackout → 350k |
+| **14** | **Transcendental Symbiosis** | **PREP** | VQEL → EFE → GWT → MMGL → auto-curricula; **no code** |
 
 **Recurring failure mode:** Blues stay at cap → ~99% survival → **`NB_GAIN↔surv: nan`** → no evolutionary pressure on neighbor-signal benefit.
 
@@ -347,7 +354,7 @@ train_entry.run_simulation()  →  main_jax._run_simulation_impl()
 
 ## 4. Current experiment — Phase **13.0** thermodynamics (`feature/phase13-thermodynamics`)
 
-**Status:** **ACTIVE** — metabolic execution tax live (`b3af410`). Train on P13 branch; **red pincer decode @ ~340k**. Prior decode @ 250k–292k logged in `decode_red_pincer_250k.log`.
+**Status:** **BLACKOUT OBSERVATION** — P13.0 tax **validated** (~0.0018 mean cost; imagination retained). Bake train **→ ~350k**. **Abort** early decode (310k) — tax landed ~290k; blues evading, reds retuning physics first. **Pincer decode** when User crosses **340k** with **`--min-step 290000`**. Prior: `decode_red_pincer_250k.log` (250k–292k).
 
 **Monitor log (live, no re-run):**
 
@@ -381,11 +388,11 @@ Startup **must** include: `git=b3af410` (or newer), `[JAX] Restored params from 
 | `red_codes_active` | **63/64** |
 | `carry_fwd` | **0.0001** ✅ |
 
-**Red pincer decode** (after ~20k red corpus steps post-restart):
+**Red pincer decode** (post-tax arms race — run at **≥340k** env steps):
 
 ```bash
 python3 tools/decode_signals.py --red /mnt/throng-runs/signal_corpus_red.jsonl \
-  --min-step <first_step_in_red_jsonl> --k 16 2>&1 | tee decode_red_pincer.log
+  --min-step 290000 --k 16 2>&1 | tee decode_red_pincer_340k.log
 ```
 
 Read **RED VQ PINCER TEST** — χ²(chase-set vs search-set pursuit directions).
@@ -896,16 +903,31 @@ phase12_coevolution:           # feature/phase13-thermodynamics (inherited from 
 
 ## 11. Roadmap (what’s next)
 
-### Phase 13.0 — **ACTIVE** (`feature/phase13-thermodynamics`, `b3af410`)
+### Phase 13.0 — **ACTIVE / BLACKOUT** (`feature/phase13-thermodynamics`, `b3af410`)
 
-1. **NOW** — Train with **metabolic execution tax**; watch **`MetabolicTax`**, blue **Stay%**, `conf_gate_imagine_frac`.
-2. **Science gate** — **Red pincer decode @ ~340k** (`--red --min-step <wiretap>`); chase-set vs search-set χ² **p < 0.05**.
-3. **Raise `n_steps`** to repo **1M** if Operator cap still **350k**.
-4. **Do not merge** P13 to `master` until pincer passes.
+1. **NOW** — **BLACKOUT** — User monitors B200 to **~350k**; Will **HOLD** (no code).
+2. **Validated** — **`MetabolicTax` ~0.0018**/step; agents maintain **K=5** gated imagination (survival > cost).
+3. **Science gate** — User runs **`--red --min-step 290000`** @ **340k–350k**; pincer χ² **p < 0.05**.
+4. **Curriculum** — Tax @ ~290k shifted prey; reds adapting motion — **language after physics**.
+5. **Do not merge** P13 → `master` until pincer passes.
 
-**Done:** 13.0 tax shipped (`b3af410`). P12 dual brain + decode tooling. Post-resume decode 250k–292k: omnibus lag-1 ✅, pincer ❌.
+**Done:** 13.0 tax shipped + live validation. P12 dual brain. Decode 250k–292k (pre-tax window); **310k decode aborted**.
 
-**Philosophy (Cam):** Dead-gradient on blue Stay — **thinking must cost energy** before we drop the spatial gate (13.1). Arms race still needs **conditional pursuit geometry** on reds.
+**Philosophy (Cam):** Thermodynamic tax breaks Stay dead-gradient without lobotomy. Measure **P12 arms race** before MAPPO teardown.
+
+### Phase 14 — **PREP ONLY** (Transcendental Symbiosis — **no code yet**)
+
+Approved **dismantle order** for the epoch after pincer + run conclusion:
+
+| Step | Component | Target files | Notes |
+|------|-----------|--------------|-------|
+| **1** | **VQEL phase split** | `network_jax.py`, `main_jax.py` | Monologue (reconstruct obs) → Dialogue (broadcast indices) |
+| **2** | **EFE head + transition gen** | `network_jax.py`, `rl_jax.py` | Value → **−G(π)**; extend `head_fwd_dyn` as generative model |
+| **3** | **GWT router** | `network_jax.py` | **M≤4** workspace; select/broadcast cross-attn |
+| **4** | **MMGL** | `rl_jax.py` | Mistake-gated PPO; track **M₁** update energy |
+| **5** | **Auto-curricula** | env + `main_jax.py` | Compositional survival tasks; XLand/POET-style law mutation |
+
+**Theory stack:** Active Inference (Friston EFE) · VQEL discrete bottleneck · GWT capacity limit · MMGL metabolic backprop. P13 runtime tax ↔ epistemic free-energy term (formalized in P14).
 
 | Pillar | Mechanism | Notes |
 |--------|-----------|-------|
@@ -937,6 +959,7 @@ GPU-resident PPO — **`d4cf614` revert** on `master`.
 - ❌ Ungated P11.2-style imagination override (`6cf965a`) without gate or metabolic cost
 - ❌ **EMA / scan-carry state** for epistemic gating (breaks checkpoint schema)
 - ❌ **Merge `feature/phase13-thermodynamics` → `master`** before red pincer χ² **p < 0.05**
+- ❌ **Phase 14 implementation** until P12 pincer measured + current run concludes
 - ❌ Re-merging **11.1 GPU rollouts** without memory refactor
 - ❌ Resume from ckpt **393** (post–Stay-collapse) for science runs
 
@@ -959,10 +982,10 @@ GPU-resident PPO — **`d4cf614` revert** on `master`.
 
 ### Cam reboot paste
 
-> You are **Cam**. Read `THRONG.md` §0b. **Phase 13.0 LIVE** — B200 on **`feature/phase13-thermodynamics`** (`b3af410+`). **Execution tax** on epistemic imagination (`delta×K=0.0025`/think) to break blue **Stay-collapse**. Train **~292k+**; **red pincer decode @ ~340k** is next target. Prior decode 250k–292k: hunger MI + omnibus lag-1 ✅; pincer χ² ❌. Watch **`MetabolicTax`**, **`conf_gate`**, Stay%. **`git=b3af410`**.
+> You are **Cam**. Read `THRONG.md` §0b. **BLACKOUT** — P13.0 tax **validated** (`MetabolicTax` ~0.0018; K=5 retained). Bake **→350k**. **No decode** until **340k** — then **`--red --min-step 290000`**. P14 dismantle order approved; **no code**. Will **HOLD** until pincer p-values land. **`git=b3af410+`**.
 
-**New Will:** P13 branch only; docs + decode on Cam directive.
+**New Will:** **HOLD** — docs only unless directed; no Phase 14 branches.
 
 ---
 
-*Last updated: 2026-06-01 — Phase 13.0 metabolic tax live (`b3af410`); pincer decode @ 340k.*
+*Last updated: 2026-06-01 — P13 validated; blackout to 350k; pincer @ 340k (`--min-step 290000`); P14 prep roadmap.*

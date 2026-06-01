@@ -7,11 +7,10 @@ to **survive, signal, and pass knowledge on**. The goal is not "an agent that
 plays a game well." The goal is **emergence**: language, culture, and proto-
 cognition arising purely from selection pressure.
 
-**Current state (Jun 2026):** **Phase 13.0 Metabolic Cognition** on Modal B200 —
-branch **`feature/phase13-thermodynamics`** @ **`b3af410+`** (`f8cfe58` docs).
-Dual brain (P12) + **execution tax** on epistemic imagination (`0.0005×5` =
-**0.0025** energy per gated think). Training **~292k+**; **red pincer decode @ ~340k**.
-Prior decode 250k–292k: hunger MI + omnibus lag-1 ✅; pincer χ² ❌.
+**Current state (Jun 2026):** **BLACKOUT OBSERVATION** — **Phase 13.0** validated on Modal B200
+(`feature/phase13-thermodynamics`, `b3af410+`). Mean **`MetabolicTax` ~0.0018**/step;
+agents **keep K=5** imagination (no lobotomy). Tax landed **~290k**; baking train **→350k**.
+**Red pincer decode** only at **≥340k**: `--red --min-step 290000`. Phase **14** roadmap approved; **no code**.
 
 **Full ops / decode / roadmap:** [THRONG.md](THRONG.md) §0b (read first).
 
@@ -37,13 +36,14 @@ For the full research log, theory, philosophy, and per-phase post-mortems see
 # Blue alarm / flee (214k reference: decode_p11_3_214k.log)
 python3 tools/decode_signals.py signal_corpus.jsonl --k 16 --min-step 149500
 
-# Red pincer / pursuit (re-run as red corpus grows)
-python3 tools/decode_signals.py --red /mnt/throng-runs/signal_corpus_red.jsonl --k 16 --min-step <wiretap_restart>
+# Red pincer — post-tax arms race only (run when corpus ≥ ~340k env steps)
+python3 tools/decode_signals.py --red /mnt/throng-runs/signal_corpus_red.jsonl \
+  --k 16 --min-step 290000 2>&1 | tee decode_red_pincer_340k.log
 ```
 
-**Pass bar (red):** RED VQ PINCER TEST χ² **p < 0.05**. Post-resume decode (250k–292k):
-hunger MI confound; omnibus lag-1 **p≈0**; pincer χ² ❌ (`decode_red_pincer_250k.log`).
-**Re-decode @ ~340k** env steps.
+**Pass bar (red):** RED VQ PINCER TEST χ² **p < 0.05**. Pre-tax window (250k–292k):
+hunger MI; omnibus lag-1 **p≈0**; pincer ❌ (`decode_red_pincer_250k.log`). **310k decode aborted**
+(curriculum: blues evading, reds retuning physics). **Hold decode until 340k–350k.**
 
 **Modal (resume — do not wipe ckpts):**
 
@@ -306,12 +306,13 @@ All knobs live in `config_phase7.yaml`. The ones you actually touch:
 
 | Phase | Status |
 |-------|--------|
-| **12** | **COMPLETE** — dual brain, wiretap, spatial gate (frozen on P12 branch) |
-| **12.2 decode** | Nucleation @ 250k–292k; pincer χ² ❌ |
-| **13.0 LIVE** | Metabolic execution tax (`b3af410`); watch **`MetabolicTax`**, Stay% |
-| **13.1+** | Drop spatial gate, inscription, proprio — after Stay stabilizes |
+| **12** | **COMPLETE** — dual brain, wiretap, spatial gate |
+| **12.2 decode** | Pre-tax 250k–292k; pincer ❌; **340k decode pending** |
+| **13.0** | **VALIDATED** — tax ~0.0018/step; **BLACKOUT** train → 350k |
+| **13.1+** | Drop spatial gate, inscription, proprio — after pincer |
+| **14 PREP** | VQEL → EFE → GWT → MMGL → auto-curricula (**no code**) |
 
-Do **not** merge **`feature/phase13-thermodynamics` → `master`** until red pincer χ² **p < 0.05**.
+Do **not** merge to **`master`** until pincer **p < 0.05**. No Phase **14** code until pincer + run end.
 
 ---
 
