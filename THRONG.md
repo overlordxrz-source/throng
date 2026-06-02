@@ -257,7 +257,7 @@ Cam's persona + triad workflow live in Git so reboots recover identity:
 6. **Phase 11.2 FROZEN** — never unguarded active override (`6cf965a`).
 7. **CPU offload only** — **`H2D + backward`**; no 11.1 GPU rollouts.
 8. **Never** comm reward shaping — red language forged by **`reward_red_catch`** only.
-9. **350k decode gate** — User runs post-grad pincer decode before **P14.2 EFE** code ships (§11).
+9. **Decode gate** — use latest post-grad pincer decode (currently 400k result) before **P14.2 EFE** code ships (§11).
 10. **Phase 14.1b proprio** — **LIVE** (`proprio_coef: 0.05`); pull **`192d686+`** on resume.
 11. **Phase 14.2 EFE** — **HOLD**; no code until red **pincer χ² p < 0.05** (400k decode: metabolic trap, not exteroception yet).
 
@@ -265,7 +265,7 @@ Cam's persona + triad workflow live in Git so reboots recover identity:
 
 | Branch | Purpose |
 |--------|---------|
-| **`feature/phase14-transcendental`** | **LIVE TRAIN:** P14.1 VQEL + hard dialogue + P13 tax (`8c48e3e+`) |
+| **`feature/phase14-transcendental`** | **LIVE TRAIN:** P14.1 + 14.1b proprio + hard dialogue + P13 tax (`192d686+`) |
 | **`feature/phase13-thermodynamics`** | **Frozen base** — superseded by P14 branch |
 | **`feature/phase12-red-coevolution`** | **Frozen** — merged into P13/P14 lineage |
 | **`master`** | **Blue production:** P11.3 static gate (no red comms, no metabolic tax) |
@@ -918,8 +918,8 @@ phase12_coevolution:           # feature/phase13-thermodynamics (inherited from 
 | No `[JAX] Red corpus:` line | Stale config — pull **`80ef1ea+`** |
 | Sim stops at **step 350k** | Operator **`n_steps=350_000`** in notebook — raise to **1M** or re-run before cap |
 | `conf_gate_imagine_frac` **>80%** | Batch-relative gate — monitor Stay; not P11.2 collapse if `imagination_agree` stays low |
-| Red pincer χ² not significant | **Expected** pre-grad; re-decode **post-grad @ 350k** with hard **z_q** |
-| `KeyError: ppo_pg_loss` @ update 10 | Stale code — pull **`8c48e3e+`** (VQEL periodic log branch) |
+| Red pincer χ² not significant | **Expected** in transition; re-decode after proprio bake (post-grad hard **z_q**) |
+| `KeyError: ppo_pg_loss` @ update 10 | Stale code — pull **`8c48e3e+`** or newer (**`192d686+`**) |
 | Post-grad **Stay≈99%** | STE→hard shock — monitor; PPO + ecology; not P11.2 unguarded override |
 
 ---
