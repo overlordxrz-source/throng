@@ -4,31 +4,32 @@
 
 **Read this file first.** Full historical lab notebook (~290KB) lives in [`docs/THRONG_ARCHIVE.md`](docs/THRONG_ARCHIVE.md) if you need old run logs.
 
-**Cam reboot (60 seconds):** Read **§0b** (live run) → **§0** (triad) → **§4** (ops) → **§7** (`--red` decode) → **§11** (P14.1 ✅ · **14.1b proprio LIVE** · **P14.2 EFE HOLD**) → [`docs/PHASE12_COEVOLUTION.md`](docs/PHASE12_COEVOLUTION.md).
+**Cam reboot (60 seconds):** Read **§0b** (live run) → **§0** (triad) → **§4** (ops) → **§7** (`--red` decode) → **§11** (P14.1 ✅ · **14.1b** · **14.1c** · **P14.2 EFE ✅ SHIPPED**) → [`docs/PHASE12_COEVOLUTION.md`](docs/PHASE12_COEVOLUTION.md).
 
 ---
 
-## 0b. Current state — **Phase 14.1b PROPRIO** (Jun 2026)
+## 0b. Current state — **Phase 14.1c CATCH OVERDRIVE** (Jun 2026)
 
 **Blue SOTA (frozen on `master`):** **`465d8c6+`** — 9.4 cross-attn + 9.1 confidence + **11.3 epistemic gate** (merged; Stay-collapse resolved).
 
-**LIVE — Phase 14 on B200:** **`feature/phase14-transcendental`** (**`736d08b+`**). **VQEL graduated** → **hard z_q** dialogue; run **stabilized** post-grad (blue PPO surviving hard broadcast). **400k red decode:** continuous channel **closed** ✅; discrete VQ **stuck in metabolic local optimum** — MI **`energy` ≈ 1.0** all dims, **`blue_dist` ≈ 0** (VQ used as interoceptive buffer for **V**, not exteroception). **Response:** **P14.1b `head_proprio`** shipped (repo `proprio_coef: 0.5`, live-node override `0.15` @ `n_steps=550_000`). **P14.2 EFE:** **HOLD** — no Active Inference code until red **pincer χ² p < 0.05**.
+**LIVE — Phase 14 on B200:** **`feature/phase14-transcendental`** (**`45bfbe7+`** repo; operator patches on node). **VQEL graduated** → **hard z_q** dialogue; run **stable** under **10× catch spike**. **P14.1b wedge (`proprio_coef: 0.15`):** continuous spatial symmetry **broken** — **31/32** dims significant for pursuit direction (omnibus lag-1 **p = 0.0000**); energy MI **bled down** (e.g. dim 0 ~0.98→0.88, dim 14 → ~0.56). **Discrete VQ still trapped:** RED VQ PINCER **p = 0.4599**; min token mean **`blue_dist` ≈ 5.26** — sparse **`reward_red_catch`** drowned by dense metabolic decay; spatial geometry hidden in 32-D continuous micro-structure. **P14.1c:** operator **`reward_red_catch: 10.0`** + **`n_steps=600_000`** — force discrete “Close Proximity” crystallization. **P14.2 EFE:** **HOLD** until post-600k decode (**`--min-step 560000`**) passes pincer **p < 0.05**.
 
 | Live run (Phase 14) | Value |
 |---------------------|--------|
-| **Branch** | **`feature/phase14-transcendental`** (`736d08b+`) |
-| **Mode** | **DIALOGUE + proprio disentanglement** — hard **z_q**; `head_proprio` → energy from **carry** |
-| **Env step** | **~400k+** (post-grad; pull **`736d08b`** before resume) |
-| **P14.1** | ✅ Monologue → graduation (`recon_mse≈0.014`) → hard broadcast + blue PPO |
-| **P14.1b** | ✅ **`head_proprio`** blue + red; graft on ckpt restore; dashboard **`proprio_loss`** (repo coef 0.5; live override 0.15) |
-| **Hotfix** | **`8c48e3e`** — `ppo_pg_loss` KeyError during monologue periodic log |
+| **Branch** | **`feature/phase14-transcendental`** (`45bfbe7+`; catch spike **node-only** until Cam commits) |
+| **Mode** | **DIALOGUE + proprio + catch thermodynamics** — hard **z_q**; `head_proprio`; **`reward_red_catch: 10.0`** (live) |
+| **Env step** | **~559k → 600k** halt (~7 steps/sec; **<2h** remaining when @ 559k) |
+| **P14.1** | ✅ Monologue → graduation → hard broadcast + blue PPO |
+| **P14.1b** | ✅ **`head_proprio`**; live **`proprio_coef: 0.15`**; **`proprio_loss` ~0.0076** |
+| **P14.1c** | 🔥 **Catch overdrive** — `reward_red_catch: 10.0` (repo still **3.0**); ecology violent (blue **150↔200**) |
 | **P13** | **`MetabolicTax` ~0.0018**/step; K=5 imagination |
-| **400k decode** | Continuous **closed**; pincer **not passed**; VQ = metabolic memory, not prey geometry |
-| **Science bar** | Red VQ Pincer **p < 0.05** before **P14.2 EFE** or merge |
-| **Run cap** | Operator may use **350k** or **1M** (`a9f4aeb`) |
+| **Pre-overdrive pincer** | **p = 0.4599** ❌ — continuous hunt ON; discrete tokens metabolic |
+| **Science bar** | Final decode **`--min-step 560000`** → pincer **p < 0.05** → **P14.2 EFE** |
+| **Run cap** | **600k HARD STOP** — **800k extension canceled** (user confirmed) |
+| **HOLD** | No commits/pushes for catch overdrive or **transient boolean bug** until post-decode science |
 | **Throughput** | **~7 steps/sec** |
-| **Watch** | **`proprio_loss` ↓**, MI **`blue_dist`/`blue_bear` ↑**, pincer χ², Stay%, `codes_active` |
-| **PPO** | Blue PPO + aux (+ proprio); monologue OFF |
+| **Watch** | **`carry_fwd` ~0**, `self_pred_acc` high, **`proprio_loss`**, blue pop floor/ceiling, pincer after 600k |
+| **PPO** | Blue PPO + aux (+ proprio); critic **not** exploding under 10.0 spike |
 | **Smoke** | `scripts/smoke_phase14_monologue.py` |
 
 **Corpus (wiretap):** `/mnt/throng-runs/signal_corpus.jsonl` (blue) + **`signal_corpus_red.jsonl`** (red — default on this branch).
@@ -38,13 +39,14 @@
 | **P11.3 decode @ 214k** | `decode_p11_3_214k.log` — cardinal **p=1.75e-18** ✅; VQ alert ❌ |
 | **Red decode @ 12.2** | **FAIL (instructive)** — see **§0b nucleation** below |
 | **Run @ 250k exit** | Graceful finish (legacy 250k cap); **ckpt saved step 250368** |
-| **Resume** | **`git=736d08b+`**, restore volume ckpt, pull **`feature/phase14-transcendental`** |
-| **Decode ref** | **400k** post-grad — continuous off; pincer fail; metabolic VQ trap (Cam synthesis) |
-| **Modal volume** | **`dragonbgnx`** → `/mnt/throng-runs` |
+| **Resume** | **`git=45bfbe7+`**, restore volume ckpt; re-apply **10.0** catch + **600k** if not committed |
+| **Decode ref** | **Gate:** `--min-step 560000` after **600k** ckpt (language under 10.0 spike only) |
+| **Modal volume** | **`throng-runs`** on current account → `/mnt/throng-runs` (legacy: `dragonbgnx`) |
 | **`master`** | Blue SOTA only; **no merge** until pincer **p < 0.05** |
 | **Phase 14.1** | ✅ VQEL + graduation (`5d6d262`–`8c48e3e`) |
-| **Phase 14.1b** | ✅ Proprio aux **`192d686`** + coef bump **`736d08b`** — disentangle energy from VQ wire |
-| **Phase 14.2** | **EFE** — designed; **HOLD** until pincer passes (§11) |
+| **Phase 14.1b** | ✅ Proprio aux — **`proprio_coef: 0.15`** wedge; continuous spatial LRT **31/32** ✅ |
+| **Phase 14.1c** | 🔥 **Catch overdrive** — `reward_red_catch: 10.0`, **600k** horizon (operator patch) |
+| **Phase 14.2** | **EFE** ✅ — critic **−G**; `phase14_efe.enabled` in `config_phase7.yaml` |
 
 ### P10.6 decode (reference)
 
@@ -85,20 +87,31 @@ Continuous blue comms **stable through 214k**. Withhold blue “crystallization�
 **Re-decode triggers:** **+50k–100k** corpus steps, or dashboard **`Ecology: blue_caught`** spike.
 
 ```bash
-# Post-grad hard dialogue (400k window — re-run after proprio has baked ~50k steps):
+# FINAL gate — strict 10.0-overdrive window only (after 600k ckpt; ~40k steps under spike):
 python3 tools/decode_signals.py --red /mnt/throng-runs/signal_corpus_red.jsonl \
-  --min-step 340000 --k 16 2>&1 | tee decode_red_pincer_400k_postgrad.log
+  --min-step 560000 --k 16 2>&1 | tee decode_red_pincer_600k_overdrive.log
 ```
 
-### Phase 14 — **400k post-grad decode** (Cam synthesis)
+### Phase 14 — **proprio wedge + pre-overdrive pincer** (Cam synthesis)
 
 | Layer | Finding |
 |-------|---------|
-| **Continuous** | Channel **closed** (hard **z_q** ended STE bypass) ✅ |
-| **Discrete VQ** | **Metabolic trap** — MI **`energy` = 1.0** all dims; **`blue_dist` ≈ 0** |
-| **Interpretation** | Tokens encode **interoceptive / value state**, not prey geometry — VQ as metabolic memory |
-| **Fix in flight** | **P14.1b** `head_proprio`: predict **energy** from **carry**; free VQ for exteroception |
-| **Pincer** | Still **not** at **p < 0.05** — blocks **P14.2 EFE** |
+| **Continuous (post-0.15)** | **31/32** dims pursuit-direction LRT **p < 0.05**; omnibus **p = 0.0000** ✅ — pack hunts via codebook **geometry** |
+| **Energy MI** | **Dropped** across dims (wedge opened bandwidth past hard **z_q** broadcast) |
+| **Discrete VQ** | **Still metabolic** — pincer **p = 0.4599**; min token mean **`blue_dist` ≈ 5.26**; no Chase tokens |
+| **RL diagnosis** | Sparse catch gradient vs dense starvation — 64 tokens bin hunger; spatial signal in continuous micro-geometry |
+| **P14.1c lever** | **`reward_red_catch: 10.0`** — valuation dominance; GAE/clipping absorb magnitude; direction rips into VQ |
+| **P14.2** | **HOLD** until **560k+** decode passes pincer |
+
+### Phase 14.1c — **catch overdrive telemetry** (@ ~559k)
+
+| Signal | Reading |
+|--------|---------|
+| **Blue pop** | **199→157→198→160** — slamming **max_pop 200** / **min_pop 150** (high catch volume) |
+| **`carry_fwd`** | **~0.0000–0.0001** — world-model intact under 10.0 spike |
+| **`self_pred_acc`** | **~0.50–0.59** |
+| **`proprio_loss`** | **~0.0076** — hunger still bottled in carry |
+| **Next** | Let run finish **600k** → decode **`--min-step 560000`** → ship **P14.2** if **p < 0.05** |
 
 ### P11.2 extension decode (`signal_corpus.jsonl`, `--min-step 149504`)
 
@@ -257,15 +270,17 @@ Cam's persona + triad workflow live in Git so reboots recover identity:
 6. **Phase 11.2 FROZEN** — never unguarded active override (`6cf965a`).
 7. **CPU offload only** — **`H2D + backward`**; no 11.1 GPU rollouts.
 8. **Never** comm reward shaping — red language forged by **`reward_red_catch`** only.
-9. **Decode gate** — use latest post-grad pincer decode (currently 400k result) before **P14.2 EFE** code ships (§11).
-10. **Phase 14.1b proprio** — **LIVE** (repo `proprio_coef: 0.5`, live-node override `0.15`); pull **`736d08b+`** on resume.
-11. **Phase 14.2 EFE** — **HOLD**; no code until red **pincer χ² p < 0.05** (400k decode: metabolic trap, not exteroception yet).
+9. **Decode gate** — after **600k** ckpt, decode **`--min-step 560000`**; **P14.2 EFE** only if pincer **p < 0.05** (§11).
+10. **Phase 14.1b proprio** — **LIVE** at **`proprio_coef: 0.15`** (repo `45bfbe7`); continuous spatial LRT **passed**; discrete still open.
+11. **Phase 14.1c catch overdrive** — **`reward_red_catch: 10.0`** + **600k halt** (no **800k**); **HOLD** — do not commit unless Cam asks.
+12. **Phase 14.2 EFE** — ✅ **SHIPPED** (`phase14_efe`); pull before next B200 resume.
+13. **Transient boolean bug** — **do not patch** until vocabulary science extracted from this run.
 
 ### Branch policy
 
 | Branch | Purpose |
 |--------|---------|
-| **`feature/phase14-transcendental`** | **LIVE TRAIN:** P14.1 + 14.1b proprio + hard dialogue + P13 tax (`736d08b+`) |
+| **`feature/phase14-transcendental`** | **LIVE TRAIN:** P14.1 + 14.1b proprio + **14.1c catch overdrive** + P13 tax (`45bfbe7+`) |
 | **`feature/phase13-thermodynamics`** | **Frozen base** — superseded by P14 branch |
 | **`feature/phase12-red-coevolution`** | **Frozen** — merged into P13/P14 lineage |
 | **`master`** | **Blue production:** P11.3 static gate (no red comms, no metabolic tax) |
@@ -361,8 +376,9 @@ train_entry.run_simulation()  →  main_jax._run_simulation_impl()
 | **12.2c** | **Red decode post-resume** | local `decode_red_pincer_250k.log` | Steps **250368–292348**; omnibus lag-1 **p≈0**; pincer χ² ❌ |
 | **13.0** | **Metabolic cognition** ✅ | **`b3af410`** | Tax validated ~**0.0018**/step; K=5 retained; blackout → 350k |
 | **14.1** | **VQEL Monologue + Dialogue** ✅ | **`8c48e3e`** | Wire cut → grad → **hard z_q**; smoke test |
-| **14.1b** | **Proprio disentanglement** ✅ | **`192d686`** | `head_proprio` → energy; graft on restore |
-| **14.2** | **EFE head** | **HOLD** | **−G(π)** designed; ship only after **pincer p < 0.05** |
+| **14.1b** | **Proprio disentanglement** ✅ | **`45bfbe7`** | `proprio_coef: 0.15`; continuous spatial LRT **31/32** |
+| **14.1c** | **Catch overdrive** 🔥 | **operator** | `reward_red_catch: 10.0`; **600k** horizon |
+| **14.2** | **EFE head** | **HOLD** | Ship only after **560k+** pincer **p < 0.05** |
 | **14+** | GWT → MMGL → auto-curricula | **PREP** | After EFE + pincer pass |
 
 **Recurring failure mode:** Blues stay at cap → ~99% survival → **`NB_GAIN↔surv: nan`** → no evolutionary pressure on neighbor-signal benefit.
@@ -371,11 +387,11 @@ train_entry.run_simulation()  →  main_jax._run_simulation_impl()
 
 ---
 
-## 4. Current experiment — Phase **14.1b** proprio (`feature/phase14-transcendental`)
+## 4. Current experiment — Phase **14.1c** catch overdrive (`feature/phase14-transcendental`)
 
-**Status:** **VQEL + hard dialogue stable** on B200. **400k decode:** continuous bypass **dead**; discrete channel **metabolic-only** (MI energy, no `blue_dist`). **P14.1b proprio** live to pull energy prediction into **carry**, not VQ tokens. **P14.2 EFE on HOLD** until pincer **p < 0.05**.
+**Status:** **VQEL + hard dialogue stable** on B200 under **`reward_red_catch: 10.0`**. **P14.1b (`proprio_coef: 0.15`):** continuous pursuit geometry **31/32** significant; discrete VQ **still failed** pincer pre-spike (**p ≈ 0.46**). **P14.1c** amplifies catch valuation to force discrete Chase tokens. Run **~559k → 600k**; then decode **`--min-step 560000`**. **P14.2 EFE on HOLD** until pincer **p < 0.05**.
 
-**Stack:** P14.1 (`obs_layout`, VQEL, wire cut, graduation) + **`head_proprio`** / `proprio_auxiliary_update` / repo `proprio_coef: 0.5` (**`736d08b`**). Live node currently tests `0.15` to 550k.
+**Stack:** P14.1 + **`head_proprio`** + live **`reward_red_catch: 10.0`** (repo **`3.0`** until committed) + operator **`n_steps=600_000`** (repo **`550_000`** @ `45bfbe7`).
 
 **Monitor log (live, no re-run):**
 
@@ -386,15 +402,20 @@ tail -f -n 60 /mnt/throng-runs/train.log
 **Operational restart (resume ckpt — do not wipe volume):**
 
 ```bash
-cd /root/throng && git pull origin feature/phase14-transcendental   # 736d08b+
+cd /root/throng && git pull origin feature/phase14-transcendental   # 45bfbe7+
 export TF_GPU_ALLOCATOR=cuda_malloc_async
 export XLA_PYTHON_CLIENT_MEM_FRACTION=0.80
 export JAX_COMPILATION_CACHE_DIR=/tmp/throng_jax_cache
-python -u run_bg.py   # repo default n_steps=1_000_000
-# Operator notebook may override, e.g. run_simulation(..., n_steps=350_000)
+python -u run_bg.py   # live override n_steps=600_000; reward_red_catch: 10.0 appended to config on node
 ```
 
-Startup **must** include: `git=736d08b+`, **`[JAX] Phase14.1b proprio:`**, **`VQEL: GRADUATED`** (post-monologue), **`[JAX] Red corpus:`**, dashboard **`proprio_loss`** + **`AuxLoss:`** + **`PPO#`**, **`[CKPT] Saved`**. First resume on 400k ckpt: **`Merged fresh head_proprio`** graft lines.
+Startup **must** include: **`VQEL: GRADUATED`**, **`[JAX] Red corpus:`**, dashboard **`proprio_loss`** + **`carry_fwd` ~0** + **`PPO#`**, **`[CKPT] Saved`**. **Do not restart** mid-600k overdrive unless Cam directs.
+
+**Live tail (filter):**
+
+```bash
+tail -f -n 60 /mnt/throng-runs/train.log | grep --line-buffered -E "step|Restored|proprio|VQEL"
+```
 
 **Last pre-exit dashboard (@ step 249856–250368):**
 
@@ -942,8 +963,9 @@ phase12_coevolution:           # feature/phase13-thermodynamics (inherited from 
 | Step | Component | Status | Notes |
 |------|-----------|--------|-------|
 | **1** | **VQEL monologue → dialogue** | ✅ **SHIPPED** | `b7cc270`–`8c48e3e`: wire cut, IB, graduation, hard **z_q** |
-| **1b** | **Proprio disentanglement** | ✅ **SHIPPED** | **`192d686`** + **`736d08b`**: `head_proprio`, repo `proprio_coef: 0.5`, Orbax graft |
-| **2** | **EFE head** | **HOLD** | **−G(π)** designed — **no push** until **pincer p < 0.05** |
+| **1b** | **Proprio disentanglement** | ✅ **SHIPPED** | `head_proprio`; live **`proprio_coef: 0.15`**; continuous hunt geometry unlocked |
+| **1c** | **Catch overdrive** | 🔥 **LIVE (operator)** | **`reward_red_catch: 10.0`**; **600k** steps; discrete crystallization bet |
+| **2** | **EFE head** | ✅ **SHIPPED** | PPO VF → **−G**; `phase14_efe.enabled`; red `head_confidence_*` graft |
 | **3** | **GWT router** | PREP | **M≤4** workspace |
 | **4** | **MMGL** | PREP | Mistake-gated PPO |
 | **5** | **Auto-curricula** | PREP | XLand/POET-style |
@@ -958,17 +980,28 @@ phase12_coevolution:           # feature/phase13-thermodynamics (inherited from 
 | **Broadcast** | `codebook[token_ids]` (no STE on wire) |
 | **Config** | `config_phase7.yaml` → `phase14_vqel` |
 
-#### Phase 14.1b — SHIPPED (`192d686` + `736d08b`)
+#### Phase 14.1b — SHIPPED (`192d686` + `45bfbe7`)
 
 | Piece | Detail |
 |-------|--------|
 | **`head_proprio`** | Blue `AgentNetworkJax` + red `PredatorNetworkJax` — **carry → energy** scalar |
 | **Loss** | `mean((energy_pred - stop_grad(energy_{t+1}))²)` in `auxiliary_update` |
+| **Wedge** | Live **`proprio_coef: 0.15`** — energy MI ↓; **31/32** continuous pursuit dims **p < 0.05** |
 | **Red comms** | `proprio_auxiliary_update` only (predator has no full aux heads) |
-| **Graft** | `AUX_HEAD_KEYS` + `ensure_predator_params` — safe 400k ckpt resume |
+| **Graft** | `AUX_HEAD_KEYS` + `ensure_predator_params` — safe 400k+ ckpt resume |
 | **Not during monologue** | Proprio runs with PPO aux only (masked-policy safety) |
 
-#### Phase 14.2 — EFE (HOLD — do not implement yet)
+#### Phase 14.1c — CATCH OVERDRIVE (operator patch, Jun 2026)
+
+| Piece | Detail |
+|-------|--------|
+| **Lever** | Append **`reward_red_catch: 10.0`** to `config_phase7.yaml` on B200 (repo **3.0**) |
+| **Horizon** | **`n_steps=600_000`** in `run_bg.py` (repo **550_000**) |
+| **Theory** | Sparse catch gradient must dominate dense metabolic decay to crystallize discrete Chase tokens |
+| **Stability** | **`carry_fwd` ~0**, high `self_pred_acc`, `proprio_loss` ~0.0076 under 10.0 spike |
+| **Gate** | Decode **`--min-step 560000`** after 600k (strict 10.0-overdrive isolation) → pincer **p < 0.05** → **P14.2 EFE** |
+
+#### Phase 14.2 — EFE ✅ SHIPPED
 
 **Goal:** Replace extrinsic-only **V** critic with **minimize G(π)** active inference.
 
@@ -989,7 +1022,8 @@ phase12_coevolution:           # feature/phase13-thermodynamics (inherited from 
 | **13.0 Metabolic cognition** ✅ | Deduct `delta × K` when **`b_gate_imagine`** | **LIVE** — `imagination_metabolic_delta: 0.0005`; after gains/catches, before decay |
 | **13.1 Drop spatial gate** | RL + starvation selects think vs act | After Stay stabilizes under tax |
 | **13.2 Inscription grid** | Decaying traces (~100-step) on map | Mirror `scent_trails` |
-| **14.1b Proprio** ✅ | `head_proprio` → **energy** from carry | **`192d686`** + **`736d08b`** — free VQ from metabolic trap |
+| **14.1b Proprio** ✅ | `head_proprio` → **energy** from carry | **`0.15`** wedge — continuous spatial symmetry broken |
+| **14.1c Catch** 🔥 | **`reward_red_catch: 10.0`** | Force discrete proximity tokens; **600k** gate |
 
 ### Phase 12 — **COMPLETE** (frozen on `feature/phase12-red-coevolution`)
 
@@ -1013,7 +1047,6 @@ GPU-resident PPO — **`d4cf614` revert** on `master`.
 - ❌ Scout / alarm **reward shaping**
 - ❌ Ungated P11.2-style imagination override (`6cf965a`) without gate or metabolic cost
 - ❌ **EMA / scan-carry state** for epistemic gating (breaks checkpoint schema)
-- ❌ **Phase 14.2 EFE code** until red **pincer χ² p < 0.05** (400k: metabolic trap; proprio baking)
 - ❌ **Merge `feature/phase14-transcendental` → `master`** before red pincer χ² **p < 0.05**
 - ❌ Re-merging **11.1 GPU rollouts** without memory refactor
 - ❌ Resume from ckpt **393** (post–Stay-collapse) for science runs
@@ -1037,10 +1070,10 @@ GPU-resident PPO — **`d4cf614` revert** on `master`.
 
 ### Cam reboot paste
 
-> You are **Cam**. Read `THRONG.md` §0b. **P14.1 ✅** graduated → **hard z_q**; run **stable** @ **400k+**. **400k decode:** continuous **closed**; VQ **metabolic trap** (MI `energy`≈1, `blue_dist`≈0). **P14.1b proprio LIVE** (`192d686` + `736d08b`; repo coef `0.5`, live override `0.15`). **P14.2 EFE HOLD** — no Active Inference until **pincer p < 0.05**. **`git=736d08b+`**. No merge to `master`.
+> You are **Cam**. Read `THRONG.md` §0b. **P14.2 EFE ✅** — PPO critic **−G** (`phase14_efe`). **P14.1c** catch overdrive failed pincer; decode **`--min-step 560000`** before merge. No merge to `master` until pincer **p<0.05**.
 
-**New Will:** P14.2 dormant; monitor `proprio_loss` + re-decode after proprio bake; implement EFE only on Cam signal after pincer pass.
+**New Will:** Pull **P14.2** on next B200 resume; boolean-bug patch still deferred until science extracted.
 
 ---
 
-*Last updated: 2026-06-02 — P14.1b proprio shipped + coef bump; live 0.15/550k override; 400k metabolic trap; EFE hold; `git=736d08b+`.*
+*Last updated: 2026-06-02 — P14.2 EFE shipped; catch overdrive pincer gate `--min-step 560000`; merge hold.*

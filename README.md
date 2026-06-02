@@ -7,11 +7,10 @@ to **survive, signal, and pass knowledge on**. The goal is not "an agent that
 plays a game well." The goal is **emergence**: language, culture, and proto-
 cognition arising purely from selection pressure.
 
-**Current state (Jun 2026):** **Phase 14.1b live at ~400k+** on Modal B200
-(`feature/phase14-transcendental`, `736d08b+`). VQEL graduated to hard **z_q** dialogue; blue PPO is stable.
-400k red decode: continuous channel closed, but VQ remains metabolically trapped (MI dominated by `energy`,
-weak `blue_dist` semantics; pincer still not significant). Proprio disentanglement is shipped (repo `proprio_coef=0.5`),
-with a live-node temporary override (`0.15`, `n_steps=550_000`) while waiting for 550k decode.
+**Current state (Jun 2026):** **Phase 14.1c catch overdrive** on Modal B200
+(`feature/phase14-transcendental`, `45bfbe7+`). VQEL hard **z_q** stable; **`proprio_coef: 0.15`** broke continuous
+spatial symmetry (**31/32** pursuit dims significant) but discrete VQ pincer still failed pre-spike (**p≈0.46**).
+**Phase 14.2 EFE** shipped: PPO critic targets **−G = V − λ·conf_pred** (`phase14_efe.enabled`). Catch overdrive decode gate **`--min-step 560000`** still applies for discrete pincer.
 
 **Full ops / decode / roadmap:** [THRONG.md](THRONG.md) §0b (read first).
 
@@ -37,20 +36,19 @@ For the full research log, theory, philosophy, and per-phase post-mortems see
 # Blue alarm / flee (214k reference: decode_p11_3_214k.log)
 python3 tools/decode_signals.py signal_corpus.jsonl --k 16 --min-step 149500
 
-# Red pincer — post-grad hard dialogue (400k+ window)
+# Red pincer — post catch-overdrive (560k+ window, after 600k ckpt)
 python3 tools/decode_signals.py --red /mnt/throng-runs/signal_corpus_red.jsonl \
-  --k 16 --min-step 410000 2>&1 | tee decode_red_pincer_410k.log
+  --k 16 --min-step 560000 2>&1 | tee decode_red_pincer_600k_overdrive.log
 ```
 
-**Pass bar (red):** RED VQ PINCER TEST χ² **p < 0.05**. Latest (~410k): continuous channel remains structured,
-but VQ pincer is still not significant and MI is energy-dominant (metabolic trap).
+**Pass bar (red):** RED VQ PINCER TEST χ² **p < 0.05**. Pre-overdrive: continuous hunt ON (**31/32** dims);
+discrete still metabolic (**p≈0.46**). Awaiting **600k** finish + **560k+** decode under **10.0** catch spike.
 
 **Modal (resume — do not wipe ckpts):**
 
 ```bash
-cd /root/throng && git pull origin feature/phase14-transcendental   # 736d08b+
-python -u run_bg.py   # repo default n_steps=1_000_000
-# current live-node override example: n_steps=550_000
+cd /root/throng && git pull origin feature/phase14-transcendental   # 45bfbe7+
+python -u run_bg.py   # live: n_steps=600_000 + reward_red_catch: 10.0 (operator patch on B200)
 ```
 
 ---

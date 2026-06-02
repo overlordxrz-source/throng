@@ -442,14 +442,20 @@ class AgentNetworkJax(nn.Module):
         return self.head_value(carry).squeeze(-1)
 
 
-# Predator (Red) comms — separate codebook + cross-attn; no P11 aux / imagination heads.
-PREDATOR_GRAFT_TOP_KEYS = ("red_codebook", "red_nb_cross_attn", "head_proprio")
+# Predator (Red) comms — separate codebook + cross-attn; EFE epistemic head (Phase 14.2).
+PREDATOR_GRAFT_TOP_KEYS = (
+    "red_codebook",
+    "red_nb_cross_attn",
+    "head_proprio",
+    "head_confidence_1",
+    "head_confidence_2",
+)
 
 
 class PredatorNetworkJax(nn.Module):
     """
-    Lean predator policy (Phase 12): VQ comms + optional red_nb_cross_attn.
-    No carry_fwd, confidence, or imagination heads — catch PPO forges language.
+    Lean predator policy (Phase 12+): VQ comms + optional red_nb_cross_attn.
+    Phase 14.2: epistemic confidence head (proprio MSE target) for EFE critic.
     """
 
     hidden_dim: int = 128
@@ -498,6 +504,8 @@ class PredatorNetworkJax(nn.Module):
         self.head_culture_fast = nn.Dense(sym_d)
         self.head_culture_slow = nn.Dense(sym_d)
         self.head_proprio = nn.Dense(1)
+        self.head_confidence_1 = nn.Dense(self.hidden_dim * 4)
+        self.head_confidence_2 = nn.Dense(1)
         if self.cross_attn_enabled:
             self.red_nb_cross_attn = NeighborCrossAttention(
                 hidden_dim=d,
@@ -507,6 +515,20 @@ class PredatorNetworkJax(nn.Module):
     def predict_proprio_energy(self, carry_t: jnp.ndarray) -> jnp.ndarray:
         """Predict next-step energy from carry (Phase 14.1b; red team)."""
         return self.head_proprio(carry_t).squeeze(-1)
+
+    def predict_epistemic_confidence(
+        self,
+        carry_t: jnp.ndarray,
+        action_oh: jnp.ndarray,
+    ) -> jnp.ndarray:
+        """Predict expected proprio MSE from [carry_t, action_t] (red EFE epistemic term)."""
+        fwd_inp = jnp.concatenate([carry_t, action_oh], axis=-1)
+        h = nn.relu(self.head_confidence_1(fwd_inp))
+        return nn.softplus(self.head_confidence_2(h)).squeeze(-1)
+
+    def value_from_carry(self, carry: jnp.ndarray) -> jnp.ndarray:
+        """Pragmatic value V(carry) for imagination / EFE rollouts."""
+        return self.head_value(carry).squeeze(-1)
 
     def __call__(
         self,
@@ -605,7 +627,9 @@ class PredatorNetworkJax(nn.Module):
         culture_slow = self.head_culture_slow(pooled)
 
         if self.is_initializing():
+            _action_oh = jnp.zeros((N, 5), dtype=obs.dtype)
             self.head_proprio(pooled)
+            self.predict_epistemic_confidence(carries, _action_oh)
 
         return new_carries, (
             action_logits,
@@ -649,7 +673,8 @@ def ensure_predator_params(
         getattr(model, "cross_attn_enabled", False) and "red_nb_cross_attn" not in flat
     )
     needs_proprio = "head_proprio" not in flat
-    if not needs_codebook and not needs_cross and not needs_proprio:
+    needs_conf = "head_confidence_1" not in flat
+    if not needs_codebook and not needs_cross and not needs_proprio and not needs_conf:
         return params
     carry = jnp.zeros((1, hidden_dim))
     obs = jnp.zeros((1, obs_dim))
@@ -665,6 +690,11 @@ def ensure_predator_params(
     if needs_proprio and "head_proprio" in fresh_flat:
         flat["head_proprio"] = fresh_flat["head_proprio"]
         print("[JAX] Merged fresh head_proprio (Phase 14.1b) into predator params")
+    if needs_conf:
+        for k in ("head_confidence_1", "head_confidence_2"):
+            if k in fresh_flat:
+                flat[k] = fresh_flat[k]
+        print("[JAX] Merged fresh head_confidence_* (Phase 14.2 EFE) into predator params")
     return sanitize_agent_params(freeze(flat))
 
 
@@ -698,6 +728,21 @@ def make_model_apply(model: AgentNetworkJax):
             n_layers,
             detach_value=detach_value,
         )
+    return apply_fn
+
+
+def make_conf_apply(model, method_name: str = "predict_carry_fwd_confidence"):
+    """Return ``(params, carry_t, action_oh) -> conf_pred`` for EFE value targets."""
+    method = getattr(model, method_name)
+
+    def apply_fn(params, carry_t, action_oh):
+        return model.apply(
+            params_apply_variables(params),
+            carry_t,
+            action_oh,
+            method=method,
+        )
+
     return apply_fn
 
 
