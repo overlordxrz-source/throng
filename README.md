@@ -7,10 +7,10 @@ to **survive, signal, and pass knowledge on**. The goal is not "an agent that
 plays a game well." The goal is **emergence**: language, culture, and proto-
 cognition arising purely from selection pressure.
 
-**Current state (Jun 2026):** **Phase 14.1c catch overdrive** on Modal B200
-(`feature/phase14-transcendental`, `45bfbe7+`). VQEL hard **z_q** stable; **`proprio_coef: 0.15`** broke continuous
-spatial symmetry (**31/32** pursuit dims significant) but discrete VQ pincer still failed pre-spike (**p≈0.46**).
-**Phase 14.2 EFE** shipped: PPO critic targets **−G = V − λ·conf_pred** (`phase14_efe.enabled`). Catch overdrive decode gate **`--min-step 560000`** still applies for discrete pincer.
+**Current state (Jun 2026):** **Phase 14.2 EFE** on `feature/phase14-transcendental`
+(**`git=08790d8`**). P14.1c catch overdrive **failed** (metabolic VQ trap; pincer **p≈0.46**).
+P14.1b proprio wedge unlocked continuous hunt (**31/32** dims). P14.2 Active Inference critic:
+PPO VF targets **−G = V − λ·conf_pred** (`phase14_efe.enabled`). Gate decode **`--min-step 560000`**.
 
 **Full ops / decode / roadmap:** [THRONG.md](THRONG.md) §0b (read first).
 
@@ -41,14 +41,15 @@ python3 tools/decode_signals.py --red /mnt/throng-runs/signal_corpus_red.jsonl \
   --k 16 --min-step 560000 2>&1 | tee decode_red_pincer_600k_overdrive.log
 ```
 
-**Pass bar (red):** RED VQ PINCER TEST χ² **p < 0.05**. Pre-overdrive: continuous hunt ON (**31/32** dims);
-discrete still metabolic (**p≈0.46**). Awaiting **600k** finish + **560k+** decode under **10.0** catch spike.
+**Pass bar (red):** RED VQ PINCER TEST χ² **p < 0.05**. Continuous hunt ON; discrete metabolic after 14.1c.
+Run **`--min-step 560000`** gate decode, then resume B200 with EFE.
 
 **Modal (resume — do not wipe ckpts):**
 
 ```bash
-cd /root/throng && git pull origin feature/phase14-transcendental   # 45bfbe7+
-python -u run_bg.py   # live: n_steps=600_000 + reward_red_catch: 10.0 (operator patch on B200)
+cd /root/throng && git pull origin feature/phase14-transcendental   # 08790d8+
+python -u run_bg.py
+# Expect: [JAX] Phase14.2 EFE: PPO critic targets -G = V - 0.1*conf_pred
 ```
 
 ---
