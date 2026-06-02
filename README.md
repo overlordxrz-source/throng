@@ -7,10 +7,11 @@ to **survive, signal, and pass knowledge on**. The goal is not "an agent that
 plays a game well." The goal is **emergence**: language, culture, and proto-
 cognition arising purely from selection pressure.
 
-**Current state (Jun 2026):** **BLACKOUT OBSERVATION** — **Phase 13.0** validated on Modal B200
-(`feature/phase13-thermodynamics`, `b3af410+`). Mean **`MetabolicTax` ~0.0018**/step;
-agents **keep K=5** imagination (no lobotomy). Tax landed **~290k**; baking train **→350k**.
-**Red pincer decode** only at **≥340k**: `--red --min-step 290000`. Phase **14** roadmap approved; **no code**.
+**Current state (Jun 2026):** **Phase 14.1b live at ~400k+** on Modal B200
+(`feature/phase14-transcendental`, `736d08b+`). VQEL graduated to hard **z_q** dialogue; blue PPO is stable.
+400k red decode: continuous channel closed, but VQ remains metabolically trapped (MI dominated by `energy`,
+weak `blue_dist` semantics; pincer still not significant). Proprio disentanglement is shipped (repo `proprio_coef=0.5`),
+with a live-node temporary override (`0.15`, `n_steps=550_000`) while waiting for 550k decode.
 
 **Full ops / decode / roadmap:** [THRONG.md](THRONG.md) §0b (read first).
 
@@ -22,7 +23,7 @@ tail -f -n 60 /mnt/throng-runs/train.log
 
 **Framework:** JAX + Flax (`lax.scan` rollout, CPU-offload PPO on B200)
 **Active config:** `config_phase7.yaml`
-**Active branch:** `feature/phase13-thermodynamics` (not `master` for live train)
+**Active branch:** `feature/phase14-transcendental` (not `master` for live train)
 **Working files:** `jax_sim/` (PyTorch in `agents/`, `main.py` is legacy).
 
 For the full research log, theory, philosophy, and per-phase post-mortems see
@@ -36,21 +37,20 @@ For the full research log, theory, philosophy, and per-phase post-mortems see
 # Blue alarm / flee (214k reference: decode_p11_3_214k.log)
 python3 tools/decode_signals.py signal_corpus.jsonl --k 16 --min-step 149500
 
-# Red pincer — post-tax arms race only (run when corpus ≥ ~340k env steps)
+# Red pincer — post-grad hard dialogue (400k+ window)
 python3 tools/decode_signals.py --red /mnt/throng-runs/signal_corpus_red.jsonl \
-  --k 16 --min-step 290000 2>&1 | tee decode_red_pincer_340k.log
+  --k 16 --min-step 410000 2>&1 | tee decode_red_pincer_410k.log
 ```
 
-**Pass bar (red):** RED VQ PINCER TEST χ² **p < 0.05**. Pre-tax window (250k–292k):
-hunger MI; omnibus lag-1 **p≈0**; pincer ❌ (`decode_red_pincer_250k.log`). **310k decode aborted**
-(curriculum: blues evading, reds retuning physics). **Hold decode until 340k–350k.**
+**Pass bar (red):** RED VQ PINCER TEST χ² **p < 0.05**. Latest (~410k): continuous channel remains structured,
+but VQ pincer is still not significant and MI is energy-dominant (metabolic trap).
 
 **Modal (resume — do not wipe ckpts):**
 
 ```bash
-cd /root/throng && git pull origin feature/phase13-thermodynamics   # b3af410+
+cd /root/throng && git pull origin feature/phase14-transcendental   # 736d08b+
 python -u run_bg.py   # repo default n_steps=1_000_000
-# notebook override example: n_steps=350_000 → exits @ 350k
+# current live-node override example: n_steps=550_000
 ```
 
 ---
@@ -307,12 +307,13 @@ All knobs live in `config_phase7.yaml`. The ones you actually touch:
 | Phase | Status |
 |-------|--------|
 | **12** | **COMPLETE** — dual brain, wiretap, spatial gate |
-| **12.2 decode** | Pre-tax 250k–292k; pincer ❌; **340k decode pending** |
-| **13.0** | **VALIDATED** — tax ~0.0018/step; **BLACKOUT** train → 350k |
+| **12.2 decode** | 250k–320k: omnibus ON, pincer still ❌ |
+| **13.0** | **VALIDATED** — tax ~0.0018/step; no imagination collapse |
 | **13.1+** | Drop spatial gate, inscription, proprio — after pincer |
-| **14 PREP** | VQEL → EFE → GWT → MMGL → auto-curricula (**no code**) |
+| **14 Step 1** | **AUTHORIZED** — VQEL Monologue split + Information Bottleneck |
+| **14+** | EFE → GWT → MMGL → auto-curricula (not started) |
 
-Do **not** merge to **`master`** until pincer **p < 0.05**. No Phase **14** code until pincer + run end.
+Do **not** merge to **`master`** until pincer **p < 0.05**.
 
 ---
 

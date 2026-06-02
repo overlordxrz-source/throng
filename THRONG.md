@@ -12,15 +12,15 @@
 
 **Blue SOTA (frozen on `master`):** **`465d8c6+`** — 9.4 cross-attn + 9.1 confidence + **11.3 epistemic gate** (merged; Stay-collapse resolved).
 
-**LIVE — Phase 14 on B200:** **`feature/phase14-transcendental`** (**`192d686+`**). **VQEL graduated** → **hard z_q** dialogue; run **stabilized** post-grad (blue PPO surviving hard broadcast). **400k red decode:** continuous channel **closed** ✅; discrete VQ **stuck in metabolic local optimum** — MI **`energy` ≈ 1.0** all dims, **`blue_dist` ≈ 0** (VQ used as interoceptive buffer for **V**, not exteroception). **Response:** **P14.1b `head_proprio`** shipped (`proprio_coef: 0.05`). **P14.2 EFE:** **HOLD** — no Active Inference code until red **pincer χ² p < 0.05**.
+**LIVE — Phase 14 on B200:** **`feature/phase14-transcendental`** (**`736d08b+`**). **VQEL graduated** → **hard z_q** dialogue; run **stabilized** post-grad (blue PPO surviving hard broadcast). **400k red decode:** continuous channel **closed** ✅; discrete VQ **stuck in metabolic local optimum** — MI **`energy` ≈ 1.0** all dims, **`blue_dist` ≈ 0** (VQ used as interoceptive buffer for **V**, not exteroception). **Response:** **P14.1b `head_proprio`** shipped (repo `proprio_coef: 0.5`, live-node override `0.15` @ `n_steps=550_000`). **P14.2 EFE:** **HOLD** — no Active Inference code until red **pincer χ² p < 0.05**.
 
 | Live run (Phase 14) | Value |
 |---------------------|--------|
-| **Branch** | **`feature/phase14-transcendental`** (`192d686+`) |
+| **Branch** | **`feature/phase14-transcendental`** (`736d08b+`) |
 | **Mode** | **DIALOGUE + proprio disentanglement** — hard **z_q**; `head_proprio` → energy from **carry** |
-| **Env step** | **~400k+** (post-grad; pull **`192d686`** before resume) |
+| **Env step** | **~400k+** (post-grad; pull **`736d08b`** before resume) |
 | **P14.1** | ✅ Monologue → graduation (`recon_mse≈0.014`) → hard broadcast + blue PPO |
-| **P14.1b** | ✅ **`head_proprio`** blue + red; graft on ckpt restore; dashboard **`proprio_loss`** |
+| **P14.1b** | ✅ **`head_proprio`** blue + red; graft on ckpt restore; dashboard **`proprio_loss`** (repo coef 0.5; live override 0.15) |
 | **Hotfix** | **`8c48e3e`** — `ppo_pg_loss` KeyError during monologue periodic log |
 | **P13** | **`MetabolicTax` ~0.0018**/step; K=5 imagination |
 | **400k decode** | Continuous **closed**; pincer **not passed**; VQ = metabolic memory, not prey geometry |
@@ -38,12 +38,12 @@
 | **P11.3 decode @ 214k** | `decode_p11_3_214k.log` — cardinal **p=1.75e-18** ✅; VQ alert ❌ |
 | **Red decode @ 12.2** | **FAIL (instructive)** — see **§0b nucleation** below |
 | **Run @ 250k exit** | Graceful finish (legacy 250k cap); **ckpt saved step 250368** |
-| **Resume** | **`git=192d686+`**, restore volume ckpt, pull **`feature/phase14-transcendental`** |
+| **Resume** | **`git=736d08b+`**, restore volume ckpt, pull **`feature/phase14-transcendental`** |
 | **Decode ref** | **400k** post-grad — continuous off; pincer fail; metabolic VQ trap (Cam synthesis) |
 | **Modal volume** | **`dragonbgnx`** → `/mnt/throng-runs` |
 | **`master`** | Blue SOTA only; **no merge** until pincer **p < 0.05** |
 | **Phase 14.1** | ✅ VQEL + graduation (`5d6d262`–`8c48e3e`) |
-| **Phase 14.1b** | ✅ Proprio aux **`192d686`** — disentangle energy from VQ wire |
+| **Phase 14.1b** | ✅ Proprio aux **`192d686`** + coef bump **`736d08b`** — disentangle energy from VQ wire |
 | **Phase 14.2** | **EFE** — designed; **HOLD** until pincer passes (§11) |
 
 ### P10.6 decode (reference)
@@ -258,14 +258,14 @@ Cam's persona + triad workflow live in Git so reboots recover identity:
 7. **CPU offload only** — **`H2D + backward`**; no 11.1 GPU rollouts.
 8. **Never** comm reward shaping — red language forged by **`reward_red_catch`** only.
 9. **Decode gate** — use latest post-grad pincer decode (currently 400k result) before **P14.2 EFE** code ships (§11).
-10. **Phase 14.1b proprio** — **LIVE** (`proprio_coef: 0.05`); pull **`192d686+`** on resume.
+10. **Phase 14.1b proprio** — **LIVE** (repo `proprio_coef: 0.5`, live-node override `0.15`); pull **`736d08b+`** on resume.
 11. **Phase 14.2 EFE** — **HOLD**; no code until red **pincer χ² p < 0.05** (400k decode: metabolic trap, not exteroception yet).
 
 ### Branch policy
 
 | Branch | Purpose |
 |--------|---------|
-| **`feature/phase14-transcendental`** | **LIVE TRAIN:** P14.1 + 14.1b proprio + hard dialogue + P13 tax (`192d686+`) |
+| **`feature/phase14-transcendental`** | **LIVE TRAIN:** P14.1 + 14.1b proprio + hard dialogue + P13 tax (`736d08b+`) |
 | **`feature/phase13-thermodynamics`** | **Frozen base** — superseded by P14 branch |
 | **`feature/phase12-red-coevolution`** | **Frozen** — merged into P13/P14 lineage |
 | **`master`** | **Blue production:** P11.3 static gate (no red comms, no metabolic tax) |
@@ -375,7 +375,7 @@ train_entry.run_simulation()  →  main_jax._run_simulation_impl()
 
 **Status:** **VQEL + hard dialogue stable** on B200. **400k decode:** continuous bypass **dead**; discrete channel **metabolic-only** (MI energy, no `blue_dist`). **P14.1b proprio** live to pull energy prediction into **carry**, not VQ tokens. **P14.2 EFE on HOLD** until pincer **p < 0.05**.
 
-**Stack:** P14.1 (`obs_layout`, VQEL, wire cut, graduation) + **`head_proprio`** / `proprio_auxiliary_update` / `proprio_coef: 0.05` (**`192d686`**).
+**Stack:** P14.1 (`obs_layout`, VQEL, wire cut, graduation) + **`head_proprio`** / `proprio_auxiliary_update` / repo `proprio_coef: 0.5` (**`736d08b`**). Live node currently tests `0.15` to 550k.
 
 **Monitor log (live, no re-run):**
 
@@ -386,7 +386,7 @@ tail -f -n 60 /mnt/throng-runs/train.log
 **Operational restart (resume ckpt — do not wipe volume):**
 
 ```bash
-cd /root/throng && git pull origin feature/phase14-transcendental   # 192d686+
+cd /root/throng && git pull origin feature/phase14-transcendental   # 736d08b+
 export TF_GPU_ALLOCATOR=cuda_malloc_async
 export XLA_PYTHON_CLIENT_MEM_FRACTION=0.80
 export JAX_COMPILATION_CACHE_DIR=/tmp/throng_jax_cache
@@ -394,7 +394,7 @@ python -u run_bg.py   # repo default n_steps=1_000_000
 # Operator notebook may override, e.g. run_simulation(..., n_steps=350_000)
 ```
 
-Startup **must** include: `git=192d686+`, **`[JAX] Phase14.1b proprio:`**, **`VQEL: GRADUATED`** (post-monologue), **`[JAX] Red corpus:`**, dashboard **`proprio_loss`** + **`AuxLoss:`** + **`PPO#`**, **`[CKPT] Saved`**. First resume on 400k ckpt: **`Merged fresh head_proprio`** graft lines.
+Startup **must** include: `git=736d08b+`, **`[JAX] Phase14.1b proprio:`**, **`VQEL: GRADUATED`** (post-monologue), **`[JAX] Red corpus:`**, dashboard **`proprio_loss`** + **`AuxLoss:`** + **`PPO#`**, **`[CKPT] Saved`**. First resume on 400k ckpt: **`Merged fresh head_proprio`** graft lines.
 
 **Last pre-exit dashboard (@ step 249856–250368):**
 
@@ -942,7 +942,7 @@ phase12_coevolution:           # feature/phase13-thermodynamics (inherited from 
 | Step | Component | Status | Notes |
 |------|-----------|--------|-------|
 | **1** | **VQEL monologue → dialogue** | ✅ **SHIPPED** | `b7cc270`–`8c48e3e`: wire cut, IB, graduation, hard **z_q** |
-| **1b** | **Proprio disentanglement** | ✅ **SHIPPED** | **`192d686`**: `head_proprio`, `proprio_coef: 0.05`, Orbax graft |
+| **1b** | **Proprio disentanglement** | ✅ **SHIPPED** | **`192d686`** + **`736d08b`**: `head_proprio`, repo `proprio_coef: 0.5`, Orbax graft |
 | **2** | **EFE head** | **HOLD** | **−G(π)** designed — **no push** until **pincer p < 0.05** |
 | **3** | **GWT router** | PREP | **M≤4** workspace |
 | **4** | **MMGL** | PREP | Mistake-gated PPO |
@@ -958,7 +958,7 @@ phase12_coevolution:           # feature/phase13-thermodynamics (inherited from 
 | **Broadcast** | `codebook[token_ids]` (no STE on wire) |
 | **Config** | `config_phase7.yaml` → `phase14_vqel` |
 
-#### Phase 14.1b — SHIPPED (`192d686`)
+#### Phase 14.1b — SHIPPED (`192d686` + `736d08b`)
 
 | Piece | Detail |
 |-------|--------|
@@ -989,7 +989,7 @@ phase12_coevolution:           # feature/phase13-thermodynamics (inherited from 
 | **13.0 Metabolic cognition** ✅ | Deduct `delta × K` when **`b_gate_imagine`** | **LIVE** — `imagination_metabolic_delta: 0.0005`; after gains/catches, before decay |
 | **13.1 Drop spatial gate** | RL + starvation selects think vs act | After Stay stabilizes under tax |
 | **13.2 Inscription grid** | Decaying traces (~100-step) on map | Mirror `scent_trails` |
-| **14.1b Proprio** ✅ | `head_proprio` → **energy** from carry | **`192d686`** — free VQ from metabolic trap |
+| **14.1b Proprio** ✅ | `head_proprio` → **energy** from carry | **`192d686`** + **`736d08b`** — free VQ from metabolic trap |
 
 ### Phase 12 — **COMPLETE** (frozen on `feature/phase12-red-coevolution`)
 
@@ -1037,10 +1037,10 @@ GPU-resident PPO — **`d4cf614` revert** on `master`.
 
 ### Cam reboot paste
 
-> You are **Cam**. Read `THRONG.md` §0b. **P14.1 ✅** graduated → **hard z_q**; run **stable** @ **400k+**. **400k decode:** continuous **closed**; VQ **metabolic trap** (MI `energy`≈1, `blue_dist`≈0). **P14.1b proprio LIVE** (`192d686`, `proprio_coef: 0.05`). **P14.2 EFE HOLD** — no Active Inference until **pincer p < 0.05**. **`git=192d686+`**. No merge to `master`.
+> You are **Cam**. Read `THRONG.md` §0b. **P14.1 ✅** graduated → **hard z_q**; run **stable** @ **400k+**. **400k decode:** continuous **closed**; VQ **metabolic trap** (MI `energy`≈1, `blue_dist`≈0). **P14.1b proprio LIVE** (`192d686` + `736d08b`; repo coef `0.5`, live override `0.15`). **P14.2 EFE HOLD** — no Active Inference until **pincer p < 0.05**. **`git=736d08b+`**. No merge to `master`.
 
 **New Will:** P14.2 dormant; monitor `proprio_loss` + re-decode after proprio bake; implement EFE only on Cam signal after pincer pass.
 
 ---
 
-*Last updated: 2026-06-02 — P14.1b proprio shipped; 400k metabolic trap; EFE hold; `git=192d686+`.*
+*Last updated: 2026-06-02 — P14.1b proprio shipped + coef bump; live 0.15/550k override; 400k metabolic trap; EFE hold; `git=736d08b+`.*
