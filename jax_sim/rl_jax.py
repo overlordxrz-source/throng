@@ -324,13 +324,13 @@ def ppo_update(
     jax.jit,
     static_argnames=(
         "aux_apply_fn", "optimizer",
-        "fwd_coef", "carry_fwd_coef", "self_pred_coef", "conf_coef",
+        "fwd_coef", "carry_fwd_coef", "self_pred_coef", "conf_coef", "proprio_coef",
     ),
 )
 def _aux_minibatch_step(
     params, opt_state, aux_apply_fn, optimizer,
-    carry_t, action_oh, loc_env_tp1, carry_tp1, action_tp1_oh, alive_mask,
-    fwd_coef, carry_fwd_coef, self_pred_coef, conf_coef,
+    carry_t, action_oh, loc_env_tp1, carry_tp1, action_tp1_oh, energy_tp1, alive_mask,
+    fwd_coef, carry_fwd_coef, self_pred_coef, conf_coef, proprio_coef,
 ):
     """
     Single minibatch gradient step combining:
@@ -339,7 +339,7 @@ def _aux_minibatch_step(
       - Self-prediction loss: predict action_{t+1} from carry_t
     """
     def loss_fn(p):
-        env_pred, self_pred_logits, carry_pred, conf_pred = aux_apply_fn(
+        env_pred, self_pred_logits, carry_pred, conf_pred, energy_pred = aux_apply_fn(
             p, carry_t, action_oh
         )
 
@@ -364,15 +364,28 @@ def _aux_minibatch_step(
         ce = -jnp.sum(action_tp1_oh * log_probs, axis=-1)
         sp_loss = (ce * alive_mask).sum() / (alive_mask.sum() + 1e-8)
 
+        energy_target = jax.lax.stop_gradient(energy_tp1)
+        proprio_per = jnp.square(energy_pred - energy_target)
+        proprio_loss = (proprio_per * alive_mask).sum() / (alive_mask.sum() + 1e-8)
+
         total = (
             fwd_coef * fwd_loss
             + carry_fwd_coef * carry_fwd_loss
             + self_pred_coef * sp_loss
             + conf_coef * conf_loss
+            + proprio_coef * proprio_loss
         )
-        return total, (fwd_loss, carry_fwd_loss, sp_loss, self_pred_logits, conf_loss, conf_pred_mean)
+        return total, (
+            fwd_loss,
+            carry_fwd_loss,
+            sp_loss,
+            self_pred_logits,
+            conf_loss,
+            conf_pred_mean,
+            proprio_loss,
+        )
 
-    (_, (fwd_l, carry_fwd_l, sp_l, sp_logits, conf_l, conf_pred_m)), grads = jax.value_and_grad(
+    (_, (fwd_l, carry_fwd_l, sp_l, sp_logits, conf_l, conf_pred_m, proprio_l)), grads = jax.value_and_grad(
         loss_fn, has_aux=True
     )(params)
     updates, new_opt_state = optimizer.update(grads, opt_state, params)
@@ -383,7 +396,7 @@ def _aux_minibatch_step(
         * alive_mask
     ).sum() / (alive_mask.sum() + 1e-8)
 
-    return new_params, new_opt_state, fwd_l, carry_fwd_l, sp_l, sp_acc, conf_l, conf_pred_m
+    return new_params, new_opt_state, fwd_l, carry_fwd_l, sp_l, sp_acc, conf_l, conf_pred_m, proprio_l
 
 
 def auxiliary_update(
@@ -403,7 +416,9 @@ def auxiliary_update(
     carry_fwd_coef: float = 0.05,
     self_pred_coef: float = 0.1,
     conf_coef: float = 0.0,
-) -> Tuple[Dict, Any, float, float, float, float, float, float]:
+    energy_np: np.ndarray = None,
+    proprio_coef: float = 0.0,
+) -> Tuple[Dict, Any, float, float, float, float, float, float, float]:
     """
     Compute forward dynamics + latent carry dynamics + self-prediction aux losses.
 
@@ -411,7 +426,7 @@ def auxiliary_update(
     Carry dynamics target: carries[t+1] with stop_gradient (Phase 11 / 9.2).
 
     Returns: (params, opt_state, avg_fwd_loss, avg_carry_fwd_loss, avg_sp_loss, avg_sp_acc,
-              avg_conf_loss, avg_conf_pred)
+              avg_conf_loss, avg_conf_pred, avg_proprio_loss)
     """
     T, N, hidden_dim = carries_np.shape
 
@@ -420,6 +435,10 @@ def auxiliary_update(
     action_t = actions_np[:-1].reshape((T - 1) * N)
     action_tp1 = actions_np[1:].reshape((T - 1) * N)
     loc_env_tp1 = obs_np[1:].reshape((T - 1) * N, obs_np.shape[-1])[:, loc_env_start:loc_env_end]
+    if energy_np is not None:
+        energy_tp1 = np.asarray(energy_np[1:]).reshape((T - 1) * N).astype(np.float32)
+    else:
+        energy_tp1 = np.zeros((T - 1) * N, dtype=np.float32)
     action_oh = np.eye(5, dtype=np.float32)[action_t]
     action_tp1_oh = np.eye(5, dtype=np.float32)[action_tp1]
 
@@ -435,19 +454,20 @@ def auxiliary_update(
     perm = rng.permutation(M)
     n_mb = max(1, M // minibatch_size)
 
-    fwd_sum = carry_fwd_sum = sp_loss_sum = sp_acc_sum = conf_sum = conf_pred_sum = 0.0
+    fwd_sum = carry_fwd_sum = sp_loss_sum = sp_acc_sum = conf_sum = conf_pred_sum = proprio_sum = 0.0
 
     for i in range(n_mb):
         idx = perm[i * minibatch_size : (i + 1) * minibatch_size]
-        params, opt_state, fwd_l, carry_fwd_l, sp_l, sp_a, conf_l, conf_p = _aux_minibatch_step(
+        params, opt_state, fwd_l, carry_fwd_l, sp_l, sp_a, conf_l, conf_p, proprio_l = _aux_minibatch_step(
             params, opt_state, aux_apply_fn, optimizer,
             jnp.array(carry_t[idx]),
             jnp.array(action_oh[idx]),
             jnp.array(loc_env_tp1[idx]),
             jnp.array(carry_tp1[idx]),
             jnp.array(action_tp1_oh[idx]),
+            jnp.array(energy_tp1[idx]),
             jnp.array(alive_t[idx]),
-            fwd_coef, carry_fwd_coef, self_pred_coef, conf_coef,
+            fwd_coef, carry_fwd_coef, self_pred_coef, conf_coef, proprio_coef,
         )
         fwd_sum += float(fwd_l)
         carry_fwd_sum += float(carry_fwd_l)
@@ -455,6 +475,7 @@ def auxiliary_update(
         sp_acc_sum += float(sp_a)
         conf_sum += float(conf_l)
         conf_pred_sum += float(conf_p)
+        proprio_sum += float(proprio_l)
 
     return (
         params,
@@ -465,7 +486,81 @@ def auxiliary_update(
         sp_acc_sum / n_mb,
         conf_sum / n_mb,
         conf_pred_sum / n_mb,
+        proprio_sum / n_mb,
     )
+
+
+@functools.partial(
+    jax.jit,
+    static_argnames=("proprio_apply_fn", "optimizer", "proprio_coef"),
+)
+def _proprio_minibatch_step(
+    params,
+    opt_state,
+    proprio_apply_fn,
+    optimizer,
+    carry_t,
+    energy_tp1,
+    alive_mask,
+    proprio_coef,
+):
+    """Proprio-only minibatch step (red predator without full aux heads)."""
+
+    def loss_fn(p):
+        energy_pred = proprio_apply_fn(p, carry_t)
+        energy_target = jax.lax.stop_gradient(energy_tp1)
+        proprio_per = jnp.square(energy_pred - energy_target)
+        proprio_loss = (proprio_per * alive_mask).sum() / (alive_mask.sum() + 1e-8)
+        return proprio_coef * proprio_loss, proprio_loss
+
+    (_, proprio_l), grads = jax.value_and_grad(loss_fn, has_aux=True)(params)
+    updates, new_opt_state = optimizer.update(grads, opt_state, params)
+    new_params = optax.apply_updates(params, updates)
+    return new_params, new_opt_state, proprio_l
+
+
+def proprio_auxiliary_update(
+    params,
+    opt_state,
+    optimizer,
+    proprio_apply_fn,
+    carries_np: np.ndarray,
+    energy_np: np.ndarray,
+    alive_np: np.ndarray = None,
+    key: jax.Array = None,
+    minibatch_size: int = 1024,
+    proprio_coef: float = 0.05,
+) -> Tuple[Dict, Any, float]:
+    """Energy prediction from carry only (Phase 14.1b; red comms path)."""
+    T, N, hidden_dim = carries_np.shape
+    carry_t = carries_np[:-1].reshape((T - 1) * N, hidden_dim)
+    energy_tp1 = np.asarray(energy_np[1:]).reshape((T - 1) * N).astype(np.float32)
+    if alive_np is not None:
+        alive_t = alive_np[:-1].reshape((T - 1) * N).astype(np.float32)
+    else:
+        alive_t = np.ones((T - 1) * N, dtype=np.float32)
+
+    M = carry_t.shape[0]
+    if key is None:
+        key = jax.random.PRNGKey(0)
+    rng = np.random.RandomState(int(jax.random.bits(key, dtype=jnp.uint32)))
+    perm = rng.permutation(M)
+    n_mb = max(1, M // int(minibatch_size))
+    proprio_sum = 0.0
+    for i in range(n_mb):
+        idx = perm[i * minibatch_size : (i + 1) * minibatch_size]
+        params, opt_state, proprio_l = _proprio_minibatch_step(
+            params,
+            opt_state,
+            proprio_apply_fn,
+            optimizer,
+            jnp.array(carry_t[idx]),
+            jnp.array(energy_tp1[idx]),
+            jnp.array(alive_t[idx]),
+            proprio_coef,
+        )
+        proprio_sum += float(proprio_l)
+    return params, opt_state, proprio_sum / n_mb
 
 
 # Keep old name as alias for backward compatibility with any external callers

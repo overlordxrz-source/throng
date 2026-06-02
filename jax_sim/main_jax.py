@@ -63,6 +63,7 @@ from jax_sim.rl_jax import (
     create_optimizer,
     ppo_update,
     auxiliary_update,
+    proprio_auxiliary_update,
     vqel_monologue_update,
 )
 from agents.network_torch import compute_obs_dim_torch, compute_fwd_env_dim, loc_env_flat_bounds
@@ -988,6 +989,31 @@ def _run_simulation_impl(
     b_aux_apply_fn = _aux_apply_fn
     r_aux_apply_fn = _aux_apply_fn
 
+    def _proprio_apply_fn(params, carry_t):
+        return model.apply(
+            params_apply_variables(params),
+            carry_t,
+            method=model.predict_proprio_energy,
+        )
+
+    b_proprio_apply_fn = _proprio_apply_fn
+    r_proprio_apply_fn = _proprio_apply_fn
+    if model_red is not None:
+        def _red_proprio_apply_fn(params, carry_t):
+            return model_red.apply(
+                params_apply_variables(params),
+                carry_t,
+                method=model_red.predict_proprio_energy,
+            )
+        r_proprio_apply_fn = _red_proprio_apply_fn
+
+    _proprio_coef = float(config.get("proprio_coef", 0.05))
+    if _proprio_coef > 0.0:
+        print(
+            f"[JAX] Phase14.1b proprio: head_proprio → energy (coef={_proprio_coef}) "
+            "— disentangle metabolic state from VQ wire"
+        )
+
     # ── NaN debug after init ────────────────────────────────
     flat_params = jax.tree_util.tree_leaves(b_params)
     has_nan_params = any(bool(jnp.isnan(p).any()) for p in flat_params)
@@ -1270,13 +1296,16 @@ def _run_simulation_impl(
                 )
             _self_pred_coef = float(config.get("self_pred_coef", 0.1))
             fwd_key, update_key = jax.random.split(update_key)
-            b_params, b_opt_state, b_fwd_loss, b_carry_fwd_loss, b_sp_loss, b_sp_acc, b_conf_loss, b_conf_pred = auxiliary_update(
+            _b_energy_np = np.asarray(b_batch["energy"]) if "energy" in b_batch else None
+            b_params, b_opt_state, b_fwd_loss, b_carry_fwd_loss, b_sp_loss, b_sp_acc, b_conf_loss, b_conf_pred, b_proprio_loss = auxiliary_update(
                 b_params, b_opt_state, b_optimizer, b_aux_apply_fn,
                 _b_carries_np, _b_actions_np, _b_obs_np,
                 _loc_env_start, _loc_env_end,
                 _b_alive_np, fwd_key, minibatch_size=_fwd_mb,
                 fwd_coef=_fwd_coef, carry_fwd_coef=_carry_fwd_coef,
                 self_pred_coef=_self_pred_coef, conf_coef=_conf_coef,
+                energy_np=_b_energy_np,
+                proprio_coef=_proprio_coef,
             )
             b_metrics["fwd_loss"] = b_fwd_loss
             b_metrics["carry_fwd_loss"] = b_carry_fwd_loss
@@ -1284,6 +1313,7 @@ def _run_simulation_impl(
             b_metrics["sp_acc"] = b_sp_acc
             b_metrics["conf_loss"] = b_conf_loss
             b_metrics["conf_pred"] = b_conf_pred
+            b_metrics["proprio_loss"] = b_proprio_loss
 
         if config.get("vq_dead_code_reset", True) and "z_e" in b_batch:
             _dc_key, update_key = jax.random.split(update_key)
@@ -1333,21 +1363,40 @@ def _run_simulation_impl(
                 f"  [JAX] Red PPO done in {__import__('time').time() - _t_rppo0:.1f}s",
                 flush=True,
             )
+        _r_energy_np = np.asarray(r_batch["energy"]) if "energy" in r_batch else None
         if not _red_comms:
             fwd_key, update_key = jax.random.split(update_key)
-            r_params, r_opt_state, r_fwd_loss, r_carry_fwd_loss, r_sp_loss, r_sp_acc, r_conf_loss, r_conf_pred = auxiliary_update(
+            r_params, r_opt_state, r_fwd_loss, r_carry_fwd_loss, r_sp_loss, r_sp_acc, r_conf_loss, r_conf_pred, r_proprio_loss = auxiliary_update(
                 r_params, r_opt_state, r_optimizer, r_aux_apply_fn,
                 _r_carries_np, _r_actions_np, _r_obs_np,
                 _loc_env_start, _loc_env_end,
                 _r_alive_np, fwd_key, minibatch_size=_fwd_mb,
                 fwd_coef=_fwd_coef, carry_fwd_coef=_carry_fwd_coef,
                 self_pred_coef=_self_pred_coef, conf_coef=_conf_coef,
+                energy_np=_r_energy_np,
+                proprio_coef=_proprio_coef,
             )
             r_metrics["fwd_loss"] = r_fwd_loss
             r_metrics["carry_fwd_loss"] = r_carry_fwd_loss
             r_metrics["sp_acc"] = r_sp_acc
             r_metrics["conf_loss"] = r_conf_loss
             r_metrics["conf_pred"] = r_conf_pred
+            r_metrics["proprio_loss"] = r_proprio_loss
+        elif _proprio_coef > 0.0 and _r_energy_np is not None:
+            _rprop_key, update_key = jax.random.split(update_key)
+            r_params, r_opt_state, r_proprio_loss = proprio_auxiliary_update(
+                r_params,
+                r_opt_state,
+                r_optimizer,
+                r_proprio_apply_fn,
+                _r_carries_np,
+                _r_energy_np,
+                _r_alive_np,
+                key=_rprop_key,
+                minibatch_size=_fwd_mb,
+                proprio_coef=_proprio_coef,
+            )
+            r_metrics["proprio_loss"] = r_proprio_loss
 
         if config.get("vq_dead_code_reset", True) and "z_e" in r_batch:
             _dc_key, update_key = jax.random.split(update_key)
@@ -1554,9 +1603,15 @@ def _run_simulation_impl(
                 if _conf_enabled
                 else ""
             )
+            proprio_loss_val = float(b_metrics.get("proprio_loss", float("nan"))) if isinstance(b_metrics, dict) else float("nan")
+            _aux_proprio = (
+                f" | proprio_loss={proprio_loss_val:.4f}"
+                if np.isfinite(proprio_loss_val)
+                else ""
+            )
             print(
                 f"  AuxLoss: fwd_env={fwd_loss_val:.4f} | carry_fwd={carry_fwd_val:.4f} "
-                f"(↓0.05–0.1) | self_pred_acc={sp_acc_val:.3f}{_aux_conf} | "
+                f"(↓0.05–0.1) | self_pred_acc={sp_acc_val:.3f}{_aux_conf}{_aux_proprio} | "
                 f"carry_rank={carry_rank} | carry_H={carry_entropy:.2f}"
             )
             if _vqel_monologue:

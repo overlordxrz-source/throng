@@ -30,6 +30,7 @@ AUX_HEAD_KEYS = (
     "head_fwd_dyn_2",
     "head_confidence_1",
     "head_confidence_2",
+    "head_proprio",
 )
 
 # Top-level module keys grafted from a fresh init when missing in Orbax checkpoints.
@@ -195,6 +196,8 @@ class AgentNetworkJax(nn.Module):
         # Phase 14.1a scaffold — keep decoder shallow so codebook carries semantics.
         self.head_vqel_recon_1 = nn.Dense(self.hidden_dim)
         self.head_vqel_recon_2 = nn.Dense(self._obs_layout().spatial_ego_dim)
+        # Phase 14.1b — proprioceptive disentanglement (energy from carry, not VQ wire).
+        self.head_proprio = nn.Dense(1)
 
         if self.cross_attn_enabled:
             self.nb_cross_attn = NeighborCrossAttention(
@@ -427,7 +430,12 @@ class AgentNetworkJax(nn.Module):
         self_pred_logits = self.head_self_pred(carry_t)
         carry_pred = self.carry_forward_dynamics(carry_t, action_oh)
         conf_pred = self.predict_carry_fwd_confidence(carry_t, action_oh)
-        return env_pred, self_pred_logits, carry_pred, conf_pred
+        energy_pred = self.predict_proprio_energy(carry_t)
+        return env_pred, self_pred_logits, carry_pred, conf_pred, energy_pred
+
+    def predict_proprio_energy(self, carry_t: jnp.ndarray) -> jnp.ndarray:
+        """Predict next-step energy from carry (Phase 14.1b proprio aux)."""
+        return self.head_proprio(carry_t).squeeze(-1)
 
     def value_from_carry(self, carry: jnp.ndarray) -> jnp.ndarray:
         """Latent value readout for K-step imagination (carry-only; frozen at inference)."""
@@ -435,7 +443,7 @@ class AgentNetworkJax(nn.Module):
 
 
 # Predator (Red) comms — separate codebook + cross-attn; no P11 aux / imagination heads.
-PREDATOR_GRAFT_TOP_KEYS = ("red_codebook", "red_nb_cross_attn")
+PREDATOR_GRAFT_TOP_KEYS = ("red_codebook", "red_nb_cross_attn", "head_proprio")
 
 
 class PredatorNetworkJax(nn.Module):
@@ -489,11 +497,16 @@ class PredatorNetworkJax(nn.Module):
         self.head_tom = nn.Dense(5)
         self.head_culture_fast = nn.Dense(sym_d)
         self.head_culture_slow = nn.Dense(sym_d)
+        self.head_proprio = nn.Dense(1)
         if self.cross_attn_enabled:
             self.red_nb_cross_attn = NeighborCrossAttention(
                 hidden_dim=d,
                 num_heads=self.cross_attn_num_heads,
             )
+
+    def predict_proprio_energy(self, carry_t: jnp.ndarray) -> jnp.ndarray:
+        """Predict next-step energy from carry (Phase 14.1b; red team)."""
+        return self.head_proprio(carry_t).squeeze(-1)
 
     def __call__(
         self,
@@ -591,6 +604,9 @@ class PredatorNetworkJax(nn.Module):
         culture_fast = self.head_culture_fast(pooled)
         culture_slow = self.head_culture_slow(pooled)
 
+        if self.is_initializing():
+            self.head_proprio(pooled)
+
         return new_carries, (
             action_logits,
             signal_out,
@@ -632,7 +648,8 @@ def ensure_predator_params(
     needs_cross = bool(
         getattr(model, "cross_attn_enabled", False) and "red_nb_cross_attn" not in flat
     )
-    if not needs_codebook and not needs_cross:
+    needs_proprio = "head_proprio" not in flat
+    if not needs_codebook and not needs_cross and not needs_proprio:
         return params
     carry = jnp.zeros((1, hidden_dim))
     obs = jnp.zeros((1, obs_dim))
@@ -645,6 +662,9 @@ def ensure_predator_params(
     if needs_cross and "red_nb_cross_attn" in fresh_flat:
         flat["red_nb_cross_attn"] = fresh_flat["red_nb_cross_attn"]
         print("[JAX] Merged fresh red_nb_cross_attn (Phase 12) into predator params")
+    if needs_proprio and "head_proprio" in fresh_flat:
+        flat["head_proprio"] = fresh_flat["head_proprio"]
+        print("[JAX] Merged fresh head_proprio (Phase 14.1b) into predator params")
     return sanitize_agent_params(freeze(flat))
 
 
