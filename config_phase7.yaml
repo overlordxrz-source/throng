@@ -231,6 +231,6 @@ phase14_vqel:
   dialogue_signal_mode: ste      # ste = legacy STE broadcast; hard = discrete z_q after graduation
 
 # Phase 14.1b — proprioceptive disentanglement (energy from carry, not VQ wire)
-proprio_coef: 0.5
+proprio_coef: 0.15
 
 exit_on_graduation: false
