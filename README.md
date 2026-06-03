@@ -36,7 +36,7 @@ For the full research log, theory, philosophy, and per-phase post-mortems see
 # Blue alarm / flee (214k reference: decode_p11_3_214k.log)
 python3 tools/decode_signals.py signal_corpus.jsonl --k 16 --min-step 149500
 
-# Red pincer — GWT Router gate (50k steps post-resume at ~666k → decode at 716k+)
+# Red pincer — GWT Router gate (50k correct-GWT steps from ppo 1305 / step ~668k → decode at 720k+)
 python3 tools/decode_signals.py --red /mnt/throng-runs/signal_corpus_red.jsonl \
   --k 16 --min-step 720000 2>&1 | tee decode_gwt_p143.log
 ```
