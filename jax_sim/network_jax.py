@@ -443,7 +443,40 @@ class AgentNetworkJax(nn.Module):
 
 
 # Predator (Red) comms — separate codebook + cross-attn; no P11 aux / imagination heads.
-PREDATOR_GRAFT_TOP_KEYS = ("red_codebook", "red_nb_cross_attn", "head_proprio", "gwt_comms_1")
+PREDATOR_GRAFT_TOP_KEYS = ("dcvq", "simvq_W", "red_nb_cross_attn", "head_proprio", "gwt_comms_1")
+
+
+class DCVQ(nn.Module):
+    n_e: int
+    e_dim: int
+    num_subspaces: int
+    beta: float = 0.25
+
+    def setup(self):
+        assert self.e_dim % self.num_subspaces == 0
+        self.sub_dim = self.e_dim // self.num_subspaces
+        self.embeddings = self.param('subspace_embeddings',
+                                     nn.initializers.normal(stddev=1.0 / self.sub_dim),
+                                     (self.num_subspaces, self.n_e, self.sub_dim))
+
+    def __call__(self, z):
+        batch_size = z.shape[0]
+        z_split = z.reshape((batch_size, self.num_subspaces, self.sub_dim))
+        z_sq = jnp.sum(z_split**2, axis=-1, keepdims=True)
+        e_sq = jnp.sum(self.embeddings**2, axis=-1)
+        e_sq_broad = jnp.expand_dims(e_sq, axis=0)
+        dot_prod = jnp.einsum('bgd,gkd->bgk', z_split, self.embeddings)
+        distances = z_sq + e_sq_broad - 2.0 * dot_prod
+        indices = jnp.argmin(distances, axis=-1)
+        batch_idx = jnp.arange(batch_size)[:, None]
+        group_idx = jnp.arange(self.num_subspaces)[None, :]
+        z_q_split = self.embeddings[group_idx, indices]
+        z_q_concat = z_q_split.reshape((batch_size, self.e_dim))
+        z_q_ste = z + jax.lax.stop_gradient(z_q_concat - z)
+        loss_codebook = jnp.sum((jax.lax.stop_gradient(z_split) - z_q_split) ** 2, axis=(-1, -2))
+        loss_commit = self.beta * jnp.sum((z_split - jax.lax.stop_gradient(z_q_split)) ** 2, axis=(-1, -2))
+        vq_loss = loss_codebook + loss_commit
+        return z_q_ste, indices, vq_loss
 
 
 class PredatorNetworkJax(nn.Module):
@@ -499,7 +532,19 @@ class PredatorNetworkJax(nn.Module):
         self.final_norm = nn.LayerNorm()
         self.head_action = nn.Dense(5)
         self.head_signal = nn.Dense(self.signal_dim)
-        self.red_codebook = nn.Embed(self.vocab_size, self.signal_dim)
+        
+        # Phase 14.4: DCVQ + SimVQ instead of red_codebook
+        self.num_subspaces = 4
+        self.dcvq = DCVQ(
+            n_e=self.vocab_size, 
+            e_dim=self.signal_dim, 
+            num_subspaces=self.num_subspaces, 
+            beta=self.vq_beta
+        )
+        self.simvq_W = self.param('simvq_W', 
+                                  nn.initializers.variance_scaling(1.0, "fan_in", "truncated_normal"), 
+                                  (self.signal_dim, self.signal_dim))
+        
         self.head_symbol = nn.Dense(sym_d)
         self.head_value = nn.Dense(
             1,
@@ -625,13 +670,12 @@ class PredatorNetworkJax(nn.Module):
         action_logits = self.head_action(h_policy) / 2.0
         # z_e sourced from comms pathway (exteroceptive mask enforced — GWT)
         z_e = self.head_signal(h_comms)
-        codebook_w = self.red_codebook.embedding
-        signal_out, token_ids, loss_vq = vector_quantize_signals(
-            z_e,
-            codebook_w,
-            beta=self.vq_beta,
-            dead_code_reset=self.vq_dead_code_reset,
-        )
+        
+        # Phase 14.4 Contingencies: DCVQ + SimVQ
+        signal_out, indices, loss_vq = self.dcvq(z_e)
+        signal_out = jnp.matmul(signal_out, self.simvq_W)
+        token_ids = indices[:, 0]  # Export first subspace token for telemetry compatibility
+        
         symbol_write = self.head_symbol(h_policy)
         values = self.head_value(value_input).squeeze(-1)
         tom_logits = self.head_tom(h_policy)[:, None, :]
@@ -674,9 +718,9 @@ def ensure_predator_params(
     obs_dim: int,
     n_layers: int,
 ) -> Any:
-    """Fill missing red_codebook / red_nb_cross_attn / gwt_comms_1 when resuming older predator ckpts."""
+    """Fill missing dcvq / simvq_W / red_nb_cross_attn / gwt_comms_1 when resuming older predator ckpts."""
     flat = unfreeze(params)
-    needs_codebook = "red_codebook" not in flat or (
+    needs_codebook = "dcvq" not in flat or "simvq_W" not in flat or (
         "head_signal" in flat
         and flat["head_signal"]["kernel"].shape[-1] != model.signal_dim
     )
@@ -693,9 +737,12 @@ def ensure_predator_params(
     fresh = model.init(rng, carry, obs, n_layers)["params"]
     fresh_flat = unfreeze(fresh)
     if needs_codebook:
-        for k in ("red_codebook", "head_signal"):
-            flat[k] = fresh_flat[k]
-        print("[JAX] Merged fresh red_codebook + head_signal into predator params")
+        for k in ("dcvq", "simvq_W", "head_signal"):
+            if k in fresh_flat:
+                flat[k] = fresh_flat[k]
+        if "red_codebook" in flat:
+            del flat["red_codebook"]
+        print("[JAX] Merged fresh dcvq + simvq_W + head_signal (Phase 14.4) into predator params")
     if needs_cross and "red_nb_cross_attn" in fresh_flat:
         flat["red_nb_cross_attn"] = fresh_flat["red_nb_cross_attn"]
         print("[JAX] Merged fresh red_nb_cross_attn (Phase 12) into predator params")
