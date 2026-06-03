@@ -425,7 +425,7 @@ def make_sim_step(
         )
         b_pop = b_pop.replace(energy=jnp.clip(b_pop.energy - cog_cost, 0.0, 1.0))
 
-        # ── Energy decay (blue standard; red apex — Phase 14.2 metabolic asymmetry) ──
+        # ── Energy decay (Phase 14.2: asymmetric — blues fast, reds apex) ──
         b_pop = b_pop.replace(energy=jnp.clip(b_pop.energy - _energy_decay, 0.0, 1.0))
         r_pop = r_pop.replace(energy=jnp.clip(r_pop.energy - _red_energy_decay, 0.0, 1.0))
 
@@ -1017,11 +1017,17 @@ def _run_simulation_impl(
         )
 
     _p14t = config.get("phase14_transcendental") or {}
-    _red_ed_cfg = float(_p14t.get("red_energy_decay", config["energy_decay"]))
-    if _red_ed_cfg != float(config["energy_decay"]):
+    _red_energy_decay_cfg = float(_p14t.get("red_energy_decay", config["energy_decay"]))
+    _blue_energy_decay_cfg = float(config["energy_decay"])
+    print(
+        f"[JAX] Phase14.2 Metabolic Asymmetry: red_energy_decay={_red_energy_decay_cfg} "
+        f"(blue energy_decay={_blue_energy_decay_cfg}; "
+        f"starvation_threshold={config['starvation_threshold']} unchanged)"
+    )
+    if "red_energy_decay" not in _p14t:
         print(
-            f"[JAX] Phase14.2 metabolic asymmetry: red_energy_decay={_red_ed_cfg} "
-            f"(blue={config['energy_decay']}) — apex predators, hunger-babble suppressed"
+            "[JAX] WARN: phase14_transcendental.red_energy_decay missing — "
+            f"using blue energy_decay={_blue_energy_decay_cfg} for reds"
         )
 
     # ── NaN debug after init ────────────────────────────────

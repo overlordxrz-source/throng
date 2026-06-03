@@ -8,8 +8,9 @@ plays a game well." The goal is **emergence**: language, culture, and proto-
 cognition arising purely from selection pressure.
 
 **Current state (Jun 2026):** **Phase 14.2 Metabolic Asymmetry** on `feature/phase14-transcendental`.
-P14.1c catch overdrive **failed** (pincer **p≈0.46**). **P14.2 EFE scrapped** (peer review). New lever:
-**`red_energy_decay: 0.0001`** (10× slower than blue) → apex predators, suppress red hunger-babble in VQ.
+P14.1c catch overdrive **failed** (pincer **p≈0.46**). **EFE scrapped**; reds now decay at
+**`red_energy_decay: 0.0001`** (10× slower than blues) for apex-predator lifespan. Verify startup:
+**`[JAX] Phase14.2 Metabolic Asymmetry: red_energy_decay=0.0001`**.
 
 **Full ops / decode / roadmap:** [THRONG.md](THRONG.md) §0b (read first).
 
@@ -40,14 +41,14 @@ python3 tools/decode_signals.py --red /mnt/throng-runs/signal_corpus_red.jsonl \
   --k 16 --min-step 560000 2>&1 | tee decode_red_pincer_600k_overdrive.log
 ```
 
-**Pass bar (red):** RED VQ PINCER TEST χ² **p < 0.05**. Run baseline decode, then resume with metabolic asymmetry.
+**Pass bar (red):** RED VQ PINCER TEST χ² **p < 0.05**. Resume B200 after pull; watch red energy MI ↓ under asymmetry.
 
 **Modal (resume — do not wipe ckpts):**
 
 ```bash
 cd /root/throng && git pull origin feature/phase14-transcendental
 python -u run_bg.py
-# Expect: [JAX] Phase14.2 metabolic asymmetry: red_energy_decay=0.0001 (blue=0.001)
+# MUST see: [JAX] Phase14.2 Metabolic Asymmetry: red_energy_decay=0.0001
 ```
 
 ---
@@ -308,7 +309,7 @@ All knobs live in `config_phase7.yaml`. The ones you actually touch:
 | **13.0** | **VALIDATED** — tax ~0.0018/step; no imagination collapse |
 | **13.1+** | Drop spatial gate, inscription, proprio — after pincer |
 | **14 Step 1** | **AUTHORIZED** — VQEL Monologue split + Information Bottleneck |
-| **14+** | GWT → MMGL → auto-curricula (not started) |
+| **14+** | EFE → GWT → MMGL → auto-curricula (not started) |
 
 Do **not** merge to **`master`** until pincer **p < 0.05**.
 
