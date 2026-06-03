@@ -16,8 +16,10 @@
 
 | Live run (Phase 14) | Value |
 |---------------------|--------|
-| **Branch** | **`feature/phase14-transcendental`** — pull latest after push |
-| **Mode** | Hard **z_q** + **proprio** + **asymmetric red decay** (`phase14_transcendental`) |
+| **Branch** | **`feature/phase14-transcendental`** — **`git=cfeddf1+`** |
+| **Modal workspace** | **`overlordxn`** (Jun 2026) — volume **`throng-runs`** → `/mnt/throng-runs` |
+| **Volume ckpt** | **`1227`**, **`1230`** on volume (resume from latest); local mirror **`~/throng_backup`** |
+| **Migration script** | **`scripts/migrate_modal.sh`** — `download` / `upload` between accounts |
 | **P14.1** | ✅ VQEL graduated → hard broadcast + blue PPO |
 | **P14.1b** | ✅ **`proprio_coef: 0.15`** — continuous hunt **31/32** ✅ |
 | **P14.1c** | ❌ **FAILED** — 10.0 catch; pincer **p ≈ 0.46** |
@@ -27,7 +29,8 @@
 | **Decode gate** | **`--min-step 560000`** on 600k corpus (14.1c baseline) |
 | **Startup verify** | **`[JAX] Phase14.2 Metabolic Asymmetry: red_energy_decay=0.0001`** (hoisted in `_normalize_config`) |
 | **Dialogue** | **`monologue_enabled: false`**, **`dialogue_signal_mode: hard`** — hard **z_q** on startup |
-| **Volume** | **`throng-runs`** → `/mnt/throng-runs` |
+| **Catch reward** | Repo **`reward_red_catch: 3.0`** (14.1c **10.0** was operator-only; not in git) |
+| **Mode** | Hard **z_q** + **proprio** + **asymmetric red decay** (`phase14_transcendental`) |
 
 **Synergic synthesis (Cam, P14.2 pivot):**
 
@@ -47,12 +50,13 @@ python3 tools/decode_signals.py --red /mnt/throng-runs/signal_corpus_red.jsonl \
 **B200 resume (do not wipe volume):**
 
 ```bash
-cd /root/throng && git pull origin feature/phase14-transcendental
+cd /root/throng && git pull origin feature/phase14-transcendental   # cfeddf1+
 export TF_GPU_ALLOCATOR=cuda_malloc_async
 export XLA_PYTHON_CLIENT_MEM_FRACTION=0.80
 export JAX_COMPILATION_CACHE_DIR=/tmp/throng_jax_cache
 python -u run_bg.py
-# MUST see: [JAX] Phase14.2 Metabolic Asymmetry: red_energy_decay=0.0001 (blue energy_decay=0.001 ...)
+# MUST see (twice): [JAX] Phase14.2 Metabolic Asymmetry: red_energy_decay=0.0001
+# MUST see: [JAX] Phase14 dialogue_signal_mode=hard
 ```
 
 ### P10.6 decode (reference)
@@ -447,7 +451,7 @@ Modal notebook: [`docs/MODAL_NOTEBOOK_PHASE9.md`](docs/MODAL_NOTEBOOK_PHASE9.md)
 
 | Ckpt / update | Use |
 |-------------|-----|
-| **Latest on volume** | **Resume target** — post-**600k** catch-overdrive run @ `/mnt/throng-runs/checkpoints/` |
+| **Latest on volume** | **`1227`**, **`1230`** @ `/mnt/throng-runs/checkpoints/` (**`overlordxn`** workspace) |
 | **489 @ 250368** | Legacy reference only (pre-P14 long run) |
 | **393** | **Avoid** — post–Stay-collapse active imagination |
 
@@ -705,24 +709,27 @@ from jax_sim.train_entry import run_simulation
 
 Never rely on cached `from jax_sim.main_jax import run_simulation` after `git pull` without `train_entry`.
 
-### Download checkpoints
+### Download / upload volume (migrate between accounts)
 
 ```bash
-./scripts/download_modal_checkpoints.sh ~/throng_checkpoints_backup
-# Old account first: modal token new  →  dim464943
-# New account upload:
-modal volume put throng-runs ~/throng_checkpoints_backup/checkpoints /checkpoints
-modal volume put throng-runs ./signal_corpus.jsonl /signal_corpus.jsonl
+# Old account: modal token new  →  download
+./scripts/migrate_modal.sh download ~/throng_backup
+
+# New account: modal token new  →  upload
+./scripts/migrate_modal.sh upload   ~/throng_backup
 ```
 
-### Modal account migration (May 2026)
+Legacy one-liner (checkpoints only): `./scripts/download_modal_checkpoints.sh ~/throng_checkpoints_backup`
 
-| Account | Workspace | Notes |
-|---------|-----------|--------|
-| **Old** | `dim464943` | Original `throng-runs` volume |
-| **New** | `dragonbgnx` | Fresh volume; checkpoints + corpus re-uploaded |
+### Modal account migration
 
-Volumes **do not transfer** between accounts — `volume get` on old, `volume create` + `volume put` on new. Repo code is always **`git clone`** to `/root/throng` (not on volume).
+| When | Workspace | Notes |
+|------|-----------|--------|
+| **Legacy** | `dim464943` | Original `throng-runs` |
+| **May 2026** | `dragonbgnx` / `dimitar-vagalinski` | Interim re-upload |
+| **Jun 2026 — LIVE** | **`overlordxn`** | **`migrate_modal.sh`** from `dimitar-vagalinski` → local `~/throng_backup` → **`overlordxn`**; ckpt **1227/1230** + both corpora on volume |
+
+Volumes **do not transfer** between accounts — always **`download`** then **`upload`**. Repo code is **`git clone`** to `/root/throng` (not on volume). B200 notebook must mount volume on **`overlordxn`** profile.
 
 **Sparse checkpoint folders on volume:** Orbax saves every `checkpoint_interval` env steps — folder **N** ≈ PPO update **N** (step ≈ **N × 512**). Local backup may omit **292**; nearest 150k substitute is **291**.
 
@@ -1069,10 +1076,10 @@ GPU-resident PPO — **`d4cf614` revert** on `master`.
 
 ### Cam reboot paste
 
-> You are **Cam**. Read `THRONG.md` §0b. **P14.1c ❌ FAILED** (pincer **p≈0.46**). **P14.2 EFE ❌ SCRAPPED**. **P14.2 ✅ Metabolic Asymmetry** — `red_energy_decay: 0.0001`, apex predators. Verify startup log binds config. **No merge** until pincer **p<0.05**.
+> You are **Cam**. Read `THRONG.md` §0b. **P14.2 ✅ Metabolic Asymmetry** (`red_energy_decay=0.0001`); **EFE ❌ scrapped**. **Modal LIVE:** workspace **`overlordxn`**, volume **`throng-runs`**, ckpt **1227/1230**. **`git=cfeddf1+`**. Hard dialogue on startup. **No merge** until pincer **p<0.05**.
 
-**New Will:** Pull latest; resume from 600k ckpt; confirm **`[JAX] Phase14.2 Metabolic Asymmetry: red_energy_decay=0.0001`**; re-decode after ~50k asymmetry steps.
+**New Will:** B200 on **`overlordxn`**; pull **`cfeddf1+`**; verify asymmetry log; resume from latest ckpt; decode after asymmetry bake.
 
 ---
 
-*Last updated: 2026-06-02 — P14.2 pivot: Metabolic Asymmetry shipped; EFE reverted; decode gate `--min-step 560000`.*
+*Last updated: 2026-06-03 — Modal **`overlordxn`** migration; `migrate_modal.sh`; config bind `6bee6e4`; P14.2 Metabolic Asymmetry; EFE scrapped.*
