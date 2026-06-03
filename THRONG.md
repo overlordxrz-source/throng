@@ -1096,6 +1096,7 @@ GPU-resident PPO — **`d4cf614` revert** on `master`.
 |------|--------|
 | `main.py`, `agents/network_torch.py` | PyTorch era — reference only |
 | `config.yaml`, Kaggle cells in archive | Pre-JAX |
+| [`docs/PHASE14_CONTINGENCIES.md`](docs/PHASE14_CONTINGENCIES.md) | **[NEW]** Phase 14.4/15 JAX implementations (SimVQ, DCVQ, VQ-VIB) |
 | [`docs/THRONG_ARCHIVE.md`](docs/THRONG_ARCHIVE.md) | Full timeline + horcrux + SYSTEM UPDATE |
 | [`docs/PHASE9_CANVAS.md`](docs/PHASE9_CANVAS.md) | Phase 9.4 cross-attention + graft |
 | [`docs/MODAL_NOTEBOOK_PHASE9.md`](docs/MODAL_NOTEBOOK_PHASE9.md) | Modal Cell 1/2/3 (clone before launch) |
