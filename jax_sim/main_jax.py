@@ -133,6 +133,19 @@ def _normalize_config(cfg: Dict) -> Dict:
     cfg.setdefault("vocab_size", cfg.get("vocab_size", 64))
     cfg.setdefault("memory_slots", cfg.get("memory_buffer_size", 20))
     cfg.setdefault("ppo_rollout_steps", cfg.get("ppo_rollout_steps", 512))
+
+    # Phase 14.2 — hoist apex-predator decay to top-level for sim_step + telemetry
+    _p14t = cfg.get("phase14_transcendental") or {}
+    _blue_decay = float(cfg.get("energy_decay", 0.001))
+    if "red_energy_decay" in _p14t:
+        cfg["red_energy_decay"] = float(_p14t["red_energy_decay"])
+    else:
+        cfg["red_energy_decay"] = _blue_decay
+        print(
+            "[JAX] WARN: phase14_transcendental.red_energy_decay missing — "
+            f"falling back to energy_decay={_blue_decay}",
+            flush=True,
+        )
     return cfg
 
 
@@ -178,8 +191,7 @@ def make_sim_step(
     _red_catch_prob = float(config.get("red_catch_prob", 1.0))
     _puzzle_reward = float(config.get("puzzle_reward", 5.0))
     _energy_decay = float(config["energy_decay"])
-    _p14t = config.get("phase14_transcendental") or {}
-    _red_energy_decay = float(_p14t.get("red_energy_decay", _energy_decay))
+    _red_energy_decay = float(config["red_energy_decay"])
     _starv_thresh = float(config["starvation_threshold"])
     _max_age = int(config["max_age"])
     _min_pop_blue = int(config.get("min_population", 200))
@@ -538,6 +550,10 @@ def _run_simulation_impl(
     Returns: (final_params, metrics_history)
     """
     config = _normalize_config(config)
+    print(
+        f"[JAX] Phase14.2 Metabolic Asymmetry: red_energy_decay={config['red_energy_decay']}",
+        flush=True,
+    )
 
     # Persistent JAX cache on a network volume (Modal) deserializes slowly and often
     # looks like a hang → spurious KeyboardInterrupt when the notebook times out.
@@ -1016,19 +1032,10 @@ def _run_simulation_impl(
             "— disentangle metabolic state from VQ wire"
         )
 
-    _p14t = config.get("phase14_transcendental") or {}
-    _red_energy_decay_cfg = float(_p14t.get("red_energy_decay", config["energy_decay"]))
-    _blue_energy_decay_cfg = float(config["energy_decay"])
     print(
-        f"[JAX] Phase14.2 Metabolic Asymmetry: red_energy_decay={_red_energy_decay_cfg} "
-        f"(blue energy_decay={_blue_energy_decay_cfg}; "
-        f"starvation_threshold={config['starvation_threshold']} unchanged)"
+        f"[JAX] Phase14.2 Metabolic Asymmetry: red_energy_decay={config['red_energy_decay']}",
+        flush=True,
     )
-    if "red_energy_decay" not in _p14t:
-        print(
-            "[JAX] WARN: phase14_transcendental.red_energy_decay missing — "
-            f"using blue energy_decay={_blue_energy_decay_cfg} for reds"
-        )
 
     # ── NaN debug after init ────────────────────────────────
     flat_params = jax.tree_util.tree_leaves(b_params)
@@ -1108,6 +1115,7 @@ def _run_simulation_impl(
     def _rebuild_sim_step(cur_n_layers):
         cfg_copy = dict(config)
         cfg_copy["n_layers"] = cur_n_layers
+        cfg_copy["red_energy_decay"] = float(config["red_energy_decay"])
         p14_live = dict(cfg_copy.get("phase14_vqel") or {})
         p14_live["monologue_enabled"] = _vqel_monologue
         p14_live["dialogue_signal_mode"] = _dialogue_signal_mode

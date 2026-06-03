@@ -221,14 +221,14 @@ phase12_coevolution:
 
 # Phase 14.1b/c — VQEL monologue + wire cut + graduation (feature/phase14-transcendental)
 phase14_vqel:
-  monologue_enabled: true        # true: blue VQEL update only (skips blue PPO/aux)
+  monologue_enabled: false       # post-600k: skip monologue; hard dialogue on startup
   monologue_lr: 0.00003          # low LR to protect 320k MAPPO policy in shared trunk
   recon_coef: 1.0
   hash_penalty_coef: 0.5
   vq_coef_monologue: 1.0
   graduate_recon_mse: 0.02       # P14-1c: exit monologue when recon MSE stays below this
   graduate_consecutive_updates: 10
-  dialogue_signal_mode: ste      # ste = legacy STE broadcast; hard = discrete z_q after graduation
+  dialogue_signal_mode: hard     # discrete z_q broadcast (graduated state)
 
 # Phase 14.1b — proprioceptive disentanglement (energy from carry, not VQ wire)
 proprio_coef: 0.15

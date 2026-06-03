@@ -25,7 +25,8 @@
 | **P14.2 EFE** | ❌ **PERMANENTLY SCRAPPED** — do not re-enable |
 | **Science bar** | Red VQ pincer **p < 0.05** before merge → `master` |
 | **Decode gate** | **`--min-step 560000`** on 600k corpus (14.1c baseline) |
-| **Startup verify** | **`[JAX] Phase14.2 Metabolic Asymmetry: red_energy_decay=0.0001`** |
+| **Startup verify** | **`[JAX] Phase14.2 Metabolic Asymmetry: red_energy_decay=0.0001`** (hoisted in `_normalize_config`) |
+| **Dialogue** | **`monologue_enabled: false`**, **`dialogue_signal_mode: hard`** — hard **z_q** on startup |
 | **Volume** | **`throng-runs`** → `/mnt/throng-runs` |
 
 **Synergic synthesis (Cam, P14.2 pivot):**
