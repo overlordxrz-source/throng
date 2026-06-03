@@ -8,56 +8,63 @@
 
 ---
 
-## 0b. Current state — **Phase 14.2 Metabolic Asymmetry** (Jun 2026)
+## 0b. Current state — **Phase 14.3 GWT Router** (Jun 2026)
 
 **Blue SOTA (frozen on `master`):** **`465d8c6+`** — 9.4 cross-attn + 9.1 confidence + **11.3 epistemic gate** (Stay-collapse resolved).
 
-**Headline:** **P14.1c catch overdrive FAILED** — extrinsic reward scaling cannot beat dense metabolic decay through VQ. **P14.2 EFE ❌ SCRAPPED** (peer review: conf head correlates with hunger noise). **P14.2 ✅ Metabolic Asymmetry** — **`red_energy_decay: 0.0001`** (10× slower than blue **0.001**); same **`starvation_threshold`** → **Apex Predators** with ~10× lifespan; VQ forced toward sparse catch geometry.
+**Headline:** **P14.2 Metabolic Asymmetry bake complete** — corpus decode definitive: persistent quantization trap. VQ bottleneck dynamically re-scaled to bin stretched metabolic state; every dim 0–31 still peaks MI with energy. Ecological scalar fixes cannot overpower representational variance of dense internal states. **P14.3 GWT Router** — structural interoception/exteroception split: `h_comms` (energy-masked obs) drives VQ; `h_policy` (full state) drives action/value. Commit **`744de6a`**.
 
 | Live run (Phase 14) | Value |
 |---------------------|--------|
-| **Branch** | **`feature/phase14-transcendental`** — **`git=cfeddf1+`** |
+| **Branch** | **`feature/phase14-transcendental`** — **`git=744de6a`** |
 | **Modal workspace** | **`overlordxn`** (Jun 2026) — volume **`throng-runs`** → `/mnt/throng-runs` |
-| **Volume ckpt** | **`1227`**, **`1230`** on volume (resume from latest); local mirror **`~/throng_backup`** |
+| **Volume ckpt** | **`1302+`** on volume (resume from latest); local mirror **`~/throng_backup`** |
 | **Migration script** | **`scripts/migrate_modal.sh`** — `download` / `upload` between accounts |
 | **P14.1** | ✅ VQEL graduated → hard broadcast + blue PPO |
 | **P14.1b** | ✅ **`proprio_coef: 0.15`** — continuous hunt **31/32** ✅ |
 | **P14.1c** | ❌ **FAILED** — 10.0 catch; pincer **p ≈ 0.46** |
-| **P14.2** | ✅ **Metabolic Asymmetry** — `red_energy_decay: 0.0001`; blues keep `energy_decay: 0.001` |
+| **P14.2** | ✅ **Metabolic Asymmetry** — `red_energy_decay: 0.0001`; corpus decode: trap confirmed |
 | **P14.2 EFE** | ❌ **PERMANENTLY SCRAPPED** — do not re-enable |
+| **P14.3** | ✅ **GWT Router** — `gwt_comms_1` (energy-masked comms path); `744de6a` |
 | **Science bar** | Red VQ pincer **p < 0.05** before merge → `master` |
-| **Decode gate** | **`--min-step 560000`** on 600k corpus (14.1c baseline) |
-| **Startup verify** | **`[JAX] Phase14.2 Metabolic Asymmetry: red_energy_decay=0.0001`** (hoisted in `_normalize_config`) |
+| **Decode gate** | **`--min-step 716000`** (after 50k GWT steps from resume ~666k) |
+| **Startup verify** | **`[JAX] Merged fresh gwt_comms_1 (Phase 14.3 GWT Router) into predator params`** |
 | **Dialogue** | **`monologue_enabled: false`**, **`dialogue_signal_mode: hard`** — hard **z_q** on startup |
-| **Catch reward** | Repo **`reward_red_catch: 3.0`** (14.1c **10.0** was operator-only; not in git) |
-| **Mode** | Hard **z_q** + **proprio** + **asymmetric red decay** (`phase14_transcendental`) |
+| **Catch reward** | Repo **`reward_red_catch: 3.0`** |
+| **Mode** | GWT mask + hard **z_q** + **proprio** + **asymmetric red decay** |
 
-**Synergic synthesis (Cam, P14.2 pivot):**
+**Synergic synthesis (Cam, P14.3 pivot):**
 
 | Lens | Finding |
 |------|---------|
-| **Physics** | Slow red decay + unchanged threshold → apex lifespan; hunger-babble variance ↓ |
-| **RL/ML** | Gradient density mismatch is **metabolic**, not critic architecture — fix the ecology |
-| **Philosophy** | Do not reward epistemic curiosity on a channel drowning in interoception |
-| **Response** | **Metabolic Asymmetry** — let catch rewards dominate red VQ wire |
+| **Physics** | VQ bottleneck minimises MSE along axes of max variance; energy monotonically decays → dominates hidden state → dominates codebook. Metabolic asymmetry insufficient — VQ dynamically re-scales to bin the stretched range |
+| **RL/ML** | Cannot fix representational variance with extrinsic reward. Must sever the interoceptive pathway structurally. GWT Router: `h_comms` (obs[:, 0]=0) → VQ; `h_policy` (full) → action/value |
+| **Philosophy** | Language cannot map physical space if the existential burden of the speaker is entirely internal. Algorithmic blindness to self within the language center forces exteroceptive grounding |
+| **Response** | **GWT structural mask** — `gwt_comms_1 = Dense(d)` on energy-zeroed obs; cross-attn carry zeroed; `head_signal` reads `h_comms` not `pooled` |
+
+> [!IMPORTANT]
+> **Run restart required.** The B200 run launched at `1b91358` (P14.2 docs). GWT commit `744de6a` was pushed after launch. Stop the current run, `git pull`, and restart to deploy the GWT Router.
 
 ```bash
-# Baseline decode (560k+ window, pre-asymmetry corpus):
-python3 tools/decode_signals.py --red /mnt/throng-runs/signal_corpus_red.jsonl \
-  --min-step 560000 --k 16 2>&1 | tee decode_red_pincer_600k_overdrive.log
-```
-
-**B200 resume (do not wipe volume):**
-
-```bash
-cd /root/throng && git pull origin feature/phase14-transcendental   # cfeddf1+
+# P14.3 B200 restart (after git pull):
+cd /root/throng && git pull origin feature/phase14-transcendental   # 744de6a
 export TF_GPU_ALLOCATOR=cuda_malloc_async
 export XLA_PYTHON_CLIENT_MEM_FRACTION=0.80
 export JAX_COMPILATION_CACHE_DIR=/tmp/throng_jax_cache
 python -u run_bg.py
-# MUST see (twice): [JAX] Phase14.2 Metabolic Asymmetry: red_energy_decay=0.0001
+# MUST see: [JAX] Merged fresh gwt_comms_1 (Phase 14.3 GWT Router) into predator params
+# MUST see: [JAX] Phase14.2 Metabolic Asymmetry: red_energy_decay=0.0001
 # MUST see: [JAX] Phase14 dialogue_signal_mode=hard
 ```
+
+**P14.3 gate decode** (after 50k steps from resume point ~666k):
+
+```bash
+python3 tools/decode_signals.py --red /mnt/throng-runs/signal_corpus_red.jsonl \
+  --min-step 716000 --k 16 2>&1 | tee decode_gwt_p143.log
+```
+
+Looking for: **energy MI → 0** across all dims 0–31; **`blue_dist` / `blue_bear`** emerge as dominant VQ eigenvectors; discrete pincer **χ²(chase vs search) p < 0.05**.
 
 ### P10.6 decode (reference)
 
@@ -284,14 +291,15 @@ Cam's persona + triad workflow live in Git so reboots recover identity:
 10. **Phase 14.1b proprio** — **`proprio_coef: 0.15`**; continuous spatial LRT **passed**; discrete still open.
 11. **Phase 14.1c** — ❌ **FAILED** (10.0 catch); operator patches **not** in repo HEAD.
 12. **Phase 14.2** — ✅ **Metabolic Asymmetry** (`phase14_transcendental.red_energy_decay: 0.0001`); **EFE permanently scrapped**.
-13. **Transient boolean bug** — **do not patch** until decode science extracted.
-14. **Merge** — **no** merge until red pincer **p < 0.05**.
+13. **Phase 14.3** — ✅ **GWT Router** (`744de6a`); `gwt_comms_1` grafted on resume; `head_signal` reads energy-masked `h_comms`. **Restart required** to deploy on B200.
+14. **Transient boolean bug** — **do not patch** until decode science extracted.
+15. **Merge** — **no** merge until red pincer **p < 0.05**.
 
 ### Branch policy
 
 | Branch | Purpose |
 |--------|---------|
-| **`feature/phase14-transcendental`** | **LIVE TRAIN:** P14.1 + 14.1b + **14.2 Metabolic Asymmetry** + P13 tax |
+| **`feature/phase14-transcendental`** | **LIVE TRAIN:** P14.1 + 14.1b + 14.2 + **14.3 GWT Router** (`744de6a`) |
 | **`feature/phase13-thermodynamics`** | **Frozen base** — superseded by P14 branch |
 | **`feature/phase12-red-coevolution`** | **Frozen** — merged into P13/P14 lineage |
 | **`master`** | **Blue production:** P11.3 static gate (no red comms, no metabolic tax) |
@@ -389,8 +397,9 @@ train_entry.run_simulation()  →  main_jax._run_simulation_impl()
 | **14.1** | **VQEL Monologue + Dialogue** ✅ | **`8c48e3e`** | Wire cut → grad → **hard z_q**; smoke test |
 | **14.1b** | **Proprio disentanglement** ✅ | **`45bfbe7`** | `proprio_coef: 0.15`; continuous spatial LRT **31/32** |
 | **14.1c** | **Catch overdrive** | ❌ **FAILED** | Operator 10.0/600k; pincer still **p≈0.46** |
-| **14.2** | **Metabolic Asymmetry** | ✅ | `red_energy_decay: 0.0001`; apex predators |
-| **14+** | GWT → MMGL → auto-curricula | **PREP** | After pincer pass |
+| **14.2** | **Metabolic Asymmetry** | ✅ | `red_energy_decay: 0.0001`; corpus decode: VQ trap confirmed |
+| **14.3** | **GWT Router** | ✅ **LIVE** | `gwt_comms_1`; energy-masked `h_comms` → VQ; `h_policy` → action/value; `744de6a` |
+| **14+** | MMGL → auto-curricula | **PREP** | After pincer pass |
 
 **Recurring failure mode:** Blues stay at cap → ~99% survival → **`NB_GAIN↔surv: nan`** → no evolutionary pressure on neighbor-signal benefit.
 
@@ -398,52 +407,62 @@ train_entry.run_simulation()  →  main_jax._run_simulation_impl()
 
 ---
 
-## 4. Current experiment — Phase **14.2 Metabolic Asymmetry** (`feature/phase14-transcendental`)
+## 4. Current experiment — Phase **14.3 GWT Router** (`feature/phase14-transcendental`)
 
-**Status:** **P14.1c failed**; **EFE scrapped**. **P14.2 Metabolic Asymmetry:** blues decay at **`energy_decay: 0.001`**; reds at **`red_energy_decay: 0.0001`** (10× slower); **`starvation_threshold` unchanged** → reds live ~10× longer (apex predators). Goal: suppress hunger-babble VQ variance; force discrete tokens toward catch geometry.
+**Status:** **P14.2 bake complete** — corpus decode confirmed persistent VQ quantization trap: every dim 0–31 peaks MI with energy despite 10× apex lifespan. Ecological fixes cannot overpower representational variance. **P14.3 GWT Router** (`744de6a`): structural separation of interoception (`h_policy`) and exteroception (`h_comms`). VQ bottleneck is now architecturally blind to energy.
 
-**Stack:** P14.1 hard **z_q** + **`proprio_coef: 0.15`** + **`phase14_transcendental.red_energy_decay: 0.0001`**.
+**Stack:** P14.1 hard **z_q** + **`proprio_coef: 0.15`** + **`red_energy_decay: 0.0001`** + **P14.3 GWT mask** (`gwt_comms_1`, `obs[:, 0]=0`).
+
+> [!IMPORTANT]
+> **Restart the B200 run.** Current process is on `1b91358` (pre-GWT). After `git pull` (gets `744de6a`), startup must print `[JAX] Merged fresh gwt_comms_1 (Phase 14.3 GWT Router) into predator params`. If absent, the GWT patch is not active.
 
 **Monitor:**
 
 ```bash
-tail -f -n 60 /mnt/throng-runs/train.log | grep --line-buffered -E "step|Restored|proprio|Metabolic|red_energy"
+tail -f -n 60 /mnt/throng-runs/train.log | grep --line-buffered -E "step|GWT|gwt|Merged|Metabolic|proprio"
 ```
 
-**Resume (do not wipe volume):**
+**Restart (pull GWT commit + resume from latest ckpt):**
 
 ```bash
-cd /root/throng && git pull origin feature/phase14-transcendental
+cd /root/throng && git pull origin feature/phase14-transcendental   # 744de6a
 export TF_GPU_ALLOCATOR=cuda_malloc_async
 export XLA_PYTHON_CLIENT_MEM_FRACTION=0.80
 export JAX_COMPILATION_CACHE_DIR=/tmp/throng_jax_cache
 python -u run_bg.py
 ```
 
-Startup **must** include: **`[JAX] Phase14.2 Metabolic Asymmetry: red_energy_decay=0.0001`**. If you see the **WARN** about missing config key, YAML is not binding.
+**Startup must include (P14.3 resume):**
 
-**Gate decode:**
+```text
+[JAX] Merged fresh gwt_comms_1 (Phase 14.3 GWT Router) into predator params
+[JAX] Phase14.2 Metabolic Asymmetry: red_energy_decay=0.0001 (blue energy_decay=0.001; starvation_threshold=0.05 unchanged)
+[JAX] Phase14.1b proprio: head_proprio → energy (coef=0.15)
+[JAX] Phase12 red comms: PredatorNetworkJax …
+[JAX] Red corpus: signal_corpus_red.jsonl …
+[JAX] Restored params from step …
+```
+
+**Gate decode** (after 50k steps from resume ~666k → decode at step 716k+):
 
 ```bash
 python3 tools/decode_signals.py --red /mnt/throng-runs/signal_corpus_red.jsonl \
-  --min-step 560000 --k 16 2>&1 | tee decode_red_pincer_600k_overdrive.log
+  --min-step 716000 --k 16 2>&1 | tee decode_gwt_p143.log
 ```
 
-Read **RED VQ PINCER TEST** — χ²(chase-set vs search-set pursuit directions).
+Read **RED VQ PINCER TEST**. Targets: energy MI → 0 across dims 0–31; `blue_dist` / `blue_bear` dominate VQ eigenvectors; pincer **χ²(chase vs search) p < 0.05**.
 
-**Historical dashboard (@ 250k legacy exit):**
-
+**Dashboard @ P14.3 launch (~667k steps):**
 
 | Metric | Value |
 |--------|--------|
-| `blue` / `red` | 198→191 / 250 |
-| `blue_caught` | **1841 → 2164** / rollout |
-| Blue Stay | **27% → 40%** |
-| Red Stay | **30% → 23%** |
-| `conf_gate_imagine_frac` | **91.1% → 84.0%** |
-| `imagination_agree` | **32.7% → 15.4%** |
-| `red_codes_active` | **63/64** |
+| `blue` / `red` | 158–194 / 250 |
+| `ppo update` | **1302–1304** |
 | `carry_fwd` | **0.0001** ✅ |
+| `proprio_loss` | **0.0062–0.0220** |
+| `self_pred_acc` | **0.321–0.538** |
+| `carry_rank` | **28–31** |
+| Throughput | **7 steps/sec** (B200) |
 
 Modal notebook: [`docs/MODAL_NOTEBOOK_PHASE9.md`](docs/MODAL_NOTEBOOK_PHASE9.md) — clone `/root/throng` first.
 
@@ -451,19 +470,10 @@ Modal notebook: [`docs/MODAL_NOTEBOOK_PHASE9.md`](docs/MODAL_NOTEBOOK_PHASE9.md)
 
 | Ckpt / update | Use |
 |-------------|-----|
-| **Latest on volume** | **`1227`**, **`1230`** @ `/mnt/throng-runs/checkpoints/` (**`overlordxn`** workspace) |
+| **Latest on volume** | **`1302+`** @ `/mnt/throng-runs/checkpoints/` (**`overlordxn`** workspace) |
+| **`1227`**, **`1230`** | P14.2 Metabolic Asymmetry reference |
 | **489 @ 250368** | Legacy reference only (pre-P14 long run) |
 | **393** | **Avoid** — post–Stay-collapse active imagination |
-
-**Startup must include (P14.2 resume):**
-
-```text
-[JAX] Phase14.2 Metabolic Asymmetry: red_energy_decay=0.0001 (blue energy_decay=0.001; starvation_threshold=0.05 unchanged)
-[JAX] Phase14.1b proprio: head_proprio → energy (coef=0.15)
-[JAX] Phase12 red comms: PredatorNetworkJax …
-[JAX] Red corpus: signal_corpus_red.jsonl …
-[JAX] Restored params from step …
-```
 
 ### Completed runs (reference)
 
