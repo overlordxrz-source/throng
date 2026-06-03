@@ -1049,6 +1049,19 @@ phase12_coevolution:           # feature/phase13-thermodynamics (inherited from 
 | **14.1c Catch** | ❌ **FAILED** | Operator 10.0/600k — extrinsic scale insufficient |
 | **14.2 Asymmetry** ✅ | `red_energy_decay: 0.0001` | Apex predators; suppress hunger VQ variance |
 
+#### Phase 15 Roadmap: Contingencies & Cumulative Culture (Research Synthesis)
+
+*If the Phase 14.3 GWT Router (structural energy masking) fails to force the VQ bottleneck to encode spatial geometry, or once it succeeds, we pivot to these research-backed mechanisms.*
+
+| Piece | Mechanism | Purpose |
+|-------|-----------|---------|
+| **Velocity Asymmetry** | **$V_{pred} < V_{prey}$** | **Ecological fix.** If reds are slower than blues, greedy pursuit mathematically diverges. Red *must* coordinate topological traps (pincers) to eat. Communication becomes a thermodynamic requirement. |
+| **SimVQ** | **Linear Reparameterization** | **VQ fix.** Replaces the disjoint Straight-Through Estimator (STE) with a linear transformation layer. Ensures *all* codebook vectors receive gradient updates simultaneously, preventing "dead codes" and dimensional collapse. |
+| **Sparse Budgets** | **~30% broadcast limit** | **Bandwidth fix.** If agents can only speak rarely, they won't waste the channel on slow-moving continuous variables (like hunger). Forces the bottleneck to prioritize highly volatile exteroceptive coordinates. |
+| **DCVQ + VQ-VIB** | **Divide-and-Conquer** | **Grammar fix.** Splitting the 32-dim latent space into parallel low-dim subspaces to create syntactic slots. VQ-VIB adds an explicit KL penalty to compress away internal noise. |
+| **Expert Dropout** | **MEDAL-ADR** | **Generational fix.** For Cumulative Culture. When training novices alongside "experts", randomly drop the experts mid-episode. Prevents passive physical imitation; forces novices to rely on semantic memory of the experts' signals. |
+| **DRCB** | **Circuit Breaker** | **Drift fix.** Detects dialect collapse (via codebook log entropy). Actively shuffles VQ centroids if the population falls back into the metabolic trap. |
+
 ### Phase 12 — **COMPLETE** (frozen on `feature/phase12-red-coevolution`)
 
 Dual brain, wiretap, spatial gate, `--red` decode — all inherited on P13 branch.
