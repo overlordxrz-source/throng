@@ -38,7 +38,7 @@
 | Lens | Finding |
 |------|---------|
 | **Physics** | VQ bottleneck minimises MSE along axes of max variance; energy monotonically decays → dominates hidden state → dominates codebook. Metabolic asymmetry insufficient — VQ dynamically re-scales to bin the stretched range |
-| **RL/ML** | Cannot fix representational variance with extrinsic reward. Must sever the interoceptive pathway structurally. GWT Router: `h_comms` (obs[:, 0]=0) → VQ; `h_policy` (full) → action/value |
+| **RL/ML** | Cannot fix representational variance with extrinsic reward. Must sever the interoceptive pathway structurally. GWT Router: `h_comms` (obs[:, 2]=0 — energy) → VQ; `h_policy` (full) → action/value |
 | **Philosophy** | Language cannot map physical space if the existential burden of the speaker is entirely internal. Algorithmic blindness to self within the language center forces exteroceptive grounding |
 | **Response** | **GWT structural mask** — `gwt_comms_1 = Dense(d)` on energy-zeroed obs; cross-attn carry zeroed; `head_signal` reads `h_comms` not `pooled` |
 
@@ -297,7 +297,7 @@ Cam's persona + triad workflow live in Git so reboots recover identity:
 10. **Phase 14.1b proprio** — **`proprio_coef: 0.15`**; continuous spatial LRT **passed**; discrete still open.
 11. **Phase 14.1c** — ❌ **FAILED** (10.0 catch); operator patches **not** in repo HEAD.
 12. **Phase 14.2** — ✅ **Metabolic Asymmetry** (`phase14_transcendental.red_energy_decay: 0.0001`); **EFE permanently scrapped**.
-13. **Phase 14.3** — ✅ **GWT Router** (`744de6a`); `gwt_comms_1` grafted on resume; `head_signal` reads energy-masked `h_comms`. **Restart required** to deploy on B200.
+13. **Phase 14.3** — ✅ **GWT Router** (`3eaec6a`); `gwt_comms_1` energy-masked at `obs[:, 2]` (energy, not age); `head_signal` reads `h_comms`. Checkpoint bug fixed (`fbc2f2e`). Docs HEAD: `84742a9`.
 14. **Transient boolean bug** — **do not patch** until decode science extracted.
 15. **Merge** — **no** merge until red pincer **p < 0.05**.
 
@@ -415,12 +415,12 @@ train_entry.run_simulation()  →  main_jax._run_simulation_impl()
 
 ## 4. Current experiment — Phase **14.3 GWT Router** (`feature/phase14-transcendental`)
 
-**Status:** **P14.2 bake complete** — corpus decode confirmed persistent VQ quantization trap: every dim 0–31 peaks MI with energy despite 10× apex lifespan. Ecological fixes cannot overpower representational variance. **P14.3 GWT Router** (`744de6a`): structural separation of interoception (`h_policy`) and exteroception (`h_comms`). VQ bottleneck is now architecturally blind to energy.
+**Status:** **P14.2 bake complete** — corpus decode confirmed persistent VQ quantization trap: every dim 0–31 peaks MI with energy despite 10× apex lifespan. Ecological fixes cannot overpower representational variance. **P14.3 GWT Router** (`3eaec6a` — energy mask corrected to `obs[:, 2]`; checkpoint bug fixed `fbc2f2e`; docs HEAD `84742a9`): structural separation of interoception (`h_policy`) and exteroception (`h_comms`). VQ bottleneck is now architecturally blind to energy.
 
-**Stack:** P14.1 hard **z_q** + **`proprio_coef: 0.15`** + **`red_energy_decay: 0.0001`** + **P14.3 GWT mask** (`gwt_comms_1`, `obs[:, 0]=0`).
+**Stack:** P14.1 hard **z_q** + **`proprio_coef: 0.15`** + **`red_energy_decay: 0.0001`** + **P14.3 GWT mask** (`gwt_comms_1`, `obs[:, 2]=0` — energy; corrected from erroneous `obs[:, 0]` in `3eaec6a`).
 
 > [!IMPORTANT]
-> **Restart the B200 run.** Current process is on `1b91358` (pre-GWT). After `git pull` (gets `744de6a`), startup must print `[JAX] Merged fresh gwt_comms_1 (Phase 14.3 GWT Router) into predator params`. If absent, the GWT patch is not active.
+> **B200 run is live on `84742a9`.** After `git pull origin feature/phase14-transcendental`, startup must print `[JAX] Merged fresh gwt_comms_1 (Phase 14.3 GWT Router) into predator params`. Energy mask is `obs[:, 2]` (confirmed). If absent, the GWT patch is not active.
 
 **Monitor:**
 
@@ -431,7 +431,7 @@ tail -f -n 60 /mnt/throng-runs/train.log | grep --line-buffered -E "step|GWT|gwt
 **Restart (pull GWT commit + resume from latest ckpt):**
 
 ```bash
-cd /root/throng && git pull origin feature/phase14-transcendental   # 744de6a
+cd /root/throng && git pull origin feature/phase14-transcendental   # 84742a9 (3eaec6a energy mask fix + fbc2f2e ckpt fix)
 export TF_GPU_ALLOCATOR=cuda_malloc_async
 export XLA_PYTHON_CLIENT_MEM_FRACTION=0.80
 export JAX_COMPILATION_CACHE_DIR=/tmp/throng_jax_cache
