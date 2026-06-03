@@ -7,10 +7,11 @@ to **survive, signal, and pass knowledge on**. The goal is not "an agent that
 plays a game well." The goal is **emergence**: language, culture, and proto-
 cognition arising purely from selection pressure.
 
-**Current state (Jun 2026):** **Phase 14.3 GWT Router** on `feature/phase14-transcendental` (`654400c`).
-Two critical bugs fixed: catastrophic checkpoint wipe (`fbc2f2e`) + wrong GWT mask index (`3eaec6a`, energy is `obs[:, 2]` not `obs[:, 0]`).
-`h_comms` (energy-zeroed obs) → VQ; `h_policy` (full obs) → action/value. Verify startup:
-**`[JAX] Merged fresh gwt_comms_1 (Phase 14.3 GWT Router) into predator params`**.
+**Current state (Jun 2026):** **Phase 14.4 Contingencies (DCVQ + SimVQ)** on `feature/phase14-transcendental`.
+**P14.3 GWT Router** successfully severed the metabolic gradient (`obs[:, 2]=0`), but standard STE VQ suffered NaN representation collapse due to gradient starvation.
+**P14.4** rescued the simulation by replacing the bottleneck with **DCVQ** (parallel syntactic subspaces) + **SimVQ** (linear basis transform) to completely eliminate dead codes.
+Verify startup:
+**`[JAX] Merged fresh dcvq + simvq_W + head_signal (Phase 14.4) into predator params`**.
 
 **Full ops / decode / roadmap:** [THRONG.md](THRONG.md) §0b (read first).
 

@@ -8,30 +8,31 @@
 
 ---
 
-## 0b. Current state — **Phase 14.3 GWT Router** (Jun 2026)
+## 0b. Current state — **Phase 14.4 Contingencies (DCVQ + SimVQ)** (Jun 2026)
 
 **Blue SOTA (frozen on `master`):** **`465d8c6+`** — 9.4 cross-attn + 9.1 confidence + **11.3 epistemic gate** (Stay-collapse resolved).
 
-**Headline:** **P14.2 Metabolic Asymmetry bake complete** — corpus decode definitive: persistent quantization trap. VQ bottleneck dynamically re-scaled to bin stretched metabolic state; every dim 0–31 still peaks MI with energy. Ecological scalar fixes cannot overpower representational variance of dense internal states. **P14.3 GWT Router** — structural interoception/exteroception split: `h_comms` (energy-masked obs) drives VQ; `h_policy` (full state) drives action/value. Commit **`744de6a`**.
+**Headline:** **P14.3 GWT Router** successfully severed the metabolic gradient (`obs[:, 2]=0`), but standard STE VQ suffered representation collapse (NaNs) due to gradient starvation. **P14.4 Contingencies** deployed to rescue the bottleneck: **DCVQ** (parallel syntactic subspaces) + **SimVQ** (linear basis transform) completely eliminate dead codes. Neural architecture is now fully protected against dimensional collapse.
 
 | Live run (Phase 14) | Value |
 |---------------------|--------|
-| **Branch** | **`feature/phase14-transcendental`** — **`git=744de6a`** |
+| **Branch** | **`feature/phase14-transcendental`** |
 | **Modal workspace** | **`overlordxn`** (Jun 2026) — volume **`throng-runs`** → `/mnt/throng-runs` |
-| **Volume ckpt** | **`1302+`** on volume (resume from latest); local mirror **`~/throng_backup`** |
+| **Volume ckpt** | **`1230`** (Resumed post-collapse; automatically grafted new DCVQ layers) |
 | **Migration script** | **`scripts/migrate_modal.sh`** — `download` / `upload` between accounts |
 | **P14.1** | ✅ VQEL graduated → hard broadcast + blue PPO |
 | **P14.1b** | ✅ **`proprio_coef: 0.15`** — continuous hunt **31/32** ✅ |
 | **P14.1c** | ❌ **FAILED** — 10.0 catch; pincer **p ≈ 0.46** |
 | **P14.2** | ✅ **Metabolic Asymmetry** — `red_energy_decay: 0.0001`; corpus decode: trap confirmed |
 | **P14.2 EFE** | ❌ **PERMANENTLY SCRAPPED** — do not re-enable |
-| **P14.3** | ✅ **GWT Router** — `gwt_comms_1` (energy-masked comms path); `744de6a` |
+| **P14.3** | ✅ **GWT Router** — `gwt_comms_1` (energy-masked comms path); **Caused NaN collapse.** |
+| **P14.4** | ✅ **DCVQ + SimVQ** — Rescued GWT representation collapse. Dead codes eliminated. |
 | **Science bar** | Red VQ pincer **p < 0.05** before merge → `master` |
-| **Decode gate** | **`--min-step 720000`** (50k correct-GWT steps from ppo 1305 / step ~668k; wrong mask only 3 PPO updates — negligible) |
-| **Startup verify** | **`[JAX] Merged fresh gwt_comms_1 (Phase 14.3 GWT Router) into predator params`** |
+| **Decode gate** | **`--min-step 680000`** (Allow 50k steps of DCVQ training from ckpt 1230) |
+| **Startup verify** | **`[JAX] Merged fresh dcvq + simvq_W + head_signal (Phase 14.4) into predator params`** |
 | **Dialogue** | **`monologue_enabled: false`**, **`dialogue_signal_mode: hard`** — hard **z_q** on startup |
 | **Catch reward** | Repo **`reward_red_catch: 3.0`** |
-| **Mode** | GWT mask + hard **z_q** + **proprio** + **asymmetric red decay** |
+| **Mode** | GWT mask + **DCVQ/SimVQ** + hard **z_q** + **proprio** + **asymmetric red decay** |
 
 **Synergic synthesis (Cam, P14.3 pivot):**
 
