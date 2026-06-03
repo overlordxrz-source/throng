@@ -38,7 +38,7 @@ python3 tools/decode_signals.py signal_corpus.jsonl --k 16 --min-step 149500
 
 # Red pincer — GWT Router gate (50k steps post-resume at ~666k → decode at 716k+)
 python3 tools/decode_signals.py --red /mnt/throng-runs/signal_corpus_red.jsonl \
-  --k 16 --min-step 716000 2>&1 | tee decode_gwt_p143.log
+  --k 16 --min-step 720000 2>&1 | tee decode_gwt_p143.log
 ```
 
 **Pass bar (red):** RED VQ PINCER TEST — energy MI → 0 across dims 0–31; `blue_dist`/`blue_bear` dominate VQ eigenvectors; pincer χ² **p < 0.05**.

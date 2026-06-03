@@ -27,7 +27,7 @@
 | **P14.2 EFE** | ❌ **PERMANENTLY SCRAPPED** — do not re-enable |
 | **P14.3** | ✅ **GWT Router** — `gwt_comms_1` (energy-masked comms path); `744de6a` |
 | **Science bar** | Red VQ pincer **p < 0.05** before merge → `master` |
-| **Decode gate** | **`--min-step 716000`** (after 50k GWT steps from resume ~666k) |
+| **Decode gate** | **`--min-step 720000`** (50k correct-GWT steps from ppo 1305 / step ~668k; wrong mask only 3 PPO updates — negligible) |
 | **Startup verify** | **`[JAX] Merged fresh gwt_comms_1 (Phase 14.3 GWT Router) into predator params`** |
 | **Dialogue** | **`monologue_enabled: false`**, **`dialogue_signal_mode: hard`** — hard **z_q** on startup |
 | **Catch reward** | Repo **`reward_red_catch: 3.0`** |
@@ -48,8 +48,8 @@
 > [!WARNING]
 > **GWT Router Mask Bug Fixed:** The initial GWT Router implementation zeroed out index `0` of the observation vector to sever the metabolic gradient. However, index 0 is `norm_age`; `energy` is actually at index `2`. The router was blinding itself to age, not energy. **Fixed in `3eaec6a`**.
 
-> [!IMPORTANT]
-> **Run restart required.** To deploy the GWT Router and the critical bug fixes, you must resume from an older checkpoint (preferably `1227` or `1230`) from your local `~/throng_backup` so the reds can build upon their pre-wipe training history!
+> [!NOTE]
+> **No rollback needed.** Wrong GWT mask (`obs[:, 0]`) ran for only ~3 PPO updates (1302→1305) before `3eaec6a` was pulled. Correct mask (`obs[:, 2]`) has been live since ppo 1305 / step ~668k. Continue from current volume checkpoint.
 
 ```bash
 # P14.3 B200 restart (after git pull):
@@ -67,7 +67,7 @@ python -u run_bg.py
 
 ```bash
 python3 tools/decode_signals.py --red /mnt/throng-runs/signal_corpus_red.jsonl \
-  --min-step 716000 --k 16 2>&1 | tee decode_gwt_p143.log
+  --min-step 720000 --k 16 2>&1 | tee decode_gwt_p143.log
 ```
 
 Looking for: **energy MI → 0** across all dims 0–31; **`blue_dist` / `blue_bear`** emerge as dominant VQ eigenvectors; discrete pincer **χ²(chase vs search) p < 0.05**.
@@ -449,11 +449,11 @@ python -u run_bg.py
 [JAX] Restored params from step …
 ```
 
-**Gate decode** (after 50k steps from resume ~666k → decode at step 716k+):
+**Gate decode** (50k correct-GWT steps from ppo 1305 / step ~668k → decode at step **720k+**):
 
 ```bash
 python3 tools/decode_signals.py --red /mnt/throng-runs/signal_corpus_red.jsonl \
-  --min-step 716000 --k 16 2>&1 | tee decode_gwt_p143.log
+  --min-step 720000 --k 16 2>&1 | tee decode_gwt_p143.log
 ```
 
 Read **RED VQ PINCER TEST**. Targets: energy MI → 0 across dims 0–31; `blue_dist` / `blue_bear` dominate VQ eigenvectors; pincer **χ²(chase vs search) p < 0.05**.
