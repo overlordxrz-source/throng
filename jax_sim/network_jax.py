@@ -443,12 +443,24 @@ class AgentNetworkJax(nn.Module):
 
 
 # Predator (Red) comms — separate codebook + cross-attn; no P11 aux / imagination heads.
-PREDATOR_GRAFT_TOP_KEYS = ("red_codebook", "red_nb_cross_attn", "head_proprio")
+PREDATOR_GRAFT_TOP_KEYS = ("red_codebook", "red_nb_cross_attn", "head_proprio", "gwt_comms_1")
 
 
 class PredatorNetworkJax(nn.Module):
     """
-    Lean predator policy (Phase 12): VQ comms + optional red_nb_cross_attn.
+    Lean predator policy (Phase 14.3 GWT Router): VQ comms via GWT structural mask.
+
+    Two pathways:
+      h_policy — full pooled transformer output (interoceptive + exteroceptive)
+                 → action logits, value, symbol write, ToM, culture, proprio.
+      h_comms  — lightweight Dense(d)+ReLU on energy-masked obs (exteroceptive ONLY)
+                 + optional cross-attention over neighbor signals
+                 → z_e → VQ bottleneck → red_signal_out.
+
+    The GWT mask (obs[:, 0] = 0) physically severs the energy/metabolic gradient
+    from the communication head, forcing the VQ codebook to maximise channel
+    capacity over exteroceptive data (blue geometry, neighbor signals).
+
     No carry_fwd, confidence, or imagination heads — catch PPO forges language.
     """
 
@@ -498,6 +510,9 @@ class PredatorNetworkJax(nn.Module):
         self.head_culture_fast = nn.Dense(sym_d)
         self.head_culture_slow = nn.Dense(sym_d)
         self.head_proprio = nn.Dense(1)
+        # Phase 14.3 GWT Router — exteroceptive-only comms embedding (energy masked).
+        # Input dim = full obs_dim; energy feature is zeroed before this layer.
+        self.gwt_comms_1 = nn.Dense(d)
         if self.cross_attn_enabled:
             self.red_nb_cross_attn = NeighborCrossAttention(
                 hidden_dim=d,
@@ -586,10 +601,30 @@ class PredatorNetworkJax(nn.Module):
         pooled = self.final_norm(x.mean(axis=1))
         new_carries = 0.9 * carries + 0.1 * pooled
 
-        value_input = jax.lax.stop_gradient(pooled) if detach_value else pooled
+        # --- Phase 14.3 GWT Router ---
+        # h_policy: full pooled transformer output (interoceptive + exteroceptive).
+        # Drives action, value, symbol, ToM, culture, and proprio heads.
+        h_policy = pooled
 
-        action_logits = self.head_action(pooled) / 2.0
-        z_e = self.head_signal(pooled)
+        # h_comms: exteroceptive-ONLY pathway.
+        # obs[:, 0] is energy (own_state index 0 per THRONG obs schema).
+        # Zeroing it physically severs the metabolic gradient from the comms head,
+        # forcing the VQ codebook to maximise MI over blue geometry / neighbor signals.
+        exteroceptive_obs = obs.at[:, 0].set(0.0)
+        h_comms = nn.relu(self.gwt_comms_1(exteroceptive_obs))
+        if self.cross_attn_enabled:
+            # Query = h_comms (exteroceptive embedding).
+            # KV   = nb_kv   (neighbor signal embeddings).
+            # Carry is zeroed: recurrent state carries metabolic history; exclude it.
+            h_comms = self.red_nb_cross_attn(
+                h_comms, jnp.zeros_like(carries), nb_kv
+            )
+
+        value_input = jax.lax.stop_gradient(h_policy) if detach_value else h_policy
+
+        action_logits = self.head_action(h_policy) / 2.0
+        # z_e sourced from comms pathway (exteroceptive mask enforced — GWT)
+        z_e = self.head_signal(h_comms)
         codebook_w = self.red_codebook.embedding
         signal_out, token_ids, loss_vq = vector_quantize_signals(
             z_e,
@@ -597,15 +632,15 @@ class PredatorNetworkJax(nn.Module):
             beta=self.vq_beta,
             dead_code_reset=self.vq_dead_code_reset,
         )
-        symbol_write = self.head_symbol(pooled)
+        symbol_write = self.head_symbol(h_policy)
         values = self.head_value(value_input).squeeze(-1)
-        tom_logits = self.head_tom(pooled)[:, None, :]
+        tom_logits = self.head_tom(h_policy)[:, None, :]
         tom_logits = jnp.broadcast_to(tom_logits, (N, K, 5))
-        culture_fast = self.head_culture_fast(pooled)
-        culture_slow = self.head_culture_slow(pooled)
+        culture_fast = self.head_culture_fast(h_policy)
+        culture_slow = self.head_culture_slow(h_policy)
 
         if self.is_initializing():
-            self.head_proprio(pooled)
+            self.head_proprio(h_policy)
 
         return new_carries, (
             action_logits,
@@ -639,7 +674,7 @@ def ensure_predator_params(
     obs_dim: int,
     n_layers: int,
 ) -> Any:
-    """Fill missing red_codebook / red_nb_cross_attn when resuming older predator ckpts."""
+    """Fill missing red_codebook / red_nb_cross_attn / gwt_comms_1 when resuming older predator ckpts."""
     flat = unfreeze(params)
     needs_codebook = "red_codebook" not in flat or (
         "head_signal" in flat
@@ -649,7 +684,9 @@ def ensure_predator_params(
         getattr(model, "cross_attn_enabled", False) and "red_nb_cross_attn" not in flat
     )
     needs_proprio = "head_proprio" not in flat
-    if not needs_codebook and not needs_cross and not needs_proprio:
+    # Phase 14.3 GWT Router — graft comms embedding if missing from P14.2 ckpt.
+    needs_gwt = "gwt_comms_1" not in flat
+    if not needs_codebook and not needs_cross and not needs_proprio and not needs_gwt:
         return params
     carry = jnp.zeros((1, hidden_dim))
     obs = jnp.zeros((1, obs_dim))
@@ -665,6 +702,9 @@ def ensure_predator_params(
     if needs_proprio and "head_proprio" in fresh_flat:
         flat["head_proprio"] = fresh_flat["head_proprio"]
         print("[JAX] Merged fresh head_proprio (Phase 14.1b) into predator params")
+    if needs_gwt and "gwt_comms_1" in fresh_flat:
+        flat["gwt_comms_1"] = fresh_flat["gwt_comms_1"]
+        print("[JAX] Merged fresh gwt_comms_1 (Phase 14.3 GWT Router) into predator params")
     return sanitize_agent_params(freeze(flat))
 
 
