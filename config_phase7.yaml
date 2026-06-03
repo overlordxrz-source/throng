@@ -233,10 +233,8 @@ phase14_vqel:
 # Phase 14.1b — proprioceptive disentanglement (energy from carry, not VQ wire)
 proprio_coef: 0.15
 
-# Phase 14.2 — Expected Free Energy critic (Active Inference)
-phase14_efe:
-  enabled: true
-  lambda_epi: 0.1          # G = -V + λ_epi * conf_pred; critic targets -G = V - λ_epi * conf
-  red_confidence_coef: 0.05  # train red head_confidence on proprio MSE (predator path)
+# Phase 14.2 — Metabolic Asymmetry (apex predators; suppress red hunger-babble)
+phase14_transcendental:
+  red_energy_decay: 0.0001   # 10× slower than energy_decay (0.001); threshold unchanged
 
 exit_on_graduation: false

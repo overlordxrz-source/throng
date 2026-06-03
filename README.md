@@ -7,10 +7,9 @@ to **survive, signal, and pass knowledge on**. The goal is not "an agent that
 plays a game well." The goal is **emergence**: language, culture, and proto-
 cognition arising purely from selection pressure.
 
-**Current state (Jun 2026):** **Phase 14.2 EFE** on `feature/phase14-transcendental`
-(**`git=08790d8`**). P14.1c catch overdrive **failed** (metabolic VQ trap; pincer **p≈0.46**).
-P14.1b proprio wedge unlocked continuous hunt (**31/32** dims). P14.2 Active Inference critic:
-PPO VF targets **−G = V − λ·conf_pred** (`phase14_efe.enabled`). Gate decode **`--min-step 560000`**.
+**Current state (Jun 2026):** **Phase 14.2 Metabolic Asymmetry** on `feature/phase14-transcendental`.
+P14.1c catch overdrive **failed** (pincer **p≈0.46**). **P14.2 EFE scrapped** (peer review). New lever:
+**`red_energy_decay: 0.0001`** (10× slower than blue) → apex predators, suppress red hunger-babble in VQ.
 
 **Full ops / decode / roadmap:** [THRONG.md](THRONG.md) §0b (read first).
 
@@ -41,15 +40,14 @@ python3 tools/decode_signals.py --red /mnt/throng-runs/signal_corpus_red.jsonl \
   --k 16 --min-step 560000 2>&1 | tee decode_red_pincer_600k_overdrive.log
 ```
 
-**Pass bar (red):** RED VQ PINCER TEST χ² **p < 0.05**. Continuous hunt ON; discrete metabolic after 14.1c.
-Run **`--min-step 560000`** gate decode, then resume B200 with EFE.
+**Pass bar (red):** RED VQ PINCER TEST χ² **p < 0.05**. Run baseline decode, then resume with metabolic asymmetry.
 
 **Modal (resume — do not wipe ckpts):**
 
 ```bash
-cd /root/throng && git pull origin feature/phase14-transcendental   # 08790d8+
+cd /root/throng && git pull origin feature/phase14-transcendental
 python -u run_bg.py
-# Expect: [JAX] Phase14.2 EFE: PPO critic targets -G = V - 0.1*conf_pred
+# Expect: [JAX] Phase14.2 metabolic asymmetry: red_energy_decay=0.0001 (blue=0.001)
 ```
 
 ---
@@ -310,7 +308,7 @@ All knobs live in `config_phase7.yaml`. The ones you actually touch:
 | **13.0** | **VALIDATED** — tax ~0.0018/step; no imagination collapse |
 | **13.1+** | Drop spatial gate, inscription, proprio — after pincer |
 | **14 Step 1** | **AUTHORIZED** — VQEL Monologue split + Information Bottleneck |
-| **14+** | EFE → GWT → MMGL → auto-curricula (not started) |
+| **14+** | GWT → MMGL → auto-curricula (not started) |
 
 Do **not** merge to **`master`** until pincer **p < 0.05**.
 

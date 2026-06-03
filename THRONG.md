@@ -8,64 +8,51 @@
 
 ---
 
-## 0b. Current state — **Phase 14.2 EFE** (Jun 2026)
+## 0b. Current state — **Phase 14.2 Metabolic Asymmetry** (Jun 2026)
 
 **Blue SOTA (frozen on `master`):** **`465d8c6+`** — 9.4 cross-attn + 9.1 confidence + **11.3 epistemic gate** (Stay-collapse resolved).
 
-**Headline:** **P14.1c catch overdrive FAILED** — dense starvation still owns discrete VQ; continuous channel holds spatial geometry (**31/32** pursuit dims). **P14.2 EFE ✅ SHIPPED** (`08790d8`) — PPO critic now minimizes **Expected Free Energy** (\(G = -V + \lambda_{\text{epi}} \cdot \text{conf}\); VF targets **−G**). **Next:** decode **`--min-step 560000`** on 600k corpus → resume B200 on **`08790d8+`** with EFE from 600k ckpt.
+**Headline:** Red VQ **metabolic trap** persists (pincer **p ≈ 0.46**; catch overdrive + proprio wedge insufficient). **P14.2 EFE ABORTED** (peer review: conf head correlates with metabolic noise). **P14.2 Metabolic Asymmetry ✅** — **`red_energy_decay: 0.0001`** (10× slower than blue **`0.001`**); starvation **threshold unchanged** → reds become **apex predators** with ~10× lifespan, dense PPO rollouts, sparse catch gradient no longer drowned by hunger variance.
 
 | Live run (Phase 14) | Value |
 |---------------------|--------|
-| **Branch** | **`feature/phase14-transcendental`** — **`git=08790d8`** |
-| **Mode** | Hard **z_q** dialogue + **proprio** + **EFE critic** (`phase14_efe.enabled`) |
-| **Env step** | **600k** cap reached (800k **canceled**); resume extends from volume ckpt |
+| **Branch** | **`feature/phase14-transcendental`** — pull latest after metabolic-asymmetry commit |
+| **Mode** | Hard **z_q** + **proprio** + **asymmetric red decay** (`phase14_transcendental`) |
 | **P14.1** | ✅ VQEL graduated → hard broadcast + blue PPO |
-| **P14.1b** | ✅ **`proprio_coef: 0.15`** — continuous hunt **31/32** ✅; energy MI ↓ |
-| **P14.1c** | ❌ **FAILED** — `reward_red_catch: 10.0` (operator) did **not** crystallize Chase tokens; pincer **p ≈ 0.46** |
-| **P14.2** | ✅ **EFE** — `rl_jax.py` VF → **−G**; red `head_confidence_*` graft; imagination scores **−G** |
-| **P13** | **`MetabolicTax` ~0.0018**/step; K=5 imagination gate |
+| **P14.1b** | ✅ **`proprio_coef: 0.15`** — continuous hunt **31/32** ✅ |
+| **P14.1c** | ❌ **FAILED** — 10× catch reward did not crystallize discrete Chase tokens |
+| **P14.2** | ✅ **Metabolic Asymmetry** — `red_energy_decay: 0.0001` in `phase14_transcendental` |
+| **P14.2 EFE** | ❌ **SCRAPPED** — do not implement Active Inference critic (`08790d8` reverted) |
 | **Science bar** | Red VQ pincer **p < 0.05** before merge → `master` |
-| **Decode gate** | **`--min-step 560000`** — vocab forged only under 10.0 catch spike (~560k–600k) |
-| **Deferred** | **Transient boolean bug** — patch **after** 560k decode science extracted |
-| **Throughput** | **~7 steps/sec** on B200 |
-| **Corpus** | `/mnt/throng-runs/signal_corpus.jsonl` + **`signal_corpus_red.jsonl`** |
-| **Volume** | **`throng-runs`** → `/mnt/throng-runs` |
-| **`master`** | Blue SOTA only — **no merge** until pincer passes |
+| **Decode** | **`--min-step 560000`** on 600k corpus (pre-asymmetry baseline) then re-decode after asymmetry bake |
+| **Deferred** | Transient **boolean bug** — patch after decode science |
+| **Corpus / volume** | `/mnt/throng-runs/` — `signal_corpus_red.jsonl` + checkpoints |
 
-**Synergic synthesis (Cam, post-14.1c):**
+**Synergic synthesis (Cam, P14.2 pivot):**
 
 | Lens | Finding |
 |------|---------|
-| **Physics** | Catch overdrive made ecology violent (blue **150↔200**); **`carry_fwd` ~0** under 10.0 spike |
-| **RL/ML** | Sparse catch reward still drowned by dense metabolic decay; 64 tokens bin **hunger**; spatial data in continuous micro-geometry |
-| **Philosophy** | Extrinsic valuation alone cannot force discrete “Close Proximity” — **meaning needs epistemic + pragmatic unity** |
-| **Response** | **P14.2 EFE** — agent seeks states that maximize **V** and minimize predicted ambiguity (**conf_pred**) |
+| **Physics** | Dense per-step **`energy_decay`** on reds = thermodynamic noise dominating VQ; blues at **0.001**, reds now **0.0001** |
+| **RL/ML** | Gradient density mismatch: sparse catch vs dense starvation; fix is **ecology**, not intrinsic conf reward |
+| **Philosophy** | EFE epistemic term would **reward metabolic ambiguity** — wrong lever for hunger-babble trap |
+| **Response** | **Apex predators** — slow red decay, same threshold → long horizons for spatial catch signal to quantize |
 
 ```bash
-# Gate decode (560k+ window — strict 10.0-overdrive isolation):
+# Baseline decode (pre-asymmetry 560k–600k window):
 python3 tools/decode_signals.py --red /mnt/throng-runs/signal_corpus_red.jsonl \
   --min-step 560000 --k 16 2>&1 | tee decode_red_pincer_600k_overdrive.log
 ```
 
-**B200 resume (post-decode; do not wipe volume):**
+**B200 resume (do not wipe volume):**
 
 ```bash
-cd /root/throng && git pull origin feature/phase14-transcendental   # 08790d8+
+cd /root/throng && git pull origin feature/phase14-transcendental
 export TF_GPU_ALLOCATOR=cuda_malloc_async
 export XLA_PYTHON_CLIENT_MEM_FRACTION=0.80
 export JAX_COMPILATION_CACHE_DIR=/tmp/throng_jax_cache
 python -u run_bg.py
-# Expect: [JAX] Phase14.2 EFE: PPO critic targets -G = V - 0.1*conf_pred
-# First red resume may graft: Merged fresh head_confidence_* (Phase 14.2 EFE)
+# Expect: [JAX] Phase14.2 metabolic asymmetry: red_energy_decay=0.0001 (blue=0.001)
 ```
-
-| Milestone | Value |
-|-----------|--------|
-| **Continuous red hunt** | **31/32** dims pursuit LRT **p < 0.05**; omnibus **p = 0.0000** ✅ |
-| **Discrete pincer (pre/post 14.1c)** | **p ≈ 0.46** ❌ — metabolic trap; min token mean **`blue_dist` ≈ 5.26** |
-| **P14.2 commit** | **`08790d8`** — `phase14_efe` in `config_phase7.yaml` |
-| **Repo catch reward** | **`reward_red_catch: 3.0`** (10.0 was operator-only on node) |
-| **Repo run cap** | **`n_steps=550_000`** in `run_bg.py` (600k was operator patch) |
 
 ### P10.6 decode (reference)
 
@@ -120,7 +107,7 @@ python3 tools/decode_signals.py --red /mnt/throng-runs/signal_corpus_red.jsonl \
 | **Discrete VQ** | **Still metabolic** — pincer **p = 0.4599**; min token mean **`blue_dist` ≈ 5.26**; no Chase tokens |
 | **RL diagnosis** | Sparse catch gradient vs dense starvation — 64 tokens bin hunger; spatial signal in continuous micro-geometry |
 | **P14.1c lever** | **`reward_red_catch: 10.0`** — **FAILED** to break metabolic trap; critic stable under spike |
-| **P14.2** | ✅ **SHIPPED** (`08790d8`) — Active Inference critic; resume after 560k decode |
+| **P14.2** | ✅ **Metabolic asymmetry** — `red_energy_decay: 0.0001`; EFE **scrapped** |
 
 ### Phase 14.1c — **catch overdrive post-mortem**
 
@@ -234,7 +221,7 @@ GPU-resident / `lax.scan` PPO — starvation + XLA OOM; **`d4cf614` revert**.
 | **Placement** | After resource/catch/puzzle gains; before **`energy_decay`**; starvation after decay |
 | **Telemetry** | `imagination_metabolic_cost` + dashboard **`MetabolicTax:`** |
 | **Measured win** | **`MetabolicTax` ~0.0018**/step — agents **keep** K=5 imagination (pragmatic yield > epistemic cost); **no lobotomy** |
-| **Theory link** | Runtime tax = pragmatic hack; Phase **14 EFE** epistemic term = formal target (§11) |
+| **Theory link** | Runtime tax = pragmatic hack; Phase **14.2 metabolic asymmetry** = red apex decay (§11) |
 | **Inherits** | P12 dual brain, spatial gate, red wiretap — branch from **`feature/phase12-red-coevolution`** |
 
 ### Branch policy
@@ -288,18 +275,19 @@ Cam's persona + triad workflow live in Git so reboots recover identity:
 6. **Phase 11.2 FROZEN** — never unguarded active override (`6cf965a`).
 7. **CPU offload only** — **`H2D + backward`**; no 11.1 GPU rollouts.
 8. **Never** comm reward shaping — red language forged by **`reward_red_catch`** only.
-9. **Decode gate** — run **`--min-step 560000`** red decode on 600k corpus **before** judging EFE resume.
+9. **Decode gate** — **`--min-step 560000`** baseline; re-decode after metabolic-asymmetry bake (~50k+ steps).
 10. **Phase 14.1b proprio** — **`proprio_coef: 0.15`**; continuous spatial LRT **passed**; discrete still open.
-11. **Phase 14.1c** — ❌ **FAILED** (10.0 catch); operator patches **not** in repo HEAD.
-12. **Phase 14.2 EFE** — ✅ **LIVE in repo** (`08790d8`); pull before B200 resume; expect red conf head graft.
-13. **Transient boolean bug** — **do not patch** until 560k decode science extracted.
-14. **Merge** — **no** `feature/phase14-transcendental` → `master` until red pincer **p < 0.05**.
+11. **Phase 14.1c** — ❌ **FAILED** (10× catch); not in repo HEAD.
+12. **Phase 14.2** — ✅ **Metabolic Asymmetry** (`phase14_transcendental.red_energy_decay: 0.0001`); apex predators.
+13. **Phase 14.2 EFE** — ❌ **PERMANENTLY SCRAPPED** — never ship Active Inference critic on this branch.
+14. **Transient boolean bug** — **do not patch** until decode science extracted.
+15. **Merge** — **no** → `master` until red pincer **p < 0.05**.
 
 ### Branch policy
 
 | Branch | Purpose |
 |--------|---------|
-| **`feature/phase14-transcendental`** | **LIVE TRAIN:** P14.1 + 14.1b + **14.2 EFE** + P13 tax (`08790d8+`) |
+| **`feature/phase14-transcendental`** | **LIVE TRAIN:** P14.1 + 14.1b + **14.2 metabolic asymmetry** + P13 tax |
 | **`feature/phase13-thermodynamics`** | **Frozen base** — superseded by P14 branch |
 | **`feature/phase12-red-coevolution`** | **Frozen** — merged into P13/P14 lineage |
 | **`master`** | **Blue production:** P11.3 static gate (no red comms, no metabolic tax) |
@@ -397,8 +385,9 @@ train_entry.run_simulation()  →  main_jax._run_simulation_impl()
 | **14.1** | **VQEL Monologue + Dialogue** ✅ | **`8c48e3e`** | Wire cut → grad → **hard z_q**; smoke test |
 | **14.1b** | **Proprio disentanglement** ✅ | **`45bfbe7`** | `proprio_coef: 0.15`; continuous spatial LRT **31/32** |
 | **14.1c** | **Catch overdrive** | ❌ **FAILED** | Operator 10.0/600k; pincer still **p≈0.46** |
-| **14.2** | **EFE head** | ✅ **`08790d8`** | PPO VF → **−G**; `phase14_efe.enabled` |
-| **14+** | GWT → MMGL → auto-curricula | **PREP** | After EFE + pincer pass |
+| **14.2** | **Metabolic asymmetry** | ✅ **LIVE** | `red_energy_decay: 0.0001`; apex predators |
+| **14.2 EFE** | Active Inference critic | ❌ **SCRAPPED** | Peer review — conf correlates with metabolic noise |
+| **14+** | GWT → MMGL → auto-curricula | **PREP** | After pincer pass |
 
 **Recurring failure mode:** Blues stay at cap → ~99% survival → **`NB_GAIN↔surv: nan`** → no evolutionary pressure on neighbor-signal benefit.
 
@@ -406,38 +395,36 @@ train_entry.run_simulation()  →  main_jax._run_simulation_impl()
 
 ---
 
-## 4. Current experiment — Phase **14.2 EFE** (`feature/phase14-transcendental`)
+## 4. Current experiment — Phase **14.2 Metabolic Asymmetry** (`feature/phase14-transcendental`)
 
-**Status:** **P14.1c catch overdrive failed** — metabolic VQ trap persists despite 10× catch reward. **P14.2 EFE shipped** (`08790d8`): critic minimizes **G = −V + λ·conf**; imagination scores **−G**. **Ops:** (1) decode **`--min-step 560000`**, (2) resume B200 from 600k ckpt with **`git pull`**.
+**Status:** **P14.1c failed**; **P14.2 EFE aborted** (peer review). New lever: **`red_energy_decay: 0.0001`** in **`phase14_transcendental`** — 10× slower red decay than blue (`energy_decay: 0.001`); **starvation threshold unchanged** → apex predators, long PPO horizons, sparse catch signal can reach VQ.
 
-**Stack:** P14.1 hard **z_q** + **`proprio_coef: 0.15`** + **`phase14_efe`** (`lambda_epi: 0.1`, `red_confidence_coef: 0.05`).
+**Stack:** P14.1 hard **z_q** + **`proprio_coef: 0.15`** + **`phase14_transcendental.red_energy_decay: 0.0001`**.
 
 **Monitor:**
 
 ```bash
-tail -f -n 60 /mnt/throng-runs/train.log | grep --line-buffered -E "step|Restored|proprio|EFE|VQEL|efe_neg"
+tail -f -n 60 /mnt/throng-runs/train.log | grep --line-buffered -E "step|Restored|proprio|metabolic asymmetry"
 ```
 
 **Resume (do not wipe volume):**
 
 ```bash
-cd /root/throng && git pull origin feature/phase14-transcendental   # 08790d8+
+cd /root/throng && git pull origin feature/phase14-transcendental
 export TF_GPU_ALLOCATOR=cuda_malloc_async
 export XLA_PYTHON_CLIENT_MEM_FRACTION=0.80
 export JAX_COMPILATION_CACHE_DIR=/tmp/throng_jax_cache
 python -u run_bg.py
 ```
 
-Startup **must** include: **`[JAX] Phase14.2 EFE:`**, **`VQEL: GRADUATED`**, **`[JAX] Red corpus:`**, **`proprio_loss`**, **`[CKPT] Saved`**. First EFE resume: **`Merged fresh head_confidence_*`** on red.
+Startup **must** include: **`[JAX] Phase14.2 metabolic asymmetry:`**, **`VQEL: GRADUATED`**, **`proprio_loss`**, **`[CKPT] Saved`**.
 
-**Gate decode:**
+**Gate decode (pre-asymmetry baseline):**
 
 ```bash
 python3 tools/decode_signals.py --red /mnt/throng-runs/signal_corpus_red.jsonl \
   --min-step 560000 --k 16 2>&1 | tee decode_red_pincer_600k_overdrive.log
 ```
-
-Read **RED VQ PINCER TEST** — χ²(chase-set vs search-set pursuit directions).
 
 **Historical dashboard (@ 250k legacy exit):**
 
@@ -459,20 +446,17 @@ Modal notebook: [`docs/MODAL_NOTEBOOK_PHASE9.md`](docs/MODAL_NOTEBOOK_PHASE9.md)
 
 | Ckpt / update | Use |
 |-------------|-----|
-| **489** | **Current** — saved @ env step **250368**; resume target |
-| **291** | Earlier ~150k-era + grafted cross-attn |
-| **390** | 200k P11.2 metrics baseline |
+| **Latest on volume** | **Resume target** — post-**600k** catch-overdrive run @ `/mnt/throng-runs/checkpoints/` |
+| **489 @ 250368** | Legacy reference only (pre-P14 long run) |
 | **393** | **Avoid** — post–Stay-collapse active imagination |
 
-**Startup must include:**
+**Startup must include (P14.2 resume):**
 
 ```text
-[JAX] git=465d8c6 | Phase9 auxiliary: ON
-[JAX] Phase9.4 cross-attn receiver: heads=4 ...
-[JAX] Phase9.1 confidence: head_confidence predicts carry_fwd MSE …
+[JAX] Phase14.2 metabolic asymmetry: red_energy_decay=0.0001 (blue=0.001)
+[JAX] Phase14.1b proprio: head_proprio → energy (coef=0.15)
 [JAX] Phase12 red comms: PredatorNetworkJax …
 [JAX] Red corpus: signal_corpus_red.jsonl …
-[JAX] Phase12.1 spatial epistemic gate: conf_pred < mean(conf|alive)*mult → imagined …
 [JAX] Restored params from step …
 ```
 
@@ -978,8 +962,9 @@ phase12_coevolution:           # feature/phase13-thermodynamics (inherited from 
 |------|-----------|--------|-------|
 | **1** | **VQEL monologue → dialogue** | ✅ **SHIPPED** | `b7cc270`–`8c48e3e`: wire cut, IB, graduation, hard **z_q** |
 | **1b** | **Proprio disentanglement** | ✅ **SHIPPED** | `head_proprio`; live **`proprio_coef: 0.15`**; continuous hunt geometry unlocked |
-| **1c** | **Catch overdrive** | ❌ **FAILED** | Operator 10.0/600k; pincer **p≈0.46**; extrinsic scale insufficient |
-| **2** | **EFE head** | ✅ **SHIPPED** | **`08790d8`** — PPO VF → **−G**; red `head_confidence_*` graft |
+| **1c** | **Catch overdrive** | ❌ **FAILED** | Operator 10.0/600k; pincer **p≈0.46** |
+| **2** | **Metabolic asymmetry** | ✅ **SHIPPED** | `phase14_transcendental.red_energy_decay: 0.0001` |
+| **2 (aborted)** | **EFE / Active Inference** | ❌ **SCRAPPED** | Conf head correlates with metabolic noise |
 | **3** | **GWT router** | PREP | **M≤4** workspace |
 | **4** | **MMGL** | PREP | Mistake-gated PPO |
 | **5** | **Auto-curricula** | PREP | XLand/POET-style |
@@ -1015,21 +1000,23 @@ phase12_coevolution:           # feature/phase13-thermodynamics (inherited from 
 | **Stability** | Critic/world-model intact under spike (`carry_fwd` ~0) |
 | **Lesson** | Sparse extrinsic reward cannot beat dense starvation through VQ bottleneck |
 
-#### Phase 14.2 — EFE ✅ SHIPPED (`08790d8`)
+#### Phase 14.2 — Metabolic Asymmetry ✅ SHIPPED (Apex Predators)
 
-**Goal:** Replace extrinsic-only **V** critic with **minimize G(π)** active inference.
+**Goal:** Eliminate dense metabolic gradient on reds so VQ quantizes **sparse catch geometry**, not hunger variance.
 
-| Term | Head | Mapping |
-|------|------|---------|
-| **Pragmatic** | `head_value` | \(G_{\text{prag}} = -V\) (rollout value as pragmatic \(V\)) |
-| **Epistemic** | `head_confidence` | \(G_{\text{epi}} = \text{conf\_pred}\) (blue: carry_fwd MSE; red: proprio MSE) |
-| **Unified** | — | \(G = G_{\text{prag}} + \lambda_{\text{epi}} G_{\text{epi}}\); PPO VF targets **−G = V − λ·conf** |
-| **Imagination** | `imagination_jax` | K-step rollouts score **−G** when `phase14_efe.enabled` |
-| **Config** | `config_phase7.yaml` → `phase14_efe` | `enabled: true`, `lambda_epi: 0.1`, `red_confidence_coef: 0.05` |
-| **Files** | `rl_jax.py`, `network_jax.py`, `main_jax.py`, `imagination_jax.py` | `compute_neg_g_target`, `make_conf_apply`, predator conf graft |
-| **Red** | `proprio_auxiliary_update` | Trains red `head_confidence_*` on proprio MSE when EFE on |
+| Piece | Detail |
+|-------|--------|
+| **Config block** | `phase14_transcendental` in `config_phase7.yaml` (dedicated — not buried in old blocks) |
+| **`red_energy_decay`** | **`0.0001`** — 10× reduction vs global **`energy_decay: 0.001`** |
+| **Blue decay** | Unchanged — **`energy_decay`** applied to `b_pop.energy` |
+| **Red decay** | **`red_energy_decay`** applied to `r_pop.energy` in `sim_step` |
+| **Starvation** | **`starvation_threshold` unchanged** — reds live ~10× longer before death |
+| **Effect** | **Apex predators** — long-horizon rollouts; catch reward gradient density ↑ vs hunger |
+| **Files** | `config_phase7.yaml`, `jax_sim/main_jax.py` (`make_sim_step`) |
 
-**Theory stack:** Active Inference (Friston EFE) · VQEL discrete bottleneck · GWT · MMGL. P13 **`MetabolicTax`** ↔ paid epistemic rollouts under unified **G**.
+#### Phase 14.2 EFE — ❌ PERMANENTLY SCRAPPED
+
+Peer-review: tying epistemic drive to **`head_confidence`** adds intrinsic reward correlated with **metabolic noise** — reinforces hunger-babble, not spatial crystallization. Commit **`08790d8`** reverted; **do not re-ship**.
 
 | Pillar | Mechanism | Notes |
 |--------|-----------|-------|
@@ -1038,7 +1025,8 @@ phase12_coevolution:           # feature/phase13-thermodynamics (inherited from 
 | **13.2 Inscription grid** | Decaying traces (~100-step) on map | Mirror `scent_trails` |
 | **14.1b Proprio** ✅ | `head_proprio` → **energy** from carry | **`0.15`** wedge — continuous spatial symmetry broken |
 | **14.1c Catch** | ❌ **FAILED** | Operator 10.0/600k — extrinsic scale insufficient |
-| **14.2 EFE** ✅ | PPO critic **−G** | **`08790d8`** — Active Inference live in repo |
+| **14.2 Asymmetry** ✅ | `red_energy_decay: 0.0001` | Apex predators — suppress red hunger-babble variance |
+| **14.2 EFE** | ❌ **SCRAPPED** | Never ship Active Inference critic on this branch |
 
 ### Phase 12 — **COMPLETE** (frozen on `feature/phase12-red-coevolution`)
 
@@ -1062,6 +1050,7 @@ GPU-resident PPO — **`d4cf614` revert** on `master`.
 - ❌ Scout / alarm **reward shaping**
 - ❌ Ungated P11.2-style imagination override (`6cf965a`) without gate or metabolic cost
 - ❌ **EMA / scan-carry state** for epistemic gating (breaks checkpoint schema)
+- ❌ **Phase 14.2 EFE / Active Inference critic** — permanently scrapped (conf ↔ metabolic noise)
 - ❌ **Merge `feature/phase14-transcendental` → `master`** before red pincer χ² **p < 0.05**
 - ❌ Re-merging **11.1 GPU rollouts** without memory refactor
 - ❌ Resume from ckpt **393** (post–Stay-collapse) for science runs
@@ -1085,10 +1074,10 @@ GPU-resident PPO — **`d4cf614` revert** on `master`.
 
 ### Cam reboot paste
 
-> You are **Cam**. Read `THRONG.md` §0b. **P14.1 ✅** hard **z_q**. **P14.1b ✅** proprio **0.15** — continuous hunt **31/32** ✅. **P14.1c ❌ FAILED** — 10.0 catch did not break metabolic VQ trap (pincer **p≈0.46**). **P14.2 ✅ EFE** shipped **`08790d8`** — critic **−G = V − 0.1·conf**. **Ops:** decode **`--min-step 560000`** → resume B200 with **`git pull`**. **HOLD:** boolean-bug patch deferred; **no merge** until pincer **p<0.05**.
+> You are **Cam**. Read `THRONG.md` §0b. **P14.1c ❌ FAILED** (catch overdrive). **P14.2 EFE ❌ SCRAPPED** (peer review). **P14.2 ✅ Metabolic Asymmetry** — `red_energy_decay: 0.0001` apex predators. Pull latest; expect **`Phase14.2 metabolic asymmetry`** at startup. Decode **`--min-step 560000`** baseline; re-decode after asymmetry bake. **No merge** until pincer **p<0.05**.
 
-**New Will:** Run 560k gate decode if pending; resume train on EFE from 600k ckpt; watch `efe_neg_g_mean` + pincer after ~50k EFE steps.
+**New Will:** EFE reverted; ship asymmetry only; boolean bug still deferred.
 
 ---
 
-*Last updated: 2026-06-02 — P14.1c failed; P14.2 EFE `08790d8`; decode gate `--min-step 560000`; merge hold.*
+*Last updated: 2026-06-02 — P14.2 pivot: metabolic asymmetry; EFE aborted; apex predators.*

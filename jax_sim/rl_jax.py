@@ -19,20 +19,6 @@ import functools
 from typing import Dict, Tuple, Any
 
 
-def compute_neg_g_target(
-    values: jnp.ndarray,
-    conf_pred: jnp.ndarray,
-    lambda_epi: float = 0.1,
-) -> jnp.ndarray:
-    """
-    Active Inference critic target: -G where G = G_prag + λ_epi G_epi,
-    G_prag = -V, G_epi = conf_pred  =>  -G = V - λ_epi * conf_pred.
-    """
-    v = jax.lax.stop_gradient(values)
-    conf = jax.lax.stop_gradient(conf_pred)
-    return v - lambda_epi * conf
-
-
 def compute_gae(
     rewards,   # (T, N) — numpy or JAX
     values,    # (T, N)
@@ -74,19 +60,16 @@ def ppo_loss(
     actions: jnp.ndarray,      # (M,) int
     old_log_probs: jnp.ndarray, # (M,)
     advantages: jnp.ndarray,    # (M,)
-    returns: jnp.ndarray,       # (M,) — reward TD returns (GAE); unused for VF when EFE on
+    returns: jnp.ndarray,       # (M,)
     carries: jnp.ndarray,       # (M, hidden_dim) — exact historical carries from rollout
     n_layers: int,
-    old_values: jnp.ndarray,     # (M,) rollout V for clipping + EFE pragmatic term
+    old_values: jnp.ndarray,     # (M,) for value clipping
     clip_eps: float = 0.2,
     vf_coef: float = 0.25,
     ent_coef: float = 0.05,
     vq_coef: float = 0.1,
     loss_vq_rollout: jnp.ndarray = None,  # (M,) per-agent VQ loss from rollout
     alive: jnp.ndarray = None,  # (M,) bool-ish
-    efe_enabled: bool = False,
-    lambda_epi: float = 0.1,
-    conf_apply_fn: Any = None,
 ) -> Tuple[jnp.ndarray, Dict]:
     """
     PPO loss evaluated with exact historical carries per timestep.
@@ -122,17 +105,10 @@ def ppo_loss(
     surr2 = clipped_ratio * advantages
     pg_loss = -jnp.minimum(surr1, surr2)
 
-    # Value loss: standard TD return, or Phase 14.2 EFE target -G(s_t)
-    if efe_enabled and conf_apply_fn is not None:
-        action_oh = jax.nn.one_hot(actions, 5, dtype=carries.dtype)
-        conf_pred = conf_apply_fn(params, carries, action_oh)
-        value_targets = compute_neg_g_target(old_values, conf_pred, lambda_epi)
-    else:
-        value_targets = returns
-
+    # Value loss with PPO clipping to safely allow backbone learning
     v_clipped = old_values + jnp.clip(values_pred - old_values, -clip_eps, clip_eps)
-    err = jnp.abs(values_pred - value_targets)
-    err_clipped = jnp.abs(v_clipped - value_targets)
+    err = jnp.abs(values_pred - returns)
+    err_clipped = jnp.abs(v_clipped - returns)
     
     delta = 0.5
     def vf_huber(e):
@@ -182,8 +158,6 @@ def ppo_loss(
         "ppo_clip_frac": jnp.mean(jnp.abs(ratio - 1.0) > clip_eps),
         "ppo_vq_loss": loss_vq_mean,
     }
-    if efe_enabled and conf_apply_fn is not None:
-        metrics["efe_neg_g_mean"] = (value_targets * (alive.astype(jnp.float32) if alive is not None else 1.0)).sum() / denom
 
     return total_loss, metrics
 
@@ -196,25 +170,17 @@ def create_optimizer(lr: float = 3e-4, max_grad_norm: float = 2.0) -> optax.Grad
     )
 
 
-@functools.partial(
-    jax.jit,
-    static_argnames=(
-        "apply_fn", "optimizer", "n_layers", "efe_enabled",
-        "conf_apply_fn",
-    ),
-)
+@functools.partial(jax.jit, static_argnames=("apply_fn", "optimizer", "n_layers"))
 def _minibatch_step(
     params, opt_state, apply_fn, optimizer,
     obs, actions, old_log_probs, advantages, returns, carries,
-    n_layers, old_values, clip_eps, vf_coef, ent_coef, vq_coef, loss_vq, alive,
-    efe_enabled, lambda_epi, conf_apply_fn,
+    n_layers, old_values, clip_eps, vf_coef, ent_coef, vq_coef, loss_vq, alive
 ):
     grad_fn = jax.value_and_grad(ppo_loss, has_aux=True)
     (loss, metrics), grads = grad_fn(
         params, apply_fn, obs, actions, old_log_probs,
         advantages, returns, carries, n_layers,
-        old_values, clip_eps, vf_coef, ent_coef, vq_coef, loss_vq, alive=alive,
-        efe_enabled=efe_enabled, lambda_epi=lambda_epi, conf_apply_fn=conf_apply_fn,
+        old_values, clip_eps, vf_coef, ent_coef, vq_coef, loss_vq, alive=alive
     )
     updates, new_opt_state = optimizer.update(grads, opt_state, params)
     new_params = optax.apply_updates(params, updates)
@@ -238,9 +204,6 @@ def ppo_update(
     gamma: float = 0.99,
     lam: float = 0.95,
     team: str = "blue",
-    efe_enabled: bool = False,
-    lambda_epi: float = 0.1,
-    conf_apply_fn: Any = None,
 ) -> Tuple[Dict, Any, Dict]:
     """
     Single gradient update step using minibatches.
@@ -326,8 +289,7 @@ def ppo_update(
         params, opt_state, mb_mets, grads = _minibatch_step(
             params, opt_state, apply_fn, optimizer,
             mb_obs, mb_act, mb_lp, mb_adv, mb_ret, mb_c,
-            n_layers, mb_v, clip_eps, vf_coef, ent_coef, vq_coef, mb_vq, mb_al,
-            efe_enabled, lambda_epi, conf_apply_fn,
+            n_layers, mb_v, clip_eps, vf_coef, ent_coef, vq_coef, mb_vq, mb_al
         )
 
         # Accumulate as Python floats to avoid holding 500 JAX arrays
@@ -530,44 +492,31 @@ def auxiliary_update(
 
 @functools.partial(
     jax.jit,
-    static_argnames=(
-        "proprio_apply_fn", "conf_apply_fn", "optimizer", "proprio_coef", "conf_coef",
-    ),
+    static_argnames=("proprio_apply_fn", "optimizer", "proprio_coef"),
 )
 def _proprio_minibatch_step(
     params,
     opt_state,
     proprio_apply_fn,
-    conf_apply_fn,
     optimizer,
     carry_t,
-    action_oh,
     energy_tp1,
     alive_mask,
     proprio_coef,
-    conf_coef,
 ):
-    """Proprio (+ optional epistemic confidence) minibatch for red predator."""
+    """Proprio-only minibatch step (red predator without full aux heads)."""
 
     def loss_fn(p):
         energy_pred = proprio_apply_fn(p, carry_t)
         energy_target = jax.lax.stop_gradient(energy_tp1)
         proprio_per = jnp.square(energy_pred - energy_target)
         proprio_loss = (proprio_per * alive_mask).sum() / (alive_mask.sum() + 1e-8)
-        total = proprio_coef * proprio_loss
-        conf_loss = jnp.array(0.0)
-        if conf_coef > 0.0 and conf_apply_fn is not None:
-            conf_pred = conf_apply_fn(p, carry_t, action_oh)
-            conf_target = jax.lax.stop_gradient(proprio_per)
-            conf_sq = jnp.square(conf_pred - conf_target)
-            conf_loss = (conf_sq * alive_mask).sum() / (alive_mask.sum() + 1e-8)
-            total = total + conf_coef * conf_loss
-        return total, (proprio_loss, conf_loss)
+        return proprio_coef * proprio_loss, proprio_loss
 
-    (_, (proprio_l, conf_l)), grads = jax.value_and_grad(loss_fn, has_aux=True)(params)
+    (_, proprio_l), grads = jax.value_and_grad(loss_fn, has_aux=True)(params)
     updates, new_opt_state = optimizer.update(grads, opt_state, params)
     new_params = optax.apply_updates(params, updates)
-    return new_params, new_opt_state, proprio_l, conf_l
+    return new_params, new_opt_state, proprio_l
 
 
 def proprio_auxiliary_update(
@@ -578,22 +527,14 @@ def proprio_auxiliary_update(
     carries_np: np.ndarray,
     energy_np: np.ndarray,
     alive_np: np.ndarray = None,
-    actions_np: np.ndarray = None,
-    conf_apply_fn: Any = None,
     key: jax.Array = None,
     minibatch_size: int = 1024,
     proprio_coef: float = 0.05,
-    conf_coef: float = 0.0,
-) -> Tuple[Dict, Any, float, float]:
-    """Energy prediction from carry; optional conf head on proprio MSE (red EFE path)."""
+) -> Tuple[Dict, Any, float]:
+    """Energy prediction from carry only (Phase 14.1b; red comms path)."""
     T, N, hidden_dim = carries_np.shape
     carry_t = carries_np[:-1].reshape((T - 1) * N, hidden_dim)
     energy_tp1 = np.asarray(energy_np[1:]).reshape((T - 1) * N).astype(np.float32)
-    if actions_np is not None:
-        action_t = actions_np[:-1].reshape((T - 1) * N).astype(np.int32)
-        action_oh = np.eye(5, dtype=np.float32)[action_t]
-    else:
-        action_oh = np.zeros((carry_t.shape[0], 5), dtype=np.float32)
     if alive_np is not None:
         alive_t = alive_np[:-1].reshape((T - 1) * N).astype(np.float32)
     else:
@@ -606,25 +547,20 @@ def proprio_auxiliary_update(
     perm = rng.permutation(M)
     n_mb = max(1, M // int(minibatch_size))
     proprio_sum = 0.0
-    conf_sum = 0.0
     for i in range(n_mb):
         idx = perm[i * minibatch_size : (i + 1) * minibatch_size]
-        params, opt_state, proprio_l, conf_l = _proprio_minibatch_step(
+        params, opt_state, proprio_l = _proprio_minibatch_step(
             params,
             opt_state,
             proprio_apply_fn,
-            conf_apply_fn,
             optimizer,
             jnp.array(carry_t[idx]),
-            jnp.array(action_oh[idx]),
             jnp.array(energy_tp1[idx]),
             jnp.array(alive_t[idx]),
             proprio_coef,
-            conf_coef,
         )
         proprio_sum += float(proprio_l)
-        conf_sum += float(conf_l)
-    return params, opt_state, proprio_sum / n_mb, conf_sum / n_mb
+    return params, opt_state, proprio_sum / n_mb
 
 
 # Keep old name as alias for backward compatibility with any external callers

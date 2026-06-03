@@ -53,7 +53,6 @@ from jax_sim.network_jax import (
     init_agent_params,
     init_predator_params,
     make_model_apply,
-    make_conf_apply,
     make_vqel_monologue_apply,
     params_apply_variables,
     sanitize_agent_params,
@@ -179,6 +178,8 @@ def make_sim_step(
     _red_catch_prob = float(config.get("red_catch_prob", 1.0))
     _puzzle_reward = float(config.get("puzzle_reward", 5.0))
     _energy_decay = float(config["energy_decay"])
+    _p14t = config.get("phase14_transcendental") or {}
+    _red_energy_decay = float(_p14t.get("red_energy_decay", _energy_decay))
     _starv_thresh = float(config["starvation_threshold"])
     _max_age = int(config["max_age"])
     _min_pop_blue = int(config.get("min_population", 200))
@@ -208,18 +209,11 @@ def make_sim_step(
     _p14 = config.get("phase14_vqel") or {}
     _vqel_monologue = bool(_p14.get("monologue_enabled", False))
     _dialogue_signal_mode = str(_p14.get("dialogue_signal_mode", "ste")).lower()
-    _p142 = config.get("phase14_efe") or {}
-    _efe_enabled_rollout = bool(_p142.get("enabled", False))
-    _lambda_epi_rollout = float(_p142.get("lambda_epi", 0.1))
     _imagine_fn = None
     if _img_gate_enabled:
         from jax_sim.imagination_jax import make_imagination_fn
         _imagine_fn = make_imagination_fn(
-            model,
-            K=_imagination_k,
-            gamma=_imagination_gamma,
-            efe_enabled=_efe_enabled_rollout,
-            lambda_epi=_lambda_epi_rollout,
+            model, K=_imagination_k, gamma=_imagination_gamma
         )
     from jax_sim import observations_jax as _obs
 
@@ -431,9 +425,9 @@ def make_sim_step(
         )
         b_pop = b_pop.replace(energy=jnp.clip(b_pop.energy - cog_cost, 0.0, 1.0))
 
-        # ── Energy decay ────────────────────────────────────────
+        # ── Energy decay (blue standard; red apex — Phase 14.2 metabolic asymmetry) ──
         b_pop = b_pop.replace(energy=jnp.clip(b_pop.energy - _energy_decay, 0.0, 1.0))
-        r_pop = r_pop.replace(energy=jnp.clip(r_pop.energy - _energy_decay, 0.0, 1.0))
+        r_pop = r_pop.replace(energy=jnp.clip(r_pop.energy - _red_energy_decay, 0.0, 1.0))
 
         # ── Starvation (after metabolic tax + decay) ────────────
         b_starved = b_pop.alive & (b_pop.energy < _starv_thresh)
@@ -1022,18 +1016,12 @@ def _run_simulation_impl(
             "— disentangle metabolic state from VQ wire"
         )
 
-    _p142 = config.get("phase14_efe") or {}
-    _efe_enabled = bool(_p142.get("enabled", False))
-    _lambda_epi = float(_p142.get("lambda_epi", 0.1))
-    _red_conf_coef = float(_p142.get("red_confidence_coef", 0.05)) if _efe_enabled else 0.0
-    b_conf_apply_fn = make_conf_apply(model, "predict_carry_fwd_confidence")
-    r_conf_apply_fn = None
-    if model_red is not None:
-        r_conf_apply_fn = make_conf_apply(model_red, "predict_epistemic_confidence")
-    if _efe_enabled:
+    _p14t = config.get("phase14_transcendental") or {}
+    _red_ed_cfg = float(_p14t.get("red_energy_decay", config["energy_decay"]))
+    if _red_ed_cfg != float(config["energy_decay"]):
         print(
-            f"[JAX] Phase14.2 EFE: PPO critic targets -G = V - {_lambda_epi}*conf_pred "
-            f"(G_prag=-V, G_epi=conf); red conf coef={_red_conf_coef}"
+            f"[JAX] Phase14.2 metabolic asymmetry: red_energy_decay={_red_ed_cfg} "
+            f"(blue={config['energy_decay']}) — apex predators, hunger-babble suppressed"
         )
 
     # ── NaN debug after init ────────────────────────────────
@@ -1310,9 +1298,6 @@ def _run_simulation_impl(
                 gamma=float(config.get("ppo_gamma", 0.99)),
                 lam=float(config.get("ppo_gae_lam", 0.95)),
                 team="blue",
-                efe_enabled=_efe_enabled,
-                lambda_epi=_lambda_epi,
-                conf_apply_fn=b_conf_apply_fn if _efe_enabled else None,
             )
             if ui == start_update:
                 print(
@@ -1382,13 +1367,6 @@ def _run_simulation_impl(
             gamma=float(config.get("ppo_gamma", 0.99)),
             lam=float(config.get("ppo_gae_lam", 0.95)),
             team="red",
-            efe_enabled=_efe_enabled,
-            lambda_epi=_lambda_epi,
-            conf_apply_fn=(
-                r_conf_apply_fn
-                if _efe_enabled and _red_comms
-                else (b_conf_apply_fn if _efe_enabled else None)
-            ),
         )
         if ui == start_update:
             print(
@@ -1416,7 +1394,7 @@ def _run_simulation_impl(
             r_metrics["proprio_loss"] = r_proprio_loss
         elif _proprio_coef > 0.0 and _r_energy_np is not None:
             _rprop_key, update_key = jax.random.split(update_key)
-            r_params, r_opt_state, r_proprio_loss, r_conf_loss = proprio_auxiliary_update(
+            r_params, r_opt_state, r_proprio_loss = proprio_auxiliary_update(
                 r_params,
                 r_opt_state,
                 r_optimizer,
@@ -1424,16 +1402,11 @@ def _run_simulation_impl(
                 _r_carries_np,
                 _r_energy_np,
                 _r_alive_np,
-                actions_np=_r_actions_np,
-                conf_apply_fn=r_conf_apply_fn if _efe_enabled else None,
                 key=_rprop_key,
                 minibatch_size=_fwd_mb,
                 proprio_coef=_proprio_coef,
-                conf_coef=_red_conf_coef,
             )
             r_metrics["proprio_loss"] = r_proprio_loss
-            if _efe_enabled:
-                r_metrics["conf_loss"] = r_conf_loss
 
         if config.get("vq_dead_code_reset", True) and "z_e" in r_batch:
             _dc_key, update_key = jax.random.split(update_key)
