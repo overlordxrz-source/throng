@@ -313,7 +313,9 @@ All knobs live in `config_phase7.yaml`. The ones you actually touch:
 | **14.1c** | ❌ FAILED — catch 10.0; pincer p≈0.46 |
 | **14.2** | ✅ Metabolic Asymmetry — red_energy_decay=0.0001 |
 | **14.3** | **LIVE** — GWT Router; energy-masked h_comms → VQ (`654400c`) |
-| **14+** | MMGL → auto-curricula — after pincer p < 0.05 |
+| **14.4** | **PREP** — Contingencies (Asymmetric Speed $V_{pred} < V_{prey}$, SimVQ, Sparse Budgets) |
+| **15.0** | **PREP** — Cumulative Culture (MEDAL-ADR Expert Dropout) |
+| **15+** | **PREP** — Open-Ended (DRCB, EVQ-VAE, MMGL auto-curricula) |
 
 Do **not** merge to **`master`** until pincer **p < 0.05**.
 

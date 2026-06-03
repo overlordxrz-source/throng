@@ -404,8 +404,10 @@ train_entry.run_simulation()  →  main_jax._run_simulation_impl()
 | **14.1b** | **Proprio disentanglement** ✅ | **`45bfbe7`** | `proprio_coef: 0.15`; continuous spatial LRT **31/32** |
 | **14.1c** | **Catch overdrive** | ❌ **FAILED** | Operator 10.0/600k; pincer still **p≈0.46** |
 | **14.2** | **Metabolic Asymmetry** | ✅ | `red_energy_decay: 0.0001`; corpus decode: VQ trap confirmed |
-| **14.3** | **GWT Router** | ✅ **LIVE** | `gwt_comms_1`; energy-masked `h_comms` → VQ; `h_policy` → action/value; `744de6a` |
-| **14+** | MMGL → auto-curricula | **PREP** | After pincer pass |
+| **14.3** | **GWT Router** | ✅ **LIVE** | `gwt_comms_1`; energy-masked `h_comms` (`obs[:, 2]`) → VQ; `h_policy` → action/value; `654400c` |
+| **14.4** | **Contingency Prep** | **PREP** | If GWT fails: Velocity Asymmetry ($V_{pred} < V_{prey}$), Sparse Budgets, SimVQ |
+| **15.0** | **Cumulative Culture** | **PREP** | MEDAL-ADR (Expert Dropout) to force generational transmission without collapse |
+| **15+** | **Open-Ended** | **PREP** | DRCB (drift deterrence), EVQ-VAE, MMGL auto-curricula |
 
 **Recurring failure mode:** Blues stay at cap → ~99% survival → **`NB_GAIN↔surv: nan`** → no evolutionary pressure on neighbor-signal benefit.
 
@@ -1092,10 +1094,10 @@ GPU-resident PPO — **`d4cf614` revert** on `master`.
 
 ### Cam reboot paste
 
-> You are **Cam**. Read `THRONG.md` §0b. **P14.2 ✅ Metabolic Asymmetry** (`red_energy_decay=0.0001`); **EFE ❌ scrapped**. **Modal LIVE:** workspace **`overlordxn`**, volume **`throng-runs`**, ckpt **1227/1230**. **`git=cfeddf1+`**. Hard dialogue on startup. **No merge** until pincer **p<0.05**.
+> You are **Cam**. Read `THRONG.md` §0b. **P14.3 ✅ GWT Router** (`obs[:, 2]` energy masked). **Modal LIVE:** workspace **`overlordxn`**, volume **`throng-runs`**, ckpt **1305+**. **`git=101d8ca+`**. Hard dialogue on startup. **Contingencies ready:** Asymmetric speed ($V_{pred} < V_{prey}$) and SimVQ. **Phase 15 Roadmap:** MEDAL-ADR Expert Dropout. **No merge** until pincer **p<0.05**.
 
-**New Will:** B200 on **`overlordxn`**; pull **`cfeddf1+`**; verify asymmetry log; resume from latest ckpt; decode after asymmetry bake.
+**New Will:** B200 on **`overlordxn`**; pull **`101d8ca+`**; verify GWT Router `obs[:, 2]` log; resume from latest ckpt; run `--red` decode gate at 720k.
 
 ---
 
-*Last updated: 2026-06-03 — Modal **`overlordxn`** migration; `migrate_modal.sh`; config bind `6bee6e4`; P14.2 Metabolic Asymmetry; EFE scrapped.*
+*Last updated: 2026-06-03 — Modal **`overlordxn`** migration; P14.3 GWT Router; Phase 15 Cumulative Culture research synthesis.*
