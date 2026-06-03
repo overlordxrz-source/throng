@@ -862,11 +862,7 @@ def _run_simulation_impl(
         else:
             r_params = jax.tree_util.tree_map(jnp.copy, b_params)
             print("[JAX] model.init done — restoring checkpoint weights...", flush=True)
-        abstract_tree = (
-            {"b_params": b_params}
-            if _red_comms
-            else {"b_params": b_params, "r_params": r_params}
-        )
+        abstract_tree = {"b_params": b_params, "r_params": r_params}
         try:
             restored = ckpt_mngr.restore(_ckpt_latest, items=abstract_tree)
         except ValueError as exc:
@@ -882,7 +878,7 @@ def _run_simulation_impl(
                 raw_restored = ckpt_mngr.restore(_ckpt_latest)
                 target_dict = unfreeze(abstract_tree)
                 source_dict = unfreeze(raw_restored)
-                _restore_agents = ("b_params",) if _red_comms else ("b_params", "r_params")
+                _restore_agents = ("b_params", "r_params")
                 for agent_type in _restore_agents:
                     if agent_type not in source_dict or agent_type not in target_dict:
                         continue
@@ -927,14 +923,10 @@ def _run_simulation_impl(
             )
             if _red_comms:
                 r_params = sanitize_agent_params(
-                    init_predator_params(
-                        model_red, keys[5], dummy_carry_red, dummy_obs, n_layers
+                    ensure_predator_params(
+                        model_red, restored["r_params"], keys[5], red_hidden_d,
+                        obs_dim=obs_dim, n_layers=n_layers
                     )
-                )
-                print(
-                    "[JAX] Phase 12: b_params from checkpoint; r_params fresh "
-                    "(predator comms — not loading legacy shared r_params)",
-                    flush=True,
                 )
             else:
                 r_params = sanitize_agent_params(
