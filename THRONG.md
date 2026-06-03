@@ -42,12 +42,18 @@
 | **Philosophy** | Language cannot map physical space if the existential burden of the speaker is entirely internal. Algorithmic blindness to self within the language center forces exteroceptive grounding |
 | **Response** | **GWT structural mask** — `gwt_comms_1 = Dense(d)` on energy-zeroed obs; cross-attn carry zeroed; `head_signal` reads `h_comms` not `pooled` |
 
+> [!WARNING]
+> **Catastrophic Checkpointing Bug Fixed:** Since Phase 12, `main_jax.py` possessed a bug where the red predator's network weights (`r_params`) were completely wiped and re-initialized with random weights every time a checkpoint was resumed (if `red_comms_enabled: true`). This explains why the predators failed to learn in P14.1c: they never got more than ~50-100k steps of training before getting wiped. **Fixed in `fbc2f2e`.**
+
+> [!WARNING]
+> **GWT Router Mask Bug Fixed:** The initial GWT Router implementation zeroed out index `0` of the observation vector to sever the metabolic gradient. However, index 0 is `norm_age`; `energy` is actually at index `2`. The router was blinding itself to age, not energy. **Fixed in `3eaec6a`**.
+
 > [!IMPORTANT]
-> **Run restart required.** The B200 run launched at `1b91358` (P14.2 docs). GWT commit `744de6a` was pushed after launch. Stop the current run, `git pull`, and restart to deploy the GWT Router.
+> **Run restart required.** To deploy the GWT Router and the critical bug fixes, you must resume from an older checkpoint (preferably `1227` or `1230`) from your local `~/throng_backup` so the reds can build upon their pre-wipe training history!
 
 ```bash
 # P14.3 B200 restart (after git pull):
-cd /root/throng && git pull origin feature/phase14-transcendental   # 744de6a
+cd /root/throng && git pull origin feature/phase14-transcendental   # 3eaec6a
 export TF_GPU_ALLOCATOR=cuda_malloc_async
 export XLA_PYTHON_CLIENT_MEM_FRACTION=0.80
 export JAX_COMPILATION_CACHE_DIR=/tmp/throng_jax_cache
