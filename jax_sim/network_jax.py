@@ -607,10 +607,10 @@ class PredatorNetworkJax(nn.Module):
         h_policy = pooled
 
         # h_comms: exteroceptive-ONLY pathway.
-        # obs[:, 0] is energy (own_state index 0 per THRONG obs schema).
+        # obs[:, 2] is energy (own_state index 2 per THRONG obs schema).
         # Zeroing it physically severs the metabolic gradient from the comms head,
         # forcing the VQ codebook to maximise MI over blue geometry / neighbor signals.
-        exteroceptive_obs = obs.at[:, 0].set(0.0)
+        exteroceptive_obs = obs.at[:, 2].set(0.0)
         h_comms = nn.relu(self.gwt_comms_1(exteroceptive_obs))
         if self.cross_attn_enabled:
             # Query = h_comms (exteroceptive embedding).
