@@ -7,10 +7,10 @@ to **survive, signal, and pass knowledge on**. The goal is not "an agent that
 plays a game well." The goal is **emergence**: language, culture, and proto-
 cognition arising purely from selection pressure.
 
-**Current state (Jun 2026):** **Phase 14.2 Metabolic Asymmetry** on `feature/phase14-transcendental`.
-P14.1c catch overdrive **failed** (pincer **p≈0.46**). **EFE scrapped**; reds now decay at
-**`red_energy_decay: 0.0001`** (10× slower than blues) for apex-predator lifespan. Verify startup:
-**`[JAX] Phase14.2 Metabolic Asymmetry: red_energy_decay=0.0001`**.
+**Current state (Jun 2026):** **Phase 14.3 GWT Router** on `feature/phase14-transcendental` (`654400c`).
+Two critical bugs fixed: catastrophic checkpoint wipe (`fbc2f2e`) + wrong GWT mask index (`3eaec6a`, energy is `obs[:, 2]` not `obs[:, 0]`).
+`h_comms` (energy-zeroed obs) → VQ; `h_policy` (full obs) → action/value. Verify startup:
+**`[JAX] Merged fresh gwt_comms_1 (Phase 14.3 GWT Router) into predator params`**.
 
 **Full ops / decode / roadmap:** [THRONG.md](THRONG.md) §0b (read first).
 
@@ -36,18 +36,19 @@ For the full research log, theory, philosophy, and per-phase post-mortems see
 # Blue alarm / flee (214k reference: decode_p11_3_214k.log)
 python3 tools/decode_signals.py signal_corpus.jsonl --k 16 --min-step 149500
 
-# Red pincer — post catch-overdrive (560k+ window, after 600k ckpt)
+# Red pincer — GWT Router gate (50k steps post-resume at ~666k → decode at 716k+)
 python3 tools/decode_signals.py --red /mnt/throng-runs/signal_corpus_red.jsonl \
-  --k 16 --min-step 560000 2>&1 | tee decode_red_pincer_600k_overdrive.log
+  --k 16 --min-step 716000 2>&1 | tee decode_gwt_p143.log
 ```
 
-**Pass bar (red):** RED VQ PINCER TEST χ² **p < 0.05**. Resume B200 after pull; watch red energy MI ↓ under asymmetry.
+**Pass bar (red):** RED VQ PINCER TEST — energy MI → 0 across dims 0–31; `blue_dist`/`blue_bear` dominate VQ eigenvectors; pincer χ² **p < 0.05**.
 
 **Modal (resume — do not wipe ckpts):**
 
 ```bash
-cd /root/throng && git pull origin feature/phase14-transcendental
+cd /root/throng && git pull origin feature/phase14-transcendental  # 654400c
 python -u run_bg.py
+# MUST see: [JAX] Merged fresh gwt_comms_1 (Phase 14.3 GWT Router) into predator params
 # MUST see: [JAX] Phase14.2 Metabolic Asymmetry: red_energy_decay=0.0001
 ```
 
@@ -307,9 +308,12 @@ All knobs live in `config_phase7.yaml`. The ones you actually touch:
 | **12** | **COMPLETE** — dual brain, wiretap, spatial gate |
 | **12.2 decode** | 250k–320k: omnibus ON, pincer still ❌ |
 | **13.0** | **VALIDATED** — tax ~0.0018/step; no imagination collapse |
-| **13.1+** | Drop spatial gate, inscription, proprio — after pincer |
-| **14 Step 1** | **AUTHORIZED** — VQEL Monologue split + Information Bottleneck |
-| **14+** | EFE → GWT → MMGL → auto-curricula (not started) |
+| **14.1** | ✅ VQEL graduated → hard z_q + blue PPO |
+| **14.1b** | ✅ proprio_coef=0.15; continuous spatial LRT 31/32 |
+| **14.1c** | ❌ FAILED — catch 10.0; pincer p≈0.46 |
+| **14.2** | ✅ Metabolic Asymmetry — red_energy_decay=0.0001 |
+| **14.3** | **LIVE** — GWT Router; energy-masked h_comms → VQ (`654400c`) |
+| **14+** | MMGL → auto-curricula — after pincer p < 0.05 |
 
 Do **not** merge to **`master`** until pincer **p < 0.05**.
 
