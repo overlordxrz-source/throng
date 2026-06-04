@@ -55,6 +55,7 @@ class PopState:
         # Book-keeping
         self.offspring_count = jnp.zeros(max_pop, dtype=jnp.int32)
         self.steps_since_catch = jnp.zeros(max_pop, dtype=jnp.int32)
+        self.steps_since_dropout = jnp.zeros(max_pop, dtype=jnp.int32)
         self.lineage_ids = jnp.zeros(max_pop, dtype=jnp.int32)
         self.next_lineage_id = jnp.int32(1)
 
@@ -64,8 +65,8 @@ class PopState:
         children = [
             self.positions, self.ages, self.alive, self.energy, self.team,
             self.n_layers, self.carries, self.signals, self.nb_gain,
-            self.offspring_count, self.steps_since_catch, self.lineage_ids,
-            self.next_lineage_id,
+            self.offspring_count, self.steps_since_catch, self.steps_since_dropout,
+            self.lineage_ids, self.next_lineage_id,
         ]
         if self.memory_buffer is not None:
             children.append(self.memory_buffer)
@@ -82,10 +83,10 @@ class PopState:
         pop.memory_slots = memory_slots
         (pop.positions, pop.ages, pop.alive, pop.energy, pop.team,
          pop.n_layers, pop.carries, pop.signals, pop.nb_gain,
-         pop.offspring_count, pop.steps_since_catch, pop.lineage_ids,
-         pop.next_lineage_id) = children[:13]
+         pop.offspring_count, pop.steps_since_catch, pop.steps_since_dropout,
+         pop.lineage_ids, pop.next_lineage_id) = children[:14]
         if memory_slots > 0:
-            pop.memory_buffer = children[13]
+            pop.memory_buffer = children[14]
         else:
             pop.memory_buffer = None
         return pop
@@ -108,6 +109,7 @@ class PopState:
         pop.nb_gain = kwargs.get("nb_gain", self.nb_gain)
         pop.offspring_count = kwargs.get("offspring_count", self.offspring_count)
         pop.steps_since_catch = kwargs.get("steps_since_catch", self.steps_since_catch)
+        pop.steps_since_dropout = kwargs.get("steps_since_dropout", self.steps_since_dropout)
         pop.lineage_ids = kwargs.get("lineage_ids", self.lineage_ids)
         pop.next_lineage_id = kwargs.get("next_lineage_id", self.next_lineage_id)
         pop.memory_buffer = kwargs.get("memory_buffer", self.memory_buffer)

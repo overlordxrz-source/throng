@@ -429,8 +429,10 @@ class SignalCorpusWriter:
         nb_hunter_sig_lag1:  Optional[np.ndarray] = None,
         nb_hunter_dist_lag1: Optional[np.ndarray] = None,
         nb_hunter_token_lag1: Optional[np.ndarray] = None,
+        carry_fwd:         Optional[np.ndarray] = None,
+        steps_since_dropout: Optional[np.ndarray] = None,
     ) -> None:
-        """Write sampled red predator records (Phase 12.1). Separate file from blue corpus.
+        """Write sampled red predator records (Phase 12.1 + 15). Separate file from blue corpus.
 
         is_hunter: emitter had blue_dist <= hunt_scout_range when signaling.
         nb_hunter_sig_lag1: mean signal of hunter reds within range at T-1.
@@ -474,6 +476,13 @@ class SignalCorpusWriter:
             if nb_hunter_token_lag1 is not None:
                 tok = int(nb_hunter_token_lag1[i])
                 rec["nb_hunter_token_lag1"] = None if tok < 0 else tok
+            
+            # Phase 15 Additions
+            if carry_fwd is not None:
+                rec["carry_fwd"] = [round(float(v), 4) for v in carry_fwd[idx].astype(np.float16)]
+            if steps_since_dropout is not None:
+                rec["steps_since_dropout"] = int(steps_since_dropout[idx])
+                
             lines.append(json.dumps(rec))
         self._fh.write("\n".join(lines) + "\n")
 

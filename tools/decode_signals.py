@@ -145,6 +145,19 @@ def load_red_corpus(path: str) -> dict:
     actions = np.array([r["action"] for r in records], dtype=np.int32)
     hunters = np.array([r["hunter"] for r in records], dtype=bool)
     steps = np.array([r["step"] for r in records], dtype=np.int64)
+    
+    # Phase 15 telemetry
+    carry_fwd_raw = [r.get("carry_fwd", None) for r in records]
+    has_carry_fwd = any(v is not None for v in carry_fwd_raw)
+    carry_fwd = None
+    if has_carry_fwd:
+        carry_fwd = np.array([v if v is not None else [float("nan")] for v in carry_fwd_raw], dtype=np.float32)
+        
+    steps_since_dropout_raw = [r.get("steps_since_dropout", None) for r in records]
+    has_ssd = any(v is not None for v in steps_since_dropout_raw)
+    steps_since_dropout = None
+    if has_ssd:
+        steps_since_dropout = np.array([v if v is not None else float("nan") for v in steps_since_dropout_raw], dtype=np.float32)
 
     ctx = {}
     for k in RED_CONTEXT_KEYS:
@@ -195,6 +208,8 @@ def load_red_corpus(path: str) -> dict:
         "nb_dist_lag1": nb_dist_lag1,
         "vq_tokens": vq_tokens,
         "nb_tok_lag1": nb_tok_lag1,
+        "carry_fwd": carry_fwd,
+        "steps_since_dropout": steps_since_dropout,
         "n": len(records),
     }
 
@@ -1056,6 +1071,100 @@ def lag1_direction_lrt(
     print(f"  Significant dim + coef pattern matching bearing = signal encodes direction")
 
 
+# ── Phase 15: Novice Memory Retention LRT ──────────────────────────────────────
+
+def novice_memory_dropout_lrt(
+    carry_fwd: np.ndarray,
+    blue_bear: np.ndarray,
+    steps_since_dropout: np.ndarray,
+    target_lag: int = 10,
+) -> None:
+    """
+    Likelihood Ratio Test: Null (intercept-only) vs Full (carry_fwd → blue_bear).
+
+    Evaluates whether novice internal memory retains bearing information exactly
+    target_lag steps after a local expert dropout event.
+
+    NOTE: OLS on ~256D with limited samples will overfit. This first-pass
+    implementation is intentionally exact per Research Agent spec. Upgrade to
+    Ridge Regression once data volume is confirmed.
+    """
+    from sklearn.linear_model import LinearRegression
+    from scipy.stats import chi2
+
+    mask = (steps_since_dropout == target_lag) & np.isfinite(steps_since_dropout)
+    X = carry_fwd[mask]
+    y = blue_bear[mask]
+
+    print(f"\n{'─'*70}")
+    print(f"  PHASE 15 CUMULATIVE CULTURE LRT: NOVICE MEMORY AT LAG-{target_lag}")
+    print(f"{'─'*70}")
+
+    if len(X) == 0:
+        print(f"  [SKIPPED] No records found at steps_since_dropout == {target_lag}.")
+        print(f"  Corpus may not yet contain post-dropout novice data.")
+        print(f"{'─'*70}")
+        return
+
+    if X.ndim == 1:
+        X = X.reshape(-1, 1)
+    if y.ndim == 1:
+        y = y.reshape(-1, 1)
+
+    n_samples, n_dims = X.shape
+
+    if n_samples < n_dims + 20:
+        print(f"  [SKIPPED] Insufficient samples ({n_samples}) for {n_dims}D state space.")
+        print(f"  Need at least {n_dims + 20} records at lag-{target_lag}.")
+        print(f"  Consider waiting for more corpus accumulation.")
+        print(f"{'─'*70}")
+        return
+
+    # Null Model: intercept-only (predict mean bearing)
+    y_mean = np.mean(y, axis=0)
+    rss_null = float(np.sum((y - y_mean) ** 2))
+
+    # Full Model: linear map from carry_fwd → blue_bear
+    reg = LinearRegression().fit(X, y)
+    y_pred = reg.predict(X)
+    rss_full = float(np.sum((y - y_pred) ** 2))
+
+    # Guard against numerical edge cases
+    rss_null = max(rss_null, 1e-9)
+    rss_full = max(rss_full, 1e-9)
+
+    if rss_full >= rss_null:
+        print(f"  Active Samples (N)            : {n_samples}")
+        print(f"  Memory Dims (D)               : {n_dims}")
+        print(f"  [FAIL] Full model RSS ({rss_full:.4f}) >= Null RSS ({rss_null:.4f}).")
+        print(f"  Memory does not encode bearing better than chance at lag-{target_lag}.")
+        print(f"{'─'*70}")
+        return
+
+    lrt_stat = n_samples * np.log(rss_null / rss_full)
+    df = n_dims * y.shape[1]
+    p_value = float(chi2.sf(lrt_stat, df))
+
+    print(f"  Active Samples (N)            : {n_samples}")
+    print(f"  Memory Dims (D)               : {n_dims}")
+    print(f"  RSS (Null, intercept-only)    : {rss_null:.4f}")
+    print(f"  RSS (Full, carry_fwd → bear)  : {rss_full:.4f}")
+    print(f"  LRT Statistic (Λ)             : {lrt_stat:.4f}")
+    print(f"  Degrees of Freedom            : {df}")
+    print(f"  Asymptotic p-value            : {p_value:.6e}")
+
+    if p_value < 0.001:
+        print(f"  ✅ SUCCESS: Novice memory retains bearing signal {target_lag} steps post-dropout (p < 0.001).")
+        print(f"  → Cumulative Culture CONFIRMED: novices track prey via internalized expert memory.")
+    elif p_value < 0.05:
+        print(f"  ⚠  MARGINAL: p < 0.05 but not < 0.001. Weak retention signal.")
+        print(f"  → Upgrade to Ridge Regression before claiming Phase 15 pass.")
+    else:
+        print(f"  ❌ FAIL: Memory signal decayed significantly by lag-{target_lag} (p={p_value:.4f}).")
+        print(f"  → carry_fwd does not encode blue_bear post-dropout. Check MEDAL-ADR params.")
+    print(f"{'─'*70}")
+
+
 # ── Phase 12.2 red decode pipeline ─────────────────────────────────────────────
 
 def decode_red_schema(
@@ -1209,6 +1318,24 @@ def decode_red_schema(
         print(f"  LAG-1 RED COMMUNICATION TEST")
         print(f"{'─'*70}")
         print("  nb_hunter_sig_lag1 absent — restart with red_corpus_enabled.")
+
+    # ── Phase 15: Novice Memory Retention LRT ───────────────────────────────
+    carry_fwd = data.get("carry_fwd")
+    steps_since_dropout = data.get("steps_since_dropout")
+    if carry_fwd is not None and steps_since_dropout is not None:
+        novice_memory_dropout_lrt(
+            carry_fwd=carry_fwd,
+            blue_bear=ctx.get("blue_bear", np.zeros(len(carry_fwd))),
+            steps_since_dropout=steps_since_dropout,
+            target_lag=10,
+        )
+    else:
+        print(f"\n{'─'*70}")
+        print(f"  PHASE 15 CUMULATIVE CULTURE LRT")
+        print(f"{'─'*70}")
+        print("  carry_fwd / steps_since_dropout absent in corpus.")
+        print("  Restart sim with Phase 15 telemetry enabled (MEDAL-ADR active).")
+        print(f"{'─'*70}")
 
     print(f"\n{'='*70}")
     print("  Done (red). Interpret:")

@@ -462,6 +462,30 @@ def make_sim_step(
             actual_drop = drop_mask & is_expert & r_pop.alive
             r_pop = kill_agents(r_pop, actual_drop)
             medal_dropouts = actual_drop.astype(jnp.float32).sum()
+            
+            # -- Option B: Local Causal Reset --
+            r_pos = r_pop.positions
+            dx = jnp.abs(r_pos[:, 0:1] - r_pos[None, :, 0])
+            dy = jnp.abs(r_pos[:, 1:2] - r_pos[None, :, 1])
+            dx = jnp.minimum(dx, config.get("grid_size", 128) - dx)
+            dy = jnp.minimum(dy, config.get("grid_size", 128) - dy)
+            dist_matrix = jnp.maximum(dx, dy)
+
+            # Mask out non-dying agents (set distance to infinity)
+            valid_dist = jnp.where(actual_drop[None, :], dist_matrix, 9999.0)
+
+            # Find the closest dying expert for each agent
+            min_dist_to_dying_expert = jnp.min(valid_dist, axis=1)
+
+            # A local expert died if the closest dying expert is within the hunt range
+            _hunt_range = config.get("alarm_scout_range", 8.0)
+            _hunt_range = config.get("hunt_scout_range", _hunt_range)
+            local_expert_died = min_dist_to_dying_expert <= _hunt_range
+
+            # Update the tracker for alive novices
+            new_steps = jnp.where(r_pop.alive & ~is_expert, r_pop.steps_since_dropout + 1, 0)
+            new_steps = jnp.where(local_expert_died & r_pop.alive & ~is_expert, 1, new_steps)
+            r_pop = r_pop.replace(steps_since_dropout=new_steps)
 
         # ── Rewards (all from config) ───────────────────────────
         b_rew = jnp.where(b_pop.alive, _reward_blue_alive, 0.0)
@@ -536,6 +560,7 @@ def make_sim_step(
             "energy": r_pop.energy,
             "alive": r_pop.alive,
             "medal_dropouts": medal_dropouts,
+            "steps_since_dropout": r_pop.steps_since_dropout,
         }
 
         new_carry = (grid, b_pop, r_pop, b_new_c, r_new_c, b_params, r_params)
@@ -1798,6 +1823,8 @@ def _run_simulation_impl(
         r_tok_all = np.array(rollout_data["red"]["token_ids"])
         r_act_all = np.array(rollout_data["red"]["actions"])
         r_energy_all = np.array(rollout_data["red"]["energy"])
+        r_carry_fwd_all = np.array(rollout_data["red"]["carries"])
+        r_steps_since_dropout_all = np.array(rollout_data["red"]["steps_since_dropout"])
 
         # loc_env is the 4th block in b_obs (8 channels: blue, red, wall, resource, shelter, contested, scent, puzzle)
         idx_offset = 6 + (config["neighbor_k"] * config["signal_dim"]) + (25 * config["symbol_dim"])
@@ -1982,6 +2009,8 @@ def _run_simulation_impl(
                     nb_hunter_sig_lag1=nb_hunter_lag1,
                     nb_hunter_dist_lag1=nb_hunter_dist_lag1,
                     nb_hunter_token_lag1=nb_hunter_token_lag1,
+                    carry_fwd=r_carry_fwd_all[t, alive_idx_r],
+                    steps_since_dropout=r_steps_since_dropout_all[t, alive_idx_r],
                 )
                 if is_hunter.any():
                     pos_r_alive_f = r_pos[alive_idx_r].astype(np.float32)
