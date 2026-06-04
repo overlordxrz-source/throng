@@ -16,9 +16,9 @@
 
 | Live run (Phase 14) | Value |
 |---------------------|--------|
-| **Branch** | **`feature/phase14-transcendental`** |
+| **Branch** | **`feature/phase15-cumulative-culture`** |
 | **Modal workspace** | **`overlordxn`** (Jun 2026) — volume **`throng-runs`** → `/mnt/throng-runs` |
-| **Volume ckpt** | **`1230`** (Resumed post-collapse; automatically grafted new DCVQ layers) |
+| **Volume ckpt** | **`1344`** (Phase 15 start; MEDAL-ADR active) |
 | **Migration script** | **`scripts/migrate_modal.sh`** — `download` / `upload` between accounts |
 | **P14.1** | ✅ VQEL graduated → hard broadcast + blue PPO |
 | **P14.1b** | ✅ **`proprio_coef: 0.15`** — continuous hunt **31/32** ✅ |
@@ -27,12 +27,14 @@
 | **P14.2 EFE** | ❌ **PERMANENTLY SCRAPPED** — do not re-enable |
 | **P14.3** | ✅ **GWT Router** — `gwt_comms_1` (energy-masked comms path); **Caused NaN collapse.** |
 | **P14.4** | ✅ **DCVQ + SimVQ** — Rescued GWT representation collapse. Dead codes eliminated. |
+| **P15.0** | ✅ **MEDAL-ADR** — Expert Dropout LIVE. `expert_dropouts=79` per rollout confirmed. |
 | **Science bar** | **Continuous Omnibus / Direction LRT p < 0.05** (Discrete pincer is obsolete due to $64^4$ combinations) |
-| **Decode gate** | **`--min-step 680000`** (Allow 50k steps of DCVQ training from ckpt 1230) |
+| **P14.4 Decode** | ✅ Direction LRT **29/32 dims p<0.05** (step 688k). Language confirmed. |
+| **Decode gate (P15)** | **`--min-step 730000`** (Allow 50k steps of MEDAL-ADR training from ckpt 1344) |
 | **Startup verify** | **`[JAX] Merged fresh dcvq...`** (Note: Only prints on *fresh* graft from old ckpt; silent if already grafted) |
 | **Dialogue** | **`monologue_enabled: false`**, **`dialogue_signal_mode: hard`** — hard **z_q** on startup |
 | **Catch reward** | Repo **`reward_red_catch: 3.0`** |
-| **Mode** | GWT mask + **DCVQ/SimVQ** + hard **z_q** + **proprio** + **asymmetric red decay** |
+| **Mode** | GWT mask + **DCVQ/SimVQ** + hard **z_q** + **proprio** + **asymmetric red decay** + **MEDAL-ADR** |
 
 **Synergic synthesis (Cam, P14.3 pivot):**
 
@@ -406,8 +408,8 @@ train_entry.run_simulation()  →  main_jax._run_simulation_impl()
 | **14.1c** | **Catch overdrive** | ❌ **FAILED** | Operator 10.0/600k; pincer still **p≈0.46** |
 | **14.2** | **Metabolic Asymmetry** | ✅ | `red_energy_decay: 0.0001`; corpus decode: VQ trap confirmed |
 | **14.3** | **GWT Router** | ✅ **LIVE** | `gwt_comms_1`; energy-masked `h_comms` (`obs[:, 2]`) → VQ; `h_policy` → action/value; `654400c` |
-| **14.4** | **Contingency Prep** | **PREP** | If GWT fails: Velocity Asymmetry ($V_{pred} < V_{prey}$), Sparse Budgets, SimVQ |
-| **15.0** | **Cumulative Culture** | **PREP** | MEDAL-ADR (Expert Dropout) to force generational transmission without collapse |
+| **14.4** | **Contingency Prep** | ✅ **MERGED** | DCVQ + SimVQ rescued GWT collapse; Direction LRT 29/32 p<0.05 at step 688k |
+| **15.0** | **Cumulative Culture** | ✅ **LIVE** | MEDAL-ADR Expert Dropout active; `expert_dropouts=79` per rollout confirmed (`e214058`) |
 | **15+** | **Open-Ended** | **PREP** | DRCB (drift deterrence), EVQ-VAE, MMGL auto-curricula |
 
 **Recurring failure mode:** Blues stay at cap → ~99% survival → **`NB_GAIN↔surv: nan`** → no evolutionary pressure on neighbor-signal benefit.
@@ -1109,10 +1111,10 @@ GPU-resident PPO — **`d4cf614` revert** on `master`.
 
 ### Cam reboot paste
 
-> You are **Cam**. Read `THRONG.md` §0b. **P14.3 ✅ GWT Router** (`obs[:, 2]` energy masked). **Modal LIVE:** workspace **`overlordxn`**, volume **`throng-runs`**, ckpt **1305+**. **`git=101d8ca+`**. Hard dialogue on startup. **Contingencies ready:** Asymmetric speed ($V_{pred} < V_{prey}$) and SimVQ. **Phase 15 Roadmap:** MEDAL-ADR Expert Dropout. **No merge** until pincer **p<0.05**.
+> You are **Cam**. Read `THRONG.md` §0b. **P14 ✅ COMPLETE** — Direction LRT 29/32 dims p<0.05 at step 688k. Language confirmed. **P15.0 ✅ LIVE** — MEDAL-ADR Expert Dropout (`medal_adr_prob=0.002`; `expert_dropouts=79` per rollout). **Modal LIVE:** workspace **`overlordxn`**, volume **`throng-runs`**, ckpt **1344+**. Branch: **`feature/phase15-cumulative-culture`** (`git=e214058`). Hard dialogue on startup.
 
-**New Will:** B200 on **`overlordxn`**; pull **`101d8ca+`**; verify GWT Router `obs[:, 2]` log; resume from latest ckpt; run `--red` decode gate at 720k.
+**New Will:** B200 on **`overlordxn`**; pull **`feature/phase15-cumulative-culture`**; resume from latest ckpt; run `--red` decode gate at **730k** to verify novice episodic memory LRT after expert dropout events.
 
 ---
 
-*Last updated: 2026-06-03 — Modal **`overlordxn`** migration; P14.3 GWT Router; Phase 15 Cumulative Culture research synthesis.*
+*Last updated: 2026-06-04 — P14 COMPLETE (Direction LRT 29/32 p<0.05); master merged; P15.0 MEDAL-ADR Expert Dropout LIVE (`feature/phase15-cumulative-culture`, ckpt 1344+, `expert_dropouts=79`/rollout).*

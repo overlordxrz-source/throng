@@ -313,12 +313,12 @@ All knobs live in `config_phase7.yaml`. The ones you actually touch:
 | **14.1b** | ✅ proprio_coef=0.15; continuous spatial LRT 31/32 |
 | **14.1c** | ❌ FAILED — catch 10.0; pincer p≈0.46 |
 | **14.2** | ✅ Metabolic Asymmetry — red_energy_decay=0.0001 |
-| **14.3** | **LIVE** — GWT Router; energy-masked h_comms → VQ (`654400c`) |
-| **14.4** | **PREP** — Contingencies (Asymmetric Speed $V_{pred} < V_{prey}$, SimVQ, Sparse Budgets) |
-| **15.0** | **PREP** — Cumulative Culture (MEDAL-ADR Expert Dropout) |
+| **14.3** | ✅ **GWT Router** — energy-masked h_comms → VQ (`654400c`) |
+| **14.4** | ✅ **MERGED to master** — DCVQ + SimVQ; Direction LRT 29/32 p<0.05 at step 688k. Language confirmed. |
+| **15.0** | ✅ **LIVE** — Cumulative Culture (MEDAL-ADR Expert Dropout); `expert_dropouts=79`/rollout |
 | **15+** | **PREP** — Open-Ended (DRCB, EVQ-VAE, MMGL auto-curricula) |
 
-Do **not** merge to **`master`** until pincer **p < 0.05**.
+Do **not** merge to **`master`** until P15 decode gate passes (novice episodic memory LRT **p < 0.05** at step 730k).
 
 ---
 
