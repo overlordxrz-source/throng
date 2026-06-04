@@ -52,6 +52,7 @@ from jax_sim.network_jax import (
     dead_code_reset_codebook_params,
     init_agent_params,
     init_predator_params,
+    reset_predator_vq_on_resume,
     make_model_apply,
     make_vqel_monologue_apply,
     params_apply_variables,
@@ -973,6 +974,11 @@ def _run_simulation_impl(
                         obs_dim=obs_dim, n_layers=n_layers
                     )
                 )
+                if bool(_p14t.get("reset_red_vq_on_resume", False)):
+                    r_params = reset_predator_vq_on_resume(
+                        model_red, r_params, keys[5], red_hidden_d,
+                        obs_dim=obs_dim, n_layers=n_layers,
+                    )
             else:
                 r_params = sanitize_agent_params(
                     ensure_aux_head_params(

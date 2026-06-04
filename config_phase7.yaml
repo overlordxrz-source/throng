@@ -239,6 +239,7 @@ phase14_transcendental:
   # P14.4 SimVQ — stateless W bound (forward only; no new params; ckpt 1413 compatible)
   simvq_w_clip: 2.0          # clip simvq_W at matmul time
   simvq_out_scale: 2.0       # tanh projection × scale → signal in [-2, 2]
+  reset_red_vq_on_resume: false  # true: reinit dcvq + simvq_W only on ckpt resume
 
 exit_on_graduation: false
 

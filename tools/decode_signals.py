@@ -125,6 +125,25 @@ def load_corpus(path: str) -> dict:
     }
 
 
+RED_CONTEXT_KEYS = ("blue_dist", "blue_bear", "energy", "neighbors")
+
+
+def _coerce_carry_fwd_scalar(v) -> float:
+    """Normalize heterogeneous carry_fwd JSON (scalar vs vector) to one float."""
+    if v is None:
+        return float("nan")
+    if isinstance(v, (int, float)):
+        return float(v)
+    if isinstance(v, (list, tuple)):
+        if len(v) == 0:
+            return float("nan")
+        arr = np.asarray(v, dtype=np.float64)
+        if arr.size == 1:
+            return float(arr.flat[0])
+        return float(np.nanmean(arr))
+    return float("nan")
+
+
 def load_red_corpus(path: str) -> dict:
     """Load Phase 12.1 red corpus (hunter / blue_dist schema)."""
     records = []
@@ -151,7 +170,10 @@ def load_red_corpus(path: str) -> dict:
     has_carry_fwd = any(v is not None for v in carry_fwd_raw)
     carry_fwd = None
     if has_carry_fwd:
-        carry_fwd = np.array([v if v is not None else [float("nan")] for v in carry_fwd_raw], dtype=np.float32)
+        carry_fwd = np.array(
+            [_coerce_carry_fwd_scalar(v) for v in carry_fwd_raw],
+            dtype=np.float32,
+        )
         
     steps_since_dropout_raw = [r.get("steps_since_dropout", None) for r in records]
     has_ssd = any(v is not None for v in steps_since_dropout_raw)
