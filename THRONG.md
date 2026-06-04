@@ -29,7 +29,7 @@
 | **P14.4** | ✅ **DCVQ + SimVQ** — Rescued GWT representation collapse. Dead codes eliminated. |
 | **Science bar** | **Continuous Omnibus / Direction LRT p < 0.05** (Discrete pincer is obsolete due to $64^4$ combinations) |
 | **Decode gate** | **`--min-step 680000`** (Allow 50k steps of DCVQ training from ckpt 1230) |
-| **Startup verify** | **`[JAX] Merged fresh dcvq + simvq_W + head_signal (Phase 14.4) into predator params`** |
+| **Startup verify** | **`[JAX] Merged fresh dcvq...`** (Note: Only prints on *fresh* graft from old ckpt; silent if already grafted) |
 | **Dialogue** | **`monologue_enabled: false`**, **`dialogue_signal_mode: hard`** — hard **z_q** on startup |
 | **Catch reward** | Repo **`reward_red_catch: 3.0`** |
 | **Mode** | GWT mask + **DCVQ/SimVQ** + hard **z_q** + **proprio** + **asymmetric red decay** |
