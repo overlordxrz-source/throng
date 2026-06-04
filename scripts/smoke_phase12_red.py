@@ -60,6 +60,11 @@ def main() -> None:
     print(f"[smoke] obs_dim={obs_dim} hidden={hidden} vocab={vocab}")
     print(f"[smoke] red_codes_active (batch)={n_unique}/{vocab}")
     print(f"[smoke] loss_vq mean={float(loss_vq.mean()):.4f} z_e std={float(z_e.std()):.4f}")
+    signal_out = outs[1]
+    sig_max = float(jnp.max(jnp.abs(signal_out)))
+    print(f"[smoke] signal_out max_abs={sig_max:.4f} (bounded by simvq_out_scale)")
+    if sig_max > 2.01:
+        raise SystemExit(f"FAIL: SimVQ output unbounded: max_abs={sig_max}")
     print(f"[smoke] carry delta norm={float(jnp.linalg.norm(new_carry - carry)):.4f}")
     if n_unique < 1:
         raise SystemExit("FAIL: no VQ codes active")

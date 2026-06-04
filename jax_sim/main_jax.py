@@ -770,6 +770,7 @@ def _run_simulation_impl(
     model_red = None
     r_model_apply = None
     if _red_comms:
+        _p14t = config.get("phase14_transcendental") or {}
         model_red = PredatorNetworkJax(
             hidden_dim=red_hidden_d,
             neighbor_k=config["neighbor_k"],
@@ -781,6 +782,8 @@ def _run_simulation_impl(
             vocab_size=_red_vocab,
             vq_beta=float(config.get("vq_beta", 0.25)),
             vq_dead_code_reset=bool(config.get("vq_dead_code_reset", True)),
+            simvq_w_clip=float(_p14t.get("simvq_w_clip", 2.0)),
+            simvq_out_scale=float(_p14t.get("simvq_out_scale", 2.0)),
             memory_slots=config.get("memory_slots", 0),
             cross_attn_enabled=_red_cross,
             cross_attn_num_heads=_cross_heads,

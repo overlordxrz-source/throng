@@ -477,11 +477,11 @@ class SignalCorpusWriter:
                 tok = int(nb_hunter_token_lag1[i])
                 rec["nb_hunter_token_lag1"] = None if tok < 0 else tok
             
-            # Phase 15 Additions
+            # Phase 15 — carry_fwd / steps_since_dropout are (n_alive,) slices, not full pop
             if carry_fwd is not None:
-                rec["carry_fwd"] = [round(float(v), 4) for v in carry_fwd[idx].astype(np.float16)]
+                rec["carry_fwd"] = [round(float(v), 4) for v in carry_fwd[i].astype(np.float16)]
             if steps_since_dropout is not None:
-                rec["steps_since_dropout"] = int(steps_since_dropout[idx])
+                rec["steps_since_dropout"] = int(steps_since_dropout[i])
                 
             lines.append(json.dumps(rec))
         self._fh.write("\n".join(lines) + "\n")

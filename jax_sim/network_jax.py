@@ -445,6 +445,21 @@ class AgentNetworkJax(nn.Module):
 # Predator (Red) comms — separate codebook + cross-attn; no P11 aux / imagination heads.
 PREDATOR_GRAFT_TOP_KEYS = ("dcvq", "simvq_W", "red_nb_cross_attn", "head_proprio", "gwt_comms_1")
 
+# SimVQ W bound — stateless forward pass only (no new params; Orbax ckpt-compatible).
+SIMVQ_W_CLIP_DEFAULT = 2.0
+SIMVQ_OUT_SCALE_DEFAULT = 2.0
+
+
+def simvq_bounded_project(
+    z: jnp.ndarray,
+    W: jnp.ndarray,
+    w_clip: float = SIMVQ_W_CLIP_DEFAULT,
+    out_scale: float = SIMVQ_OUT_SCALE_DEFAULT,
+) -> jnp.ndarray:
+    """Clip W at matmul time, then tanh-scale the projection (P15 stabilization)."""
+    W_eff = jnp.clip(W, -w_clip, w_clip)
+    return jnp.tanh(jnp.matmul(z, W_eff)) * out_scale
+
 
 class DCVQ(nn.Module):
     n_e: int
@@ -507,6 +522,8 @@ class PredatorNetworkJax(nn.Module):
     vocab_size: int = 64
     vq_beta: float = 0.25
     vq_dead_code_reset: bool = True
+    simvq_w_clip: float = SIMVQ_W_CLIP_DEFAULT
+    simvq_out_scale: float = SIMVQ_OUT_SCALE_DEFAULT
     max_layers: int = 6
     memory_slots: int = 0
     cross_attn_enabled: bool = True
@@ -671,9 +688,11 @@ class PredatorNetworkJax(nn.Module):
         # z_e sourced from comms pathway (exteroceptive mask enforced — GWT)
         z_e = self.head_signal(h_comms)
         
-        # Phase 14.4 Contingencies: DCVQ + SimVQ
+        # Phase 14.4 Contingencies: DCVQ + SimVQ (P15: bounded W projection)
         signal_out, indices, loss_vq = self.dcvq(z_e)
-        signal_out = jnp.matmul(signal_out, self.simvq_W)
+        signal_out = simvq_bounded_project(
+            signal_out, self.simvq_W, self.simvq_w_clip, self.simvq_out_scale
+        )
         token_ids = indices[:, 0]  # Export first subspace token for telemetry compatibility
         
         symbol_write = self.head_symbol(h_policy)

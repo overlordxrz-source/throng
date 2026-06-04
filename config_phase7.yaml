@@ -236,6 +236,9 @@ proprio_coef: 0.15
 # Phase 14.2 — Metabolic Asymmetry (apex predators: slow red energy decay)
 phase14_transcendental:
   red_energy_decay: 0.0001   # 10× slower than blue energy_decay (0.001); same starvation_threshold
+  # P14.4 SimVQ — stateless W bound (forward only; no new params; ckpt 1413 compatible)
+  simvq_w_clip: 2.0          # clip simvq_W at matmul time
+  simvq_out_scale: 2.0       # tanh projection × scale → signal in [-2, 2]
 
 exit_on_graduation: false
 
