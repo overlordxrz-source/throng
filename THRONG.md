@@ -8,33 +8,27 @@
 
 ---
 
-## 0b. Current state — **Phase 14.4 Contingencies (DCVQ + SimVQ)** (Jun 2026)
+## 0b. Current state — **Phase 15 Cumulative Culture** (Jun 2026)
 
 **Blue SOTA (frozen on `master`):** **`465d8c6+`** — 9.4 cross-attn + 9.1 confidence + **11.3 epistemic gate** (Stay-collapse resolved).
 
-**Headline:** **P14.3 GWT Router** successfully severed the metabolic gradient (`obs[:, 2]=0`), but standard STE VQ suffered representation collapse (NaNs) due to gradient starvation. **P14.4 Contingencies** deployed to rescue the bottleneck: **DCVQ** (parallel syntactic subspaces) + **SimVQ** (linear basis transform) completely eliminate dead codes. Neural architecture is now fully protected against dimensional collapse.
+**Headline:** **P14.4 DCVQ + SimVQ** confirmed language (Direction LRT **29/32 p<0.05** @ 688k). **P15.0 MEDAL-ADR** live. Post-SimVQ-stabilization graft (**`22c7920`**) left red VQ collapsed (**2/64** codes, **3000+** loss) — **P15.1 cold-restart** (**`c1d27c3`**) surgically reinit **`dcvq` + `simvq_W`** on resume while preserving predator policy/value. Operator executing cold-restart now; accumulate **~50k clean steps** post-stabilization before P15 decode.
 
-| Live run (Phase 14) | Value |
+| Live run (Phase 15) | Value |
 |---------------------|--------|
-| **Branch** | **`feature/phase15-cumulative-culture`** |
-| **Modal workspace** | **`overlordxn`** (Jun 2026) — volume **`throng-runs`** → `/mnt/throng-runs` |
-| **Volume ckpt** | **`1344`** (Phase 15 start; MEDAL-ADR active) |
+| **Branch** | **`feature/phase15-cumulative-culture`** (`git=d349e43`) |
+| **Modal workspace** | **`dragonbg`** (Jun 2026) — volume **`throng-runs`** → `/mnt/throng-runs` |
+| **Volume ckpt** | **`1413`** (resume); pre-restart run reached **~736k** / ppo **1439** |
 | **Migration script** | **`scripts/migrate_modal.sh`** — `download` / `upload` between accounts |
-| **P14.1** | ✅ VQEL graduated → hard broadcast + blue PPO |
-| **P14.1b** | ✅ **`proprio_coef: 0.15`** — continuous hunt **31/32** ✅ |
-| **P14.1c** | ❌ **FAILED** — 10.0 catch; pincer **p ≈ 0.46** |
-| **P14.2** | ✅ **Metabolic Asymmetry** — `red_energy_decay: 0.0001`; corpus decode: trap confirmed |
-| **P14.2 EFE** | ❌ **PERMANENTLY SCRAPPED** — do not re-enable |
-| **P14.3** | ✅ **GWT Router** — `gwt_comms_1` (energy-masked comms path); **Caused NaN collapse.** |
-| **P14.4** | ✅ **DCVQ + SimVQ** — Rescued GWT representation collapse. Dead codes eliminated. |
-| **P15.0** | ✅ **MEDAL-ADR** — Expert Dropout LIVE. `expert_dropouts=79` per rollout confirmed. |
-| **Science bar** | **Continuous Omnibus / Direction LRT p < 0.05** (Discrete pincer is obsolete due to $64^4$ combinations) |
-| **P14.4 Decode** | ✅ Direction LRT **29/32 dims p<0.05** (step 688k). Language confirmed. |
-| **Decode gate (P15)** | **`--min-step 730000`** (Allow 50k steps of MEDAL-ADR training from ckpt 1344) |
-| **Startup verify** | **`[JAX] Merged fresh dcvq...`** (Note: Only prints on *fresh* graft from old ckpt; silent if already grafted) |
-| **Dialogue** | **`monologue_enabled: false`**, **`dialogue_signal_mode: hard`** — hard **z_q** on startup |
-| **Catch reward** | Repo **`reward_red_catch: 3.0`** |
-| **Mode** | GWT mask + **DCVQ/SimVQ** + hard **z_q** + **proprio** + **asymmetric red decay** + **MEDAL-ADR** |
+| **P14.4** | ✅ DCVQ + SimVQ — Direction LRT **29/32 p<0.05** (688k) |
+| **P15.0** | ✅ **MEDAL-ADR** — `expert_dropouts≈66–83`/rollout |
+| **P15.1** | 🔄 **SimVQ bound** (`22c7920`) + **Red VQ cold-restart** (`c1d27c3`) + **decode carry_fwd pad** (`d349e43`) |
+| **Science bar (P15)** | **Novice episodic memory LRT p < 0.05** @ lag-10 post-dropout (`tools/decode_signals.py`) |
+| **Decode gate (P15)** | **`--min-step 730000`** + **~50k clean steps after cold-restart** (do not decode pre-restart corpus window) |
+| **Cold-restart flag** | `phase14_transcendental.reset_red_vq_on_resume: true` → reinit VQ only; **set `false` after codebook re-expands** |
+| **Startup verify (cold-restart)** | **`[JAX] Red VQ cold-restart: codebook + simvq_W reinitialized (r_params policy/attn preserved)`** |
+| **Dialogue** | **`monologue_enabled: false`**, **`dialogue_signal_mode: hard`** |
+| **Mode** | GWT + DCVQ/SimVQ (bounded W) + hard **z_q** + proprio + asymmetric red decay + **MEDAL-ADR** |
 
 **Synergic synthesis (Cam, P14.3 pivot):**
 
@@ -409,7 +403,8 @@ train_entry.run_simulation()  →  main_jax._run_simulation_impl()
 | **14.2** | **Metabolic Asymmetry** | ✅ | `red_energy_decay: 0.0001`; corpus decode: VQ trap confirmed |
 | **14.3** | **GWT Router** | ✅ **LIVE** | `gwt_comms_1`; energy-masked `h_comms` (`obs[:, 2]`) → VQ; `h_policy` → action/value; `654400c` |
 | **14.4** | **Contingency Prep** | ✅ **MERGED** | DCVQ + SimVQ rescued GWT collapse; Direction LRT 29/32 p<0.05 at step 688k |
-| **15.0** | **Cumulative Culture** | ✅ **LIVE** | MEDAL-ADR Expert Dropout active; `expert_dropouts=79` per rollout confirmed (`e214058`) |
+| **15.0** | **Cumulative Culture** | ✅ **LIVE** | MEDAL-ADR Expert Dropout; `expert_dropouts≈66–83`/rollout |
+| **15.1** | **VQ recovery** | 🔄 **IN FLIGHT** | SimVQ bound (`22c7920`); red VQ cold-restart (`c1d27c3`); decode pad (`d349e43`) |
 | **15+** | **Open-Ended** | **PREP** | DRCB (drift deterrence), EVQ-VAE, MMGL auto-curricula |
 
 **Recurring failure mode:** Blues stay at cap → ~99% survival → **`NB_GAIN↔surv: nan`** → no evolutionary pressure on neighbor-signal benefit.
@@ -481,8 +476,8 @@ Modal notebook: [`docs/MODAL_NOTEBOOK_PHASE9.md`](docs/MODAL_NOTEBOOK_PHASE9.md)
 
 | Ckpt / update | Use |
 |-------------|-----|
-| **Latest on volume** | **`1302+`** @ `/mnt/throng-runs/checkpoints/` (**`overlordxn`** workspace) |
-| **`1227`**, **`1230`** | P14.2 Metabolic Asymmetry reference |
+| **Latest on volume** | **`1413+`** @ `/mnt/throng-runs/checkpoints/` (**`dragonbg`** workspace) |
+| **`1227`**, **`1230`**, **`1410`**, **`1413`** | Migration reference; **1413** = pre cold-restart resume point |
 | **489 @ 250368** | Legacy reference only (pre-P14 long run) |
 | **393** | **Avoid** — post–Stay-collapse active imagination |
 
@@ -748,9 +743,10 @@ Legacy one-liner (checkpoints only): `./scripts/download_modal_checkpoints.sh ~/
 |------|-----------|--------|
 | **Legacy** | `dim464943` | Original `throng-runs` |
 | **May 2026** | `dragonbgnx` / `dimitar-vagalinski` | Interim re-upload |
-| **Jun 2026 — LIVE** | **`overlordxn`** | **`migrate_modal.sh`** from `dimitar-vagalinski` → local `~/throng_backup` → **`overlordxn`**; ckpt **1227/1230** + both corpora on volume |
+| **Jun 2026 interim** | **`dvagalin`** / **`overlordxn`** | Prior workspaces; ckpt **1413** pulled via `migrate_modal.sh` |
+| **Jun 2026 — LIVE** | **`dragonbg`** | **`migrate_modal.sh upload`** from `~/throng_backup`; ckpt **1413** + both corpora on volume |
 
-Volumes **do not transfer** between accounts — always **`download`** then **`upload`**. Repo code is **`git clone`** to `/root/throng` (not on volume). B200 notebook must mount volume on **`overlordxn`** profile.
+Volumes **do not transfer** between accounts — always **`download`** then **`upload`**. Repo code is **`git clone`** to `/root/throng` (not on volume). B200 notebook must mount volume on **`dragonbg`** profile (`modal token new` → fresh auth).
 
 **Sparse checkpoint folders on volume:** Orbax saves every `checkpoint_interval` env steps — folder **N** ≈ PPO update **N** (step ≈ **N × 512**). Local backup may omit **292**; nearest 150k substitute is **291**.
 
@@ -1111,10 +1107,10 @@ GPU-resident PPO — **`d4cf614` revert** on `master`.
 
 ### Cam reboot paste
 
-> You are **Cam**. Read `THRONG.md` §0b. **P14 ✅ COMPLETE** — Direction LRT 29/32 dims p<0.05 at step 688k. Language confirmed. **P15.0 ✅ LIVE** — MEDAL-ADR Expert Dropout (`medal_adr_prob=0.002`; `expert_dropouts=79` per rollout). **Modal LIVE:** workspace **`overlordxn`**, volume **`throng-runs`**, ckpt **1344+**. Branch: **`feature/phase15-cumulative-culture`** (`git=e214058`). Hard dialogue on startup.
+> You are **Cam**. Read `THRONG.md` §0b. **P14 ✅ COMPLETE** — Direction LRT 29/32 @ 688k. **P15.0 ✅ LIVE** — MEDAL-ADR (`expert_dropouts≈80`/rollout). **P15.1 🔄 IN FLIGHT** — red VQ cold-restart after SimVQ collapse (2/64 codes); operator stabilizing codebook. **Modal LIVE:** workspace **`dragonbg`**, volume **`throng-runs`**, ckpt **1413+**. Branch: **`feature/phase15-cumulative-culture`** (`git=d349e43`).
 
-**New Will:** B200 on **`overlordxn`**; pull **`feature/phase15-cumulative-culture`**; resume from latest ckpt; run `--red` decode gate at **730k** to verify novice episodic memory LRT after expert dropout events.
+**New Will:** B200 on **`dragonbg`**; monitoring cold-restart; watch **`red_codes_active`** re-expand and **RedVQ loss** fall; set **`reset_red_vq_on_resume: false`** once stable; accumulate **~50k clean steps** then P15 decode (`--min-step` ≥ cold-restart step) — novice memory LRT **p < 0.05**.
 
 ---
 
-*Last updated: 2026-06-04 — P14 COMPLETE (Direction LRT 29/32 p<0.05); master merged; P15.0 MEDAL-ADR Expert Dropout LIVE (`feature/phase15-cumulative-culture`, ckpt 1344+, `expert_dropouts=79`/rollout).*
+*Last updated: 2026-06-04 — P15.1 cold-restart in flight (`dragonbg`, ckpt 1413, `d349e43`); decode gate pending post-stabilization + 50k clean corpus.*

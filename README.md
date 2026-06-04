@@ -7,11 +7,9 @@ to **survive, signal, and pass knowledge on**. The goal is not "an agent that
 plays a game well." The goal is **emergence**: language, culture, and proto-
 cognition arising purely from selection pressure.
 
-**Current state (Jun 2026):** **Phase 14.4 Contingencies (DCVQ + SimVQ)** on `feature/phase14-transcendental`.
-**P14.3 GWT Router** successfully severed the metabolic gradient (`obs[:, 2]=0`), but standard STE VQ suffered NaN representation collapse due to gradient starvation.
-**P14.4** rescued the simulation by replacing the bottleneck with **DCVQ** (parallel syntactic subspaces) + **SimVQ** (linear basis transform) to completely eliminate dead codes.
-Verify startup:
-**`[JAX] Merged fresh dcvq + simvq_W + head_signal (Phase 14.4) into predator params`**.
+**Current state (Jun 2026):** **Phase 15 Cumulative Culture** on `feature/phase15-cumulative-culture` (`d349e43`).
+**P15.0 MEDAL-ADR** live. **P15.1:** SimVQ stabilization + red VQ cold-restart (`reset_red_vq_on_resume`) recovering collapsed codebook (2/64).
+**Modal workspace:** **`dragonbg`** — volume **`throng-runs`** @ `/mnt/throng-runs`, resume ckpt **1413**.
 
 **Full ops / decode / roadmap:** [THRONG.md](THRONG.md) §0b (read first).
 
@@ -23,7 +21,7 @@ tail -f -n 60 /mnt/throng-runs/train.log
 
 **Framework:** JAX + Flax (`lax.scan` rollout, CPU-offload PPO on B200)
 **Active config:** `config_phase7.yaml`
-**Active branch:** `feature/phase14-transcendental` (not `master` for live train)
+**Active branch:** `feature/phase15-cumulative-culture` (not `master` for live train)
 **Working files:** `jax_sim/` (PyTorch in `agents/`, `main.py` is legacy).
 
 For the full research log, theory, philosophy, and per-phase post-mortems see
@@ -37,20 +35,21 @@ For the full research log, theory, philosophy, and per-phase post-mortems see
 # Blue alarm / flee (214k reference: decode_p11_3_214k.log)
 python3 tools/decode_signals.py signal_corpus.jsonl --k 16 --min-step 149500
 
-# Red pincer — GWT Router gate (50k correct-GWT steps from ppo 1305 / step ~668k → decode at 720k+)
+# Phase 15 cumulative culture decode (after cold-restart + ~50k clean steps)
 python3 tools/decode_signals.py --red /mnt/throng-runs/signal_corpus_red.jsonl \
-  --k 16 --min-step 720000 2>&1 | tee decode_gwt_p143.log
+  --min-step 780000 --k 16 2>&1 | tee decode_p15_culture.log
 ```
 
-**Pass bar (red):** RED VQ PINCER TEST — energy MI → 0 across dims 0–31; `blue_dist`/`blue_bear` dominate VQ eigenvectors; pincer χ² **p < 0.05**.
+**Pass bar (P15):** Novice episodic memory LRT — **`carry_fwd → blue_bear`** at lag-10 post-dropout, **p < 0.05**.
 
 **Modal (resume — do not wipe ckpts):**
 
 ```bash
-cd /root/throng && git pull origin feature/phase14-transcendental  # 654400c
+cd /root/throng && git pull origin feature/phase15-cumulative-culture   # d349e43
+# Cold-restart only: set phase14_transcendental.reset_red_vq_on_resume: true
 python -u run_bg.py
-# MUST see: [JAX] Merged fresh gwt_comms_1 (Phase 14.3 GWT Router) into predator params
-# MUST see: [JAX] Phase14.2 Metabolic Asymmetry: red_energy_decay=0.0001
+# Cold-restart startup: [JAX] Red VQ cold-restart: codebook + simvq_W reinitialized ...
+# After codebook stabilizes: set reset_red_vq_on_resume: false
 ```
 
 ---
@@ -315,8 +314,8 @@ All knobs live in `config_phase7.yaml`. The ones you actually touch:
 | **14.2** | ✅ Metabolic Asymmetry — red_energy_decay=0.0001 |
 | **14.3** | ✅ **GWT Router** — energy-masked h_comms → VQ (`654400c`) |
 | **14.4** | ✅ **MERGED to master** — DCVQ + SimVQ; Direction LRT 29/32 p<0.05 at step 688k. Language confirmed. |
-| **15.0** | ✅ **LIVE** — Cumulative Culture (MEDAL-ADR Expert Dropout); `expert_dropouts=79`/rollout |
-| **15+** | **PREP** — Open-Ended (DRCB, EVQ-VAE, MMGL auto-curricula) |
+| **15.0** | ✅ **LIVE** — MEDAL-ADR; `expert_dropouts≈80`/rollout |
+| **15.1** | 🔄 **IN FLIGHT** — SimVQ bound + red VQ cold-restart; decode after +50k clean steps |
 
 Do **not** merge to **`master`** until P15 decode gate passes (novice episodic memory LRT **p < 0.05** at step 730k).
 
