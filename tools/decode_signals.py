@@ -128,20 +128,29 @@ def load_corpus(path: str) -> dict:
 RED_CONTEXT_KEYS = ("blue_dist", "blue_bear", "energy", "neighbors")
 
 
-def _coerce_carry_fwd_scalar(v) -> float:
-    """Normalize heterogeneous carry_fwd JSON (scalar vs vector) to one float."""
+def _infer_carry_fwd_dim(values, default: int = 32) -> int:
+    """Infer carry vector width from the first multi-element list in the corpus."""
+    for v in values:
+        if isinstance(v, (list, tuple)) and len(v) > 1:
+            return len(v)
+    return default
+
+
+def _coerce_carry_fwd_row(v, carry_dim: int) -> list:
+    """Normalize one carry_fwd JSON value to a length-carry_dim float row."""
+    nan_row = [float("nan")] * carry_dim
     if v is None:
-        return float("nan")
+        return nan_row
     if isinstance(v, (int, float)):
-        return float(v)
+        return nan_row  # legacy scalar — treat as missing vector
     if isinstance(v, (list, tuple)):
-        if len(v) == 0:
-            return float("nan")
-        arr = np.asarray(v, dtype=np.float64)
-        if arr.size == 1:
-            return float(arr.flat[0])
-        return float(np.nanmean(arr))
-    return float("nan")
+        if len(v) == 0 or len(v) == 1:
+            return nan_row
+        row = [float(x) for x in v[:carry_dim]]
+        if len(row) < carry_dim:
+            row.extend([float("nan")] * (carry_dim - len(row)))
+        return row
+    return nan_row
 
 
 def load_red_corpus(path: str) -> dict:
@@ -170,8 +179,9 @@ def load_red_corpus(path: str) -> dict:
     has_carry_fwd = any(v is not None for v in carry_fwd_raw)
     carry_fwd = None
     if has_carry_fwd:
+        carry_dim = _infer_carry_fwd_dim(carry_fwd_raw)
         carry_fwd = np.array(
-            [_coerce_carry_fwd_scalar(v) for v in carry_fwd_raw],
+            [_coerce_carry_fwd_row(v, carry_dim) for v in carry_fwd_raw],
             dtype=np.float32,
         )
         
