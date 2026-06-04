@@ -221,6 +221,11 @@ def make_sim_step(
     _p14 = config.get("phase14_vqel") or {}
     _vqel_monologue = bool(_p14.get("monologue_enabled", False))
     _dialogue_signal_mode = str(_p14.get("dialogue_signal_mode", "ste")).lower()
+    
+    _p15 = config.get("phase15_cumulative_culture") or {}
+    _medal_adr_enabled = bool(_p15.get("medal_adr_enabled", False))
+    _medal_adr_prob = float(_p15.get("medal_adr_prob", 0.0))
+    
     _imagine_fn = None
     if _img_gate_enabled:
         from jax_sim.imagination_jax import make_imagination_fn
@@ -447,6 +452,17 @@ def make_sim_step(
         b_pop = kill_agents(b_pop, b_starved)
         r_pop = kill_agents(r_pop, r_starved)
 
+        # ── Phase 15.0: MEDAL-ADR (Expert Dropout) ──────────────
+        medal_dropouts = jnp.zeros((), dtype=jnp.float32)
+        if _medal_adr_enabled and _medal_adr_prob > 0.0:
+            medal_rng = jax.random.split(key_misc, 4)[3]
+            # Experts are the first half of the population
+            is_expert = jnp.arange(r_pop.max_pop) < (r_pop.max_pop // 2)
+            drop_mask = jax.random.uniform(medal_rng, (r_pop.max_pop,)) < _medal_adr_prob
+            actual_drop = drop_mask & is_expert & r_pop.alive
+            r_pop = kill_agents(r_pop, actual_drop)
+            medal_dropouts = actual_drop.astype(jnp.float32).sum()
+
         # ── Rewards (all from config) ───────────────────────────
         b_rew = jnp.where(b_pop.alive, _reward_blue_alive, 0.0)
         b_rew = b_rew + 0.02 * b_pop.energy
@@ -519,6 +535,7 @@ def make_sim_step(
             "signals": r_pop.signals,
             "energy": r_pop.energy,
             "alive": r_pop.alive,
+            "medal_dropouts": medal_dropouts,
         }
 
         new_carry = (grid, b_pop, r_pop, b_new_c, r_new_c, b_params, r_params)
@@ -1645,10 +1662,14 @@ def _run_simulation_impl(
             if "blue_caught" in rollout_data["blue"]:
                 blue_caught_rollout = int(np.asarray(rollout_data["blue"]["blue_caught"]).sum())
             print(f"  VQ: loss={vq_loss_val:.4f} | codes_active={vq_codes_str} | clusters={active_clusters_str} | NB_GAIN↔surv: {sp_r:.3f}")
+            medal_str = ""
+            if "medal_dropouts" in rollout_data.get("red", {}):
+                _md = np.asarray(rollout_data["red"]["medal_dropouts"]).sum()
+                medal_str = f" | expert_dropouts={int(_md)}"
             print(
                 f"  Ecology: blue_caught={blue_caught_rollout} this rollout | "
                 f"red_floor={red_curriculum_stages[red_curriculum_idx]} "
-                f"sustain={red_sustain_count}/{red_sustain_needed} | brain={n_layers}L"
+                f"sustain={red_sustain_count}/{red_sustain_needed} | brain={n_layers}L{medal_str}"
             )
             if bool((_p9 or {}).get("imagination_gating_enabled", False)):
                 im_agree_val = float("nan")
