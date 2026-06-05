@@ -173,6 +173,7 @@ def load_red_corpus(path: str) -> dict:
     actions = np.array([r["action"] for r in records], dtype=np.int32)
     hunters = np.array([r["hunter"] for r in records], dtype=bool)
     steps = np.array([r["step"] for r in records], dtype=np.int64)
+    agents = np.array([r["agent"] for r in records], dtype=np.int32)
     
     # Phase 15 telemetry
     carry_fwd_raw = [r.get("carry_fwd", None) for r in records]
@@ -235,6 +236,7 @@ def load_red_corpus(path: str) -> dict:
         "actions": actions,
         "hunters": hunters,
         "steps": steps,
+        "agents": agents,
         "ctx": ctx,
         "nb_lag1": nb_lag1,
         "nb_dist_lag1": nb_dist_lag1,
@@ -1197,6 +1199,142 @@ def novice_memory_dropout_lrt(
     print(f"{'─'*70}")
 
 
+def lag10_episodic_lrt(data: dict, target_lag: int = 10) -> None:
+    """
+    Phase 15.2: MEDAL-ADR Lag-10 Episodic Memory LRT.
+    Aligns Novice action at step t with Expert signal at step t-10.
+    """
+    import scipy.stats as stats
+
+    print(f"\n{'─'*70}")
+    print(f"  PHASE 15.2: LAG-10 EPISODIC MEMORY LRT (MEDAL-ADR)")
+    print(f"{'─'*70}")
+
+    steps = data["steps"]
+    agents = data.get("agents")
+    ssd = data.get("steps_since_dropout")
+    actions = data["actions"]
+    signals = data["signals"]
+    ctx = data["ctx"]
+
+    if agents is None or ssd is None:
+        print("  [ERROR] Missing 'agents' or 'steps_since_dropout' in corpus.")
+        return
+
+    # Assuming Red max_pop = 250, experts are agent < 125, novices are agent >= 125
+    expert_mask = agents < 125
+    novice_mask = agents >= 125
+
+    # Group expert signals by step for fast lookup
+    expert_signals_by_step = {}
+    unique_steps = np.unique(steps)
+    for st in unique_steps:
+        mask = (steps == st) & expert_mask
+        if mask.any():
+            # Mean expert signal at this step
+            expert_signals_by_step[st] = signals[mask].mean(axis=0)
+
+    # Find novices at step t where steps_since_dropout == target_lag
+    valid_novices = novice_mask & (ssd == target_lag) & np.isfinite(ssd)
+    valid_indices = np.where(valid_novices)[0]
+
+    Y_list = []
+    X0_list = []
+    X1_list = []
+
+    dir_circ = {
+        0: [0.0, 1.0],
+        1: [0.0, -1.0],
+        2: [1.0, 0.0],
+        3: [-1.0, 0.0],
+        4: [0.0, 0.0],
+    }
+
+    available_steps = np.array(list(expert_signals_by_step.keys()))
+    if len(available_steps) == 0:
+        print("  [SKIPPED] No expert signals found.")
+        return
+
+    for i in valid_indices:
+        t = steps[i]
+        t_target = t - target_lag
+        
+        closest_step = available_steps[np.argmin(np.abs(available_steps - t_target))]
+        if abs(closest_step - t_target) > 4:
+            continue
+            
+        exp_sig = expert_signals_by_step[closest_step]
+        
+        act = actions[i]
+        y_vec = dir_circ.get(act, [0.0, 0.0])
+        
+        blue_dist = ctx.get("blue_dist", np.zeros_like(actions))[i]
+        blue_bear = ctx.get("blue_bear", np.zeros_like(actions))[i]
+        
+        if not np.isfinite(blue_dist) or not np.isfinite(blue_bear):
+            continue
+            
+        x_spatial = [blue_dist, np.sin(np.radians(blue_bear)), np.cos(np.radians(blue_bear))]
+        
+        Y_list.append(y_vec)
+        X0_list.append([1.0] + x_spatial)
+        X1_list.append([1.0] + x_spatial + exp_sig.tolist())
+        
+    if len(Y_list) < 50:
+        print(f"  [SKIPPED] Insufficient aligned samples ({len(Y_list)}). Need at least 50.")
+        print(f"{'─'*70}")
+        return
+        
+    Y = np.array(Y_list)
+    X0 = np.array(X0_list)
+    X1 = np.array(X1_list)
+    
+    n_samples = Y.shape[0]
+    action_dim = Y.shape[1]
+    expert_dim = signals.shape[1]
+    
+    ridge0 = 1e-6 * np.eye(X0.shape[1])
+    XTX0 = X0.T @ X0 + ridge0
+    X0_mle = np.linalg.solve(XTX0, X0.T @ Y)
+    res_0 = Y - X0 @ X0_mle
+    cov_0 = (res_0.T @ res_0) / n_samples
+    
+    ridge1 = 1e-6 * np.eye(X1.shape[1])
+    XTX1 = X1.T @ X1 + ridge1
+    X1_mle = np.linalg.solve(XTX1, X1.T @ Y)
+    res_1 = Y - X1 @ X1_mle
+    cov_1 = (res_1.T @ res_1) / n_samples
+    
+    eps = 1e-8 * np.eye(action_dim)
+    det_0 = np.linalg.det(cov_0 + eps)
+    det_1 = np.linalg.det(cov_1 + eps)
+    
+    if det_0 <= 0 or det_1 <= 0:
+        print("  [ERROR] Covariance matrix determinant is non-positive.")
+        print(f"{'─'*70}")
+        return
+        
+    lrt_stat = n_samples * (np.log(det_0) - np.log(det_1))
+    lrt_stat = max(0.0, lrt_stat)
+    
+    dof = action_dim * expert_dim
+    p_value = float(stats.chi2.sf(lrt_stat, dof))
+    
+    print(f"  Aligned Samples (N)           : {n_samples}")
+    print(f"  Action Dims (d)               : {action_dim}")
+    print(f"  Expert Signal Dims (q)        : {expert_dim}")
+    print(f"  LRT Statistic (Λ)             : {lrt_stat:.4f}")
+    print(f"  Degrees of Freedom (ν)        : {dof}")
+    print(f"  Asymptotic p-value            : {p_value:.6e}")
+    
+    if p_value < 0.05:
+        print(f"  ✅ SUCCESS: Novice action at step t is significantly predicted by")
+        print(f"     expert signal at step t-{target_lag} (p < 0.05).")
+        print(f"  → Episodic Memory Decode CONFIRMED.")
+    else:
+        print(f"  ❌ FAIL: No significant episodic transmission (p={p_value:.4f}).")
+    print(f"{'─'*70}")
+
 # ── Phase 12.2 red decode pipeline ─────────────────────────────────────────────
 
 def decode_red_schema(
@@ -1205,6 +1343,7 @@ def decode_red_schema(
     k: int = 8,
     min_step: int = 0,
     max_step: int = 0,
+    do_lag10_episodic: bool = False,
 ) -> None:
     """Full offline decode for signal_corpus_red.jsonl (Phase 12.2)."""
     _apply_step_filter(data, min_step, max_step, emitter_key="hunters")
@@ -1366,8 +1505,9 @@ def decode_red_schema(
         print(f"  PHASE 15 CUMULATIVE CULTURE LRT")
         print(f"{'─'*70}")
         print("  carry_fwd / steps_since_dropout absent in corpus.")
-        print("  Restart sim with Phase 15 telemetry enabled (MEDAL-ADR active).")
-        print(f"{'─'*70}")
+    # ── Phase 15.2: MEDAL-ADR Lag-10 Episodic Memory LRT ───────────────
+    if do_lag10_episodic:
+        lag10_episodic_lrt(data, target_lag=10)
 
     print(f"\n{'='*70}")
     print("  Done (red). Interpret:")
@@ -1719,6 +1859,8 @@ def main() -> None:
                     help="Ignore records after this step (0 = no limit)")
     ap.add_argument("--baseline", default=None,
                     help="Pre-withdrawal corpus for comparison (skips full analysis)")
+    ap.add_argument("--lag10", "--episodic", dest="lag10", action="store_true",
+                    help="Phase 15.2: Run Lag-10 Episodic Memory LRT for Cultural Transmission")
     args = ap.parse_args()
 
     if args.red:
@@ -1730,7 +1872,7 @@ def main() -> None:
         print(f"\nLoading RED corpus from {corpus_path} …")
         data = load_red_corpus(corpus_path)
         decode_red_schema(
-            data, k=args.k, min_step=args.min_step, max_step=args.max_step,
+            data, k=args.k, min_step=args.min_step, max_step=args.max_step, do_lag10_episodic=args.lag10
         )
         return
 
