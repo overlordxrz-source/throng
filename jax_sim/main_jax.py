@@ -262,8 +262,9 @@ def make_sim_step(
         )
 
         # ── Forward passes ──────────────────────────────────────
+        noise_key, key_misc = jax.random.split(key_misc)
         b_new_c, b_outs = model_apply(b_params_sg, b_carries, b_obs, _n_layers)
-        r_new_c, r_outs = _r_apply(r_params_sg, r_carries, r_obs, _n_layers)
+        r_new_c, r_outs = _r_apply(r_params_sg, r_carries, r_obs, _n_layers, rngs={'dropout': noise_key})
 
         b_action_logits, b_signal_out, b_sym_w, b_vals, b_tom, b_token_ids, b_loss_vq, b_z_e, b_cult_f, b_cult_s = b_outs
         r_action_logits, r_signal_out, r_sym_w, r_vals, r_tom, r_token_ids, r_loss_vq, r_z_e, r_cult_f, r_cult_s = r_outs
@@ -785,6 +786,7 @@ def _run_simulation_impl(
             vq_dead_code_reset=bool(config.get("vq_dead_code_reset", True)),
             simvq_w_clip=float(_p14t.get("simvq_w_clip", 2.0)),
             simvq_out_scale=float(_p14t.get("simvq_out_scale", 2.0)),
+            vq_noise_scale=float(_p12.get("red_vq_noise_scale", 0.0)),
             memory_slots=config.get("memory_slots", 0),
             cross_attn_enabled=_red_cross,
             cross_attn_num_heads=_cross_heads,

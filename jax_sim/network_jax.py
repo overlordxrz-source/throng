@@ -232,6 +232,7 @@ class AgentNetworkJax(nn.Module):
         n_layers: int,
         nb_gain: Optional[jnp.ndarray] = None,
         detach_value: bool = False,
+        deterministic: bool = False,
     ) -> Tuple[jnp.ndarray, Tuple]:
         """
         Forward pass.
@@ -525,6 +526,7 @@ class PredatorNetworkJax(nn.Module):
     vq_dead_code_reset: bool = True
     simvq_w_clip: float = SIMVQ_W_CLIP_DEFAULT
     simvq_out_scale: float = SIMVQ_OUT_SCALE_DEFAULT
+    vq_noise_scale: float = 0.0
     max_layers: int = 6
     memory_slots: int = 0
     cross_attn_enabled: bool = True
@@ -593,6 +595,7 @@ class PredatorNetworkJax(nn.Module):
         n_layers: int,
         nb_gain: Optional[jnp.ndarray] = None,
         detach_value: bool = False,
+        deterministic: bool = False,
     ) -> Tuple[jnp.ndarray, Tuple]:
         del nb_gain
         N = obs.shape[0]
@@ -689,8 +692,13 @@ class PredatorNetworkJax(nn.Module):
         # z_e sourced from comms pathway (exteroceptive mask enforced — GWT)
         z_e = self.head_signal(h_comms)
         
+        z_e_noisy = z_e
+        if not deterministic and self.vq_noise_scale > 0.0:
+            noise_key = self.make_rng('dropout')
+            z_e_noisy = z_e + jax.random.normal(noise_key, z_e.shape) * self.vq_noise_scale
+        
         # Phase 14.4 Contingencies: DCVQ + SimVQ (P15: bounded W projection)
-        signal_out, indices, loss_vq = self.dcvq(z_e)
+        signal_out, indices, loss_vq = self.dcvq(z_e_noisy)
         signal_out = simvq_bounded_project(
             signal_out, self.simvq_W, self.simvq_w_clip, self.simvq_out_scale
         )
@@ -825,13 +833,15 @@ def params_apply_variables(params: Any) -> dict:
 
 def make_model_apply(model: AgentNetworkJax):
     """Return ``apply(params, carries, obs, n_layers, ...)`` with correct Flax variables."""
-    def apply_fn(params, carries, obs, n_layers, detach_value: bool = False):
+    def apply_fn(params, carries, obs, n_layers, detach_value: bool = False, deterministic: bool = False, rngs=None):
         return model.apply(
             params_apply_variables(params),
             carries,
             obs,
             n_layers,
             detach_value=detach_value,
+            deterministic=deterministic,
+            rngs=rngs,
         )
     return apply_fn
 
