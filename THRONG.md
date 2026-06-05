@@ -12,21 +12,23 @@
 
 **Blue SOTA (frozen on `master`):** **`465d8c6+`** — 9.4 cross-attn + 9.1 confidence + **11.3 epistemic gate** (Stay-collapse resolved).
 
-**Headline:** **P14.4 DCVQ + SimVQ** confirmed language (Direction LRT **29/32 p<0.05** @ 688k). **P15.0 MEDAL-ADR** live. Post-SimVQ-stabilization graft (**`22c7920`**) left red VQ collapsed (**2/64** codes, **3000+** loss) — **P15.1 cold-restart** (**`c1d27c3`**) surgically reinit **`dcvq` + `simvq_W`** on resume while preserving predator policy/value. Operator executing cold-restart now; accumulate **~50k clean steps** post-stabilization before P15 decode.
+**Headline:** **P14.4 DCVQ + SimVQ** confirmed language (Direction LRT **29/32 p<0.05** @ 688k). **P15.0 MEDAL-ADR** live. Post-SimVQ graft (**`22c7920`**) collapsed red VQ (**2/64**, **3000+** loss). Codebook-only cold-restart (**`c1d27c3`**) failed — **`gwt_comms_1`** encoder still output a 2-cluster manifold. **P15.1b** (**`3d60923`**) extends surgery to **`gwt_comms_1` + `dcvq` + `simvq_W`**; policy/value/cross-attn preserved. Operator confirmed extended restart @ ckpt **1461** / step **~748k**; monitoring **`red_codes_active`** re-expansion.
 
 | Live run (Phase 15) | Value |
 |---------------------|--------|
-| **Branch** | **`feature/phase15-cumulative-culture`** (`git=d349e43`) |
+| **Branch** | **`feature/phase15-cumulative-culture`** (`git=3d60923`) |
 | **Modal workspace** | **`dragonbg`** (Jun 2026) — volume **`throng-runs`** → `/mnt/throng-runs` |
-| **Volume ckpt** | **`1413`** (resume); pre-restart run reached **~736k** / ppo **1439** |
+| **Volume ckpt** | **`1461+`** (extended cold-restart resume @ step **~748032**) |
 | **Migration script** | **`scripts/migrate_modal.sh`** — `download` / `upload` between accounts |
 | **P14.4** | ✅ DCVQ + SimVQ — Direction LRT **29/32 p<0.05** (688k) |
-| **P15.0** | ✅ **MEDAL-ADR** — `expert_dropouts≈66–83`/rollout |
-| **P15.1** | 🔄 **SimVQ bound** (`22c7920`) + **Red VQ cold-restart** (`c1d27c3`) + **decode carry_fwd pad** (`d349e43`) |
+| **P15.0** | ✅ **MEDAL-ADR** — `expert_dropouts≈80–90`/rollout |
+| **P15.1** | ✅ SimVQ bound (`22c7920`) + decode carry_fwd pad (`d349e43`) |
+| **P15.1b** | 🔄 **Extended cold-restart** (`3d60923`) — **`gwt_comms_1` + codebook + `simvq_W`** |
 | **Science bar (P15)** | **Novice episodic memory LRT p < 0.05** @ lag-10 post-dropout (`tools/decode_signals.py`) |
-| **Decode gate (P15)** | **`--min-step 730000`** + **~50k clean steps after cold-restart** (do not decode pre-restart corpus window) |
-| **Cold-restart flag** | `phase14_transcendental.reset_red_vq_on_resume: true` → reinit VQ only; **set `false` after codebook re-expands** |
-| **Startup verify (cold-restart)** | **`[JAX] Red VQ cold-restart: codebook + simvq_W reinitialized (r_params policy/attn preserved)`** |
+| **Decode gate (P15)** | **`--min-step` ≥ cold-restart step + 50k** (e.g. **~798k** if restart @ 748k) |
+| **Cold-restart flag** | `phase14_transcendental.reset_red_vq_on_resume: true` **once** → set **`false`** when `red_codes_active ≥ 16/64` |
+| **Startup verify** | **`[JAX] Red VQ cold-restart: gwt_comms_1 + codebook + simvq_W reinitialized (policy/value/attn preserved)`** |
+| **Escalation** | If **`red_codes_active` flat at 2/64** through **~760k** → candidate next graft: **`head_signal`** |
 | **Dialogue** | **`monologue_enabled: false`**, **`dialogue_signal_mode: hard`** |
 | **Mode** | GWT + DCVQ/SimVQ (bounded W) + hard **z_q** + proprio + asymmetric red decay + **MEDAL-ADR** |
 
@@ -404,7 +406,7 @@ train_entry.run_simulation()  →  main_jax._run_simulation_impl()
 | **14.3** | **GWT Router** | ✅ **LIVE** | `gwt_comms_1`; energy-masked `h_comms` (`obs[:, 2]`) → VQ; `h_policy` → action/value; `654400c` |
 | **14.4** | **Contingency Prep** | ✅ **MERGED** | DCVQ + SimVQ rescued GWT collapse; Direction LRT 29/32 p<0.05 at step 688k |
 | **15.0** | **Cumulative Culture** | ✅ **LIVE** | MEDAL-ADR Expert Dropout; `expert_dropouts≈66–83`/rollout |
-| **15.1** | **VQ recovery** | 🔄 **IN FLIGHT** | SimVQ bound (`22c7920`); red VQ cold-restart (`c1d27c3`); decode pad (`d349e43`) |
+| **15.1** | **VQ recovery** | 🔄 **IN FLIGHT** | SimVQ bound (`22c7920`); decode pad (`d349e43`); extended cold-restart (`3d60923`) |
 | **15+** | **Open-Ended** | **PREP** | DRCB (drift deterrence), EVQ-VAE, MMGL auto-curricula |
 
 **Recurring failure mode:** Blues stay at cap → ~99% survival → **`NB_GAIN↔surv: nan`** → no evolutionary pressure on neighbor-signal benefit.
@@ -476,8 +478,8 @@ Modal notebook: [`docs/MODAL_NOTEBOOK_PHASE9.md`](docs/MODAL_NOTEBOOK_PHASE9.md)
 
 | Ckpt / update | Use |
 |-------------|-----|
-| **Latest on volume** | **`1413+`** @ `/mnt/throng-runs/checkpoints/` (**`dragonbg`** workspace) |
-| **`1227`**, **`1230`**, **`1410`**, **`1413`** | Migration reference; **1413** = pre cold-restart resume point |
+| **Latest on volume** | **`1461+`** @ `/mnt/throng-runs/checkpoints/` (**`dragonbg`** workspace) |
+| **`1413`**, **`1449`**, **`1461`** | Pre/post cold-restart lineage; **1461** = extended `gwt_comms_1` restart |
 | **489 @ 250368** | Legacy reference only (pre-P14 long run) |
 | **393** | **Avoid** — post–Stay-collapse active imagination |
 
@@ -691,6 +693,25 @@ tail -f /mnt/throng-runs/train.log
 ```
 
 `Ctrl+C` on `tail` does **not** stop training. Check: `ps aux | grep run_bg`.
+
+### P15.1b — Red VQ cold-restart (Jupyter cells)
+
+**When:** `red_codes_active` stuck at **2/64** after SimVQ graft. **Once per collapse event.**
+
+1. **Cell 1** — clone + `git reset --hard origin/feature/phase15-cumulative-culture` (`3d60923+`)
+2. **Cell 2** — set `phase14_transcendental.reset_red_vq_on_resume: true` in `config_phase7.yaml` (**run once only**)
+3. **Cell 3** — `pkill -f run_bg.py`; env vars; `subprocess.Popen([python, -u, /root/throng/run_bg.py], cwd=/root/throng)`
+4. **Cell 4** — `!tail -f /mnt/throng-runs/train.log`
+
+**Startup must print:** `[JAX] Red VQ cold-restart: gwt_comms_1 + codebook + simvq_W reinitialized (policy/value/attn preserved)`
+
+**Monitor 10–20k steps:** `red_codes_active` → **≥16/64**, `RedVQ loss` falling.
+
+5. **Cell 5** (after stabilization) — set `reset_red_vq_on_resume: false` (**do not skip**)
+
+**Future resumes:** Cells **1, 3, 4** only — **do not re-run Cell 2** unless VQ collapses again.
+
+**Surgery scope (`3d60923`):** reinit **`gwt_comms_1`**, **`dcvq`**, **`simvq_W`**, legacy **`red_codebook`**. Preserve **`head_action`**, **`head_value`**, **`red_nb_cross_attn`**, transformer blocks.
 
 ### Notebook setup only (decode, short tasks)
 
@@ -1107,10 +1128,10 @@ GPU-resident PPO — **`d4cf614` revert** on `master`.
 
 ### Cam reboot paste
 
-> You are **Cam**. Read `THRONG.md` §0b. **P14 ✅ COMPLETE** — Direction LRT 29/32 @ 688k. **P15.0 ✅ LIVE** — MEDAL-ADR (`expert_dropouts≈80`/rollout). **P15.1 🔄 IN FLIGHT** — red VQ cold-restart after SimVQ collapse (2/64 codes); operator stabilizing codebook. **Modal LIVE:** workspace **`dragonbg`**, volume **`throng-runs`**, ckpt **1413+**. Branch: **`feature/phase15-cumulative-culture`** (`git=d349e43`).
+> You are **Cam**. Read `THRONG.md` §0b. **P14 ✅ COMPLETE** — Direction LRT 29/32 @ 688k. **P15.0 ✅ LIVE** — MEDAL-ADR (`expert_dropouts≈80–90`/rollout). **P15.1b 🔄 IN FLIGHT** — extended cold-restart (`gwt_comms_1` + codebook + `simvq_W`, `3d60923`) confirmed @ ckpt **1461** / step **~748k**; monitoring `red_codes_active` off 2/64. **Modal LIVE:** **`dragonbg`**, volume **`throng-runs`**. Branch: **`feature/phase15-cumulative-culture`**.
 
-**New Will:** B200 on **`dragonbg`**; monitoring cold-restart; watch **`red_codes_active`** re-expand and **RedVQ loss** fall; set **`reset_red_vq_on_resume: false`** once stable; accumulate **~50k clean steps** then P15 decode (`--min-step` ≥ cold-restart step) — novice memory LRT **p < 0.05**.
+**New Will:** B200 on **`dragonbg`**; watch **`red_codes_active`** and **RedVQ loss** through **~760k**; Cell 5 (`reset_red_vq_on_resume: false`) when **≥16/64**; +50k clean corpus → P15 decode (novice memory LRT **p < 0.05**). Escalate **`head_signal`** graft if flat at 760k.
 
 ---
 
-*Last updated: 2026-06-04 — P15.1 cold-restart in flight (`dragonbg`, ckpt 1413, `d349e43`); decode gate pending post-stabilization + 50k clean corpus.*
+*Last updated: 2026-06-04 — P15.1b extended cold-restart live (`3d60923`, `dragonbg`, ckpt 1461, step ~748k); decode pending stabilization + 50k clean corpus.*

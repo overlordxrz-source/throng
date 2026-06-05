@@ -7,9 +7,9 @@ to **survive, signal, and pass knowledge on**. The goal is not "an agent that
 plays a game well." The goal is **emergence**: language, culture, and proto-
 cognition arising purely from selection pressure.
 
-**Current state (Jun 2026):** **Phase 15 Cumulative Culture** on `feature/phase15-cumulative-culture` (`d349e43`).
-**P15.0 MEDAL-ADR** live. **P15.1:** SimVQ stabilization + red VQ cold-restart (`reset_red_vq_on_resume`) recovering collapsed codebook (2/64).
-**Modal workspace:** **`dragonbg`** — volume **`throng-runs`** @ `/mnt/throng-runs`, resume ckpt **1413**.
+**Current state (Jun 2026):** **Phase 15 Cumulative Culture** on `feature/phase15-cumulative-culture` (`3d60923`).
+**P15.0 MEDAL-ADR** live. **P15.1b:** extended red VQ cold-restart reinit **`gwt_comms_1` + codebook + `simvq_W`** — monitoring codebook re-expansion post-restart @ step **~748k**.
+**Modal workspace:** **`dragonbg`** — volume **`throng-runs`** @ `/mnt/throng-runs`, ckpt **1461+**.
 
 **Full ops / decode / roadmap:** [THRONG.md](THRONG.md) §0b (read first).
 
@@ -35,21 +35,25 @@ For the full research log, theory, philosophy, and per-phase post-mortems see
 # Blue alarm / flee (214k reference: decode_p11_3_214k.log)
 python3 tools/decode_signals.py signal_corpus.jsonl --k 16 --min-step 149500
 
-# Phase 15 cumulative culture decode (after cold-restart + ~50k clean steps)
+# Phase 15 cumulative culture decode (after cold-restart stabilizes + ~50k clean steps)
 python3 tools/decode_signals.py --red /mnt/throng-runs/signal_corpus_red.jsonl \
-  --min-step 780000 --k 16 2>&1 | tee decode_p15_culture.log
+  --min-step 798000 --k 16 2>&1 | tee decode_p15_culture.log
 ```
 
-**Pass bar (P15):** Novice episodic memory LRT — **`carry_fwd → blue_bear`** at lag-10 post-dropout, **p < 0.05**.
+**Pass bar (P15):** Novice episodic memory LRT — **`carry_fwd → blue_bear`** at lag-10 post-dropout, **p < 0.05**. Set `--min-step` ≥ cold-restart step + 50k.
 
 **Modal (resume — do not wipe ckpts):**
 
 ```bash
-cd /root/throng && git pull origin feature/phase15-cumulative-culture   # d349e43
-# Cold-restart only: set phase14_transcendental.reset_red_vq_on_resume: true
+# Clone first on fresh pods — repo is NOT on the volume
+git clone -b feature/phase15-cumulative-culture https://github.com/overlordxrz-source/throng.git /root/throng
+cd /root/throng && git pull origin feature/phase15-cumulative-culture   # 3d60923
+
+# Cold-restart ONCE only (see THRONG.md §4 P15.1b cells):
+#   phase14_transcendental.reset_red_vq_on_resume: true
 python -u run_bg.py
-# Cold-restart startup: [JAX] Red VQ cold-restart: codebook + simvq_W reinitialized ...
-# After codebook stabilizes: set reset_red_vq_on_resume: false
+# Must see: [JAX] Red VQ cold-restart: gwt_comms_1 + codebook + simvq_W reinitialized ...
+# After red_codes_active ≥ 16/64: set reset_red_vq_on_resume: false
 ```
 
 ---
@@ -315,7 +319,7 @@ All knobs live in `config_phase7.yaml`. The ones you actually touch:
 | **14.3** | ✅ **GWT Router** — energy-masked h_comms → VQ (`654400c`) |
 | **14.4** | ✅ **MERGED to master** — DCVQ + SimVQ; Direction LRT 29/32 p<0.05 at step 688k. Language confirmed. |
 | **15.0** | ✅ **LIVE** — MEDAL-ADR; `expert_dropouts≈80`/rollout |
-| **15.1** | 🔄 **IN FLIGHT** — SimVQ bound + red VQ cold-restart; decode after +50k clean steps |
+| **15.1** | 🔄 **IN FLIGHT** — SimVQ bound + extended cold-restart (`gwt_comms_1`); decode after +50k clean steps |
 
 Do **not** merge to **`master`** until P15 decode gate passes (novice episodic memory LRT **p < 0.05** at step 730k).
 
