@@ -7,9 +7,11 @@ to **survive, signal, and pass knowledge on**. The goal is not "an agent that
 plays a game well." The goal is **emergence**: language, culture, and proto-
 cognition arising purely from selection pressure.
 
-**Current state (Jun 2026):** **Phase 15 Cumulative Culture** on `feature/phase15-cumulative-culture` (`ee62f7f`).
-**P15.0 MEDAL-ADR** live. **P15.1c:** cold-restart now includes **`gwt_comms_1` + `head_signal` + codebook + `simvq_W`** (P15.1b failed @ 763k, still 2/64).
-**Modal workspace:** **`dragonbg`** — volume **`throng-runs`** @ `/mnt/throng-runs`, ckpt **1490+**.
+**Current state (Jun 2026):** **Phase 15** on `feature/phase15-cumulative-culture` (`ee62f7f`).
+**P15.1c LIVE** — cold-restart w/ `gwt_comms_1` + `head_signal` confirmed @ ckpt **1491** / step **763392**; monitoring **773k gate** (`red_codes_active` still 2/64 early).
+**Modal:** **`dragonbg`** — volume **`throng-runs`**, ckpt **1491+**.
+
+**Notebook:** 3 cells — setup / launch (`COLD_RESTART` toggle) / optional `tail -f`. See [THRONG.md §4](THRONG.md#p151c--modal-notebook-3-cells). **Do not Run All.**
 
 **Full ops / decode / roadmap:** [THRONG.md](THRONG.md) §0b (read first).
 
@@ -35,25 +37,24 @@ For the full research log, theory, philosophy, and per-phase post-mortems see
 # Blue alarm / flee (214k reference: decode_p11_3_214k.log)
 python3 tools/decode_signals.py signal_corpus.jsonl --k 16 --min-step 149500
 
-# Phase 15 cumulative culture decode (after cold-restart stabilizes + ~50k clean steps)
+# Phase 15 decode — after restart stabilizes + 50k clean steps (e.g. restart @ 763k → 813k)
 python3 tools/decode_signals.py --red /mnt/throng-runs/signal_corpus_red.jsonl \
-  --min-step <RESTART_STEP_PLUS_50K> --k 16 2>&1 | tee decode_p15_culture.log
+  --min-step 813000 --k 16 2>&1 | tee decode_p15_culture.log
 ```
 
-**Pass bar (P15):** Novice episodic memory LRT — **`carry_fwd → blue_bear`** at lag-10 post-dropout, **p < 0.05**. Set `--min-step` ≥ cold-restart step + 50k.
+**Pass bar (P15):** Novice episodic memory LRT — **`carry_fwd → blue_bear`** at lag-10, **p < 0.05**.
 
-**Modal (resume — do not wipe ckpts):**
+**Modal (3-cell notebook — see THRONG.md §4):**
+
+```python
+# Cell 2 toggle:
+COLD_RESTART = True   # surgery once | False = normal resume
+```
 
 ```bash
-# Clone first on fresh pods — repo is NOT on the volume
-git clone -b feature/phase15-cumulative-culture https://github.com/overlordxrz-source/throng.git /root/throng
-cd /root/throng && git pull origin feature/phase15-cumulative-culture   # ee62f7f
-
-# Cold-restart ONCE only (see THRONG.md §4 P15.1c cells):
-#   phase14_transcendental.reset_red_vq_on_resume: true
-python -u run_bg.py
-# Must see: [JAX] Red VQ cold-restart: gwt_comms_1 + head_signal + codebook + simvq_W reinitialized ...
-# After red_codes_active ≥ 16/64: set reset_red_vq_on_resume: false
+# Startup must print (when COLD_RESTART=True):
+# [JAX] Red VQ cold-restart: gwt_comms_1 + head_signal + codebook + simvq_W reinitialized ...
+# When red_codes_active ≥ 16/64: re-run Cell 2 with COLD_RESTART=False before next restart
 ```
 
 ---
