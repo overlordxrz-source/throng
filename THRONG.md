@@ -407,6 +407,7 @@ train_entry.run_simulation()  →  main_jax._run_simulation_impl()
 | **14.4** | **Contingency Prep** | ✅ **MERGED** | DCVQ + SimVQ rescued GWT collapse; Direction LRT 29/32 p<0.05 at step 688k |
 | **15.0** | **Cumulative Culture** | ✅ **LIVE** | MEDAL-ADR Expert Dropout; `expert_dropouts≈66–83`/rollout |
 | **15.1e** | **Latent Heat** | ✅ **SUCCESS** | Gaussian noise (`0.5`) injected to `z_e` shattered VQ singularity; `red_codes` **2→52/64** (`610e553`) |
+| **15.2** | **Episodic Memory LRT** | ✅ **READY** | `decode_signals.py --lag10`; Offline multivariate temporal lag regression to verify cultural transmission (`f7e04a4`) |
 | **15+** | **Open-Ended** | **PREP** | DRCB (drift deterrence), EVQ-VAE, MMGL auto-curricula |
 
 **Recurring failure mode:** Blues stay at cap → ~99% survival → **`NB_GAIN↔surv: nan`** → no evolutionary pressure on neighbor-signal benefit.
@@ -415,28 +416,28 @@ train_entry.run_simulation()  →  main_jax._run_simulation_impl()
 
 ---
 
-## 4. Current experiment — Phase **14.3 GWT Router** (`feature/phase14-transcendental`)
+## 4. Current experiment — Phase **15.2 Episodic Memory LRT** (`feature/phase15-cumulative-culture`)
 
-**Status:** **P14.2 bake complete** — corpus decode confirmed persistent VQ quantization trap: every dim 0–31 peaks MI with energy despite 10× apex lifespan. Ecological fixes cannot overpower representational variance. **P14.3 GWT Router** (`3eaec6a` — energy mask corrected to `obs[:, 2]`; checkpoint bug fixed `fbc2f2e`; docs HEAD `84742a9`): structural separation of interoception (`h_policy`) and exteroception (`h_comms`). VQ bottleneck is now architecturally blind to energy.
-
-**Stack:** P14.1 hard **z_q** + **`proprio_coef: 0.15`** + **`red_energy_decay: 0.0001`** + **P14.3 GWT mask** (`gwt_comms_1`, `obs[:, 2]=0` — energy; corrected from erroneous `obs[:, 0]` in `3eaec6a`).
+**Status:** **P15.2 live** — Episodic Memory LRT offline script merged and validated. We injected Phase 15.1e "Latent Heat" (Gaussian noise `0.5` to `z_e`), which successfully shattered the VQ singularity and recovered the codebook (`red_codes_active` ~52/64).
 
 > [!IMPORTANT]
-> **B200 run is live on `84742a9`.** After `git pull origin feature/phase14-transcendental`, startup must print `[JAX] Merged fresh gwt_comms_1 (Phase 14.3 GWT Router) into predator params`. Energy mask is `obs[:, 2]` (confirmed). If absent, the GWT patch is not active.
+> **B200 run is live on `f7e04a4`.** After `git pull origin feature/phase15-cumulative-culture`, ensure `reset_red_vq_on_resume` is `false` to preserve the recovered codebook. Run decode scripts offline with `--lag10` once step 813k is passed.
 
 **Monitor:**
 
 ```bash
-tail -f -n 60 /mnt/throng-runs/train.log | grep --line-buffered -E "step|GWT|gwt|Merged|Metabolic|proprio"
+tail -f -n 60 /mnt/throng-runs/train.log | grep --line-buffered -E "step|GWT|MEDAL|expert_dropouts"
 ```
 
-**Restart (pull GWT commit + resume from latest ckpt):**
+**Restart (pull Phase 15 commit + resume from latest ckpt):**
 
 ```bash
-cd /root/throng && git pull origin feature/phase14-transcendental   # 84742a9 (3eaec6a energy mask fix + fbc2f2e ckpt fix)
+cd /root/throng && git pull origin feature/phase15-cumulative-culture
 export TF_GPU_ALLOCATOR=cuda_malloc_async
 export XLA_PYTHON_CLIENT_MEM_FRACTION=0.80
 export JAX_COMPILATION_CACHE_DIR=/tmp/throng_jax_cache
+# Disable Cold Restart
+sed -i 's/reset_red_vq_on_resume: true/reset_red_vq_on_resume: false/g' /root/throng/config_phase7.yaml
 python -u run_bg.py
 ```
 
