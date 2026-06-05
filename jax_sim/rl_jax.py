@@ -70,6 +70,7 @@ def ppo_loss(
     vq_coef: float = 0.1,
     loss_vq_rollout: jnp.ndarray = None,  # (M,) per-agent VQ loss from rollout
     alive: jnp.ndarray = None,  # (M,) bool-ish
+    rng_key: jax.Array = None,  # Added for noise
 ) -> Tuple[jnp.ndarray, Dict]:
     """
     PPO loss evaluated with exact historical carries per timestep.
@@ -83,7 +84,10 @@ def ppo_loss(
     carries = jax.lax.stop_gradient(carries)
 
     # Evaluate minibatch directly (no scan needed because samples are independent)
-    _, outs = apply_fn(params, carries, obs, n_layers, detach_value=False)
+    kwargs = {}
+    if rng_key is not None:
+        kwargs["rngs"] = {"dropout": rng_key}
+    _, outs = apply_fn(params, carries, obs, n_layers, detach_value=False, **kwargs)
 
     # Unpack outputs
     action_logits = outs[0]      # (M, 5)
@@ -174,13 +178,13 @@ def create_optimizer(lr: float = 3e-4, max_grad_norm: float = 2.0) -> optax.Grad
 def _minibatch_step(
     params, opt_state, apply_fn, optimizer,
     obs, actions, old_log_probs, advantages, returns, carries,
-    n_layers, old_values, clip_eps, vf_coef, ent_coef, vq_coef, loss_vq, alive
+    n_layers, old_values, clip_eps, vf_coef, ent_coef, vq_coef, loss_vq, alive, rng_key
 ):
     grad_fn = jax.value_and_grad(ppo_loss, has_aux=True)
     (loss, metrics), grads = grad_fn(
         params, apply_fn, obs, actions, old_log_probs,
         advantages, returns, carries, n_layers,
-        old_values, clip_eps, vf_coef, ent_coef, vq_coef, loss_vq, alive=alive
+        old_values, clip_eps, vf_coef, ent_coef, vq_coef, loss_vq, alive=alive, rng_key=rng_key
     )
     updates, new_opt_state = optimizer.update(grads, opt_state, params)
     new_params = optax.apply_updates(params, updates)
@@ -286,10 +290,11 @@ def ppo_update(
         mb_al = jnp.array(flat_alive[idx]) if flat_alive is not None else None
         mb_vq = jnp.array(flat_loss_vq[idx]) if flat_loss_vq is not None else None
 
+        key, mb_key = jax.random.split(key)
         params, opt_state, mb_mets, grads = _minibatch_step(
             params, opt_state, apply_fn, optimizer,
             mb_obs, mb_act, mb_lp, mb_adv, mb_ret, mb_c,
-            n_layers, mb_v, clip_eps, vf_coef, ent_coef, vq_coef, mb_vq, mb_al
+            n_layers, mb_v, clip_eps, vf_coef, ent_coef, vq_coef, mb_vq, mb_al, mb_key
         )
 
         # Accumulate as Python floats to avoid holding 500 JAX arrays
