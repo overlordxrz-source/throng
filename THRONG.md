@@ -12,7 +12,7 @@
 
 **Blue SOTA (frozen on `master`):** **`465d8c6+`** — 9.4 cross-attn + 9.1 confidence + **11.3 epistemic gate** (Stay-collapse resolved).
 
-**Headline:** **P14.4 DCVQ + SimVQ** confirmed language (Direction LRT **29/32 p<0.05** @ 688k). **P15.0 MEDAL-ADR** live. Post-SimVQ graft collapsed red VQ (**2/64**). **P15.1b** ❌ (`gwt_comms_1` + codebook @ 763k). **P15.1c** ✅ surgery confirmed @ ckpt **1491** / step **~763392** — startup line with **`head_signal`** verified; **~1.5k steps in**, still **2/64** (monitor through **~773k**). Next escalation: **`red_nb_cross_attn`**.
+**Headline:** **P14.4 DCVQ + SimVQ** confirmed language (Direction LRT **29/32 p<0.05** @ 688k). **P15.0 MEDAL-ADR** live. Post-SimVQ graft collapsed red VQ (**2/64**). **P15.1c/d** ❌ surgeries failed to break singularity. **P15.1e** ✅ Latent Heat (Gaussian noise `red_vq_noise_scale=0.5`) injected into `z_e`. **SUCCESS:** `red_codes_active` shattered singularity, reaching **52/64** at step 771k. VQ is alive again.
 
 | Live run (Phase 15) | Value |
 |---------------------|--------|
@@ -23,13 +23,12 @@
 | **P14.4** | ✅ DCVQ + SimVQ — Direction LRT **29/32 p<0.05** (688k) |
 | **P15.0** | ✅ **MEDAL-ADR** — `expert_dropouts≈74–90`/rollout |
 | **P15.1** | ✅ SimVQ bound (`22c7920`) + decode carry_fwd pad (`d349e43`) |
-| **P15.1b** | ❌ **`gwt_comms_1` + codebook** — flat **2/64** through **763k** |
-| **P15.1c** | 🔄 **LIVE** — `head_signal` + GWT + codebook (`ee62f7f`); **773k gate** pending |
+| **P15.1b/c/d** | ❌ **Basic/Escalated Surgeries FAILED** — flat **2/64** through **768k** |
+| **P15.1e** | ✅ **Latent Heat (Noise Injection)** (`7980206`) — broke singularity! **52/64** active at **771k**. |
 | **Science bar (P15)** | **Novice episodic memory LRT p < 0.05** @ lag-10 post-dropout |
 | **Decode gate (P15)** | **`--min-step` ≥ restart step + 50k** (e.g. **~813k** if restart @ 763k) |
-| **Cold-restart toggle** | Cell 2 `COLD_RESTART = True` once → **`False`** when **≥16/64** codes |
-| **Startup verify** | **`[JAX] Red VQ cold-restart: gwt_comms_1 + head_signal + codebook + simvq_W reinitialized ...`** |
-| **773k gate** | Still **2/64** → escalate **`red_nb_cross_attn`** into cold-restart keys |
+| **Cold-restart toggle** | **`False`** (Codebook has recovered to ≥16/64 codes) |
+| **P15.1e Status** | Singularity shattered! `red_codes_active` = **52/64** |
 | **Dialogue** | **`monologue_enabled: false`**, **`dialogue_signal_mode: hard`** |
 | **Mode** | GWT + DCVQ/SimVQ (bounded W) + hard **z_q** + proprio + asymmetric red decay + **MEDAL-ADR** |
 
@@ -407,7 +406,7 @@ train_entry.run_simulation()  →  main_jax._run_simulation_impl()
 | **14.3** | **GWT Router** | ✅ **LIVE** | `gwt_comms_1`; energy-masked `h_comms` (`obs[:, 2]`) → VQ; `h_policy` → action/value; `654400c` |
 | **14.4** | **Contingency Prep** | ✅ **MERGED** | DCVQ + SimVQ rescued GWT collapse; Direction LRT 29/32 p<0.05 at step 688k |
 | **15.0** | **Cumulative Culture** | ✅ **LIVE** | MEDAL-ADR Expert Dropout; `expert_dropouts≈66–83`/rollout |
-| **15.1** | **VQ recovery** | 🔄 **IN FLIGHT** | SimVQ bound; decode pad; cold-restart ladder (`3d60923` → `ee62f7f`) |
+| **15.1e** | **Latent Heat** | ✅ **SUCCESS** | Gaussian noise (`0.5`) injected to `z_e` shattered VQ singularity; `red_codes` **2→52/64** (`610e553`) |
 | **15+** | **Open-Ended** | **PREP** | DRCB (drift deterrence), EVQ-VAE, MMGL auto-curricula |
 
 **Recurring failure mode:** Blues stay at cap → ~99% survival → **`NB_GAIN↔surv: nan`** → no evolutionary pressure on neighbor-signal benefit.
@@ -1138,10 +1137,10 @@ GPU-resident PPO — **`d4cf614` revert** on `master`.
 
 ### Cam reboot paste
 
-> You are **Cam**. Read `THRONG.md` §0b. **P15.1c 🔄 LIVE** — cold-restart w/ `head_signal` confirmed @ ckpt **1491** / step **763392**; still **2/64** early (~765k). **773k gate** pending. **Modal:** **`dragonbg`**. Branch: **`feature/phase15-cumulative-culture`** (`ee62f7f`).
+> You are **Cam**. Read `THRONG.md` §0b. **P15.1e ✅ SUCCESS** — Latent Heat noise injection (`red_vq_noise_scale=0.5`) shattered the VQ singularity; `red_codes_active` reached **52/64** around step 771k. **Modal:** **`dragonbg`**. Branch: **`feature/phase15-cumulative-culture`** (`610e553`).
 
 **New Will:** Monitor **`red_codes_active`** through **773k**; Cell 2 `COLD_RESTART=False` when **≥16/64**; escalate **`red_nb_cross_attn`** if flat. P15 decode @ restart+50k (~813k). **Never Run All** (tail blocks).
 
 ---
 
-*Last updated: 2026-06-04 — P15.1c live @ 763392; 3-cell notebook; 773k gate pending.*
+*Last updated: 2026-06-05 — P15.1e broke VQ singularity; red_codes_active=52/64*
