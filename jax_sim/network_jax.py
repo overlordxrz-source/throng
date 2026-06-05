@@ -444,7 +444,7 @@ class AgentNetworkJax(nn.Module):
 
 # Predator (Red) comms — separate codebook + cross-attn; no P11 aux / imagination heads.
 PREDATOR_GRAFT_TOP_KEYS = ("dcvq", "simvq_W", "red_nb_cross_attn", "head_proprio", "gwt_comms_1")
-PREDATOR_VQ_COLD_RESTART_KEYS = ("dcvq", "simvq_W", "red_codebook")
+PREDATOR_VQ_COLD_RESTART_KEYS = ("gwt_comms_1", "dcvq", "simvq_W", "red_codebook")
 
 # SimVQ W bound — stateless forward pass only (no new params; Orbax ckpt-compatible).
 SIMVQ_W_CLIP_DEFAULT = 2.0
@@ -783,7 +783,7 @@ def reset_predator_vq_on_resume(
     obs_dim: int,
     n_layers: int,
 ) -> Any:
-    """Reinitialize red VQ codebook + SimVQ W only; preserve policy/attn/value leaves."""
+    """Reinitialize GWT comms encoder + VQ bottleneck; preserve policy/attn/value leaves."""
     flat = unfreeze(params)
     carry = jnp.zeros((1, hidden_dim))
     obs = jnp.zeros((1, obs_dim))
@@ -796,8 +796,8 @@ def reset_predator_vq_on_resume(
     if not reset:
         return params
     print(
-        "[JAX] Red VQ cold-restart: codebook + simvq_W reinitialized "
-        "(r_params policy/attn preserved)",
+        "[JAX] Red VQ cold-restart: gwt_comms_1 + codebook + simvq_W reinitialized "
+        "(policy/value/attn preserved)",
         flush=True,
     )
     return sanitize_agent_params(freeze(flat))
