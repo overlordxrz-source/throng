@@ -322,7 +322,8 @@ All knobs live in `config_phase7.yaml`. The ones you actually touch:
 | **15.0** | ✅ **LIVE** — MEDAL-ADR; `expert_dropouts≈80`/rollout |
 | **15.1e** | ✅ **SUCCESS** — Latent Heat shattered VQ singularity; `red_codes_active=52/64` |
 | **15.2** | ❌ **FAILED** — Episodic Memory LRT failed (p=0.8369). Novices failed to use episodic memory. |
-| **15.3** | **PREP** — Semantic Retention Loss (SRL) predicts `nb_sigs_{t-5}` from `carry_t` |
+| **15.3** | ❌ **REVERTED** — Semantic Retention Loss (SRL) failed due to lack of BPTT and momentum corruption. |
+| **15.4** | **PREP** — Memory Architecture Pivot (Pending LSTM/GRU upgrade or manual BPTT) |
 | **16.0** | **PREP** — Open-Ended Combinatorial Complexity via expanded topology |
 | **17.0** | **PREP** — The Rosetta Stone (Extraction) autoencoder mapping to English |
 | **18.0** | **PREP** — The Hive-Mind Interface bidirectional text terminal |
