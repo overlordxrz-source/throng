@@ -497,53 +497,67 @@ def auxiliary_update(
 
 @functools.partial(
     jax.jit,
-    static_argnames=("proprio_apply_fn", "optimizer", "proprio_coef"),
+    static_argnames=("red_aux_apply_fn", "optimizer", "proprio_coef", "retention_coef"),
 )
-def _proprio_minibatch_step(
+def _red_minibatch_step(
     params,
     opt_state,
-    proprio_apply_fn,
+    red_aux_apply_fn,
     optimizer,
     carry_t,
     energy_tp1,
+    nb_sigs_target,
     alive_mask,
     proprio_coef,
+    retention_coef,
 ):
-    """Proprio-only minibatch step (red predator without full aux heads)."""
+    """Red predator minibatch step with SRL and Proprio (Phase 15.3)."""
 
     def loss_fn(p):
-        energy_pred = proprio_apply_fn(p, carry_t)
+        energy_pred, retention_pred = red_aux_apply_fn(p, carry_t)
+        
+        # Proprio (Energy) Loss
         energy_target = jax.lax.stop_gradient(energy_tp1)
         proprio_per = jnp.square(energy_pred - energy_target)
         proprio_loss = (proprio_per * alive_mask).sum() / (alive_mask.sum() + 1e-8)
-        return proprio_coef * proprio_loss, proprio_loss
+        
+        # SRL (Semantic Retention Loss)
+        retention_target = jax.lax.stop_gradient(nb_sigs_target)
+        retention_per = jnp.square(retention_pred - retention_target).sum(axis=-1)
+        retention_loss = (retention_per * alive_mask).sum() / (alive_mask.sum() + 1e-8)
+        
+        total_loss = proprio_coef * proprio_loss + retention_coef * retention_loss
+        return total_loss, (proprio_loss, retention_loss)
 
-    (_, proprio_l), grads = jax.value_and_grad(loss_fn, has_aux=True)(params)
+    (_, (proprio_l, retention_l)), grads = jax.value_and_grad(loss_fn, has_aux=True)(params)
     updates, new_opt_state = optimizer.update(grads, opt_state, params)
     new_params = optax.apply_updates(params, updates)
-    return new_params, new_opt_state, proprio_l
+    return new_params, new_opt_state, proprio_l, retention_l
 
 
-def proprio_auxiliary_update(
+def red_auxiliary_update(
     params,
     opt_state,
     optimizer,
-    proprio_apply_fn,
+    red_aux_apply_fn,
     carries_np: np.ndarray,
     energy_np: np.ndarray,
+    nb_sigs_target_np: np.ndarray,
     alive_np: np.ndarray = None,
     key: jax.Array = None,
     minibatch_size: int = 1024,
     proprio_coef: float = 0.05,
-) -> Tuple[Dict, Any, float]:
-    """Energy prediction from carry only (Phase 14.1b; red comms path)."""
-    T, N, hidden_dim = carries_np.shape
-    carry_t = carries_np[:-1].reshape((T - 1) * N, hidden_dim)
-    energy_tp1 = np.asarray(energy_np[1:]).reshape((T - 1) * N).astype(np.float32)
+    retention_coef: float = 0.1,
+) -> Tuple[Dict, Any, float, float]:
+    """Energy and Semantic Retention predictions (Phase 14.1b + 15.3)."""
+    T_lag, N, hidden_dim = carries_np.shape
+    carry_t = carries_np.reshape(T_lag * N, hidden_dim)
+    energy_tp1 = np.asarray(energy_np).reshape(T_lag * N).astype(np.float32)
+    nb_sigs_target = np.asarray(nb_sigs_target_np).reshape(T_lag * N, -1).astype(np.float32)
     if alive_np is not None:
-        alive_t = alive_np[:-1].reshape((T - 1) * N).astype(np.float32)
+        alive_t = alive_np.reshape(T_lag * N).astype(np.float32)
     else:
-        alive_t = np.ones((T - 1) * N, dtype=np.float32)
+        alive_t = np.ones(T_lag * N, dtype=np.float32)
 
     M = carry_t.shape[0]
     if key is None:
@@ -552,20 +566,24 @@ def proprio_auxiliary_update(
     perm = rng.permutation(M)
     n_mb = max(1, M // int(minibatch_size))
     proprio_sum = 0.0
+    retention_sum = 0.0
     for i in range(n_mb):
         idx = perm[i * minibatch_size : (i + 1) * minibatch_size]
-        params, opt_state, proprio_l = _proprio_minibatch_step(
+        params, opt_state, proprio_l, retention_l = _red_minibatch_step(
             params,
             opt_state,
-            proprio_apply_fn,
+            red_aux_apply_fn,
             optimizer,
             jnp.array(carry_t[idx]),
             jnp.array(energy_tp1[idx]),
+            jnp.array(nb_sigs_target[idx]),
             jnp.array(alive_t[idx]),
             proprio_coef,
+            retention_coef,
         )
         proprio_sum += float(proprio_l)
-    return params, opt_state, proprio_sum / n_mb
+        retention_sum += float(retention_l)
+    return params, opt_state, proprio_sum / n_mb, retention_sum / n_mb
 
 
 # Keep old name as alias for backward compatibility with any external callers

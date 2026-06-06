@@ -233,6 +233,7 @@ phase14_vqel:
 
 # Phase 14.1b — proprioceptive disentanglement (energy from carry, not VQ wire)
 proprio_coef: 0.15
+retention_coef: 0.1
 
 # Phase 14.2 — Metabolic Asymmetry (apex predators: slow red energy decay)
 phase14_transcendental:

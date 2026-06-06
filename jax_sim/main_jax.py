@@ -65,8 +65,10 @@ from jax_sim.rl_jax import (
     ppo_update,
     auxiliary_update,
     proprio_auxiliary_update,
+    red_auxiliary_update,
     vqel_monologue_update,
 )
+from jax_sim.obs_layout import make_obs_layout
 from agents.network_torch import compute_obs_dim_torch, compute_fwd_env_dim, loc_env_flat_bounds
 from jax_sim.observations_jax import (
     RED_NEIGHBOR_SIGNAL_API_VERSION,
@@ -1061,14 +1063,15 @@ def _run_simulation_impl(
 
     b_proprio_apply_fn = _proprio_apply_fn
     r_proprio_apply_fn = _proprio_apply_fn
+    r_red_aux_apply_fn = None
     if model_red is not None:
-        def _red_proprio_apply_fn(params, carry_t):
+        def _red_aux_apply_fn(params, carry_t):
             return model_red.apply(
                 params_apply_variables(params),
                 carry_t,
-                method=model_red.predict_proprio_energy,
+                method=model_red.red_auxiliary_heads,
             )
-        r_proprio_apply_fn = _red_proprio_apply_fn
+        r_red_aux_apply_fn = _red_aux_apply_fn
 
     _proprio_coef = float(config.get("proprio_coef", 0.05))
     if _proprio_coef > 0.0:
@@ -1451,21 +1454,43 @@ def _run_simulation_impl(
             r_metrics["conf_loss"] = r_conf_loss
             r_metrics["conf_pred"] = r_conf_pred
             r_metrics["proprio_loss"] = r_proprio_loss
-        elif _proprio_coef > 0.0 and _r_energy_np is not None:
+        elif _proprio_coef > 0.0 and _r_energy_np is not None and r_red_aux_apply_fn is not None:
             _rprop_key, update_key = jax.random.split(update_key)
-            r_params, r_opt_state, r_proprio_loss = proprio_auxiliary_update(
+            
+            # Phase 15.3 SRL setup: extract nb_sigs_target
+            _layout = make_obs_layout(
+                signal_dim=int(config["signal_dim"]),
+                symbol_dim=int(config.get("symbol_dim", 16)),
+                memory_slots=0,
+                neighbor_k=int(config.get("red_neighbor_k", config["neighbor_k"])),
+                local_cells=int(config.get("local_cells", 25)),
+                env_channels=int(config.get("env_channels", 8)),
+            )
+            _r_nb_sigs_np = _r_obs_np[:, :, _layout.nb_sigs_start:_layout.nb_sigs_end]
+            
+            # Temporal Slicing on Axis 0 (lag = 5)
+            _lag = 5
+            _r_carries_lag = _r_carries_np[_lag:]
+            _r_energy_lag = _r_energy_np[_lag:]
+            _r_nb_sigs_target = _r_nb_sigs_np[:-_lag]
+            _r_alive_lag = _r_alive_np[_lag:] if _r_alive_np is not None else None
+
+            r_params, r_opt_state, r_proprio_loss, r_retention_loss = red_auxiliary_update(
                 r_params,
                 r_opt_state,
                 r_optimizer,
-                r_proprio_apply_fn,
-                _r_carries_np,
-                _r_energy_np,
-                _r_alive_np,
+                r_red_aux_apply_fn,
+                _r_carries_lag,
+                _r_energy_lag,
+                _r_nb_sigs_target,
+                _r_alive_lag,
                 key=_rprop_key,
                 minibatch_size=_fwd_mb,
                 proprio_coef=_proprio_coef,
+                retention_coef=float(config.get("retention_coef", 0.1)),
             )
             r_metrics["proprio_loss"] = r_proprio_loss
+            r_metrics["retention_loss"] = r_retention_loss
 
         if config.get("vq_dead_code_reset", True) and "z_e" in r_batch:
             _dc_key, update_key = jax.random.split(update_key)

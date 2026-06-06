@@ -575,6 +575,9 @@ class PredatorNetworkJax(nn.Module):
         self.head_culture_fast = nn.Dense(sym_d)
         self.head_culture_slow = nn.Dense(sym_d)
         self.head_proprio = nn.Dense(1)
+        # Phase 15.3 Semantic Retention Loss (SRL)
+        self.head_retention = nn.Dense(self.signal_dim * self.neighbor_k)
+        
         # Phase 14.3 GWT Router — exteroceptive-only comms embedding (energy masked).
         # Input dim = full obs_dim; energy feature is zeroed before this layer.
         self.gwt_comms_1 = nn.Dense(d)
@@ -584,9 +587,11 @@ class PredatorNetworkJax(nn.Module):
                 num_heads=self.cross_attn_num_heads,
             )
 
-    def predict_proprio_energy(self, carry_t: jnp.ndarray) -> jnp.ndarray:
-        """Predict next-step energy from carry (Phase 14.1b; red team)."""
-        return self.head_proprio(carry_t).squeeze(-1)
+    def red_auxiliary_heads(self, carry_t: jnp.ndarray) -> Tuple[jnp.ndarray, jnp.ndarray]:
+        """Predict next-step energy and lag-5 neighbor signals from carry (Phase 14.1b + 15.3)."""
+        energy_pred = self.head_proprio(carry_t).squeeze(-1)
+        retention_pred = self.head_retention(carry_t)
+        return energy_pred, retention_pred
 
     def __call__(
         self,
