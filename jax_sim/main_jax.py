@@ -1685,10 +1685,11 @@ def _run_simulation_impl(
             if _red_comms:
                 red_vq_val = float(r_metrics.get("ppo_vq_loss", float("nan")))
                 red_ent_val = float(r_metrics.get("ppo_entropy", float("nan")))
+                red_ret_val = float(r_metrics.get("retention_loss", float("nan")))
                 print(f"  Actions (red):  {red_act_str}")
                 print(
                     f"  RedVQ: loss={red_vq_val:.4f} | red_codes_active={red_codes_str} "
-                    f"| red_entropy={red_ent_val:.4f}"
+                    f"| red_entropy={red_ent_val:.4f} | RedAux: ret_loss={red_ret_val:.4f}"
                 )
             print(f"  Energy:  mean={e_mean:.3f} std={e_std:.3f} | Age: mean={age_mean:.0f} max={age_max:.0f}")
             vf_loss = float(b_metrics.get('ppo_vf_loss', 0)) if isinstance(b_metrics, dict) else 0
