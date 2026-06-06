@@ -407,7 +407,7 @@ train_entry.run_simulation()  →  main_jax._run_simulation_impl()
 | **14.4** | **Contingency Prep** | ✅ **MERGED** | DCVQ + SimVQ rescued GWT collapse; Direction LRT 29/32 p<0.05 at step 688k |
 | **15.0** | **Cumulative Culture** | ✅ **LIVE** | MEDAL-ADR Expert Dropout; `expert_dropouts≈66–83`/rollout |
 | **15.1e** | **Latent Heat** | ✅ **SUCCESS** | Gaussian noise (`0.5`) injected to `z_e` shattered VQ singularity; `red_codes` **2→52/64** (`610e553`) |
-| **15.2** | **Episodic Memory LRT** | ✅ **READY** | `decode_signals.py --lag10`; Offline multivariate temporal lag regression to verify cultural transmission (`f7e04a4`) |
+| **15.2** | **Episodic Memory LRT** | ❌ **FAILED** | p=0.8369 (action LRT); p=0.1038 (memory retention). Novices failed to use episodic memory of expert signals. |
 | **15+** | **Open-Ended** | **PREP** | DRCB (drift deterrence), EVQ-VAE, MMGL auto-curricula |
 
 **Recurring failure mode:** Blues stay at cap → ~99% survival → **`NB_GAIN↔surv: nan`** → no evolutionary pressure on neighbor-signal benefit.
@@ -418,7 +418,7 @@ train_entry.run_simulation()  →  main_jax._run_simulation_impl()
 
 ## 4. Current experiment — Phase **15.2 Episodic Memory LRT** (`feature/phase15-cumulative-culture`)
 
-**Status:** **P15.2 live** — Episodic Memory LRT offline script merged and validated. We injected Phase 15.1e "Latent Heat" (Gaussian noise `0.5` to `z_e`), which successfully shattered the VQ singularity and recovered the codebook (`red_codes_active` ~52/64).
+**Status:** **P15.2 completed — FAILED.** While Phase 15.1e Latent Heat successfully recovered the VQ codebook (maintaining ~54/64 active codes), the Phase 15.2 Lag-10 Episodic Memory LRT test definitively failed. Novice agents do not significantly retain bearing memory (p=0.1038) nor do their actions reflect expert signals from 10 steps prior (p=0.8369). The system has not achieved Cumulative Culture.
 
 > [!IMPORTANT]
 > **B200 run is live on `f7e04a4`.** After `git pull origin feature/phase15-cumulative-culture`, ensure `reset_red_vq_on_resume` is `false` to preserve the recovered codebook. Run decode scripts offline with `--lag10` once step 813k is passed.
