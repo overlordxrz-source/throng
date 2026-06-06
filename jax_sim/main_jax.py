@@ -912,11 +912,14 @@ def _run_simulation_impl(
             r_params = jax.tree_util.tree_map(jnp.copy, b_params)
             print("[JAX] model.init done — restoring checkpoint weights...", flush=True)
         abstract_tree = {"b_params": b_params, "r_params": r_params}
+        # Always restore the raw dictionary from disk and graft manually.
+        # Passing items=abstract_tree causes Orbax to auto-create empty parent dicts
+        # for missing heads, which bypasses our graft_missing_param_subtrees logic.
         try:
-            restored = ckpt_mngr.restore(_ckpt_latest, items=abstract_tree)
+            raw_restored = ckpt_mngr.restore(_ckpt_latest)
             from flax.core import freeze, unfreeze
             target_dict = unfreeze(abstract_tree)
-            source_dict = unfreeze(restored)
+            source_dict = unfreeze(raw_restored)
             _restore_agents = ("b_params", "r_params")
             for agent_type in _restore_agents:
                 if agent_type not in source_dict or agent_type not in target_dict:
