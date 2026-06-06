@@ -505,16 +505,17 @@ def _red_minibatch_step(
     red_aux_apply_fn,
     optimizer,
     carry_t,
+    obs_seq,
     energy_tp1,
     nb_sigs_target,
     alive_mask,
     proprio_coef,
     retention_coef,
 ):
-    """Red predator minibatch step with SRL and Proprio (Phase 15.3)."""
+    """Red predator minibatch step with SRL BPTT and Proprio (Phase 15.4)."""
 
     def loss_fn(p):
-        energy_pred, retention_pred = red_aux_apply_fn(p, carry_t)
+        energy_pred, retention_pred = red_aux_apply_fn(p, carry_t, obs_seq)
         
         # Proprio (Energy) Loss
         energy_target = jax.lax.stop_gradient(energy_tp1)
@@ -541,6 +542,7 @@ def red_auxiliary_update(
     optimizer,
     red_aux_apply_fn,
     carries_np: np.ndarray,
+    obs_seq_np: np.ndarray,
     energy_np: np.ndarray,
     nb_sigs_target_np: np.ndarray,
     alive_np: np.ndarray = None,
@@ -549,9 +551,16 @@ def red_auxiliary_update(
     proprio_coef: float = 0.05,
     retention_coef: float = 0.1,
 ) -> Tuple[Dict, Any, float, float]:
-    """Energy and Semantic Retention predictions (Phase 14.1b + 15.3)."""
+    """Energy and Semantic Retention predictions (Phase 15.4 BPTT)."""
     T_lag, N, hidden_dim = carries_np.shape
     carry_t = carries_np.reshape(T_lag * N, hidden_dim)
+    
+    # obs_seq_np shape: (T_lag, N, lag, obs_dim)
+    # Transpose to (lag, T_lag*N, obs_dim) for lax.scan
+    lag = obs_seq_np.shape[2]
+    obs_dim = obs_seq_np.shape[3]
+    obs_seq = obs_seq_np.transpose((2, 0, 1, 3)).reshape(lag, T_lag * N, obs_dim)
+    
     energy_tp1 = np.asarray(energy_np).reshape(T_lag * N).astype(np.float32)
     nb_sigs_target = np.asarray(nb_sigs_target_np).reshape(T_lag * N, -1).astype(np.float32)
     if alive_np is not None:
@@ -575,6 +584,7 @@ def red_auxiliary_update(
             red_aux_apply_fn,
             optimizer,
             jnp.array(carry_t[idx]),
+            jnp.array(obs_seq[:, idx, :]),
             jnp.array(energy_tp1[idx]),
             jnp.array(nb_sigs_target[idx]),
             jnp.array(alive_t[idx]),

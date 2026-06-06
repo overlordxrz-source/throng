@@ -1086,10 +1086,20 @@ def _run_simulation_impl(
     r_proprio_apply_fn = _proprio_apply_fn
     r_red_aux_apply_fn = None
     if model_red is not None:
-        def _red_aux_apply_fn(params, carry_t):
+        def _red_aux_apply_fn(params, carry_t, obs_seq):
+            def scan_fn(c, o):
+                new_c, _ = model_red.apply(
+                    params_apply_variables(params),
+                    c, o, n_layers, deterministic=True,
+                )
+                return new_c, None
+            
+            # obs_seq is shape (lag, M, obs_dim)
+            final_carry, _ = jax.lax.scan(scan_fn, carry_t, obs_seq)
+            
             return model_red.apply(
                 params_apply_variables(params),
-                carry_t,
+                final_carry,
                 method=model_red.red_auxiliary_heads,
             )
         r_red_aux_apply_fn = _red_aux_apply_fn
@@ -1136,6 +1146,12 @@ def _run_simulation_impl(
     b_optimizer = create_optimizer(config["ppo_lr"], config["ppo_max_grad_norm"])
     r_optimizer = create_optimizer(config["ppo_lr"], config["ppo_max_grad_norm"])
     b_opt_state = b_optimizer.init(b_params)
+    
+    b_aux_optimizer = create_optimizer(config["ppo_lr"], config["ppo_max_grad_norm"])
+    r_aux_optimizer = create_optimizer(config["ppo_lr"], config["ppo_max_grad_norm"])
+    b_aux_opt_state = b_aux_optimizer.init(b_params)
+    r_aux_opt_state = r_aux_optimizer.init(r_params)
+    
     b_vqel_optimizer = None
     b_vqel_opt_state = None
     if _vqel_monologue:
@@ -1390,8 +1406,8 @@ def _run_simulation_impl(
             _self_pred_coef = float(config.get("self_pred_coef", 0.1))
             fwd_key, update_key = jax.random.split(update_key)
             _b_energy_np = np.asarray(b_batch["energy"]) if "energy" in b_batch else None
-            b_params, b_opt_state, b_fwd_loss, b_carry_fwd_loss, b_sp_loss, b_sp_acc, b_conf_loss, b_conf_pred, b_proprio_loss = auxiliary_update(
-                b_params, b_opt_state, b_optimizer, b_aux_apply_fn,
+            b_params, b_aux_opt_state, b_fwd_loss, b_carry_fwd_loss, b_sp_loss, b_sp_acc, b_conf_loss, b_conf_pred, b_proprio_loss = auxiliary_update(
+                b_params, b_aux_opt_state, b_aux_optimizer, b_aux_apply_fn,
                 _b_carries_np, _b_actions_np, _b_obs_np,
                 _loc_env_start, _loc_env_end,
                 _b_alive_np, fwd_key, minibatch_size=_fwd_mb,
@@ -1459,8 +1475,8 @@ def _run_simulation_impl(
         _r_energy_np = np.asarray(r_batch["energy"]) if "energy" in r_batch else None
         if not _red_comms:
             fwd_key, update_key = jax.random.split(update_key)
-            r_params, r_opt_state, r_fwd_loss, r_carry_fwd_loss, r_sp_loss, r_sp_acc, r_conf_loss, r_conf_pred, r_proprio_loss = auxiliary_update(
-                r_params, r_opt_state, r_optimizer, r_aux_apply_fn,
+            r_params, r_aux_opt_state, r_fwd_loss, r_carry_fwd_loss, r_sp_loss, r_sp_acc, r_conf_loss, r_conf_pred, r_proprio_loss = auxiliary_update(
+                r_params, r_aux_opt_state, r_aux_optimizer, r_aux_apply_fn,
                 _r_carries_np, _r_actions_np, _r_obs_np,
                 _loc_env_start, _loc_env_end,
                 _r_alive_np, fwd_key, minibatch_size=_fwd_mb,
@@ -1491,17 +1507,24 @@ def _run_simulation_impl(
             
             # Temporal Slicing on Axis 0 (lag = 5)
             _lag = 5
-            _r_carries_lag = _r_carries_np[_lag:]
+            _r_carries_t0 = _r_carries_np[:-_lag]
             _r_energy_lag = _r_energy_np[_lag:]
             _r_nb_sigs_target = _r_nb_sigs_np[:-_lag]
             _r_alive_lag = _r_alive_np[_lag:] if _r_alive_np is not None else None
+            
+            # Build obs_seq of shape (T-lag, N, lag, obs_dim)
+            _T, _N, _D = _r_obs_np.shape
+            _obs_seq = np.empty((_T - _lag, _N, _lag, _D), dtype=_r_obs_np.dtype)
+            for l in range(_lag):
+                _obs_seq[:, :, l, :] = _r_obs_np[l + 1 : _T - _lag + l + 1]
 
-            r_params, r_opt_state, r_proprio_loss, r_retention_loss = red_auxiliary_update(
+            r_params, r_aux_opt_state, r_proprio_loss, r_retention_loss = red_auxiliary_update(
                 r_params,
-                r_opt_state,
-                r_optimizer,
+                r_aux_opt_state,
+                r_aux_optimizer,
                 r_red_aux_apply_fn,
-                _r_carries_lag,
+                _r_carries_t0,
+                _obs_seq,
                 _r_energy_lag,
                 _r_nb_sigs_target,
                 _r_alive_lag,
