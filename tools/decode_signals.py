@@ -265,6 +265,8 @@ def _apply_step_filter(
         return
     for key in ("signals", "actions", emitter_key, "steps"):
         data[key] = data[key][keep]
+    if "agents" in data:
+        data["agents"] = data["agents"][keep]
     data["ctx"] = {k: v[keep] for k, v in data["ctx"].items()}
     if data.get("nb_lag1") is not None:
         data["nb_lag1"] = data["nb_lag1"][keep]
@@ -273,6 +275,10 @@ def _apply_step_filter(
     data["vq_tokens"] = data["vq_tokens"][keep]
     if data.get("nb_tok_lag1") is not None:
         data["nb_tok_lag1"] = data["nb_tok_lag1"][keep]
+    if data.get("carry_fwd") is not None:
+        data["carry_fwd"] = data["carry_fwd"][keep]
+    if data.get("steps_since_dropout") is not None:
+        data["steps_since_dropout"] = data["steps_since_dropout"][keep]
     data["n"] = int(keep.sum())
 
 
