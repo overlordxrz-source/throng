@@ -1205,15 +1205,15 @@ def novice_memory_dropout_lrt(
     print(f"{'─'*70}")
 
 
-def lag10_episodic_lrt(data: dict, target_lag: int = 10) -> None:
+def lag5_episodic_lrt(data: dict, target_lag: int = 5) -> None:
     """
-    Phase 15.2: MEDAL-ADR Lag-10 Episodic Memory LRT.
-    Aligns Novice action at step t with Expert signal at step t-10.
+    Phase 15.2b: MEDAL-ADR Lag-5 Episodic Memory LRT.
+    Aligns Novice action at step t with Expert signal at step t-5.
     """
     import scipy.stats as stats
 
     print(f"\n{'─'*70}")
-    print(f"  PHASE 15.2: LAG-10 EPISODIC MEMORY LRT (MEDAL-ADR)")
+    print(f"  PHASE 15.2b: LAG-5 EPISODIC MEMORY LRT (MEDAL-ADR)")
     print(f"{'─'*70}")
 
     steps = data["steps"]
@@ -1349,7 +1349,7 @@ def decode_red_schema(
     k: int = 8,
     min_step: int = 0,
     max_step: int = 0,
-    do_lag10_episodic: bool = False,
+    do_lag5_episodic: bool = False,
 ) -> None:
     """Full offline decode for signal_corpus_red.jsonl (Phase 12.2)."""
     _apply_step_filter(data, min_step, max_step, emitter_key="hunters")
@@ -1504,16 +1504,16 @@ def decode_red_schema(
             carry_fwd=carry_fwd,
             blue_bear=ctx.get("blue_bear", np.zeros(len(carry_fwd))),
             steps_since_dropout=steps_since_dropout,
-            target_lag=10,
+            target_lag=5,
         )
     else:
         print(f"\n{'─'*70}")
         print(f"  PHASE 15 CUMULATIVE CULTURE LRT")
         print(f"{'─'*70}")
         print("  carry_fwd / steps_since_dropout absent in corpus.")
-    # ── Phase 15.2: MEDAL-ADR Lag-10 Episodic Memory LRT ───────────────
-    if do_lag10_episodic:
-        lag10_episodic_lrt(data, target_lag=10)
+    # ── Phase 15.2b: MEDAL-ADR Lag-5 Episodic Memory LRT ───────────────
+    if do_lag5_episodic:
+        lag5_episodic_lrt(data, target_lag=5)
 
     print(f"\n{'='*70}")
     print("  Done (red). Interpret:")
@@ -1865,8 +1865,8 @@ def main() -> None:
                     help="Ignore records after this step (0 = no limit)")
     ap.add_argument("--baseline", default=None,
                     help="Pre-withdrawal corpus for comparison (skips full analysis)")
-    ap.add_argument("--lag10", "--episodic", dest="lag10", action="store_true",
-                    help="Phase 15.2: Run Lag-10 Episodic Memory LRT for Cultural Transmission")
+    ap.add_argument("--lag5", "--episodic", dest="lag5", action="store_true",
+                    help="Phase 15.2b: Run Lag-5 Episodic Memory LRT for Cultural Transmission")
     args = ap.parse_args()
 
     if args.red:
@@ -1878,7 +1878,7 @@ def main() -> None:
         print(f"\nLoading RED corpus from {corpus_path} …")
         data = load_red_corpus(corpus_path)
         decode_red_schema(
-            data, k=args.k, min_step=args.min_step, max_step=args.max_step, do_lag10_episodic=args.lag10
+            data, k=args.k, min_step=args.min_step, max_step=args.max_step, do_lag5_episodic=args.lag5
         )
         return
 
