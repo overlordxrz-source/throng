@@ -64,7 +64,6 @@ from jax_sim.rl_jax import (
     create_optimizer,
     ppo_update,
     auxiliary_update,
-    proprio_auxiliary_update,
     red_auxiliary_update,
     vqel_monologue_update,
 )
