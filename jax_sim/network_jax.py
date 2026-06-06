@@ -31,7 +31,6 @@ AUX_HEAD_KEYS = (
     "head_confidence_1",
     "head_confidence_2",
     "head_proprio",
-    "head_retention",
 )
 
 # Top-level module keys grafted from a fresh init when missing in Orbax checkpoints.
