@@ -914,6 +914,25 @@ def _run_simulation_impl(
         abstract_tree = {"b_params": b_params, "r_params": r_params}
         try:
             restored = ckpt_mngr.restore(_ckpt_latest, items=abstract_tree)
+            from flax.core import freeze, unfreeze
+            target_dict = unfreeze(abstract_tree)
+            source_dict = unfreeze(restored)
+            _restore_agents = ("b_params", "r_params")
+            for agent_type in _restore_agents:
+                if agent_type not in source_dict or agent_type not in target_dict:
+                    continue
+                src_agent = unfreeze(source_dict[agent_type])
+                tgt_agent = unfreeze(target_dict[agent_type])
+                injected_paths = graft_missing_param_subtrees(src_agent, tgt_agent)
+                if injected_paths:
+                    for path in injected_paths:
+                        print(
+                            f"[JAX] Injected randomly initialized {path} "
+                            f"into {agent_type}",
+                            flush=True,
+                        )
+                    source_dict[agent_type] = freeze(src_agent)
+            restored = freeze(source_dict)
         except ValueError as exc:
             msg = str(exc)
             if "do not match" in msg:
