@@ -320,7 +320,12 @@ All knobs live in `config_phase7.yaml`. The ones you actually touch:
 | **14.3** | ✅ **GWT Router** — energy-masked h_comms → VQ (`654400c`) |
 | **14.4** | ✅ **MERGED to master** — DCVQ + SimVQ; Direction LRT 29/32 p<0.05 at step 688k. Language confirmed. |
 | **15.0** | ✅ **LIVE** — MEDAL-ADR; `expert_dropouts≈80`/rollout |
-| **15.1** | 🔄 **IN FLIGHT** — cold-restart ladder (`head_signal` @ `ee62f7f`); decode after +50k clean steps |
+| **15.1e** | ✅ **SUCCESS** — Latent Heat shattered VQ singularity; `red_codes_active=52/64` |
+| **15.2** | ❌ **FAILED** — Episodic Memory LRT failed (p=0.8369). Novices failed to use episodic memory. |
+| **15.3** | **PREP** — Semantic Retention Loss (SRL) predicts `nb_sigs_{t-5}` from `carry_t` |
+| **16.0** | **PREP** — Open-Ended Combinatorial Complexity via expanded topology |
+| **17.0** | **PREP** — The Rosetta Stone (Extraction) autoencoder mapping to English |
+| **18.0** | **PREP** — The Hive-Mind Interface bidirectional text terminal |
 
 Do **not** merge to **`master`** until P15 decode gate passes (novice episodic memory LRT **p < 0.05** at step 730k).
 

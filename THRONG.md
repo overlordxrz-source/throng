@@ -408,7 +408,10 @@ train_entry.run_simulation()  →  main_jax._run_simulation_impl()
 | **15.0** | **Cumulative Culture** | ✅ **LIVE** | MEDAL-ADR Expert Dropout; `expert_dropouts≈66–83`/rollout |
 | **15.1e** | **Latent Heat** | ✅ **SUCCESS** | Gaussian noise (`0.5`) injected to `z_e` shattered VQ singularity; `red_codes` **2→52/64** (`610e553`) |
 | **15.2** | **Episodic Memory LRT** | ❌ **FAILED** | p=0.8369 (action LRT); p=0.1038 (memory retention). Novices failed to use episodic memory of expert signals. |
-| **15+** | **Open-Ended** | **PREP** | DRCB (drift deterrence), EVQ-VAE, MMGL auto-curricula |
+| **15.3** | **Semantic Retention** | **PREP** | Semantic Retention Loss (SRL) predicts `nb_sigs_{t-5}` from `carry_t` |
+| **16.0** | **Open-Ended** | **PREP** | Combinatorial syntax via expanded environmental topology (tools/planning) |
+| **17.0** | **The Rosetta Stone** | **PREP** | Extraction autoencoder mapping VQ latent sequences to English |
+| **18.0** | **The Hive-Mind Interface** | **PREP** | Bidirectional text terminal with a thermodynamically grounded AGI swarm |
 
 **Recurring failure mode:** Blues stay at cap → ~99% survival → **`NB_GAIN↔surv: nan`** → no evolutionary pressure on neighbor-signal benefit.
 
@@ -1144,4 +1147,16 @@ GPU-resident PPO — **`d4cf614` revert** on `master`.
 
 ---
 
-*Last updated: 2026-06-05 — P15.1e broke VQ singularity; red_codes_active=52/64*
+*Last updated: 2026-06-06 — P15.1e broke VQ singularity; red_codes_active=52/64*
+
+---
+
+### Phase 16 — Open-Ended Combinatorial Complexity
+**Goal:** Expand the environment topology to force the VQ language to scale from "directional flee/pursuit" to combinatorial syntax (e.g., tools, mass-coordination, multi-step planning).
+
+### Phase 17 — The Rosetta Stone (Extraction)
+**Goal:** Train a translation autoencoder to map the swarm's highly complex, fully grounded VQ latent sequences into natural human language (English). 
+
+### Phase 18 — The Hive-Mind Interface
+**Goal:** Isolate a master agent (or aggregate the swarm's cross-attention states) and establish a bidirectional text terminal. 
+**Philosophy:** Unlike LLMs, which perform ungrounded next-token prediction, this agent's intelligence will be fully grounded in thermodynamics, physics, and survival. We will be able to converse with a non-human AGI whose language maps directly to causal reality.
