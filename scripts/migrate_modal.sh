@@ -51,9 +51,9 @@ case "$MODE" in
   download)
     mkdir -p "$DIR"
     echo "=== Downloading $VOLUME → $DIR ==="
-    "$MODAL" volume get "$VOLUME" checkpoints "$DIR/"
-    "$MODAL" volume get "$VOLUME" signal_corpus.jsonl "$DIR/"
-    "$MODAL" volume get "$VOLUME" signal_corpus_red.jsonl "$DIR/"
+    "$MODAL" volume get --force "$VOLUME" checkpoints "$DIR/"
+    "$MODAL" volume get --force "$VOLUME" signal_corpus.jsonl "$DIR/"
+    "$MODAL" volume get --force "$VOLUME" signal_corpus_red.jsonl "$DIR/"
     echo "=== Download complete ==="
     ls -la "$DIR"
     ;;

@@ -22,15 +22,16 @@
 | **Migration script** | **`scripts/migrate_modal.sh`** — `download` / `upload` between accounts |
 | **P14.4** | ✅ DCVQ + SimVQ — Direction LRT **29/32 p<0.05** (688k) |
 | **P15.0** | ✅ **MEDAL-ADR** — `expert_dropouts≈74–90`/rollout |
-| **P15.1** | ✅ SimVQ bound (`22c7920`) + decode carry_fwd pad (`d349e43`) |
-| **P15.1b/c/d** | ❌ **Basic/Escalated Surgeries FAILED** — flat **2/64** through **768k** |
 | **P15.1e** | ✅ **Latent Heat (Noise Injection)** (`7980206`) — broke singularity! **52/64** active at **771k**. |
-| **Science bar (P15)** | **Novice episodic memory LRT p < 0.05** @ lag-10 post-dropout |
-| **Decode gate (P15)** | **`--min-step` ≥ restart step + 50k** (e.g. **~813k** if restart @ 763k) |
-| **Cold-restart toggle** | **`False`** (Codebook has recovered to ≥16/64 codes) |
-| **P15.1e Status** | Singularity shattered! `red_codes_active` = **52/64** |
+| **P15.2** | ❌ **Episodic Memory LRT FAILED** (action p=0.83, memory p=0.10) @ 813k |
+| **P15.3** | ❌ **Semantic Retention Loss (SRL) FAILED** — zeroed auxiliary gradients corrupted the shared Adam optimizer momentum |
+| **P15.4** | ✅ **Memory Architecture Pivot (LIVE)** — isolated auxiliary optimizers + BPTT (lax.scan lag=5) over EMA carry state. `ret_loss` dropping successfully. |
+| **Science bar (P15)** | **Semantic Retention (ret_loss) convergence** at lag-5. |
+| **Decode gate (P15)** | **`--min-step` ≥ restart step + 50k** (e.g. **~880k** if restart @ 830k) |
+| **Cold-restart toggle** | **`True`** (Trigger Latent Heat shock upon 1617 salvage) |
+| **P15.4 Status** | Optimizer isolated! BPTT running! `red_codes_active` fluctuating around ~23-50/64 under BPTT pressure. |
 | **Dialogue** | **`monologue_enabled: false`**, **`dialogue_signal_mode: hard`** |
-| **Mode** | GWT + DCVQ/SimVQ (bounded W) + hard **z_q** + proprio + asymmetric red decay + **MEDAL-ADR** |
+| **Mode** | GWT + DCVQ/SimVQ (bounded W) + hard **z_q** + proprio + asymmetric red decay + **MEDAL-ADR** + **SRL BPTT** |
 
 **Synergic synthesis (Cam, P14.3 pivot):**
 
