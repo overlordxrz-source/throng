@@ -444,7 +444,7 @@ class AgentNetworkJax(nn.Module):
 
 
 # Predator (Red) comms — separate codebook + cross-attn; no P11 aux / imagination heads.
-PREDATOR_GRAFT_TOP_KEYS = ("dcvq", "simvq_W", "red_nb_cross_attn", "head_proprio", "gwt_comms_1")
+PREDATOR_GRAFT_TOP_KEYS = ("dcvq", "simvq_W", "red_nb_cross_attn", "head_proprio", "gwt_comms_1", "carry_gru")
 PREDATOR_VQ_COLD_RESTART_KEYS = ("gwt_comms_1", "head_signal", "dcvq", "simvq_W", "red_codebook", "red_nb_cross_attn")
 
 # SimVQ W bound — stateless forward pass only (no new params; Orbax ckpt-compatible).
@@ -550,6 +550,8 @@ class PredatorNetworkJax(nn.Module):
             TransformerBlock(d, self.n_heads) for _ in range(self.max_layers)
         ]
         self.final_norm = nn.LayerNorm()
+        # Phase 15.5: GRUCell to replace EMA, protecting magnitude from BPTT explosion
+        self.carry_gru = nn.GRUCell(features=d, name="carry_gru")
         self.head_action = nn.Dense(5)
         self.head_signal = nn.Dense(self.signal_dim)
         
@@ -670,7 +672,8 @@ class PredatorNetworkJax(nn.Module):
             x = self.blocks[i](x)
 
         pooled = self.final_norm(x.mean(axis=1))
-        new_carries = 0.9 * carries + 0.1 * pooled
+        # Phase 15.5: GRUCell protects representations from BPTT magnitude explosion
+        new_carries, _ = self.carry_gru(carries, pooled)
 
         # --- Phase 14.3 GWT Router ---
         # h_policy: full pooled transformer output (interoceptive + exteroceptive).
@@ -764,7 +767,9 @@ def ensure_predator_params(
     needs_proprio = "head_proprio" not in flat
     # Phase 14.3 GWT Router — graft comms embedding if missing from P14.2 ckpt.
     needs_gwt = "gwt_comms_1" not in flat
-    if not needs_codebook and not needs_cross and not needs_proprio and not needs_gwt:
+    # Phase 15.5 GRUCell upgrade
+    needs_gru = "carry_gru" not in flat
+    if not needs_codebook and not needs_cross and not needs_proprio and not needs_gwt and not needs_gru:
         return params
     carry = jnp.zeros((1, hidden_dim))
     obs = jnp.zeros((1, obs_dim))
@@ -786,6 +791,9 @@ def ensure_predator_params(
     if needs_gwt and "gwt_comms_1" in fresh_flat:
         flat["gwt_comms_1"] = fresh_flat["gwt_comms_1"]
         print("[JAX] Merged fresh gwt_comms_1 (Phase 14.3 GWT Router) into predator params")
+    if needs_gru and "carry_gru" in fresh_flat:
+        flat["carry_gru"] = fresh_flat["carry_gru"]
+        print("[JAX] Merged fresh carry_gru (Phase 15.5 GRUCell upgrade) into predator params")
     return sanitize_agent_params(freeze(flat))
 
 
