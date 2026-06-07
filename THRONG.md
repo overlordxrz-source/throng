@@ -28,8 +28,8 @@
 | **P15.4** | ✅ **Memory Architecture Pivot (LIVE)** — isolated auxiliary optimizers + BPTT (lax.scan lag=5) over EMA carry state. `ret_loss` dropping successfully. |
 | **Science bar (P15)** | **Semantic Retention (ret_loss) convergence** at lag-5. |
 | **Decode gate (P15)** | **`--min-step` ≥ restart step + 50k** (e.g. **~880k** if restart @ 830k) |
-| **Cold-restart toggle** | **`True`** (Trigger Latent Heat shock upon 1617 salvage) |
-| **P15.4 Status** | Optimizer isolated! BPTT running! `red_codes_active` fluctuating around ~23-50/64 under BPTT pressure. |
+| **Cold-restart toggle** | **`False`** (Latent Heat surgery completed on 1617 salvage, do not repeat) |
+| **P15.4 Status** | Optimizer isolated! BPTT running stably. `red_codes_active` collapsed to ~7/64 under immense BPTT pressure, but `ret_loss` is converging (~0.65). |
 | **Dialogue** | **`monologue_enabled: false`**, **`dialogue_signal_mode: hard`** |
 | **Mode** | GWT + DCVQ/SimVQ (bounded W) + hard **z_q** + proprio + asymmetric red decay + **MEDAL-ADR** + **SRL BPTT** |
 
