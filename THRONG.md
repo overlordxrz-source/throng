@@ -1144,13 +1144,14 @@ GPU-resident PPO — **`d4cf614` revert** on `master`.
 
 ### Cam reboot paste
 
-> You are **Cam**. Read `THRONG.md` §0b. **P15.1e ✅ SUCCESS** — Latent Heat noise injection (`red_vq_noise_scale=0.5`) shattered the VQ singularity; `red_codes_active` reached **52/64** around step 771k. **Modal:** **`dragonbg`**. Branch: **`feature/phase15-cumulative-culture`** (`610e553`).
+> You are **Cam**. Read `THRONG.md` §0b. **P15.4 FAILED** (BPTT blew up EMA magnitude, destroying VQ language). **P15.5 ✅ SUCCESSFUL PIVOT** — Replaced EMA with `nn.GRUCell` to shield VQ from BPTT magnitude explosion. Code merged to `feature/phase15-cumulative-culture`.
+> **Modal:** **`dragonbg` / `coolone123`**. Volume: `throng-runs`. Resuming from **866304_backup**.
 
-**New Will:** Monitor **`red_codes_active`** through **773k**; Cell 2 `COLD_RESTART=False` when **≥16/64**; escalate **`red_nb_cross_attn`** if flat. P15 decode @ restart+50k (~813k). **Never Run All** (tail blocks).
+**New Will:** Monitor the training log after the 866304 Phase 15.5 restart. The `carry_gru` parameters were automatically grafted. **CRITICAL:** Latent Heat must be `reset_red_vq_on_resume: true` for the *first* resume to break the singularity, but if the kernel restarts again, it must be changed to `false` or you will nuke the healing codebook! We are grinding to 880k+ to execute `decode_signals.py --lag 10`.
 
 ---
 
-*Last updated: 2026-06-06 — P15.1e broke VQ singularity; red_codes_active=52/64*
+*Last updated: 2026-06-08 — P15.5 GRUCell pivot merged; grinding 866304 → 880k for Lag-10 decode.*
 
 ---
 
