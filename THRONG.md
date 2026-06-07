@@ -646,7 +646,9 @@ Allocator (GPU_0_bfc) ... If the cause is memory fragmentation maybe
   TF_GPU_ALLOCATOR=cuda_malloc_async will improve the situation.
 ```
 
-**Cause:** XLA **BFC allocator fragmentation** after many update cycles — not model size (~1.1 GiB alloc during rollout scan). Can also hit if process still runs **stale 11.1 code** (mixed `GPU-resident backward` + `H2D` in same log = two code paths / two processes or partial pull).
+**Cause:** XLA **BFC allocator fragmentation** after many update cycles — not model size (~1.1 GiB alloc during rollout scan). Can also hit if process still runs **stale 11.1 code**. 
+> [!CAUTION]
+> **Phase 15.4 BPTT Zombie OOM:** If you see `RESOURCE_EXHAUSTED: Out of memory while trying to allocate 17.39GiB` during `_red_minibatch_step`, it means **two `run_bg.py` processes are running concurrently**. The 5-step BPTT unroll is memory intensive; two simultaneous trainers will instantly blow past the 192GB B200 limit. Always `pkill -f run_bg.py` before launching a new notebook cell.
 
 **Recovery (run in order):**
 
