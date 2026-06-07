@@ -67,9 +67,9 @@ case "$MODE" in
     echo "=== Ensuring volume $VOLUME exists ==="
     "$MODAL" volume create "$VOLUME" || true
     echo "=== Uploading $DIR → $VOLUME ==="
-    "$MODAL" volume put "$VOLUME" "$DIR/checkpoints" /checkpoints
-    "$MODAL" volume put "$VOLUME" "$DIR/signal_corpus.jsonl" /
-    "$MODAL" volume put "$VOLUME" "$DIR/signal_corpus_red.jsonl" /
+    "$MODAL" volume put -f "$VOLUME" "$DIR/checkpoints" /checkpoints
+    "$MODAL" volume put -f "$VOLUME" "$DIR/signal_corpus.jsonl" /
+    "$MODAL" volume put -f "$VOLUME" "$DIR/signal_corpus_red.jsonl" /
     echo "=== Upload complete ==="
     "$MODAL" volume ls "$VOLUME" /
     ;;
