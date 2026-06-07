@@ -25,11 +25,11 @@
 | **P15.1e** | ✅ **Latent Heat (Noise Injection)** (`7980206`) — broke singularity! **52/64** active at **771k**. |
 | **P15.2** | ❌ **Episodic Memory LRT FAILED** (action p=0.83, memory p=0.10) @ 813k |
 | **P15.3** | ❌ **Semantic Retention Loss (SRL) FAILED** — zeroed auxiliary gradients corrupted the shared Adam optimizer momentum |
-| **P15.4** | ✅ **Memory Architecture Pivot (LIVE)** — isolated auxiliary optimizers + BPTT (lax.scan lag=5) over EMA carry state. `ret_loss` dropping successfully. |
-| **Science bar (P15)** | **Semantic Retention (ret_loss) convergence** at lag-5. |
-| **Decode gate (P15)** | **`--min-step` ≥ restart step + 50k** (e.g. **~880k** if restart @ 830k) |
-| **Cold-restart toggle** | **`False`** (Latent Heat surgery completed on 1617 salvage, do not repeat) |
-| **P15.4 Status** | Optimizer isolated! BPTT running stably. `red_codes_active` collapsed to ~7/64 under immense BPTT pressure, but `ret_loss` is converging (~0.65). |
+| **P15.4** | ❌ **EMA + BPTT FAILED** — BPTT drove `ret_loss` down by blowing up memory magnitude, crushing VQ codebook back into singularity (peak MI = `energy` on all 32 dims). |
+| **P15.5** | ✅ **Memory Architecture Pivot (LIVE)** — Replaced static EMA with `nn.GRUCell` to absorb temporal gradients via sigmoid gates and protect representation magnitude. |
+| **Science bar (P15.5)** | **Semantic Retention (ret_loss) convergence** at lag-10 with intact VQ codebook. |
+| **Decode gate (P15.5)** | `python3 tools/decode_signals.py --red --min-step 880000 --lag 10` |
+| **Cold-restart toggle** | **`True`** (MUST be true on P15.5 resume from 866304 to shatter corrupted codebook) |
 | **Dialogue** | **`monologue_enabled: false`**, **`dialogue_signal_mode: hard`** |
 | **Mode** | GWT + DCVQ/SimVQ (bounded W) + hard **z_q** + proprio + asymmetric red decay + **MEDAL-ADR** + **SRL BPTT** |
 
