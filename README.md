@@ -9,6 +9,7 @@ cognition arising purely from selection pressure.
 
 **Current state (Jun 2026):** **Phase 16 (Open-Ended Combinatorial Complexity)** on `feature/phase15-cumulative-culture`.
 **Phase 15 is COMPLETE!** — The `nn.GRUCell` decoupled magnitude explosion from temporal BPTT gradients, resulting in mathematical confirmation of both Episodic Memory ($p < 0.05$) and Cumulative Culture ($p < 0.001$) at Lag-10.
+**Phase 16 is ACTIVE!** — Combinatorial Syntax Scaffold introduced with `Big Green` prey (requires 2+ simultaneous strikes), 8-dimensional action space, and a 100k-step CtD phase gate to bootstrap noun/verb compositionality. PosDis and TRE metrics added to signal decoder.
 **Modal:** **`dragonbg`** — volume **`throng-runs`**.
 **Notebook:** 3 cells — setup / launch (`COLD_RESTART` toggle) / optional `tail -f`. See [THRONG.md §4](THRONG.md#p151c--modal-notebook-3-cells). **Do not Run All.**
 

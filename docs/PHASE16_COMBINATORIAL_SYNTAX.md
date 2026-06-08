@@ -28,3 +28,16 @@ We need to expand from 5 actions (N/S/E/W/Stay) to 8 actions (+ Strike, Push, Gu
 2. In `init_predator_params`, when loading the old checkpoint (which has `head_action.kernel` of shape `[H, 5]`), we will dynamically allocate a new kernel of shape `[H, 8]`.
 3. We will **copy** the learned weights for the first 5 actions directly from the checkpoint to preserve movement semantics.
 4. We will initialize the biases for the 3 new actions to heavily negative values (e.g., `-5.0`). This ensures the new actions start with near-zero probability, preserving the current policy's performance while allowing PPO entropy to gradually explore the new interactions over time.
+
+## Evaluation Metrics (TRE & PosDis)
+To detect non-trivial compositionality and grammatical structure, we will deploy two new metrics in `decode_signals.py`:
+1. **Positional Disentanglement (PosDis)**: Measures whether specific DCVQ codebook dimensions spontaneously specialize to encode independent variables (e.g., target type vs bearing). A PosDis score approaching 1.0 indicates rigid grammatical slots.
+2. **Tree Reconstruction Error (TRE)**: Evaluates whether messages compose according to the structural derivations of the inputs.
+
+## Execution Scaffold: Composition through Decomposition (CtD)
+To prevent the emergence of degenerate lookup codes, we will employ a CtD phase gate:
+- **0–100k Steps**: Big Greens are deployed but are catchable *solo* at a reduced reward (`reward=2.0`). This forces the VQ codebook to learn target discrimination (nouns) without the pressure of coordination (verbs).
+- **100k+ Steps**: Cooperative threshold activates. Big Greens now require simultaneous multi-agent strikes, unlocking the maximum reward (`8.0`) but risking a mauling penalty (`-1.0`) if attempted alone.
+
+## Stag Hunt Payoff Mathematics
+Standard PPO with large negative penalties (e.g., `-5.0`) for solo strikes leads to "risk-dominant" convergence (foraging small blues instead of hunting big greens). A moderate `-1.0` penalty is required to keep the cooperative basin ("payoff-dominant" cooperative equilibrium) accessible to policy gradients. The `+1.5` `r_coord` bonus ensures the total cooperative reward (`8.0 + 1.5 = 9.5`) cleanly dominates the baseline foraging behavior.

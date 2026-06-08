@@ -349,15 +349,15 @@ def loc_env_flat_bounds(config: dict) -> tuple[int, int]:
     r = config["local_obs_radius"]
     W = (2 * r + 1) ** 2
     start = 6 + K * sd + W * symd
-    end = start + W * 8
+    end = start + W * 9
     return start, end
 
 
 def compute_fwd_env_dim(config: dict) -> int:
-    """Flat loc_env size (W × 8 env channels)."""
+    """Flat loc_env size (W × 9 env channels)."""
     r = config["local_obs_radius"]
     W = (2 * r + 1) ** 2
-    return W * 8
+    return W * 9
 
 
 def compute_obs_dim_torch(config: dict) -> int:
@@ -366,8 +366,8 @@ def compute_obs_dim_torch(config: dict) -> int:
     symd = config.get("symbol_dim", 8)
     r    = config["local_obs_radius"]
     W    = (2 * r + 1) ** 2
-    # Phase 8: env channels = 8 (blue_pres, red_pres, wall, resource, shelter, contested, scent, puzzle)
-    env_ch = 8
+    # Phase 16: env channels = 9 (blue_pres, blue_bg_pres, red_pres, wall, resource, shelter, contested, scent, puzzle)
+    env_ch = 9
     base = 6 + K * sd + W * symd + W * env_ch + sd
     # Phase 7: episodic memory buffer
     mem_slots = int(config.get("memory_buffer_size", 0))

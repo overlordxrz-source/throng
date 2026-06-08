@@ -184,8 +184,8 @@ def apply_moves(
     walls:     jnp.ndarray,  # (size, size) bool
 ) -> jnp.ndarray:
     """Return new positions after movement (collision with walls = stay)."""
-    # Action → delta
-    deltas = jnp.array([[0, 0], [-1, 0], [1, 0], [0, 1], [0, -1]], dtype=jnp.int32)
+    # Action → delta (N, S, E, W, Stay, Strike, Push, Guard)
+    deltas = jnp.array([[0, 0], [-1, 0], [1, 0], [0, 1], [0, -1], [0, 0], [0, 0], [0, 0]], dtype=jnp.int32)
     new_pos = positions + deltas[actions]
     new_pos = wrap(new_pos, grid_size)
     # Wall collision: if target cell is wall, stay
@@ -219,20 +219,21 @@ def consume_resources(
 # ── Catch detection ──────────────────────────────────────────────────────────
 
 def apply_catches(
-    b_pos: jnp.ndarray,  # (max_pop_b, 2)
+    b_pos: jnp.ndarray,
     b_alive: jnp.ndarray,
-    r_pos: jnp.ndarray,  # (max_pop_r, 2)
+    b_is_big_green: jnp.ndarray,
+    r_pos: jnp.ndarray,
     r_alive: jnp.ndarray,
+    r_actions: jnp.ndarray,
     grid_size: int,
+    step: int,
+    coop_threshold_step: int,
     catch_radius: int = 1,
     catch_prob: float = 1.0,
     rng: jnp.ndarray | None = None,
-) -> Tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray]:
+) -> Tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray]:
     """
-    Return (b_new_alive, r_catch_reward, b_catch_penalty, caught_idx_mask)
-    Red catches blue if within catch_radius Chebyshev distance.
-    If catch_prob < 1.0, each in-range blue survives with probability (1 - catch_prob)
-    (predator jitter / safety bubble).
+    Returns (b_new_alive, caught_b, r_caught_small, r_caught_big_coop, r_caught_big_solo, r_mauled, b_penalty)
     """
     max_b = b_pos.shape[0]
 
@@ -241,24 +242,45 @@ def apply_catches(
     diff = jnp.minimum(diff, grid_size - diff)
     dist = jnp.max(diff, axis=-1)  # (B, R)
 
-    in_range = (dist <= catch_radius) & b_alive[:, None] & r_alive[None, :]
-    in_range_b = jnp.any(in_range, axis=1)  # (B,)
+    in_range = (dist <= catch_radius) & b_alive[:, None] & r_alive[None, :]  # (B, R)
+    is_striking = (r_actions == 5)  # (R,) ACTION_STRIKE
+
+    # 1. Small Blue logic (proximity based)
+    in_range_small = in_range & ~b_is_big_green[:, None]
+    caught_small_potential = jnp.any(in_range_small, axis=1)
+
+    # 2. Big Green logic
+    in_range_big = in_range & b_is_big_green[:, None]
+    striking_in_range_big = in_range_big & is_striking[None, :]
+    n_striking_reds = jnp.sum(striking_in_range_big, axis=1)
+
+    coop_active = step >= coop_threshold_step
+
+    caught_big_coop_potential = coop_active & (n_striking_reds >= 2)
+    caught_big_solo_potential = ~coop_active & (n_striking_reds >= 1)
+    mauled_b = coop_active & (n_striking_reds == 1)
+
+    potential_caught_b = caught_small_potential | caught_big_coop_potential | caught_big_solo_potential
 
     if catch_prob >= 1.0:
-        caught_b = in_range_b
-        caught = in_range
+        caught_b = potential_caught_b
     else:
         roll = jax.random.uniform(rng, (max_b,))
-        caught_b = in_range_b & (roll < catch_prob)
-        caught = in_range & caught_b[:, None]
+        caught_b = potential_caught_b & (roll < catch_prob)
 
     b_new_alive = b_alive & ~caught_b
 
-    # Red reward per successful catch (one per blue actually caught)
-    r_catch_rew = jnp.sum(caught, axis=0).astype(jnp.float32)  # (R,)
+    # Assign reward counts to reds based on actually caught blues
+    r_caught_small = jnp.sum(in_range_small & (caught_small_potential & caught_b)[:, None], axis=0).astype(jnp.float32)
+    r_caught_big_coop = jnp.sum(striking_in_range_big & (caught_big_coop_potential & caught_b)[:, None], axis=0).astype(jnp.float32)
+    r_caught_big_solo = jnp.sum(striking_in_range_big & (caught_big_solo_potential & caught_b)[:, None], axis=0).astype(jnp.float32)
+    
+    # Mauling occurs on the attempt, regardless of whether the prey dies
+    r_mauled = jnp.sum(striking_in_range_big & mauled_b[:, None], axis=0).astype(jnp.float32)
+
     b_penalty = -1.0 * caught_b.astype(jnp.float32)
 
-    return b_new_alive, r_catch_rew, b_penalty, caught_b
+    return b_new_alive, caught_b, r_caught_small, r_caught_big_coop, r_caught_big_solo, r_mauled, b_penalty
 
 
 # ── Symbol / culture writes ─────────────────────────────────────────────────

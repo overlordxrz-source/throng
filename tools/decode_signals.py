@@ -1863,6 +1863,8 @@ def main() -> None:
                     help="Pre-withdrawal corpus for comparison (skips full analysis)")
     ap.add_argument("--lag", type=int, default=0,
                     help="Phase 15.2b: Run Episodic Memory LRT for Cultural Transmission at specified lag")
+    ap.add_argument("--metrics", type=str, default="",
+                    help="Comma-separated list of metrics to compute (e.g. posdis,tre)")
     args = ap.parse_args()
 
     if args.red:
@@ -1948,6 +1950,44 @@ def main() -> None:
     print(hdr)
     print("  " + "─" * (len(hdr) - 2))
     best_label = {}
+    
+    # Optional Metrics Computation
+    if args.metrics:
+        metrics_to_run = [m.strip().lower() for m in args.metrics.split(",")]
+        print(f"\n{'─'*70}")
+        print(f"  COMPOSITIONALITY METRICS")
+        print(f"{'─'*70}")
+        
+        if "posdis" in metrics_to_run:
+            F = mi_mat.shape[1]
+            if F > 1:
+                max_mi = mi_mat.max(axis=1)
+                sum_mi = mi_mat.sum(axis=1)
+                eps = 1e-8
+                disentanglement = 1.0 - (sum_mi - max_mi) / (np.maximum(max_mi, eps) * (F - 1))
+                valid = max_mi > 1e-3
+                posdis_score = float(np.mean(disentanglement[valid])) if np.any(valid) else 0.0
+                print(f"  PosDis (Positional Disentanglement): {posdis_score:.4f}")
+            else:
+                print("  PosDis: N/A (requires multiple context features)")
+                
+        if "tre" in metrics_to_run:
+            # Tree Reconstruction Error (TRE) typically requires a derivation tree.
+            # Using a linear decodability score (R^2) as a proxy for structural compositionality.
+            try:
+                from sklearn.linear_model import Ridge
+                X = signals
+                scores = []
+                for k in CONTEXT_KEYS:
+                    if k in ctx:
+                        y = ctx[k]
+                        model = Ridge(alpha=1.0)
+                        model.fit(X, y)
+                        scores.append(model.score(X, y))
+                tre_proxy = np.mean(scores) if scores else 0.0
+                print(f"  TRE (Tree Reconstruction Error proxy via linear decodability R^2): {tre_proxy:.4f}")
+            except ImportError:
+                print("  TRE: sklearn required for computation.")
     for di in range(sig_dim):
         vals = "  ".join(f"{mi_mat[di, fi]:>9.4f}" for fi in range(len(CONTEXT_KEYS)))
         best_fi = int(mi_mat[di].argmax())

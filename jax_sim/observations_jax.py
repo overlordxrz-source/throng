@@ -50,6 +50,7 @@ def build_observations_jax(
     step: int,
     key: jnp.ndarray = None,
     limit_red_sensing: bool = False,
+    blue_bg_map: jnp.ndarray = None,
 ) -> jnp.ndarray:
     """Build flat observation vector for all agents."""
     gs = config["grid_size"]
@@ -72,9 +73,13 @@ def build_observations_jax(
         pop.positions, pop.signals, pop.alive, K, gs,
     )
 
+    if blue_bg_map is None:
+        blue_bg_map = jnp.zeros_like(blue_map)
+
     loc_sym = get_local_patches(grid.symbols, pop.positions, r, gs)
     loc_pres = jnp.concatenate([
         get_local_patches(blue_map.astype(jnp.float32), pop.positions, r, gs)[..., None],
+        get_local_patches(blue_bg_map.astype(jnp.float32), pop.positions, r, gs)[..., None],
         get_local_patches(red_map.astype(jnp.float32), pop.positions, r, gs)[..., None],
     ], axis=-1)
     loc_wall = get_local_patches(grid.walls.astype(jnp.float32), pop.positions, r, gs)[..., None]

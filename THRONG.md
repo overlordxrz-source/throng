@@ -8,30 +8,27 @@
 
 ---
 
-## 0b. Current state — **Phase 15 Cumulative Culture** (Jun 2026)
+## 0b. Current state — **Phase 16 Open-Ended Combinatorial Complexity** (Jun 2026)
 
 **Blue SOTA (frozen on `master`):** **`465d8c6+`** — 9.4 cross-attn + 9.1 confidence + **11.3 epistemic gate** (Stay-collapse resolved).
 
-**Headline:** **P14.4 DCVQ + SimVQ** confirmed language (Direction LRT **29/32 p<0.05** @ 688k). **P15.0 MEDAL-ADR** live. Post-SimVQ graft collapsed red VQ (**2/64**). **P15.1c/d** ❌ surgeries failed to break singularity. **P15.1e** ✅ Latent Heat (Gaussian noise `red_vq_noise_scale=0.5`) injected into `z_e`. **SUCCESS:** `red_codes_active` shattered singularity, reaching **52/64** at step 771k. VQ is alive again.
+**Headline:** Phase 15 mathematically confirmed Episodic Memory and Cumulative Culture at Lag-10! The architecture has pivoted to Phase 16: to force combinatorial syntax, we've introduced `Big Green` prey requiring cooperative simultaneous strikes, an expanded 8-dim action space, and a 100k-step CtD phase gate to safely bootstrap noun/verb composition.
 
-| Live run (Phase 15) | Value |
+| Live run (Phase 16) | Value |
 |---------------------|--------|
 | **Branch** | **`feature/phase15-cumulative-culture`** (`git=ee62f7f` code; docs `34074ab`) |
 | **Modal workspace** | **`dragonbg`** (Jun 2026) — volume **`throng-runs`** → `/mnt/throng-runs` |
-| **Volume ckpt** | **`1491+`** — P15.1c cold-restart resume @ step **763392** |
+| **Volume ckpt** | **`1689+`** — P15.5 BPTT resume |
 | **Migration script** | **`scripts/migrate_modal.sh`** — `download` / `upload` between accounts |
 | **P14.4** | ✅ DCVQ + SimVQ — Direction LRT **29/32 p<0.05** (688k) |
 | **P15.0** | ✅ **MEDAL-ADR** — `expert_dropouts≈74–90`/rollout |
-| **P15.1e** | ✅ **Latent Heat (Noise Injection)** (`7980206`) — broke singularity! **52/64** active at **771k**. |
-| **P15.2** | ❌ **Episodic Memory LRT FAILED** (action p=0.83, memory p=0.10) @ 813k |
-| **P15.3** | ❌ **Semantic Retention Loss (SRL) FAILED** — zeroed auxiliary gradients corrupted the shared Adam optimizer momentum |
-| **P15.4** | ❌ **EMA + BPTT FAILED** — BPTT drove `ret_loss` down by blowing up memory magnitude, crushing VQ codebook back into singularity (peak MI = `energy` on all 32 dims). |
 | **P15.5** | 🏆 **Memory Architecture Pivot (CONFIRMED)** — `nn.GRUCell` decoupled magnitude explosion from temporal BPTT gradients. |
+| **P16.0** | 🚀 **Combinatorial Syntax Scaffold** — `Big Green` prey introduced (reward 8.0, solo penalty -1.0) with a 100k step solo-catchable phase gate (CtD) to build noun vocabulary before cooperative thresholds demand syntax (verbs). Action space expanded to 8. |
 | **Science bar (P15.5)** | ✅ **CONFIRMED**: Episodic Memory ($p < 0.05$) & Cumulative Culture ($p < 0.001$) at Lag-10! |
-| **Decode gate (P15.5)** | `python3 tools/decode_signals.py --red --min-step 880000 --lag 10` |
-| **Cold-restart toggle** | **`True`** (MUST be true on P15.5 resume from 866304 to shatter corrupted codebook) |
+| **Decode gate (P16.0)** | `python3 tools/decode_signals.py --red --metrics posdis,tre` |
+| **Cold-restart toggle** | **`True`** (MUST be true on resume from 866304 to shatter corrupted codebook) |
 | **Dialogue** | **`monologue_enabled: false`**, **`dialogue_signal_mode: hard`** |
-| **Mode** | GWT + DCVQ/SimVQ (bounded W) + hard **z_q** + proprio + asymmetric red decay + **MEDAL-ADR** + **SRL BPTT** |
+| **Mode** | GWT + DCVQ/SimVQ (bounded W) + hard **z_q** + proprio + asymmetric red decay + **MEDAL-ADR** + **SRL BPTT** + **Big Green Cooperate** |
 
 **Synergic synthesis (Cam, P14.3 pivot):**
 

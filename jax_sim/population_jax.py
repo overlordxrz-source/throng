@@ -58,6 +58,7 @@ class PopState:
         self.steps_since_dropout = jnp.zeros(max_pop, dtype=jnp.int32)
         self.lineage_ids = jnp.zeros(max_pop, dtype=jnp.int32)
         self.next_lineage_id = jnp.int32(1)
+        self.is_big_green = jnp.zeros(max_pop, dtype=jnp.bool_)
 
     # ── PyTree registration ───────────────────────────────────────────────
 
@@ -66,7 +67,7 @@ class PopState:
             self.positions, self.ages, self.alive, self.energy, self.team,
             self.n_layers, self.carries, self.signals, self.nb_gain,
             self.offspring_count, self.steps_since_catch, self.steps_since_dropout,
-            self.lineage_ids, self.next_lineage_id,
+            self.lineage_ids, self.next_lineage_id, self.is_big_green,
         ]
         if self.memory_buffer is not None:
             children.append(self.memory_buffer)
@@ -84,9 +85,9 @@ class PopState:
         (pop.positions, pop.ages, pop.alive, pop.energy, pop.team,
          pop.n_layers, pop.carries, pop.signals, pop.nb_gain,
          pop.offspring_count, pop.steps_since_catch, pop.steps_since_dropout,
-         pop.lineage_ids, pop.next_lineage_id) = children[:14]
+         pop.lineage_ids, pop.next_lineage_id, pop.is_big_green) = children[:15]
         if memory_slots > 0:
-            pop.memory_buffer = children[14]
+            pop.memory_buffer = children[15]
         else:
             pop.memory_buffer = None
         return pop
@@ -113,6 +114,7 @@ class PopState:
         pop.lineage_ids = kwargs.get("lineage_ids", self.lineage_ids)
         pop.next_lineage_id = kwargs.get("next_lineage_id", self.next_lineage_id)
         pop.memory_buffer = kwargs.get("memory_buffer", self.memory_buffer)
+        pop.is_big_green = kwargs.get("is_big_green", self.is_big_green)
         return pop
 
 
@@ -145,6 +147,10 @@ def init_population(
     positions = jnp.stack([pos_y, pos_x], axis=1)
 
     alive = jnp.arange(max_pop) < n_agents
+    
+    # 20% of the initial population are Big Greens
+    is_bg = jax.random.uniform(keys[2], (max_pop,)) < 0.2
+    is_bg = is_bg & alive
 
     # Update state
     pop = pop.replace(
@@ -152,6 +158,7 @@ def init_population(
         alive=alive,
         energy=jnp.where(alive, 1.0, 0.0),
         team=jnp.where(alive, jnp.int8(team_id), jnp.int8(0)),
+        is_big_green=is_bg,
     )
     return pop
 
@@ -259,6 +266,10 @@ def apply_auto_reproduce(
     new_signals = jnp.where(activate_mask[:, None], parent_signals, pop.signals)
     new_nb_gain = jnp.where(activate_mask, 1.0, pop.nb_gain)
     
+    # We maintain the type of the parent
+    parent_is_big_green = pop.is_big_green[assigned_parents]
+    new_is_big_green = jnp.where(activate_mask, parent_is_big_green, pop.is_big_green)
+    
     pop = pop.replace(
         alive=new_alive,
         positions=new_positions,
@@ -268,7 +279,8 @@ def apply_auto_reproduce(
         n_layers=new_layers,
         carries=new_carries,
         signals=new_signals,
-        nb_gain=new_nb_gain
+        nb_gain=new_nb_gain,
+        is_big_green=new_is_big_green
     )
     
     if pop.memory_buffer is not None:

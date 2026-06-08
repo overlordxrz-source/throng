@@ -145,7 +145,7 @@ class AgentNetworkJax(nn.Module):
     cross_attn_num_heads: int = 4
     neighbor_k: int = 6
     local_cells: int = 25
-    env_channels: int = 8
+    env_channels: int = 9
 
     def setup(self):
         d = self.hidden_dim
@@ -170,7 +170,7 @@ class AgentNetworkJax(nn.Module):
 
         # Output heads
         self.final_norm = nn.LayerNorm()
-        self.head_action = nn.Dense(5)           # 5 actions
+        self.head_action = nn.Dense(8)           # 8 actions (N, S, E, W, Stay, Strike, Push, Guard)
         self.head_signal = nn.Dense(self.signal_dim)  # continuous z_e pre-VQ
         self.codebook = nn.Embed(self.vocab_size, self.signal_dim)
         self.head_symbol = nn.Dense(sym_d)       # symbol write
@@ -552,7 +552,7 @@ class PredatorNetworkJax(nn.Module):
         self.final_norm = nn.LayerNorm()
         # Phase 15.5: GRUCell to replace EMA, protecting magnitude from BPTT explosion
         self.carry_gru = nn.GRUCell(features=d, name="carry_gru")
-        self.head_action = nn.Dense(5)
+        self.head_action = nn.Dense(8)           # 8 actions
         self.head_signal = nn.Dense(self.signal_dim)
         
         # Phase 14.4: DCVQ + SimVQ instead of red_codebook
@@ -757,6 +757,8 @@ def ensure_predator_params(
 ) -> Any:
     """Fill missing dcvq / simvq_W / red_nb_cross_attn / gwt_comms_1 when resuming older predator ckpts."""
     flat = unfreeze(params)
+    pad_head_action(flat)  # Phase 16 parameter grafting
+    pad_emb_env(flat)      # Phase 16 obs grafting
     needs_codebook = "dcvq" not in flat or "simvq_W" not in flat or (
         "head_signal" in flat
         and flat["head_signal"]["kernel"].shape[-1] != model.signal_dim
@@ -933,6 +935,53 @@ def sanitize_agent_params(params: Any) -> Any:
     return params
 
 
+def pad_head_action(flat_params: dict, target_actions: int = 8) -> None:
+    """Pad head_action weights/biases from 5 to 8 actions if needed."""
+    if "head_action" not in flat_params:
+        return
+    ha = flat_params["head_action"]
+    kernel = ha["kernel"]
+    bias = ha["bias"]
+    
+    if kernel.shape[1] < target_actions:
+        d = kernel.shape[0]
+        missing = target_actions - kernel.shape[1]
+        padded_kernel = jnp.concatenate([
+            kernel,
+            jnp.zeros((d, missing), dtype=kernel.dtype)
+        ], axis=1)
+        padded_bias = jnp.concatenate([
+            bias,
+            jnp.zeros((missing,), dtype=bias.dtype)
+        ], axis=0)
+        flat_params["head_action"] = {
+            "kernel": padded_kernel,
+            "bias": padded_bias,
+        }
+        print(f"[JAX] Grafting padding to head_action: expanded from {kernel.shape[1]} to {target_actions} actions", flush=True)
+
+
+def pad_emb_env(flat_params: dict, target_channels: int = 9) -> None:
+    """Pad emb_env kernel from 8 to 9 channels if needed."""
+    if "emb_env" not in flat_params:
+        return
+    ee = flat_params["emb_env"]
+    kernel = ee["kernel"]
+    # Kernel shape: (in_channels, hidden_dim)
+    if kernel.shape[0] < target_channels:
+        hidden_dim = kernel.shape[1]
+        missing = target_channels - kernel.shape[0]
+        padded_kernel = jnp.concatenate([
+            kernel,
+            jnp.zeros((missing, hidden_dim), dtype=kernel.dtype)
+        ], axis=0)
+        flat_params["emb_env"] = {
+            "kernel": padded_kernel,
+            "bias": ee.get("bias", jnp.zeros(hidden_dim, dtype=kernel.dtype)),
+        }
+        print(f"[JAX] Grafting padding to emb_env: expanded from {kernel.shape[0]} to {target_channels} channels", flush=True)
+
+
 def ensure_aux_head_params(
     model: AgentNetworkJax,
     params: Any,
@@ -943,6 +992,8 @@ def ensure_aux_head_params(
 ) -> Any:
     """Fill missing auxiliary-head / VQ / monologue params when resuming."""
     flat = unfreeze(params)
+    pad_head_action(flat)  # Phase 16 parameter grafting
+    pad_emb_env(flat)      # Phase 16 obs grafting
     needs_vq = (
         "codebook" not in flat
         or (

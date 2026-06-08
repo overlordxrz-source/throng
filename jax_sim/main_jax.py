@@ -191,6 +191,15 @@ def make_sim_step(
     _reward_red_starve = float(config.get("reward_red_starve_per_step", -0.01))
     _red_catch_radius = int(config.get("red_catch_radius", 1))
     _red_catch_prob = float(config.get("red_catch_prob", 1.0))
+
+    # Phase 16 parameters
+    p16 = config.get("phase16_combinatorial_syntax", {})
+    _rew_small_blue = float(p16.get("reward_small_blue", 3.0))
+    _rew_big_green_coop = float(p16.get("reward_big_green_success", 8.0))
+    _rew_big_green_solo_pen = float(p16.get("reward_big_green_solo_penalty", -1.0))
+    _rew_big_green_solo_catch = float(p16.get("reward_big_green_solo_catchable", 2.0))
+    _rew_coord = float(p16.get("r_coord", 1.5))
+    _coop_threshold_step = int(p16.get("coop_threshold_step", 100000))
     _puzzle_reward = float(config.get("puzzle_reward", 5.0))
     _energy_decay = float(config["energy_decay"])
     _red_energy_decay = float(config["red_energy_decay"])
@@ -237,11 +246,13 @@ def make_sim_step(
     from jax_sim import observations_jax as _obs
 
     @jax.jit
-    def sim_step(carry, step_key):
+    def sim_step(carry, scan_input):
         """
         carry = (grid, blue_pop, red_pop, blue_carries, red_carries, b_params, r_params)
+        scan_input = (step_key, step_idx)
         Returns: new_carry, rollout_data
         """
+        step_key, step_idx = scan_input
         grid, b_pop, r_pop, b_carries, r_carries, b_params, r_params = carry
         b_params_sg = jax.tree.map(jax.lax.stop_gradient, b_params)
         r_params_sg = jax.tree.map(jax.lax.stop_gradient, r_params)
@@ -249,17 +260,23 @@ def make_sim_step(
 
         # ── Build presence maps ─────────────────────────────────
         blue_map = jnp.zeros((gs, gs), dtype=jnp.bool_)
-        blue_map = blue_map.at[b_pop.positions[:, 0], b_pop.positions[:, 1]].set(b_pop.alive)
+        blue_map = blue_map.at[b_pop.positions[:, 0], b_pop.positions[:, 1]].set(b_pop.alive & ~b_pop.is_big_green)
+        
+        blue_bg_map = jnp.zeros((gs, gs), dtype=jnp.bool_)
+        blue_bg_map = blue_bg_map.at[b_pop.positions[:, 0], b_pop.positions[:, 1]].set(b_pop.alive & b_pop.is_big_green)
+        jax.debug.print("Step {step}: Big Green Map sum: {sum}", step=step_idx, sum=jnp.sum(blue_bg_map))
+        
         red_map = jnp.zeros((gs, gs), dtype=jnp.bool_)
         red_map = red_map.at[r_pop.positions[:, 0], r_pop.positions[:, 1]].set(r_pop.alive)
 
         # ── Observations (via observations_jax — reload with train_entry) ──
         b_obs = _obs.build_observations_jax(
             b_pop, grid, blue_map, red_map, config, 0,
-            key=key_b_obs, limit_red_sensing=True,
+            key=key_b_obs, limit_red_sensing=True, blue_bg_map=blue_bg_map,
         )
         r_obs = _obs.build_observations_jax(
             r_pop, grid, blue_map, red_map, config, 0, key=key_r_obs,
+            blue_bg_map=blue_bg_map,
         )
 
         # ── Forward passes ──────────────────────────────────────
@@ -401,10 +418,10 @@ def make_sim_step(
 
         # ── Catch detection (optional predator jitter via red_catch_prob) ──
         catch_rng = jax.random.split(key_misc)[1]
-        b_new_alive, r_catch_rew, b_catch_pen, caught_b = apply_catches(
-            b_pop.positions, b_pop.alive,
-            r_pop.positions, r_pop.alive,
-            gs,
+        b_new_alive, caught_b, r_caught_small, r_caught_big_coop, r_caught_big_solo, r_mauled, b_catch_pen = apply_catches(
+            b_pop.positions, b_pop.alive, b_pop.is_big_green,
+            r_pop.positions, r_pop.alive, r_actions,
+            gs, step_idx, _coop_threshold_step,
             catch_radius=_red_catch_radius,
             catch_prob=_red_catch_prob,
             rng=catch_rng,
@@ -421,7 +438,7 @@ def make_sim_step(
         )
 
         # ── Red starvation tracking ─────────────────────────────
-        r_caught_any = r_catch_rew > 0
+        r_caught_any = (r_caught_small > 0) | (r_caught_big_coop > 0) | (r_caught_big_solo > 0)
         new_steps_since = jnp.where(r_caught_any, 0, r_pop.steps_since_catch + 1)
         new_steps_since = jnp.where(r_pop.alive, new_steps_since, 0)
         r_pop = r_pop.replace(steps_since_catch=new_steps_since)
@@ -499,7 +516,10 @@ def make_sim_step(
         b_rew = b_rew + _puzzle_reward * p_rew
         b_rew = b_rew + contested_gain * 0.5
 
-        r_rew = _reward_red_catch * r_catch_rew
+        r_rew = _rew_small_blue * r_caught_small
+        r_rew = r_rew + (_rew_big_green_coop + _rew_coord) * r_caught_big_coop
+        r_rew = r_rew + _rew_big_green_solo_catch * r_caught_big_solo
+        r_rew = r_rew + _rew_big_green_solo_pen * r_mauled
         r_rew = r_rew + jnp.where(r_pop.alive, _reward_red_starve, 0.0)
         r_rew = r_rew + _reward_red_move * r_moved.astype(jnp.float32)
 
@@ -1250,12 +1270,14 @@ def _run_simulation_impl(
     for ui in range(start_update, n_updates):
         update_key = update_keys[ui]
         step_keys = jax.random.split(update_key, T)
+        step_idxs = jnp.arange(ui * T, (ui + 1) * T)
 
         if use_pmap:
             # step_keys needs to be shaped (n_devices, T, 2)
-            # Actually step_keys is just a PRNGKey array. We can split it for each device.
             step_keys_pmap = jax.random.split(update_key, n_devices * T).reshape(n_devices, T, -1)
-            final_carry, rollout_data = sim_step_mapped(grid, b_pop, r_pop, b_carries, r_carries, step_keys_pmap)
+            step_idxs_pmap = jnp.broadcast_to(step_idxs[None, :], (n_devices, T))
+            scan_input_pmap = (step_keys_pmap, step_idxs_pmap)
+            final_carry, rollout_data = sim_step_mapped(grid, b_pop, r_pop, b_carries, r_carries, scan_input_pmap)
             grid, b_pop, r_pop, b_carries, r_carries, _, _ = final_carry
             
             # Flatten rollout data across devices
@@ -1263,11 +1285,12 @@ def _run_simulation_impl(
                 return x.reshape(n_devices * T, *x.shape[2:])
             rollout_data = jax.tree_util.tree_map(flatten_pmap, rollout_data)
         else:
+            scan_input = (step_keys, step_idxs)
             init_carry = (grid, b_pop, r_pop, b_carries, r_carries, b_params, r_params)
             if ui == start_update:
                 print(f"[JAX] lax.scan rollout starting (update {ui + 1})...", flush=True)
             _t_rollout0 = __import__("time").time()
-            final_carry, rollout_data = lax.scan(sim_step_fn, init_carry, step_keys)
+            final_carry, rollout_data = lax.scan(sim_step_fn, init_carry, scan_input)
             if ui == start_update:
                 _dt0 = __import__("time").time() - _t_rollout0
                 print(
