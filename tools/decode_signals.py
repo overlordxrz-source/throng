@@ -39,7 +39,7 @@ try:
 except ImportError:
     sys.exit("sklearn required: pip install scikit-learn")
 
-ACTION_NAMES = {0: "N", 1: "S", 2: "E", 3: "W", 4: "STAY"}
+ACTION_NAMES = {0: "N", 1: "S", 2: "E", 3: "W", 4: "STAY", 5: "STRK", 6: "PUSH", 7: "GRD"}
 CONTEXT_KEYS = ["red_dist", "red_bear", "resource", "energy", "neighbors"]
 RED_CONTEXT_KEYS = ["blue_dist", "blue_bear", "resource", "energy", "neighbors"]
 RED_CORPUS_DEFAULT = "/mnt/throng-runs/signal_corpus_red.jsonl"
