@@ -759,6 +759,7 @@ def ensure_predator_params(
     flat = unfreeze(params)
     pad_head_action(flat)  # Phase 16 parameter grafting
     pad_emb_env(flat)      # Phase 16 obs grafting
+    pad_gwt_comms_1(flat)  # Phase 16 obs grafting for GWT Router
     needs_codebook = "dcvq" not in flat or "simvq_W" not in flat or (
         "head_signal" in flat
         and flat["head_signal"]["kernel"].shape[-1] != model.signal_dim
@@ -980,6 +981,41 @@ def pad_emb_env(flat_params: dict, target_channels: int = 9) -> None:
             "bias": ee.get("bias", jnp.zeros(hidden_dim, dtype=kernel.dtype)),
         }
         print(f"[JAX] Grafting padding to emb_env: expanded from {kernel.shape[0]} to {target_channels} channels", flush=True)
+
+
+def pad_gwt_comms_1(flat_params: dict, target_channels: int = 2335) -> None:
+    """Pad gwt_comms_1 kernel from 2310 to 2335 by interleaving zeros for the 9th env channel."""
+    if "gwt_comms_1" not in flat_params:
+        return
+    gc1 = flat_params["gwt_comms_1"]
+    kernel = gc1["kernel"]
+    if kernel.shape[0] < target_channels:
+        hidden_dim = kernel.shape[1]
+        
+        # Calculate exactly where loc_env starts in the flattened obs vector
+        K = 6  # neighbor_k
+        W = 25 # (2*2 + 1)**2
+        sig_dim = 32
+        sym_dim = 16
+        idx_start = 6 + K * sig_dim + W * sym_dim  # 598
+        
+        # We need to build the new kernel by inserting W rows of zeros
+        new_kernel = jnp.zeros((target_channels, hidden_dim), dtype=kernel.dtype)
+        
+        # The new indices for the inserted 9th channel (index 8 in each W block)
+        insert_indices = jnp.array([idx_start + 8 + i * 9 for i in range(W)])
+        
+        # All other indices map to the old kernel
+        mask = jnp.ones(target_channels, dtype=bool)
+        mask = mask.at[insert_indices].set(False)
+        
+        new_kernel = new_kernel.at[mask].set(kernel)
+        
+        flat_params["gwt_comms_1"] = {
+            "kernel": new_kernel,
+            "bias": gc1.get("bias", jnp.zeros(hidden_dim, dtype=kernel.dtype)),
+        }
+        print(f"[JAX] Grafting interleaved padding to gwt_comms_1: expanded from {kernel.shape[0]} to {target_channels}", flush=True)
 
 
 def ensure_aux_head_params(

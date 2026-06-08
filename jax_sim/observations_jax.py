@@ -79,7 +79,6 @@ def build_observations_jax(
     loc_sym = get_local_patches(grid.symbols, pop.positions, r, gs)
     loc_pres = jnp.concatenate([
         get_local_patches(blue_map.astype(jnp.float32), pop.positions, r, gs)[..., None],
-        get_local_patches(blue_bg_map.astype(jnp.float32), pop.positions, r, gs)[..., None],
         get_local_patches(red_map.astype(jnp.float32), pop.positions, r, gs)[..., None],
     ], axis=-1)
     loc_wall = get_local_patches(grid.walls.astype(jnp.float32), pop.positions, r, gs)[..., None]
@@ -88,9 +87,10 @@ def build_observations_jax(
     loc_contested = get_local_patches(grid.contested_res, pop.positions, r, gs)[..., None]
     loc_scent = get_local_patches(grid.scent_trails, pop.positions, r, gs)[..., None]
     loc_puzzle = get_local_patches(grid.puzzle_grid, pop.positions, r, gs)[..., None]
+    loc_blue_bg = get_local_patches(blue_bg_map.astype(jnp.float32), pop.positions, r, gs)[..., None]
 
     loc_env = jnp.concatenate([
-        loc_pres, loc_wall, loc_res, loc_shelter, loc_contested, loc_scent, loc_puzzle
+        loc_pres, loc_wall, loc_res, loc_shelter, loc_contested, loc_scent, loc_puzzle, loc_blue_bg
     ], axis=-1)
 
     if key is not None:
