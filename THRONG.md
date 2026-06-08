@@ -39,6 +39,34 @@
 | **Philosophy** | Language cannot map physical space if the existential burden of the speaker is entirely internal. Algorithmic blindness to self within the language center forces exteroceptive grounding |
 | **Response** | **GWT structural mask** — `gwt_comms_1 = Dense(d)` on energy-zeroed obs; cross-attn carry zeroed; `head_signal` reads `h_comms` not `pooled` |
 
+### Phase 15.5 / 16.0 — **CtD Scaffold & Lag-10 Episodic Memory (880k)**
+
+**Synergic synthesis (Cam, Phase 15.5 pivot):**
+
+| Lens | Finding |
+|------|---------|
+| **Physics** | System achieved thermodynamic homeostasis. `MetabolicTax: 0.00178` vs `Energy: 0.471` proves agents willingly pay the epistemic cost of K=5 imagination to project light-cones. Syntax is now a thermodynamic requirement. |
+| **RL/ML** | `carry_fwd` pinned at optimal 0.0002; `carry_H` massive at 5201.72. The `nn.GRUCell` structural mask validated—recurrent temporal magnitude decoupled from BPTT gradient accumulation. |
+| **Philosophy** | Testing for the birth of Time. Lag-1 = biological reflex. Lag-10 correlation = Episodic Memory (symbol retains semantic weight after stimulus vanishes). The boundary of proto-language. |
+
+**Phase 15.5 / 16.0 Gate Decode** (From resume point 866304):
+
+```bash
+# 1. Test for Episodic Memory and Cumulative Culture (Blue Prey)
+# Looking for action LRT and memory retention p < 0.05 at 10 timesteps.
+python3 tools/decode_signals.py /mnt/throng-runs/signal_corpus.jsonl \
+  --min-step 866304 --lag 10 2>&1 | tee decode_blue_lag10_880k.log
+
+# 2. Check Red Pincer spatial grounding (Red Predators)
+# Looking for the discrete pincer χ² (Chase vs Search) p < 0.05.
+python3 tools/decode_signals.py --red /mnt/throng-runs/signal_corpus_red.jsonl \
+  --min-step 866304 --k 16 2>&1 | tee decode_red_pincer_880k.log
+
+# 3. Phase 16 Initial Syntax check (Optional early look at PosDis/TRE)
+python3 tools/decode_signals.py /mnt/throng-runs/signal_corpus.jsonl \
+  --min-step 866304 --metrics posdis,tre 2>&1 | tee decode_blue_syntax_880k.log
+```
+
 > [!WARNING]
 > **Catastrophic Checkpointing Bug Fixed:** Since Phase 12, `main_jax.py` possessed a bug where the red predator's network weights (`r_params`) were completely wiped and re-initialized with random weights every time a checkpoint was resumed (if `red_comms_enabled: true`). This explains why the predators failed to learn in P14.1c: they never got more than ~50-100k steps of training before getting wiped. **Fixed in `fbc2f2e`.**
 

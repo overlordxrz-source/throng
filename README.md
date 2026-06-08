@@ -169,8 +169,8 @@ Each agent is a **Flax transformer** (`jax_sim/network_jax.py`):
 - 256-dim recurrent **carry** persisting across the agent's lifetime.
 - Eight output heads (action, signal, symbol, culture-fast, culture-slow,
   value, theory-of-mind, gain).
-- Observation dimension currently **1,800** at `n_layers=2, neighbor_k=6,
-  memory_buffer_size=5, env_ch=8`.
+- Observation dimension currently **2,335** at `n_layers=2, neighbor_k=6,
+  memory_buffer_size=5, env_ch=9`.
 
 ### Learning
 
@@ -374,7 +374,7 @@ These are organised by *cost and risk*, so the cheap wins land first.
 - At inference, use `head_fwd` + critic to score each candidate action by
   imagined-2-step return.
 - Replace `argmax(action_logits)` with `argmax_a vf(fwd(h, a))`.
-- Fixed branching factor (5 actions × depth K) — JIT-friendly.
+- Fixed branching factor (8 actions × depth K) — JIT-friendly.
 
 **Phase 9.4 — Communication Upgrades** (post-9.3)
 - Multi-head attention over neighbour signals (replace mean-pool).
