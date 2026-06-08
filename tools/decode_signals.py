@@ -1508,9 +1508,8 @@ def decode_red_schema(
         print(f"  PHASE 15 CUMULATIVE CULTURE LRT")
         print(f"{'─'*70}")
         print("  carry_fwd / steps_since_dropout absent in corpus.")
-    # ── Phase 15.2b: MEDAL-ADR Lag-5 Episodic Memory LRT ───────────────
     if lag_episodic > 0:
-        lag5_episodic_lrt(data, target_lag=lag_episodic)
+        lag_episodic_lrt(data, target_lag=lag_episodic)
 
     print(f"\n{'='*70}")
     print("  Done (red). Interpret:")
