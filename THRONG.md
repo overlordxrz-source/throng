@@ -698,33 +698,28 @@ tail -f /mnt/throng-runs/train.log
 
 `Ctrl+C` on `tail` does **not** stop training. Check: `ps aux | grep run_bg`.
 
-### P15.1c — Modal notebook (3 cells)
+### P16.0 — Modal notebook (3 cells)
 
 **Do NOT "Run All"** — Cell 3 (`tail -f`) blocks forever; cells after it never run.
 
-**Cell 1 — Setup:** clone + `git reset --hard origin/feature/phase15-cumulative-culture` (`ee62f7f+`); verify `/mnt/throng-runs/checkpoints`.
+**Cell 1 — Setup & Checkout:** 
+Modal restarts wipe `/root/throng`. Always clone and pull `feature/phase15-cumulative-culture` first, then restore the `1689` backup checkpoint.
 
-**Cell 2 — Launch (toggle at top):**
-```python
-COLD_RESTART = True   # True = surgery | False = normal resume
-```
-Writes `reset_red_vq_on_resume` to config, kills old `run_bg.py`, sets B200 env vars, `Popen` launch, ends with `!tail -n 40` (non-blocking).
+**Cell 2 — Launch:**
+Kills old `run_bg.py`, sets B200 env vars (`TF_GPU_ALLOCATOR`, `XLA_PYTHON_CLIENT_MEM_FRACTION`), and `Popen` streams `run_bg.py`.
 
-**Cell 3 — Live tail (optional):** `!tail -f /mnt/throng-runs/train.log` — Ctrl+C stops tail only.
+**Cell 3 — Live tail:** 
+`!tail -f -n 100 /mnt/throng-runs/train.log`
 
-| When | Cell 1 | Cell 2 toggle | Cell 3 |
-|------|--------|---------------|--------|
-| Surgery restart | Run | `True` | Optional |
-| Normal resume | Run | `False` | Optional |
-| Codebook healed | Skip | `False` (before next restart) | — |
+| Step | Action |
+|------|--------|
+| **1-2k (Smoke Test)** | Watch tail for `Grafting padding...` (emb_env and head_action). Verify `Big Green Map sum: X` prints non-zero. |
+| **100k (CtD)** | Run `tools/decode_signals.py` to verify small/big prey separation. |
+| **150k** | Run decode with `--metrics posdis,tre` and check `PosDis > 0.3`. |
 
-**Startup must print:** `[JAX] Red VQ cold-restart: gwt_comms_1 + head_signal + codebook + simvq_W reinitialized (policy/value/red_nb_cross_attn preserved)`
-
-**Monitor:** `red_codes_active` → **≥16/64** within **~10k steps** of restart (~773k if restart @ 763k).
-
-**Surgery scope (`ee62f7f`):** **`gwt_comms_1`**, **`head_signal`**, **`dcvq`**, **`simvq_W`**. Preserve **`head_action`**, **`head_value`**, **`red_nb_cross_attn`**, transformer blocks.
-
-**773k gate:** still **2/64** → next graft candidate **`red_nb_cross_attn`** (full comms path reset).
+**Startup must print:**
+- `[JAX] Grafting padding to emb_env: expanded from 8 to 9 channels`
+- `[JAX] Grafting padding to head_action: expanded from 5 to 8 actions`
 
 ### Notebook setup only (decode, short tasks)
 
