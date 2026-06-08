@@ -760,7 +760,7 @@ def ensure_predator_params(
     pad_head_action(flat)  # Phase 16 parameter grafting
     pad_emb_env(flat)      # Phase 16 obs grafting
     pad_gwt_comms_1(flat)  # Phase 16 obs grafting for GWT Router
-    pad_auxiliary_heads(flat) # Phase 16 auxiliary grafting
+    pad_auxiliary_heads(flat, hidden_dim) # Phase 16 auxiliary grafting
     needs_codebook = "dcvq" not in flat or "simvq_W" not in flat or (
         "head_signal" in flat
         and flat["head_signal"]["kernel"].shape[-1] != model.signal_dim
@@ -1019,17 +1019,15 @@ def pad_gwt_comms_1(flat_params: dict, target_channels: int = 2335) -> None:
         print(f"[JAX] Grafting interleaved padding to gwt_comms_1: expanded from {kernel.shape[0]} to {target_channels}", flush=True)
 
 
-def pad_auxiliary_heads(flat_params: dict, target_actions: int = 8) -> None:
+def pad_auxiliary_heads(flat_params: dict, hidden_dim: int, target_actions: int = 8) -> None:
     """Pad auxiliary heads to handle the expanded 8-dimensional action_oh vector."""
-    missing = target_actions - 5
-    if missing <= 0:
-        return
-        
+    
     # 1. Output heads: pad axis=1 (like head_action)
     for k in ["head_self_pred", "head_tom"]:
         if k in flat_params:
             d = flat_params[k]["kernel"]
             if d.shape[1] < target_actions:
+                missing = target_actions - d.shape[1]
                 padded_kernel = jnp.concatenate([d, jnp.zeros((d.shape[0], missing), dtype=d.dtype)], axis=1)
                 bias = flat_params[k].get("bias", jnp.zeros(d.shape[1], dtype=d.dtype))
                 padded_bias = jnp.concatenate([bias, jnp.zeros((missing,), dtype=bias.dtype)], axis=0)
@@ -1040,13 +1038,8 @@ def pad_auxiliary_heads(flat_params: dict, target_actions: int = 8) -> None:
     for k in ["head_fwd_1", "head_fwd_dyn_1", "head_confidence_1"]:
         if k in flat_params:
             d = flat_params[k]["kernel"]
-            # Check if it was sized for 5 actions. (hidden_dim + 5)
-            # We don't hardcode hidden_dim in case it changes, we just check if it needs padding
-            # Wait, d.shape[0] = hidden_dim + current_actions
-            # If current_actions is 5, we pad 3.
-            # Let's just assume hidden_dim is d.shape[0] - 5
-            hidden_dim = d.shape[0] - 5
-            if hidden_dim > 0 and d.shape[0] < hidden_dim + target_actions:
+            if d.shape[0] < hidden_dim + target_actions:
+                missing = (hidden_dim + target_actions) - d.shape[0]
                 padded_kernel = jnp.concatenate([d, jnp.zeros((missing, d.shape[1]), dtype=d.dtype)], axis=0)
                 flat_params[k] = {
                     "kernel": padded_kernel,
@@ -1097,7 +1090,7 @@ def ensure_aux_head_params(
     flat = unfreeze(params)
     pad_head_action(flat)  # Phase 16 parameter grafting
     pad_emb_env(flat)      # Phase 16 obs grafting
-    pad_auxiliary_heads(flat) # Phase 16 auxiliary grafting
+    pad_auxiliary_heads(flat, hidden_dim) # Phase 16 auxiliary grafting
     pad_head_fwd_2(flat)   # Phase 16 env prediction grafting
     needs_vq = (
         "codebook" not in flat
