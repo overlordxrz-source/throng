@@ -1648,9 +1648,9 @@ def _run_simulation_impl(
             # Action distribution (N=stay, S, E, W, stay=0)
             alive_actions = b_act_all[b_alive_all]
             if len(alive_actions) > 0:
-                act_counts = np.bincount(alive_actions, minlength=5)
+                act_counts = np.bincount(alive_actions, minlength=8)
                 act_pct = act_counts / act_counts.sum() * 100
-                act_str = f"N={act_pct[1]:.0f}% S={act_pct[2]:.0f}% E={act_pct[3]:.0f}% W={act_pct[4]:.0f}% Stay={act_pct[0]:.0f}%"
+                act_str = f"N={act_pct[1]:.0f}% S={act_pct[2]:.0f}% E={act_pct[3]:.0f}% W={act_pct[4]:.0f}% Stay={act_pct[0]:.0f}% Strk={act_pct[5]:.0f}% Push={act_pct[6]:.0f}% Grd={act_pct[7]:.0f}%"
             else:
                 act_str = "no alive agents"
 
@@ -1662,11 +1662,11 @@ def _run_simulation_impl(
                 r_alive_all = np.array(rollout_data["red"]["alive"]).astype(bool)
                 r_alive_actions = r_act_all[r_alive_all]
                 if len(r_alive_actions) > 0:
-                    r_counts = np.bincount(r_alive_actions, minlength=5)
+                    r_counts = np.bincount(r_alive_actions, minlength=8)
                     r_pct = r_counts / r_counts.sum() * 100
                     red_act_str = (
-                        f"N={r_pct[1]:.0f}% S={r_pct[2]:.0f}% E={r_pct[3]:.0f}% "
-                        f"W={r_pct[4]:.0f}% Stay={r_pct[0]:.0f}%"
+                        f"N={r_pct[1]:.0f}% S={r_pct[2]:.0f}% E={r_pct[3]:.0f}% W={r_pct[4]:.0f}% Stay={r_pct[0]:.0f}% "
+                        f"Strk={r_pct[5]:.0f}% Push={r_pct[6]:.0f}% Grd={r_pct[7]:.0f}%"
                     )
                 else:
                     red_act_str = "no alive reds"
