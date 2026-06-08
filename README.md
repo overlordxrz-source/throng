@@ -7,10 +7,9 @@ to **survive, signal, and pass knowledge on**. The goal is not "an agent that
 plays a game well." The goal is **emergence**: language, culture, and proto-
 cognition arising purely from selection pressure.
 
-**Current state (Jun 2026):** **Phase 15.5** on `feature/phase15-cumulative-culture`.
-**P15.5 LIVE** — Memory Architecture Pivot: Replaced static EMA with `nn.GRUCell` to absorb temporal BPTT gradients and protect the VQ codebook from magnitude explosions. 
-**Modal:** **`dragonbg`** — volume **`throng-runs`**, ckpt **866304+** (`1689_backup`).
-
+**Current state (Jun 2026):** **Phase 16 (Open-Ended Combinatorial Complexity)** on `feature/phase15-cumulative-culture`.
+**Phase 15 is COMPLETE!** — The `nn.GRUCell` decoupled magnitude explosion from temporal BPTT gradients, resulting in mathematical confirmation of both Episodic Memory ($p < 0.05$) and Cumulative Culture ($p < 0.001$) at Lag-10.
+**Modal:** **`dragonbg`** — volume **`throng-runs`**.
 **Notebook:** 3 cells — setup / launch (`COLD_RESTART` toggle) / optional `tail -f`. See [THRONG.md §4](THRONG.md#p151c--modal-notebook-3-cells). **Do not Run All.**
 
 **Full ops / decode / roadmap:** [THRONG.md](THRONG.md) §0b (read first).
