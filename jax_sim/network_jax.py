@@ -331,8 +331,8 @@ class AgentNetworkJax(nn.Module):
         )
         symbol_write = self.head_symbol(pooled)              # (N, sym_d)
         values = self.head_value(value_input).squeeze(-1)  # (N,)  unbounded, Huber loss prevents explosion
-        tom_logits = self.head_tom(pooled)[:, None, :]     # (N, 1, 5) — simplified; real version needs K
-        tom_logits = jnp.broadcast_to(tom_logits, (N, K, 5))  # (N, K, 5)
+        tom_logits = self.head_tom(pooled)[:, None, :]     # (N, 1, 8) — simplified; real version needs K
+        tom_logits = jnp.broadcast_to(tom_logits, (N, K, 8))  # (N, K, 8)
         culture_fast = self.head_culture_fast(pooled)       # (N, sym_d)
         culture_slow = self.head_culture_slow(pooled)       # (N, sym_d)
 
@@ -715,7 +715,7 @@ class PredatorNetworkJax(nn.Module):
         symbol_write = self.head_symbol(h_policy)
         values = self.head_value(value_input).squeeze(-1)
         tom_logits = self.head_tom(h_policy)[:, None, :]
-        tom_logits = jnp.broadcast_to(tom_logits, (N, K, 5))
+        tom_logits = jnp.broadcast_to(tom_logits, (N, K, 8))
         culture_fast = self.head_culture_fast(h_policy)
         culture_slow = self.head_culture_slow(h_policy)
 
