@@ -264,7 +264,12 @@ def make_sim_step(
         
         blue_bg_map = jnp.zeros((gs, gs), dtype=jnp.bool_)
         blue_bg_map = blue_bg_map.at[b_pop.positions[:, 0], b_pop.positions[:, 1]].set(b_pop.alive & b_pop.is_big_green)
-        jax.debug.print("Step {step}: Big Green Map sum: {sum}", step=step_idx, sum=jnp.sum(blue_bg_map))
+        jax.lax.cond(
+            step_idx % 512 == 0,
+            lambda _: jax.debug.print("Step {step}: Big Green Map sum: {s}", step=step_idx, s=jnp.sum(blue_bg_map)),
+            lambda _: None,
+            None
+        )
         
         red_map = jnp.zeros((gs, gs), dtype=jnp.bool_)
         red_map = red_map.at[r_pop.positions[:, 0], r_pop.positions[:, 1]].set(r_pop.alive)
