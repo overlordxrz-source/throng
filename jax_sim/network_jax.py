@@ -1055,6 +1055,36 @@ def pad_auxiliary_heads(flat_params: dict, target_actions: int = 8) -> None:
                 print(f"[JAX] Grafting padding to {k}: expanded inputs to {hidden_dim + target_actions}")
 
 
+def pad_head_fwd_2(flat_params: dict, target_outputs: int = 225) -> None:
+    """Pad head_fwd_2 outputs from 200 to 225 by interleaving zeros for the 9th env channel."""
+    if "head_fwd_2" not in flat_params:
+        return
+    hf2 = flat_params["head_fwd_2"]
+    kernel = hf2["kernel"]
+    if kernel.shape[1] < target_outputs:
+        hidden_dim = kernel.shape[0]
+        
+        W = 25 # (2*2 + 1)**2
+        
+        new_kernel = jnp.zeros((hidden_dim, target_outputs), dtype=kernel.dtype)
+        bias = hf2.get("bias", jnp.zeros(kernel.shape[1], dtype=kernel.dtype))
+        new_bias = jnp.zeros(target_outputs, dtype=bias.dtype)
+        
+        insert_indices = jnp.array([8 + i * 9 for i in range(W)])
+        
+        mask = jnp.ones(target_outputs, dtype=bool)
+        mask = mask.at[insert_indices].set(False)
+        
+        new_kernel = new_kernel.at[:, mask].set(kernel)
+        new_bias = new_bias.at[mask].set(bias)
+        
+        flat_params["head_fwd_2"] = {
+            "kernel": new_kernel,
+            "bias": new_bias,
+        }
+        print(f"[JAX] Grafting interleaved padding to head_fwd_2: expanded outputs from {kernel.shape[1]} to {target_outputs}", flush=True)
+
+
 def ensure_aux_head_params(
     model: AgentNetworkJax,
     params: Any,
@@ -1068,6 +1098,7 @@ def ensure_aux_head_params(
     pad_head_action(flat)  # Phase 16 parameter grafting
     pad_emb_env(flat)      # Phase 16 obs grafting
     pad_auxiliary_heads(flat) # Phase 16 auxiliary grafting
+    pad_head_fwd_2(flat)   # Phase 16 env prediction grafting
     needs_vq = (
         "codebook" not in flat
         or (
