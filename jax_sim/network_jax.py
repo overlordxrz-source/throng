@@ -772,7 +772,7 @@ def ensure_predator_params(
     # Phase 15.5 GRUCell upgrade
     needs_gru = "carry_gru" not in flat
     if not needs_codebook and not needs_cross and not needs_proprio and not needs_gwt and not needs_gru:
-        return params
+        return sanitize_agent_params(freeze(flat))
     carry = jnp.zeros((1, hidden_dim))
     obs = jnp.zeros((1, obs_dim))
     fresh = model.init(rng, carry, obs, n_layers)["params"]
@@ -1013,7 +1013,7 @@ def ensure_aux_head_params(
         and not needs_cross_attn
         and not needs_vqel_recon
     ):
-        return params
+        return sanitize_agent_params(freeze(flat))
     carry = jnp.zeros((1, hidden_dim))
     if needs_vq and obs_dim > 0:
         obs = jnp.zeros((1, obs_dim))
