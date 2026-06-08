@@ -615,7 +615,7 @@ class PredatorNetworkJax(nn.Module):
         loc_sym = obs[:, 6 + K * self.signal_dim : 6 + K * self.signal_dim + W * sym_d].reshape(
             N, W, sym_d
         )
-        env_ch = 8
+        env_ch = 9
         loc_env = obs[
             :,
             6 + K * self.signal_dim + W * sym_d : 6 + K * self.signal_dim + W * sym_d + W * env_ch,
