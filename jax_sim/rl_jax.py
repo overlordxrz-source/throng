@@ -444,8 +444,8 @@ def auxiliary_update(
         energy_tp1 = np.asarray(energy_np[1:]).reshape((T - 1) * N).astype(np.float32)
     else:
         energy_tp1 = np.zeros((T - 1) * N, dtype=np.float32)
-    action_oh = np.eye(5, dtype=np.float32)[action_t]
-    action_tp1_oh = np.eye(5, dtype=np.float32)[action_tp1]
+    action_oh = np.eye(8, dtype=np.float32)[action_t]
+    action_tp1_oh = np.eye(8, dtype=np.float32)[action_tp1]
 
     if alive_np is not None:
         alive_t = alive_np[:-1].reshape((T - 1) * N).astype(np.float32)

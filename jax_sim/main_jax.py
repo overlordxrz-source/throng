@@ -315,7 +315,7 @@ def make_sim_step(
         r_actions = jax.vmap(jax.random.categorical)(r_action_keys, r_action_logits)
 
         if _imagine_fn is not None:
-            action_oh_table = jnp.eye(5, dtype=b_carries.dtype)
+            action_oh_table = jnp.eye(8, dtype=b_carries.dtype)
             b_action_oh_reactive = action_oh_table[b_actions_reactive]
             b_conf_pred = model.apply(
                 params_apply_variables(b_params_sg),

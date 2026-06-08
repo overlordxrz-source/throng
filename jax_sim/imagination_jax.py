@@ -53,10 +53,10 @@ def make_imagination_fn(
         """
         n_agents = carries.shape[0]
         greedy = jnp.argmax(action_logits, axis=-1)
-        action_oh_table = jnp.eye(5, dtype=carries.dtype)
+        action_oh_table = jnp.eye(8, dtype=carries.dtype)
 
         def score_action(a: jnp.ndarray) -> jnp.ndarray:
-            action_oh = jnp.broadcast_to(action_oh_table[a], (n_agents, 5))
+            action_oh = jnp.broadcast_to(action_oh_table[a], (n_agents, 8))
 
             def scan_body(carry, _k):
                 v = _value(params, carry)
