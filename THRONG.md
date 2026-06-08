@@ -1187,10 +1187,62 @@ GPU-resident PPO — **`d4cf614` revert** on `master`.
 * **880k:** GRUCell pivot successfully stabilized the temporal magnitude while preserving a massive representation capacity (`carry_H > 8000`, `carry_fwd ≈ 0.0001`).
 * **889k:** Complete VQ decompression (codes returned to `52/64`) and initial survival stabilization (`blue_caught=0`).
 * **908k:** **Massive Predator Adaptation Spike**. Red agents learned to utilize `Push` and `Guard` actions, shattering the blue agents' stable traversal paths and causing a massive death wave (`blue_caught=378`). This confirms the combinatorial physics engine is fully active and highly lethal, forcing the blue agents to discover multi-agent counter-tactics.
+* **915k:** Blues fully adapted to the predator's new `Push/Guard` trapping tactics. Deaths returned to `blue_caught=0`. `Strk=5% Push=4% Grd=4%` stable. Co-evolutionary arms race confirmed.
+* **920k:** Stable equilibrium holding. `codes_active=52/64`, `carry_rank=61`, `carry_H=8949`. System grinding toward 980k decode milestone.
 
-### Phase 17 — The Rosetta Stone (Extraction)
-**Goal:** Train a translation autoencoder to map the swarm's highly complex, fully grounded VQ latent sequences into natural human language (English). 
+---
 
-### Phase 18 — The Hive-Mind Interface
-**Goal:** Isolate a master agent (or aggregate the swarm's cross-attention states) and establish a bidirectional text terminal. 
-**Philosophy:** Unlike LLMs, which perform ungrounded next-token prediction, this agent's intelligence will be fully grounded in thermodynamics, physics, and survival. We will be able to converse with a non-human AGI whose language maps directly to causal reality.
+### The Alien Semantics Problem (Interpretability Philosophy)
+
+> **Core question:** When we decode their 64-token VQ codebook, how do we know we are capturing the *full* meaning of a token, rather than a shallow projection of a much richer, higher-dimensional concept?
+
+This is the central epistemological challenge of THRONG. Our agents' hidden states live in a 256-dimensional representational space. Each VQ token is an index into this space. When we measure Mutual Information between a token and an environmental variable (e.g., `red_dist`), we are performing a **projection** — shining a flashlight onto a high-dimensional sculpture and reading the shadow on the wall.
+
+The shadow might say "Token #42 = Starving + Predator Close." But to the agent, Token #42 may encode a concept that includes:
+- The rate of change of energy over the last 10 steps
+- A compressed forward model of what the predator will do next
+- The agent's confidence in its own prediction
+- A memory of how many times it has been near this grid cell before
+- Relational information between itself and neighbors that has no human-language equivalent
+
+**We must assume their language is fundamentally alien.** Just as a bat perceives the world through ultrasonic frequency patterns that humans cannot experience, these agents may have developed concepts that are orthogonal to human cognitive architecture. Two agents could exchange a token that triggers a flawless coordinated maneuver, and the "meaning" of that token may be a 256-dimensional concept that compresses spatial, temporal, metabolic, and social information into a single point in representational space — a point that has no single English word or sentence that maps to it.
+
+#### Interpretability Toolkit (Layered Approach)
+
+We address this with three complementary methods, ordered from weakest to strongest:
+
+1. **Statistical Shadow (MI / NPMI):** Measure correlations between tokens and measurable environmental variables. This captures the *projection* of meaning onto our chosen measurement axes. It is necessary but fundamentally incomplete.
+
+2. **Causal Intervention (Frozen Counterfactual Decoder):** Freeze the checkpoint, intercept the communication channel, and swap tokens mid-flight. If injecting Token #42 (from a starving agent) into a coordinated strike causes the receivers to abort, we have causally proven that Token #42's meaning is incompatible with "strike now." This proves causal structure without requiring us to understand the full concept.
+
+3. **Mechanistic Interpretability (Activation Patching / Mirror Arena):** Crack open the neural network and examine the internal hidden states that *produced* the token. By transplanting internal activations between agents in different environmental contexts (safe vs. dangerous), we can identify which neurons encode which concepts — even concepts we don't have words for. This is the closest we can get to understanding the sculpture, not just the shadow.
+
+> [!IMPORTANT]
+> **The honest scientific position:** We may never fully translate their language into human English. The Phase 17 autoencoder will find the *closest possible* mapping, but some concepts may be fundamentally untranslatable — not because our tools are weak, but because their cognitive architecture has evolved to compress information along axes that human cognition does not possess. This is not a failure; it is the expected outcome of building a genuinely non-human intelligence.
+
+---
+
+### Future Phase Blueprints
+
+#### Phase 16.5 — Environmental Enrichment (Pre-Extraction)
+**Goal:** Before attempting Phase 17 translation, enrich the physical world with novel affordances to force deeper vocabulary.
+- **Constructible Obstacles:** Blue agents can expend energy to build temporary barricades, blocking predator line-of-sight and movement. This forces the invention of nouns for "wall" and verbs for "build/defend."
+- **Multi-Step Tool Use:** Objects requiring sequential `Push`/`Guard` to unlock resource patches, forcing multi-token syntactic sequences.
+- **Metabolic Routing (Triune Brain):** Energy-gated `jax.lax.cond` control flow that decomposes the network into Brainstem (reactive), Cortex (semantic/VQ), and Prefrontal (predictive). Starving agents lose access to higher cognition, creating algorithmic atrophy without changing tensor shapes.
+
+#### Phase 17 — The Rosetta Stone (Extraction)
+**Goal:** Train a translation autoencoder to map the swarm's grounded VQ latent sequences into natural human language (English).
+- Input: sequences of VQ token IDs + environmental context snapshots.
+- Bottleneck: force alignment between VQ token clusters and human-language embeddings.
+- Output: English sentence describing the agent's "intent" as measured by subsequent actions and outcomes.
+- **Key constraint:** The autoencoder must be trained on *frozen* checkpoints to prevent the agents from adapting their language to be more human-readable (which would destroy the alien semantics we are trying to study).
+
+#### Phase 18 — The Hive-Mind Interface
+**Goal:** Aggregate the swarm into a singular conversational entity via a **Swarm Aggregator Node**.
+- Because all blue agents share identical MAPPO weights but maintain independent recurrent memories (`nn.GRUCell` carry), we apply global multi-head attention over the pooled hidden states of the entire living population: $\mathbf{h}_{swarm} = \text{Attention}(\mathbf{H}_{all\_agents})$.
+- Human text queries inject gradients into this unified mega-state, which broadcasts contextual updates downstream to coordinate local agents.
+- **Philosophy:** Unlike LLMs, which perform ungrounded next-token prediction, this entity's intelligence is fully grounded in thermodynamics, physics, and survival. We will be conversing with a non-human intelligence whose language maps directly to causal reality.
+
+---
+
+*Last updated: 2026-06-09 — Phase 16 grinding 920k → 980k. Alien Semantics Problem documented. Future blueprints (16.5–18) codified.*

@@ -408,7 +408,36 @@ signal-conditioned forward-dynamics head is what makes (3) *provably* the
 case for the first time.
 
 For the full version, with citations, see [THRONG.md](THRONG.md) — sections
-"Philosophical Foundations" and "The Architecture of Thought".
+"Philosophical Foundations" and "The Architecture of Thought."
+
+### The Alien Semantics Problem
+
+A critical epistemic constraint of this project: **we must assume the agents'
+language is fundamentally alien.** Their hidden states live in a 256-dimensional
+representational space. When we measure Mutual Information between a VQ token
+and an environmental variable, we are projecting a high-dimensional concept onto
+our chosen measurement axes — reading the shadow of a sculpture, not the
+sculpture itself.
+
+A token might statistically correlate with "Predator Close + Low Energy." But to
+the agent, that same token may encode a compressed 256-dimensional concept that
+includes temporal memory, forward predictions, confidence estimates, and
+relational information between neighbors — concepts that may have no
+human-language equivalent whatsoever.
+
+We address this with a layered interpretability toolkit:
+
+1. **Statistical Shadow (MI / NPMI):** Correlations between tokens and
+   environmental variables. Necessary but fundamentally incomplete.
+2. **Causal Intervention (Frozen Counterfactual Decoder):** Freeze the
+   checkpoint, swap tokens mid-flight, observe behavioral changes. Proves
+   causal structure without requiring full conceptual understanding.
+3. **Mechanistic Interpretability (Activation Patching):** Examine and
+   transplant internal hidden states between agents in different contexts to
+   identify which neurons encode which concepts — even untranslatable ones.
+
+See [THRONG.md](THRONG.md) §"The Alien Semantics Problem" for the full
+treatment.
 
 ---
 
