@@ -1175,8 +1175,18 @@ GPU-resident PPO — **`d4cf614` revert** on `master`.
 
 ---
 
-### Phase 16 — Open-Ended Combinatorial Complexity
+### Phase 16 — Open-Ended Combinatorial Complexity (CtD Scaffold)
 **Goal:** Expand the environment topology to force the VQ language to scale from "directional flee/pursuit" to combinatorial syntax (e.g., tools, mass-coordination, multi-step planning).
+
+#### Phase 16 Theoretical Foundation & Findings
+1. **Risk-Dominant Equilibrium Trap:** In complex multi-agent scenarios like Stag Hunt (Big Green), shared-policy PPO is mathematically biased toward suboptimal, risk-dominant equilibria (foraging/fleeing) rather than payoff-dominant equilibria (coordinated striking). This is due to "relative overgeneralization" — the high variance of uncoordinated partner actions causes the expected value of cooperative actions to plummet during early exploration. 
+2. **The CtD Gate Solution:** To bypass the risk-dominant trap, we introduced a 100k-step CtD phase gate. By making Big Green solo-catchable initially, agents learn the intrinsic value of the noun ("Big Green") before being subjected to the cooperative friction that requires the verb ("Strike together").
+3. **Automated Lexical Parsing (NPMI):** To formally decode the emergent syntax without introducing grounding biases, we will use **Normalized Pointwise Mutual Information (NPMI)**. VQ tokens with high NPMI against static features (e.g., `blue_bg_map`) are classified as **Nouns**. Tokens with high NPMI against dynamic/relational features (e.g., `Strike` action executions) are classified as **Verbs**.
+
+#### Phase 16 Execution Log
+* **880k:** GRUCell pivot successfully stabilized the temporal magnitude while preserving a massive representation capacity (`carry_H > 8000`, `carry_fwd ≈ 0.0001`).
+* **889k:** Complete VQ decompression (codes returned to `52/64`) and initial survival stabilization (`blue_caught=0`).
+* **908k:** **Massive Predator Adaptation Spike**. Red agents learned to utilize `Push` and `Guard` actions, shattering the blue agents' stable traversal paths and causing a massive death wave (`blue_caught=378`). This confirms the combinatorial physics engine is fully active and highly lethal, forcing the blue agents to discover multi-agent counter-tactics.
 
 ### Phase 17 — The Rosetta Stone (Extraction)
 **Goal:** Train a translation autoencoder to map the swarm's highly complex, fully grounded VQ latent sequences into natural human language (English). 
