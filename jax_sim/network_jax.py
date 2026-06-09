@@ -320,7 +320,7 @@ class AgentNetworkJax(nn.Module):
         value_input = jax.lax.stop_gradient(pooled) if detach_value else pooled
 
         # Output heads
-        action_logits = self.head_action(pooled) / 2.0   # (N, 5)  temperature=2.0 for exploration
+        action_logits = self.head_action(pooled) / 2.0   # (N, 8)  temperature=2.0 for exploration
         z_e = self.head_signal(pooled)                 # (N, signal_dim)
         codebook_w = self.codebook.embedding           # (vocab_size, signal_dim)
         signal_out, token_ids, loss_vq = vector_quantize_signals(
@@ -338,7 +338,7 @@ class AgentNetworkJax(nn.Module):
 
         # Register auxiliary-head params in the same init as __call__ (Flax idiom).
         if self.is_initializing():
-            _action_oh = jnp.zeros((N, 5), dtype=obs.dtype)
+            _action_oh = jnp.zeros((N, 8), dtype=obs.dtype)
             self.auxiliary_heads(carries, _action_oh)
             _zq_seed = jnp.zeros_like(z_e)
             self.head_vqel_recon_2(nn.relu(self.head_vqel_recon_1(_zq_seed)))
@@ -374,7 +374,7 @@ class AgentNetworkJax(nn.Module):
     def forward_dynamics(
         self,
         carry_t: jnp.ndarray,    # (N, hidden_dim)
-        action_oh: jnp.ndarray,  # (N, 5)
+        action_oh: jnp.ndarray,  # (N, 8)
     ) -> jnp.ndarray:
         """
         Predict flat loc_env_{t+1} from carry_t + action_onehot.
@@ -387,7 +387,7 @@ class AgentNetworkJax(nn.Module):
     def carry_forward_dynamics(
         self,
         carry_t: jnp.ndarray,    # (N, hidden_dim)
-        action_oh: jnp.ndarray,  # (N, 5)
+        action_oh: jnp.ndarray,  # (N, 8)
     ) -> jnp.ndarray:
         """
         Predict carry_{t+1} from carry_t + action_onehot.
@@ -413,14 +413,14 @@ class AgentNetworkJax(nn.Module):
     def auxiliary_heads(
         self,
         carry_t: jnp.ndarray,    # (N, hidden_dim)
-        action_oh: jnp.ndarray,  # (N, 5)  — action taken at t
+        action_oh: jnp.ndarray,  # (N, 8)  — action taken at t
     ) -> tuple:
         """
         Compute auxiliary predictions from carry_t in one forward pass.
 
         Returns:
           env_pred         (N, fwd_env_dim) — predicted flat loc_env_{t+1}
-          self_pred_logits (N, 5)           — predicted action_{t+1}
+          self_pred_logits (N, 8)           — predicted action_{t+1}
           carry_pred       (N, hidden_dim)  — predicted carry_{t+1}
           conf_pred        (N,)             — predicted carry_fwd MSE (Phase 9.1)
 
@@ -1127,7 +1127,7 @@ def ensure_aux_head_params(
         for k in ("head_vqel_recon_1", "head_vqel_recon_2"):
             flat[k] = fresh_flat[k]
         print("[JAX] Merged fresh VQEL monologue decoder heads into restored checkpoint")
-    action_oh = jnp.zeros((1, 5), dtype=jnp.float32)
+    action_oh = jnp.zeros((1, 8), dtype=jnp.float32)
     aux_only = model.init(
         rng, carry, action_oh, method=model.auxiliary_heads
     )["params"]

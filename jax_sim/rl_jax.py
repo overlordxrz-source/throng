@@ -90,7 +90,7 @@ def ppo_loss(
     _, outs = apply_fn(params, carries, obs, n_layers, detach_value=False, **kwargs)
 
     # Unpack outputs
-    action_logits = outs[0]      # (M, 5)
+    action_logits = outs[0]      # (M, 8)
     values_pred = outs[3]        # (M,)
 
     # Action log probs
