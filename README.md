@@ -9,7 +9,7 @@ cognition arising purely from selection pressure.
 
 **Current state (Jun 2026):** **Phase 16.5 (Environmental Enrichment)** drafted on `feature/phase16-5-enrichment`.
 **Phase 15 is COMPLETE!** — The `nn.GRUCell` decoupled magnitude explosion from temporal BPTT gradients, resulting in mathematical confirmation of both Episodic Memory ($p < 0.05$) and Cumulative Culture ($p < 0.001$) at Lag-10.
-**Phase 16 is COMPLETE!** — Reached 980k. Offline ATE (Average Treatment Effect) using the Frozen Counterfactual Causal Test on Token 3 (Strike) vs Token 55 (Flee) showed an effect size of **0.0000**. The agents are ignoring the communication channel; it remains functionally ungrounded.
+**Phase 16 is COMPLETE!** — Reached 950k. Offline ATE (Average Treatment Effect) using the Frozen Counterfactual Causal Test on Token 3 (Strike) vs Token 55 (Flee) showed an effect size of **0.0000**. The agents are ignoring the communication channel; it remains functionally ungrounded.
 **Phase 16.5 DRAFTED** — `feature/phase16-5-enrichment` branch: Barrier physics, 9-action space (`Build`), Feral Masking, Critic Shock discount. **Goal:** Force communication grounding.
 **Modal:** **`dragonbg`** — volume **`throng-runs`**.
 
@@ -261,7 +261,7 @@ throng/
 ├── main.py                    # Legacy CLI
 ├── tools/
 │   ├── decode_signals.py      # Offline corpus analysis (blue/red)
-│   └── causal_intervention.py # Frozen counterfactual causal test (980k)
+│   └── causal_intervention.py # Frozen counterfactual causal test (950k)
 ├── THRONG.md                  # Full research log + theory + roadmap
 └── README.md                  # You are here
 ```
