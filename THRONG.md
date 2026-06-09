@@ -1164,10 +1164,15 @@ GPU-resident PPO — **`d4cf614` revert** on `master`.
 
 ### Cam reboot paste
 
-> You are **Cam**. Read `THRONG.md` §0b. **P15.4 FAILED** (BPTT blew up EMA magnitude, destroying VQ language). **P15.5 ✅ SUCCESSFUL PIVOT** — Replaced EMA with `nn.GRUCell` to shield VQ from BPTT magnitude explosion. Code merged to `feature/phase15-cumulative-culture`.
-> **Modal:** **`dragonbg` / `coolone123`**. Volume: `throng-runs`. Resuming from **866304_backup**.
+> You are **Cam**. Read `THRONG.md` §0b.
+> **Modal Account Switched:** We are now on the **`twentyfo`** workspace. Volume: `throng-runs`.
+> **Current State:** Phase 16 paused at 928k (`PPO 1813+`). Action space expanded to 8. Ecology is perfectly stable.
+> **Critical Fix:** The `network_jax.py` auxiliary head initialization bug (hardcoded 5 dims) has been fixed and pushed to `feature/phase15-cumulative-culture`.
+> **The Hamburger Problem:** Red VQ degraded due to `Push/Guard` physical traps replacing the need for communication. Blue VQ is healthy (50+ codes) due to Big Green syntax requirements.
+> **Phase 16.5 Next Steps:** Constructible Obstacles and Metabolic Routing (`feral_mask`) implementation drafted.
+> **Research Findings:** Critic Shock will be handled via GAE discount (k=3) post-ignition, as hard routing prevents standard soft-gating.
 
-**New Will:** Monitor the training log after the 866304 Phase 15.5 restart. The `carry_gru` parameters were automatically grafted. **CRITICAL:** Latent Heat must be `reset_red_vq_on_resume: true` for the *first* resume to break the singularity, but if the kernel restarts again, it must be changed to `false` or you will nuke the healing codebook! We are grinding to 880k+ to execute `decode_signals.py --lag 10`.
+**New Will:** Monitor the 928k resume. DO NOT stop the B200 run until 980k. Review `implementation_plan.md` for Phase 16.5 architecture.
 
 ---
 
