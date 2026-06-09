@@ -53,6 +53,9 @@ def build_cfg() -> dict:
     cfg["vq_dead_code_reset"] = True
     cfg["ppo_rollout_steps"] = 512
     cfg["ppo_minibatch_size"] = 512
+    # Phase 16.5 — Environmental Enrichment
+    cfg["n_actions"] = 9        # N, S, E, W, Stay, Strike, Push, Guard, Build
+    cfg["env_channels"] = 10    # +barrier_hp_map channel
     return cfg
 
 
