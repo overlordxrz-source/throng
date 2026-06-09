@@ -18,7 +18,7 @@
 |---------------------|--------|
 | **Branch** | **`feature/phase15-cumulative-culture`** (`git=ee62f7f` code; docs `34074ab`) |
 | **Modal workspace** | **`dragonbg`** (Jun 2026) — volume **`throng-runs`** → `/mnt/throng-runs` |
-| **Volume ckpt** | **`1689+`** — P15.5 BPTT resume |
+| **Volume ckpt** | **`1813+`** (928k) — P16 account migration |
 | **Migration script** | **`scripts/migrate_modal.sh`** — `download` / `upload` between accounts |
 | **P14.4** | ✅ DCVQ + SimVQ — Direction LRT **29/32 p<0.05** (688k) |
 | **P15.0** | ✅ **MEDAL-ADR** — `expert_dropouts≈74–90`/rollout |
@@ -1190,6 +1190,7 @@ GPU-resident PPO — **`d4cf614` revert** on `master`.
 * **915k:** Blues fully adapted to the predator's new `Push/Guard` trapping tactics. Deaths returned to `blue_caught=0`. `Strk=5% Push=4% Grd=4%` stable. Co-evolutionary arms race confirmed.
 * **920k:** Stable equilibrium holding. `codes_active=52/64`, `carry_rank=61`, `carry_H=8949`. System grinding toward 980k decode milestone.
 * **924k:** Perfect stability. `codes_active=50/64`, `carry_H=9508`. Combinatorial action space holding steady (`Strk=5% Push=5% Grd=5%`). Big Green sum tracking live.
+* **928k:** Account migration pause. `blue_caught=2` (minor predator breach), `codes_active=51/64`. Action usage steady at `Strk=5% Push=5% Grd=6%`. Volume backed up to local.
 
 ---
 
