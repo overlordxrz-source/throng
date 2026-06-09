@@ -333,6 +333,7 @@ class AgentNetworkJax(nn.Module):
         symbol_write = self.head_symbol(pooled)              # (N, sym_d)
         feral_mask = jax.lax.stop_gradient(obs[:, 2] < 0.20)
         symbol_write = jnp.where(feral_mask[:, None], 0.0, symbol_write)
+        signal_out = jnp.where(feral_mask[:, None], 0.0, signal_out)
         values = self.head_value(value_input).squeeze(-1)  # (N,)  unbounded, Huber loss prevents explosion
         tom_logits = self.head_tom(pooled)[:, None, :]     # (N, 1, 8) — simplified; real version needs K
         tom_logits = jnp.broadcast_to(tom_logits, (N, K, self.n_actions))  # (N, K, n_actions)
@@ -341,7 +342,7 @@ class AgentNetworkJax(nn.Module):
 
         # Register auxiliary-head params in the same init as __call__ (Flax idiom).
         if self.is_initializing():
-            _action_oh = jnp.zeros((N, 8), dtype=obs.dtype)
+            _action_oh = jnp.zeros((N, self.n_actions), dtype=obs.dtype)
             self.auxiliary_heads(carries, _action_oh)
             _zq_seed = jnp.zeros_like(z_e)
             self.head_vqel_recon_2(nn.relu(self.head_vqel_recon_1(_zq_seed)))
@@ -1134,7 +1135,7 @@ def ensure_aux_head_params(
         for k in ("head_vqel_recon_1", "head_vqel_recon_2"):
             flat[k] = fresh_flat[k]
         print("[JAX] Merged fresh VQEL monologue decoder heads into restored checkpoint")
-    action_oh = jnp.zeros((1, 8), dtype=jnp.float32)
+    action_oh = jnp.zeros((1, model.n_actions), dtype=jnp.float32)
     aux_only = model.init(
         rng, carry, action_oh, method=model.auxiliary_heads
     )["params"]
