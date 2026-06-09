@@ -335,7 +335,7 @@ class AgentNetworkJax(nn.Module):
         symbol_write = jnp.where(feral_mask[:, None], 0.0, symbol_write)
         values = self.head_value(value_input).squeeze(-1)  # (N,)  unbounded, Huber loss prevents explosion
         tom_logits = self.head_tom(pooled)[:, None, :]     # (N, 1, 8) — simplified; real version needs K
-        tom_logits = jnp.broadcast_to(tom_logits, (N, K, 8))  # (N, K, 8)
+        tom_logits = jnp.broadcast_to(tom_logits, (N, K, self.n_actions))  # (N, K, n_actions)
         culture_fast = self.head_culture_fast(pooled)       # (N, sym_d)
         culture_slow = self.head_culture_slow(pooled)       # (N, sym_d)
 
@@ -722,7 +722,7 @@ class PredatorNetworkJax(nn.Module):
         symbol_write = jnp.where(feral_mask[:, None], 0.0, symbol_write)
         values = self.head_value(value_input).squeeze(-1)
         tom_logits = self.head_tom(h_policy)[:, None, :]
-        tom_logits = jnp.broadcast_to(tom_logits, (N, K, 8))
+        tom_logits = jnp.broadcast_to(tom_logits, (N, K, self.n_actions))
         culture_fast = self.head_culture_fast(h_policy)
         culture_slow = self.head_culture_slow(h_policy)
 
