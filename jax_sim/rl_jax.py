@@ -25,6 +25,8 @@ def compute_gae(
     dones,     # (T, N)  1.0 = terminal
     gamma: float = 0.99,
     lam:   float = 0.95,
+    ignition: np.ndarray = None,
+    ignition_discount: float = 0.1,
 ) -> Tuple[np.ndarray, np.ndarray]:
     """
     Pure discounted returns + advantage = returns - values (CPU numpy loop).
@@ -45,6 +47,11 @@ def compute_gae(
         returns[t] = carry
 
     advantages = returns - values
+    if ignition is not None:
+        ignition = np.asarray(ignition, dtype=bool)
+        adv_weight = np.where(ignition, 1.0 - ignition_discount, 1.0)
+        advantages = advantages * adv_weight
+
     adv_mean = advantages.mean()
     adv_std = advantages.std() + 1e-8
     advantages = (advantages - adv_mean) / adv_std
@@ -71,6 +78,8 @@ def ppo_loss(
     loss_vq_rollout: jnp.ndarray = None,  # (M,) per-agent VQ loss from rollout
     alive: jnp.ndarray = None,  # (M,) bool-ish
     rng_key: jax.Array = None,  # Added for noise
+    ignition: jnp.ndarray = None, # (M,) bool
+    ignition_discount: float = 0.1,
 ) -> Tuple[jnp.ndarray, Dict]:
     """
     PPO loss evaluated with exact historical carries per timestep.
@@ -119,6 +128,10 @@ def ppo_loss(
         return jnp.where(e < delta, 0.5 * jnp.square(e), delta * (e - 0.5 * delta))
         
     vf_loss = jnp.maximum(vf_huber(err), vf_huber(err_clipped))
+    
+    if ignition is not None:
+        vf_weight = jnp.where(ignition, 1.0 - ignition_discount, 1.0)
+        vf_loss = vf_loss * vf_weight
 
     # Entropy bonus
     action_probs = jax.nn.softmax(action_logits, axis=-1)
@@ -178,13 +191,15 @@ def create_optimizer(lr: float = 3e-4, max_grad_norm: float = 2.0) -> optax.Grad
 def _minibatch_step(
     params, opt_state, apply_fn, optimizer,
     obs, actions, old_log_probs, advantages, returns, carries,
-    n_layers, old_values, clip_eps, vf_coef, ent_coef, vq_coef, loss_vq, alive, rng_key
+    n_layers, old_values, clip_eps, vf_coef, ent_coef, vq_coef, loss_vq, alive, rng_key,
+    ignition, ignition_discount
 ):
     grad_fn = jax.value_and_grad(ppo_loss, has_aux=True)
     (loss, metrics), grads = grad_fn(
         params, apply_fn, obs, actions, old_log_probs,
         advantages, returns, carries, n_layers,
-        old_values, clip_eps, vf_coef, ent_coef, vq_coef, loss_vq, alive=alive, rng_key=rng_key
+        old_values, clip_eps, vf_coef, ent_coef, vq_coef, loss_vq, alive=alive, rng_key=rng_key,
+        ignition=ignition, ignition_discount=ignition_discount
     )
     updates, new_opt_state = optimizer.update(grads, opt_state, params)
     new_params = optax.apply_updates(params, updates)
@@ -208,6 +223,7 @@ def ppo_update(
     gamma: float = 0.99,
     lam: float = 0.95,
     team: str = "blue",
+    ignition_discount: float = 0.1,
 ) -> Tuple[Dict, Any, Dict]:
     """
     Single gradient update step using minibatches.
@@ -223,8 +239,9 @@ def ppo_update(
     carries = batch["carries"]
     alive = batch.get("alive")
     loss_vq = batch.get("loss_vq")
+    ignition = batch.get("ignition")
 
-    advantages, returns = compute_gae(rewards, values, dones, gamma=gamma, lam=lam)
+    advantages, returns = compute_gae(rewards, values, dones, gamma=gamma, lam=lam, ignition=ignition, ignition_discount=ignition_discount)
 
     # Debug
     print(f"  [DEBUG] rewards mean={float(rewards.mean()):.4f} std={float(rewards.std()):.4f}")
@@ -250,9 +267,10 @@ def ppo_update(
     flat_values = flatten_to_cpu(values)
     flat_alive = flatten_to_cpu(alive)
     flat_loss_vq = flatten_to_cpu(loss_vq)
+    flat_ignition = flatten_to_cpu(ignition)
 
     # Delete GPU references so XLA can reclaim VRAM
-    del obs, actions, old_log_probs, advantages, returns, carries, values, alive, loss_vq
+    del obs, actions, old_log_probs, advantages, returns, carries, values, alive, loss_vq, ignition
     del batch
 
     # Shuffle on CPU (no GPU allocation for permutation array)
@@ -289,12 +307,14 @@ def ppo_update(
         mb_v = jnp.array(flat_values[idx])
         mb_al = jnp.array(flat_alive[idx]) if flat_alive is not None else None
         mb_vq = jnp.array(flat_loss_vq[idx]) if flat_loss_vq is not None else None
+        mb_ig = jnp.array(flat_ignition[idx]) if flat_ignition is not None else None
 
         key, mb_key = jax.random.split(key)
         params, opt_state, mb_mets, grads = _minibatch_step(
             params, opt_state, apply_fn, optimizer,
             mb_obs, mb_act, mb_lp, mb_adv, mb_ret, mb_c,
-            n_layers, mb_v, clip_eps, vf_coef, ent_coef, vq_coef, mb_vq, mb_al, mb_key
+            n_layers, mb_v, clip_eps, vf_coef, ent_coef, vq_coef, mb_vq, mb_al, mb_key,
+            mb_ig, ignition_discount
         )
 
         # Accumulate as Python floats to avoid holding 500 JAX arrays
@@ -423,6 +443,7 @@ def auxiliary_update(
     conf_coef: float = 0.0,
     energy_np: np.ndarray = None,
     proprio_coef: float = 0.0,
+    n_actions: int = 8,
 ) -> Tuple[Dict, Any, float, float, float, float, float, float, float]:
     """
     Compute forward dynamics + latent carry dynamics + self-prediction aux losses.
@@ -444,8 +465,8 @@ def auxiliary_update(
         energy_tp1 = np.asarray(energy_np[1:]).reshape((T - 1) * N).astype(np.float32)
     else:
         energy_tp1 = np.zeros((T - 1) * N, dtype=np.float32)
-    action_oh = np.eye(8, dtype=np.float32)[action_t]
-    action_tp1_oh = np.eye(8, dtype=np.float32)[action_tp1]
+    action_oh = np.eye(n_actions, dtype=np.float32)[action_t]
+    action_tp1_oh = np.eye(n_actions, dtype=np.float32)[action_tp1]
 
     if alive_np is not None:
         alive_t = alive_np[:-1].reshape((T - 1) * N).astype(np.float32)

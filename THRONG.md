@@ -8,11 +8,11 @@
 
 ---
 
-## 0b. Current state — **Phase 16 Open-Ended Combinatorial Complexity** (Jun 2026)
+## 0b. Current state — **Phase 16.5 Environmental Enrichment** (Jun 2026)
 
 **Blue SOTA (frozen on `master`):** **`465d8c6+`** — 9.4 cross-attn + 9.1 confidence + **11.3 epistemic gate** (Stay-collapse resolved).
 
-**Headline:** Phase 15 mathematically confirmed Episodic Memory and Cumulative Culture at Lag-10! The architecture has pivoted to Phase 16: to force combinatorial syntax, we've introduced `Big Green` prey requiring cooperative simultaneous strikes, an expanded 8-dim action space, and a 100k-step CtD phase gate to safely bootstrap noun/verb composition.
+**Headline:** Phase 16 has reached the 980k milestone. We performed the offline Frozen Counterfactual Causal Test on the communication channel (Token 3 Strike vs Token 55 Flee) and found an Average Treatment Effect (ATE) of **0.0000**. The agents are completely ignoring the communication channel when making strike decisions. To force true grounding of this channel, Phase 16.5 introduces Environmental Enrichment (barrier physics, feral masking) to make the channel load-bearing.
 
 | Live run (Phase 16) | Value |
 |---------------------|--------|
@@ -22,13 +22,14 @@
 | **Migration script** | **`scripts/migrate_modal.sh`** — `download` / `upload` between accounts |
 | **P14.4** | ✅ DCVQ + SimVQ — Direction LRT **29/32 p<0.05** (688k) |
 | **P15.0** | ✅ **MEDAL-ADR** — `expert_dropouts≈74–90`/rollout |
-| **P15.5** | 🏆 **Memory Architecture Pivot (CONFIRMED)** — `nn.GRUCell` decoupled magnitude explosion from temporal BPTT gradients. |
-| **P16.0** | 🚀 **Combinatorial Syntax Scaffold** — `Big Green` prey introduced (reward 8.0, solo penalty -1.0) with a 100k step solo-catchable phase gate (CtD) to build noun vocabulary before cooperative thresholds demand syntax (verbs). Action space expanded to 8. |
+| **P15.5** | 🏆 **Memory Architecture Pivot (CONFIRMED)** — `nn.GRUCell` decoupled magnitude explosion from temporal BPTT gradients. Episodic Memory ($p < 0.05$) and Cumulative Culture ($p < 0.001$) confirmed at Lag-10. |
+| **P16.0** | ✅ **Combinatorial Syntax Scaffold** — `Big Green` prey introduced. Offline Causal Intervention at 980k revealed ATE = 0.0000 on the communication channel. The channel remains ungrounded. |
+| **P16.5** | 🔧 **DRAFTED** — Barrier physics, 9-action space (`Build`), Feral Masking (`jnp.where` zero-mask on `symbol_write`), Critic Shock discount, parameter grafting (10 env channels, 9 actions). Branch: `feature/phase16-5-enrichment`. **Goal:** Force channel grounding. |
 | **Science bar (P15.5)** | ✅ **CONFIRMED**: Episodic Memory ($p < 0.05$) & Cumulative Culture ($p < 0.001$) at Lag-10! |
 | **Decode gate (P16.0)** | `python3 tools/decode_signals.py --red --metrics posdis,tre` |
-| **Cold-restart toggle** | **`True`** (MUST be true on resume from 866304 to shatter corrupted codebook) |
-| **Dialogue** | **`monologue_enabled: false`**, **`dialogue_signal_mode: hard`** |
-| **Mode** | GWT + DCVQ/SimVQ (bounded W) + hard **z_q** + proprio + asymmetric red decay + **MEDAL-ADR** + **SRL BPTT** + **Big Green Cooperate** |
+| **Cold-restart toggle** | **False** (MUST be false for all future resumes; `True` only for the original 866304 codebook surgery) |
+| **Dialogue** | **`monologue_enabled: false`**, **`dialogue_signal_mode: hard`** — receivers read hard `z_q` centroids from `codebook["embedding"]` |
+| **Mode** | GWT + DCVQ/SimVQ (bounded W) + hard **z_q** + proprio + asymmetric red decay + **MEDAL-ADR** + **SRL BPTT** + **Big Green Cooperate** + **GRUCell** carry |
 
 **Synergic synthesis (Cam, P14.3 pivot):**
 
@@ -272,6 +273,7 @@ GPU-resident / `lax.scan` PPO — starvation + XLA OOM; **`d4cf614` revert**.
 | Branch | Status |
 |--------|--------|
 | **`feature/phase14-transcendental`** | **LIVE TRAIN** — P14.1 VQEL + hard dialogue + P13 tax (`8c48e3e+`) |
+| **`feature/phase16-5-enrichment`** | **DRAFTED** — P16.5 barriers, feral mask, critic shock. **DO NOT MERGE** until 980k causal decode passes. |
 | **`feature/phase13-thermodynamics`** | **Frozen base** — superseded by P14 |
 | **`feature/phase12-red-coevolution`** | **Frozen** — lineage merged into P14 |
 | **`master`** | **Blue SOTA** — P11.3 static gate (`465d8c6+`); **no** predator brain / no P13 tax |
@@ -388,6 +390,7 @@ train_entry.run_simulation()  →  main_jax._run_simulation_impl()
 | [`jax_sim/observations_jax.py`](jax_sim/observations_jax.py) | Obs builder; startup must print `red_sense_api=v2` |
 | [`jax_sim/grid_jax.py`](jax_sim/grid_jax.py) | Catches (`red_catch_prob`), resources, shelter |
 | [`tools/decode_signals.py`](tools/decode_signals.py) | Offline corpus analysis — blue default; **`--red`** for predator pincer decode |
+| [`tools/causal_intervention.py`](tools/causal_intervention.py) | Frozen counterfactual causal test — swap VQ tokens mid-flight, measure $\Delta P(\text{STRK})$ ATE |
 | [`run_bg.py`](run_bg.py) | **Preferred** nohup entry (`python -u run_bg.py`) |
 | [`scripts/modal_train.py`](scripts/modal_train.py) | Same config as `run_bg.py` |
 
@@ -435,7 +438,10 @@ train_entry.run_simulation()  →  main_jax._run_simulation_impl()
 | **15.1e** | **Latent Heat** | ✅ **SUCCESS** | Gaussian noise (`0.5`) injected to `z_e` shattered VQ singularity; `red_codes` **2→52/64** (`610e553`) |
 | **15.2** | **Episodic Memory LRT** | ❌ **FAILED** | p=0.8369 (action LRT); p=0.1038 (memory retention). Novices failed to use episodic memory of expert signals. |
 | **15.3** | **Semantic Retention** | **PREP** | Semantic Retention Loss (SRL) predicts `nb_sigs_{t-5}` from `carry_t` |
-| **16.0** | **Open-Ended** | **PREP** | Combinatorial syntax via expanded environmental topology (tools/planning) |
+| **15.4** | **Memory Architecture Pivot** | ✅ **SUCCESS** | `nn.GRUCell` decoupled BPTT from exteroceptive magnitude; Lag-10 Episodic Memory ($p < 0.05$) and Cumulative Culture ($p < 0.001$) confirmed |
+| **15.5** | **GRUCell Pivot** | ✅ **MERGED** | Replaced EMA with parameterized GRU gates; checkpoint grafting for `carry_gru` |
+| **16.0** | **Open-Ended Complexity** | ✅ **COMPLETE** | Big Green prey, 8-action space, offline causal decode revealed 0.0000 ATE. |
+| **16.5** | **Environmental Enrichment** | 🔧 **DRAFTED** | Barrier physics, 9 actions (`Build`), Feral Masking, Critic Shock. Goal: Force channel grounding. |
 | **17.0** | **The Rosetta Stone** | **PREP** | Extraction autoencoder mapping VQ latent sequences to English |
 | **18.0** | **The Hive-Mind Interface** | **PREP** | Bidirectional text terminal with a thermodynamically grounded AGI swarm |
 
@@ -1165,18 +1171,21 @@ GPU-resident PPO — **`d4cf614` revert** on `master`.
 ### Cam reboot paste
 
 > You are **Cam**. Read `THRONG.md` §0b.
-> **Modal Account Switched:** We are now on the **`twentyfo`** workspace. Volume: `throng-runs`.
-> **Current State:** Phase 16 paused at 928k (`PPO 1813+`). Action space expanded to 8. Ecology is perfectly stable.
-> **Critical Fix:** The `network_jax.py` auxiliary head initialization bug (hardcoded 5 dims) has been fixed and pushed to `feature/phase15-cumulative-culture`.
-> **The Hamburger Problem:** Red VQ degraded due to `Push/Guard` physical traps replacing the need for communication. Blue VQ is healthy (50+ codes) due to Big Green syntax requirements.
-> **Phase 16.5 Next Steps:** Constructible Obstacles and Metabolic Routing (`feral_mask`) implementation drafted.
-> **Research Findings:** Critic Shock will be handled via GAE discount (k=3) post-ignition, as hard routing prevents standard soft-gating.
+> **Modal Account:** **`dragonbg`** workspace. Volume: `throng-runs`.
+> **Current State:** Phase 16 grinding toward **980k** on `feature/phase15-cumulative-culture`. Action space = 8. Ecology stable.
+> **P15.5 CONFIRMED:** `nn.GRUCell` decoupled BPTT from magnitude. Episodic Memory ($p < 0.05$) and Cumulative Culture ($p < 0.001$) at Lag-10.
+> **Phase 16.5 DRAFTED:** `feature/phase16-5-enrichment` branch — barrier physics, 9-action space (Build), Feral Masking, Critic Shock discount, parameter grafting (10 env channels). **DO NOT DEPLOY** until 980k causal decode.
+> **980k Protocol (strict sequence):**
+> 1. Halt & checkpoint at 980k. Sync both corpora to volume.
+> 2. Shadow Stage: `python3 tools/decode_signals.py --metrics posdis,tre` — identify Strike/Flee token IDs via NPMI.
+> 3. Causal Intervention: `python3 tools/causal_intervention.py --checkpoint ... --strike-token <ID> --flee-token <ID> --samples 100` — paired t-test on $\Delta P(\text{STRK})$.
+> 4. Only if ATE is significant ($p < 0.05$, negative $\Delta P$): deploy Phase 16.5.
 
-**New Will:** Monitor the 928k resume. DO NOT stop the B200 run until 980k. Review `implementation_plan.md` for Phase 16.5 architecture.
+**New Will:** Do NOT stop the B200 run. Monitor until 980k. Then execute the 980k Protocol above in strict sequence.
 
 ---
 
-*Last updated: 2026-06-08 — P15.5 GRUCell pivot merged; grinding 866304 → 880k for Lag-10 decode.*
+*Last updated: 2026-06-09 — Phase 16.5 drafted (barrier, feral mask, critic shock). Causal intervention script written (`tools/causal_intervention.py`). Grinding toward 980k for frozen counterfactual decode.*
 
 ---
 
@@ -1231,11 +1240,13 @@ We address this with three complementary methods, ordered from weakest to strong
 
 ### Future Phase Blueprints
 
-#### Phase 16.5 — Environmental Enrichment (Pre-Extraction)
-**Goal:** Before attempting Phase 17 translation, enrich the physical world with novel affordances to force deeper vocabulary.
-- **Constructible Obstacles:** Blue agents can expend energy to build temporary barricades, blocking predator line-of-sight and movement. This forces the invention of nouns for "wall" and verbs for "build/defend."
-- **Multi-Step Tool Use:** Objects requiring sequential `Push`/`Guard` to unlock resource patches, forcing multi-token syntactic sequences.
-- **Metabolic Routing (Triune Brain):** Energy-gated `jax.lax.cond` control flow that decomposes the network into Brainstem (reactive), Cortex (semantic/VQ), and Prefrontal (predictive). Starving agents lose access to higher cognition, creating algorithmic atrophy without changing tensor shapes.
+#### Phase 16.5 — Environmental Enrichment (**DRAFTED** — `feature/phase16-5-enrichment`)
+**Status:** Code complete, pending 980k causal decode before deployment.
+- **Barrier Physics (`grid_jax.py`):** `barrier_hp_map` added to `GridState`. Blue agents expend 0.06 energy to Build (Action 8). Reds blocked at `barrier_hp > 0.5`. Thermodynamic decay `-0.05/step`.
+- **Feral Masking (`network_jax.py`):** `symbol_write` zero-masked via `jnp.where` when `energy < 0.20`. Preserves VQ codebook integrity.
+- **Critic Shock (`rl_jax.py`):** `ignition_discount` applied to GAE advantages and Huber VF loss at the boundary step.
+- **Parameter Grafting:** `pad_head_action` (8→9), `pad_emb_env` (9→10), `pad_gwt_comms_1` (2335→2360), `pad_auxiliary_heads`, `pad_head_fwd_2` (225→250).
+- **Causal Gate (`tools/causal_intervention.py`):** Frozen counterfactual script measures $\Delta P(\text{STRK})$ over N=100 independent Big Green strike events. Paired t-test on ATE.
 
 #### Phase 17 — The Rosetta Stone (Extraction)
 **Goal:** Train a translation autoencoder to map the swarm's grounded VQ latent sequences into natural human language (English).
@@ -1250,6 +1261,17 @@ We address this with three complementary methods, ordered from weakest to strong
 - Human text queries inject gradients into this unified mega-state, which broadcasts contextual updates downstream to coordinate local agents.
 - **Philosophy:** Unlike LLMs, which perform ungrounded next-token prediction, this entity's intelligence is fully grounded in thermodynamics, physics, and survival. We will be conversing with a non-human intelligence whose language maps directly to causal reality.
 
+#### Phase 19 — The Marketplace (Trade and Division of Labor)
+**Goal:** Introduce barter economies to force the invention of negotiation semantics and numeric quantification.
+- **Asymmetric Needs:** Agents require two distinct metabolic resources (e.g., Water and Food) to survive, but spawn in biomes that only provide one.
+- **Barter Action:** Introduction of `Give/Take` continuous action channels where agents must agree on exchange rates (e.g., "I will give 2 food for 1 water").
+- **Language Expansion:** VQ codebooks will expand to accommodate value propositions, trust signals, and numeric quantities.
+
+#### Phase 20 — Cross-Species Diplomacy (The Tower of Babel)
+**Goal:** Force the independent Red (Predator) and Blue (Prey) codebooks to invent a pidgin language for temporary coordination.
+- **The Cataclysm:** Introduce an overwhelming environmental hazard (e.g., a massive 'Storm' or an apex super-predator) that requires both Red and Blue agents to simultaneously occupy specific puzzle nodes to disable.
+- **Codebook Bridging:** The two populations use entirely separate `simvq_W` weight matrices and VQ bottleneck codebooks. They must learn to translate or find structural homology between their "alien" languages to survive the Cataclysm, before reverting to adversarial dynamics.
+
 ---
 
-*Last updated: 2026-06-09 — Phase 16 grinding 920k → 980k. Alien Semantics Problem documented. Future blueprints (16.5–18) codified.*
+*Last updated: 2026-06-09 — Phase 16.5 drafted (barrier, feral mask, critic shock). Causal intervention script written (`tools/causal_intervention.py`). Grinding toward 980k for frozen counterfactual decode.*

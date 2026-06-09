@@ -44,7 +44,7 @@ def make_obs_layout(
     memory_slots: int,
     neighbor_k: int = 6,
     local_cells: int = 25,
-    env_channels: int = 9,
+    env_channels: int = 10,
     own_state_dim: int = 6,
 ) -> ObsLayout:
     """Return canonical flat-observation slice boundaries."""

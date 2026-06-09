@@ -32,7 +32,7 @@ import yaml
 
 from jax_sim.grid_jax import (
     GridState, wrap, apply_moves, consume_resources, apply_catches,
-    write_to_grid, decay_grid, get_local_patches, get_neighbour_signals,
+    write_to_grid, decay_grid, decay_barrier_grid, get_local_patches, get_neighbour_signals,
     generate_puzzle_nodes, update_puzzle_grid, decay_puzzle_timeout, check_puzzle_solved,
     generate_resource_patches, generate_shelter_spots, generate_contested_nodes,
     update_scent_trails,
@@ -354,12 +354,31 @@ def make_sim_step(
         r_pop = update_memory_buffer(r_pop, r_mean_nb_sig, r_actions, r_pop.alive)
 
         # ── Movement ────────────────────────────────────────────
-        b_new_pos = apply_moves(b_pop.positions, b_actions, b_pop.alive, gs, grid.walls)
-        r_new_pos = apply_moves(r_pop.positions, r_actions, r_pop.alive, gs, grid.walls)
+        b_new_pos, _ = apply_moves(b_pop.positions, b_actions, b_pop.alive, gs, grid.walls, grid.barrier_hp_map, False)
+        r_new_pos, r_intended_pos = apply_moves(r_pop.positions, r_actions, r_pop.alive, gs, grid.walls, grid.barrier_hp_map, True)
+        
         b_moved = (b_new_pos != b_pop.positions).any(axis=-1) & b_pop.alive
         r_moved = (r_new_pos != r_pop.positions).any(axis=-1) & r_pop.alive
         b_pop = b_pop.replace(positions=b_new_pos)
         r_pop = r_pop.replace(positions=r_new_pos)
+
+        # ── Phase 16.5: Constructible Obstacles ─────────────────
+        _p16_5 = config.get("phase16_5_enrichment", {})
+        _barrier_build_cost = float(_p16_5.get("barrier_build_cost", 0.06))
+        b_building = (b_actions == 8) & b_pop.alive
+        barrier_addition = b_building.astype(jnp.float32) * 3.0
+        
+        r_blocked = (grid.barrier_hp_map[r_intended_pos[:, 0], r_intended_pos[:, 1]] > 0.5) & r_pop.alive
+        barrier_damage = r_blocked.astype(jnp.float32)
+        
+        new_barrier_hp = grid.barrier_hp_map.at[b_pop.positions[:, 0], b_pop.positions[:, 1]].add(barrier_addition)
+        new_barrier_hp = new_barrier_hp.at[r_intended_pos[:, 0], r_intended_pos[:, 1]].add(-barrier_damage)
+        
+        _barrier_decay_rate = float(_p16_5.get("barrier_decay_rate", 0.05))
+        new_barrier_hp = decay_barrier_grid(new_barrier_hp, _barrier_decay_rate)
+        grid = grid.replace(barrier_hp_map=new_barrier_hp)
+        
+        b_pop = b_pop.replace(energy=jnp.clip(b_pop.energy - (b_building.astype(jnp.float32) * _barrier_build_cost), 0.0, 1.0))
 
         # ── Scent trails (reds deposit scent) ───────────────────
         new_scent = update_scent_trails(
@@ -471,6 +490,15 @@ def make_sim_step(
         b_pop = b_pop.replace(energy=jnp.clip(b_pop.energy - _energy_decay, 0.0, 1.0))
         r_pop = r_pop.replace(energy=jnp.clip(r_pop.energy - _red_energy_decay, 0.0, 1.0))
 
+        # ── Phase 16.5: Ignition Tracking (Metabolic Routing) ───
+        _feral_threshold = float(config.get("phase16_5_enrichment", {}).get("feral_threshold", 0.20))
+        pre_step_energy = b_obs[:, 2]
+        post_step_energy = b_pop.energy
+        ignition = (pre_step_energy < _feral_threshold) & (post_step_energy >= _feral_threshold)
+        
+        _ignition_discount = float(config.get("phase16_5_enrichment", {}).get("ignition_discount", 0.1))
+        b_pop = b_pop.replace(energy=jnp.clip(b_pop.energy - (ignition.astype(jnp.float32) * _ignition_discount), 0.0, 1.0))
+
         # ── Starvation (after metabolic tax + decay) ────────────
         b_starved = b_pop.alive & (b_pop.energy < _starv_thresh)
         r_starved = r_pop.alive & (r_pop.energy < _starv_thresh)
@@ -560,7 +588,7 @@ def make_sim_step(
         r_done = (~r_pop.alive).astype(jnp.float32)
 
         b_rollout = {
-            "obs": b_obs, "actions": b_actions, "log_probs": b_log_probs_taken,
+            "obs": b_obs, "actions": b_actions, "action_logits": b_action_logits, "log_probs": b_log_probs_taken,
             "values": b_vals, "rewards": b_rew, "dones": b_done,
             "carries": b_carries,
             "loss_vq": b_loss_vq,
@@ -575,6 +603,7 @@ def make_sim_step(
             "imagination_agree": b_imagination_agree,
             "conf_gate_imagine_frac": b_conf_gate_frac,
             "imagination_metabolic_cost": cog_cost,
+            "ignition": ignition,
         }
         r_rollout = {
             "obs": r_obs, "actions": r_actions, "log_probs": r_log_probs_taken,
@@ -1425,6 +1454,7 @@ def _run_simulation_impl(
                 gamma=float(config.get("ppo_gamma", 0.99)),
                 lam=float(config.get("ppo_gae_lam", 0.95)),
                 team="blue",
+                ignition_discount=float(config.get("phase16_5_enrichment", {}).get("ignition_discount", 0.1)),
             )
             if ui == start_update:
                 print(
@@ -1443,6 +1473,7 @@ def _run_simulation_impl(
                 self_pred_coef=_self_pred_coef, conf_coef=_conf_coef,
                 energy_np=_b_energy_np,
                 proprio_coef=_proprio_coef,
+                n_actions=int(config.get("n_actions", 8)),
             )
             b_metrics["fwd_loss"] = b_fwd_loss
             b_metrics["carry_fwd_loss"] = b_carry_fwd_loss
@@ -1512,6 +1543,7 @@ def _run_simulation_impl(
                 self_pred_coef=_self_pred_coef, conf_coef=_conf_coef,
                 energy_np=_r_energy_np,
                 proprio_coef=_proprio_coef,
+                n_actions=int(config.get("n_actions", 8)),
             )
             r_metrics["fwd_loss"] = r_fwd_loss
             r_metrics["carry_fwd_loss"] = r_carry_fwd_loss

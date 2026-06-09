@@ -39,7 +39,7 @@ try:
 except ImportError:
     sys.exit("sklearn required: pip install scikit-learn")
 
-ACTION_NAMES = {0: "N", 1: "S", 2: "E", 3: "W", 4: "STAY", 5: "STRK", 6: "PUSH", 7: "GRD"}
+ACTION_NAMES = {0: "N", 1: "S", 2: "E", 3: "W", 4: "STAY", 5: "STRK", 6: "PUSH", 7: "GRD", 8: "BUILD"}
 CONTEXT_KEYS = ["red_dist", "red_bear", "resource", "energy", "neighbors"]
 RED_CONTEXT_KEYS = ["blue_dist", "blue_bear", "resource", "energy", "neighbors"]
 RED_CORPUS_DEFAULT = "/mnt/throng-runs/signal_corpus_red.jsonl"
@@ -1079,8 +1079,9 @@ def lag1_direction_lrt(
     # Control model
     lr_ctrl = LogisticRegression(max_iter=1000, C=1.0, solver="lbfgs")
     lr_ctrl.fit(ctrl_z, y)
+    y_idx = np.searchsorted(lr_ctrl.classes_, y)
     ll_ctrl = float(np.sum(
-        np.log(lr_ctrl.predict_proba(ctrl_z)[np.arange(n_elig), y] + 1e-12)
+        np.log(lr_ctrl.predict_proba(ctrl_z)[np.arange(n_elig), y_idx] + 1e-12)
     ))
 
     print(f"\n  Per-dim direction LRT  χ²({df_per_dim})  (one dim at a time):")
@@ -1091,7 +1092,7 @@ def lag1_direction_lrt(
         lr_one = LogisticRegression(max_iter=1000, C=1.0, solver="lbfgs")
         lr_one.fit(X_one, y)
         ll_one = float(np.sum(
-            np.log(lr_one.predict_proba(X_one)[np.arange(n_elig), y] + 1e-12)
+            np.log(lr_one.predict_proba(X_one)[np.arange(n_elig), y_idx] + 1e-12)
         ))
         chi_val = max(0.0, 2 * (ll_one - ll_ctrl))
         p_val   = float(1 - chi2.cdf(chi_val, df=df_per_dim))
@@ -1100,7 +1101,7 @@ def lag1_direction_lrt(
         # Show per-direction weight for this dim (coef sign tells direction)
         coef_row = lr_one.coef_[:, 1]   # coef for lag1_dim (column 1)
         coef_str = "  ".join(
-            f"{dir_names[c]}:{coef_row[i]:+.3f}"
+            f"{dir_names.get(c, str(c))}:{coef_row[i]:+.3f}"
             for i, c in enumerate(lr_ctrl.classes_)
         )
         print(f"  dim{d}  {chi_val:>8.3f}  {p_val:>8.4f}  {sig}")

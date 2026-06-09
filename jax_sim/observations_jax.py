@@ -88,9 +88,10 @@ def build_observations_jax(
     loc_scent = get_local_patches(grid.scent_trails, pop.positions, r, gs)[..., None]
     loc_puzzle = get_local_patches(grid.puzzle_grid, pop.positions, r, gs)[..., None]
     loc_blue_bg = get_local_patches(blue_bg_map.astype(jnp.float32), pop.positions, r, gs)[..., None]
+    loc_barrier = get_local_patches(grid.barrier_hp_map, pop.positions, r, gs)[..., None]
 
     loc_env = jnp.concatenate([
-        loc_pres, loc_wall, loc_res, loc_shelter, loc_contested, loc_scent, loc_puzzle, loc_blue_bg
+        loc_pres, loc_wall, loc_res, loc_shelter, loc_contested, loc_scent, loc_puzzle, loc_blue_bg, loc_barrier
     ], axis=-1)
 
     if key is not None:

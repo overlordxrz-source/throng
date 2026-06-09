@@ -145,7 +145,7 @@ class AgentNetworkTorch(nn.Module):
         self.emb_own  = nn.Linear(6,          token_dim)
         self.emb_nb   = nn.Linear(signal_dim,  token_dim)   # per neighbour
         self.emb_sym  = nn.Linear(symbol_dim,  token_dim)   # per symbol cell
-        self.emb_pres = nn.Linear(7,           token_dim)   # per cell: [blue, red, wall, resource, shelter, contested, scent]
+        self.emb_pres = nn.Linear(10,           token_dim)   # per cell: [blue, red, wall, resource, shelter, contested, scent, puzzle, blue_bg, barrier]
         self.emb_sig  = nn.Linear(signal_dim,  token_dim)
         self.emb_mem  = nn.Linear(hidden_dim,  token_dim)
         # Phase 7: episodic memory tokens
@@ -214,7 +214,7 @@ class AgentNetworkTorch(nn.Module):
         own  = obs[:, c:c + 6];                                  c += 6
         nb   = obs[:, c:c + K * sd].view(N, K, sd);             c += K * sd
         syms = obs[:, c:c + W * syd].view(N, W, syd);           c += W * syd
-        pres = obs[:, c:c + W * 7].view(N, W, 7);               c += W * 7  # Phase 7: 7 env channels
+        pres = obs[:, c:c + W * 10].view(N, W, 10);               c += W * 10  # Phase 16.5: 10 env channels
         sig  = obs[:, c:c + sd];                                 c += sd
         # Phase 7: episodic memory buffer
         epi = None
@@ -235,7 +235,7 @@ class AgentNetworkTorch(nn.Module):
         t_own  = self.emb_own(own).unsqueeze(1)                  # (N, 1, D)
         t_nb   = self.emb_nb(nb.reshape(N * K, sd)).view(N, K, self.token_dim)
         t_sym  = self.emb_sym(syms.reshape(N * W, syd)).view(N, W, self.token_dim)
-        t_pres = self.emb_pres(pres.reshape(N * W, 7)).view(N, W, self.token_dim)
+        t_pres = self.emb_pres(pres.reshape(N * W, 10)).view(N, W, self.token_dim)
         t_sig  = self.emb_sig(sig).unsqueeze(1)                  # (N, 1, D)
         t_mem  = self.emb_mem(carries).unsqueeze(1)              # (N, 1, D)
         t_cult_f = self.emb_sym(cult_fast.reshape(N * W, syd)).view(N, W, self.token_dim)
@@ -354,10 +354,10 @@ def loc_env_flat_bounds(config: dict) -> tuple[int, int]:
 
 
 def compute_fwd_env_dim(config: dict) -> int:
-    """Flat loc_env size (W × 9 env channels)."""
+    """Flat loc_env size (W × 10 env channels)."""
     r = config["local_obs_radius"]
     W = (2 * r + 1) ** 2
-    return W * 9
+    return W * 10
 
 
 def compute_obs_dim_torch(config: dict) -> int:
@@ -366,8 +366,8 @@ def compute_obs_dim_torch(config: dict) -> int:
     symd = config.get("symbol_dim", 8)
     r    = config["local_obs_radius"]
     W    = (2 * r + 1) ** 2
-    # Phase 16: env channels = 9 (blue_pres, blue_bg_pres, red_pres, wall, resource, shelter, contested, scent, puzzle)
-    env_ch = 9
+    # Phase 16.5: env channels = 10 (blue_pres, blue_bg_pres, red_pres, wall, resource, shelter, contested, scent, puzzle, barrier)
+    env_ch = 10
     base = 6 + K * sd + W * symd + W * env_ch + sd
     # Phase 7: episodic memory buffer
     mem_slots = int(config.get("memory_buffer_size", 0))

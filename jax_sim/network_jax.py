@@ -146,6 +146,7 @@ class AgentNetworkJax(nn.Module):
     neighbor_k: int = 6
     local_cells: int = 25
     env_channels: int = 9
+    n_actions: int = 8
 
     def setup(self):
         d = self.hidden_dim
@@ -170,7 +171,7 @@ class AgentNetworkJax(nn.Module):
 
         # Output heads
         self.final_norm = nn.LayerNorm()
-        self.head_action = nn.Dense(8)           # 8 actions (N, S, E, W, Stay, Strike, Push, Guard)
+        self.head_action = nn.Dense(self.n_actions)           # N actions (N, S, E, W, Stay, Strike, Push, Guard, [Build])
         self.head_signal = nn.Dense(self.signal_dim)  # continuous z_e pre-VQ
         self.codebook = nn.Embed(self.vocab_size, self.signal_dim)
         self.head_symbol = nn.Dense(sym_d)       # symbol write
@@ -330,6 +331,8 @@ class AgentNetworkJax(nn.Module):
             dead_code_reset=self.vq_dead_code_reset,
         )
         symbol_write = self.head_symbol(pooled)              # (N, sym_d)
+        feral_mask = jax.lax.stop_gradient(obs[:, 2] < 0.20)
+        symbol_write = jnp.where(feral_mask[:, None], 0.0, symbol_write)
         values = self.head_value(value_input).squeeze(-1)  # (N,)  unbounded, Huber loss prevents explosion
         tom_logits = self.head_tom(pooled)[:, None, :]     # (N, 1, 8) — simplified; real version needs K
         tom_logits = jnp.broadcast_to(tom_logits, (N, K, 8))  # (N, K, 8)
@@ -531,6 +534,8 @@ class PredatorNetworkJax(nn.Module):
     memory_slots: int = 0
     cross_attn_enabled: bool = True
     cross_attn_num_heads: int = 4
+    n_actions: int = 8
+    env_channels: int = 9
 
     def setup(self):
         d = self.hidden_dim
@@ -552,7 +557,7 @@ class PredatorNetworkJax(nn.Module):
         self.final_norm = nn.LayerNorm()
         # Phase 15.5: GRUCell to replace EMA, protecting magnitude from BPTT explosion
         self.carry_gru = nn.GRUCell(features=d, name="carry_gru")
-        self.head_action = nn.Dense(8)           # 8 actions
+        self.head_action = nn.Dense(self.n_actions)           # N actions
         self.head_signal = nn.Dense(self.signal_dim)
         
         # Phase 14.4: DCVQ + SimVQ instead of red_codebook
@@ -615,7 +620,7 @@ class PredatorNetworkJax(nn.Module):
         loc_sym = obs[:, 6 + K * self.signal_dim : 6 + K * self.signal_dim + W * sym_d].reshape(
             N, W, sym_d
         )
-        env_ch = 9
+        env_ch = self.env_channels
         loc_env = obs[
             :,
             6 + K * self.signal_dim + W * sym_d : 6 + K * self.signal_dim + W * sym_d + W * env_ch,
@@ -713,6 +718,8 @@ class PredatorNetworkJax(nn.Module):
         token_ids = indices[:, 0]  # Export first subspace token for telemetry compatibility
         
         symbol_write = self.head_symbol(h_policy)
+        feral_mask = jax.lax.stop_gradient(obs[:, 2] < 0.20)
+        symbol_write = jnp.where(feral_mask[:, None], 0.0, symbol_write)
         values = self.head_value(value_input).squeeze(-1)
         tom_logits = self.head_tom(h_policy)[:, None, :]
         tom_logits = jnp.broadcast_to(tom_logits, (N, K, 8))
@@ -937,8 +944,8 @@ def sanitize_agent_params(params: Any) -> Any:
     return params
 
 
-def pad_head_action(flat_params: dict, target_actions: int = 8) -> None:
-    """Pad head_action weights/biases from 5 to 8 actions if needed."""
+def pad_head_action(flat_params: dict, target_actions: int = 9) -> None:
+    """Pad head_action weights/biases from 8 to 9 actions if needed."""
     if "head_action" not in flat_params:
         return
     ha = flat_params["head_action"]
@@ -963,8 +970,8 @@ def pad_head_action(flat_params: dict, target_actions: int = 8) -> None:
         print(f"[JAX] Grafting padding to head_action: expanded from {kernel.shape[1]} to {target_actions} actions", flush=True)
 
 
-def pad_emb_env(flat_params: dict, target_channels: int = 9) -> None:
-    """Pad emb_env kernel from 8 to 9 channels if needed."""
+def pad_emb_env(flat_params: dict, target_channels: int = 10) -> None:
+    """Pad emb_env kernel from 9 to 10 channels if needed."""
     if "emb_env" not in flat_params:
         return
     ee = flat_params["emb_env"]
@@ -984,8 +991,8 @@ def pad_emb_env(flat_params: dict, target_channels: int = 9) -> None:
         print(f"[JAX] Grafting padding to emb_env: expanded from {kernel.shape[0]} to {target_channels} channels", flush=True)
 
 
-def pad_gwt_comms_1(flat_params: dict, target_channels: int = 2335) -> None:
-    """Pad gwt_comms_1 kernel from 2310 to 2335 by interleaving zeros for the 9th env channel."""
+def pad_gwt_comms_1(flat_params: dict, target_channels: int = 2360) -> None:
+    """Pad gwt_comms_1 kernel from 2335 to 2360 by interleaving zeros for the 10th env channel."""
     if "gwt_comms_1" not in flat_params:
         return
     gc1 = flat_params["gwt_comms_1"]
@@ -1003,8 +1010,8 @@ def pad_gwt_comms_1(flat_params: dict, target_channels: int = 2335) -> None:
         # We need to build the new kernel by inserting W rows of zeros
         new_kernel = jnp.zeros((target_channels, hidden_dim), dtype=kernel.dtype)
         
-        # The new indices for the inserted 9th channel (index 8 in each W block)
-        insert_indices = jnp.array([idx_start + 8 + i * 9 for i in range(W)])
+        # The new indices for the inserted 10th channel (index 9 in each W block)
+        insert_indices = jnp.array([idx_start + 9 + i * 10 for i in range(W)])
         
         # All other indices map to the old kernel
         mask = jnp.ones(target_channels, dtype=bool)
@@ -1019,8 +1026,8 @@ def pad_gwt_comms_1(flat_params: dict, target_channels: int = 2335) -> None:
         print(f"[JAX] Grafting interleaved padding to gwt_comms_1: expanded from {kernel.shape[0]} to {target_channels}", flush=True)
 
 
-def pad_auxiliary_heads(flat_params: dict, hidden_dim: int, target_actions: int = 8) -> None:
-    """Pad auxiliary heads to handle the expanded 8-dimensional action_oh vector."""
+def pad_auxiliary_heads(flat_params: dict, hidden_dim: int, target_actions: int = 9) -> None:
+    """Pad auxiliary heads to handle the expanded 9-dimensional action_oh vector."""
     
     # 1. Output heads: pad axis=1 (like head_action)
     for k in ["head_self_pred", "head_tom"]:
@@ -1048,8 +1055,8 @@ def pad_auxiliary_heads(flat_params: dict, hidden_dim: int, target_actions: int 
                 print(f"[JAX] Grafting padding to {k}: expanded inputs to {hidden_dim + target_actions}")
 
 
-def pad_head_fwd_2(flat_params: dict, target_outputs: int = 225) -> None:
-    """Pad head_fwd_2 outputs from 200 to 225 by interleaving zeros for the 9th env channel."""
+def pad_head_fwd_2(flat_params: dict, target_outputs: int = 250) -> None:
+    """Pad head_fwd_2 outputs from 225 to 250 by interleaving zeros for the 10th env channel."""
     if "head_fwd_2" not in flat_params:
         return
     hf2 = flat_params["head_fwd_2"]
@@ -1063,7 +1070,7 @@ def pad_head_fwd_2(flat_params: dict, target_outputs: int = 225) -> None:
         bias = hf2.get("bias", jnp.zeros(kernel.shape[1], dtype=kernel.dtype))
         new_bias = jnp.zeros(target_outputs, dtype=bias.dtype)
         
-        insert_indices = jnp.array([8 + i * 9 for i in range(W)])
+        insert_indices = jnp.array([9 + i * 10 for i in range(W)])
         
         mask = jnp.ones(target_outputs, dtype=bool)
         mask = mask.at[insert_indices].set(False)

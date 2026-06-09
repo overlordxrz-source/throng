@@ -27,6 +27,7 @@ class GridState:
         self.scent_trails  = jnp.zeros((size, size), dtype=jnp.float32)
         self.cultural_fast = jnp.zeros((size, size, symbol_dim), dtype=jnp.float32)
         self.cultural_slow = jnp.zeros((size, size, symbol_dim), dtype=jnp.float32)
+        self.barrier_hp_map = jnp.zeros((size, size), dtype=jnp.float32)
         # Puzzle
         self.puzzle_grid   = jnp.zeros((size, size), dtype=jnp.float32)
         self.puzzle_nodes  = jnp.zeros((3, 6), dtype=jnp.int32) # [ay, ax, by, bx, ry, rx]
@@ -37,7 +38,8 @@ class GridState:
         children = (
             self.symbols, self.walls, self.resources,
             self.shelter_spots, self.contested_res, self.scent_trails,
-            self.cultural_fast, self.cultural_slow, self.puzzle_grid,
+            self.cultural_fast, self.cultural_slow, self.barrier_hp_map,
+            self.puzzle_grid,
             self.puzzle_nodes, self.puzzle_active, self.puzzle_cooldown,
         )
         aux = (self.size, self.symbol_dim)
@@ -49,7 +51,7 @@ class GridState:
         gs = cls(size, symbol_dim)
         (gs.symbols, gs.walls, gs.resources,
          gs.shelter_spots, gs.contested_res, gs.scent_trails,
-         gs.cultural_fast, gs.cultural_slow, gs.puzzle_grid,
+         gs.cultural_fast, gs.cultural_slow, gs.barrier_hp_map, gs.puzzle_grid,
          gs.puzzle_nodes, gs.puzzle_active, gs.puzzle_cooldown) = children
         return gs
 
@@ -64,6 +66,7 @@ class GridState:
         gs.scent_trails = kwargs.get("scent_trails", self.scent_trails)
         gs.cultural_fast = kwargs.get("cultural_fast", self.cultural_fast)
         gs.cultural_slow = kwargs.get("cultural_slow", self.cultural_slow)
+        gs.barrier_hp_map = kwargs.get("barrier_hp_map", self.barrier_hp_map)
         gs.puzzle_grid = kwargs.get("puzzle_grid", self.puzzle_grid)
         gs.puzzle_nodes = kwargs.get("puzzle_nodes", self.puzzle_nodes)
         gs.puzzle_active = kwargs.get("puzzle_active", self.puzzle_active)
@@ -182,16 +185,28 @@ def apply_moves(
     alive:     jnp.ndarray,  # (max_pop,) bool
     grid_size: int,
     walls:     jnp.ndarray,  # (size, size) bool
-) -> jnp.ndarray:
-    """Return new positions after movement (collision with walls = stay)."""
-    # Action → delta (N, S, E, W, Stay, Strike, Push, Guard)
-    deltas = jnp.array([[0, 0], [-1, 0], [1, 0], [0, 1], [0, -1], [0, 0], [0, 0], [0, 0]], dtype=jnp.int32)
+    barrier_hp: jnp.ndarray | None = None, # (size, size) float32
+    is_red:    bool = False,
+) -> Tuple[jnp.ndarray, jnp.ndarray]:
+    """Return (final_positions, intended_positions) after movement."""
+    # Action → delta (N, S, E, W, Stay, Strike, Push, Guard, Build)
+    deltas = jnp.array([[0, 0], [-1, 0], [1, 0], [0, 1], [0, -1], [0, 0], [0, 0], [0, 0], [0, 0]], dtype=jnp.int32)
     new_pos = positions + deltas[actions]
     new_pos = wrap(new_pos, grid_size)
+    intended_pos = new_pos
+    
     # Wall collision: if target cell is wall, stay
     wall_hit = walls[new_pos[:, 0], new_pos[:, 1]]
-    new_pos = jnp.where(wall_hit[:, None] | ~alive[:, None], positions, new_pos)
-    return new_pos
+    
+    # Barrier block logic (only reds get blocked by barriers)
+    if barrier_hp is not None and is_red:
+        barrier_val = barrier_hp[new_pos[:, 0], new_pos[:, 1]]
+        barrier_blocked = barrier_val > 0.5
+    else:
+        barrier_blocked = jnp.zeros_like(wall_hit)
+        
+    new_pos = jnp.where((wall_hit | barrier_blocked)[:, None] | ~alive[:, None], positions, new_pos)
+    return new_pos, intended_pos
 
 
 # ── Resource consumption ───────────────────────────────────────────────────
@@ -309,6 +324,9 @@ def write_to_grid(
 
 def decay_grid(grid: jnp.ndarray, decay: float) -> jnp.ndarray:
     return grid * decay
+
+def decay_barrier_grid(barrier: jnp.ndarray, decay_rate: float) -> jnp.ndarray:
+    return jnp.clip(barrier - decay_rate, 0.0, None)
 
 
 # ── Local patch extraction ───────────────────────────────────────────────────

@@ -7,11 +7,11 @@ to **survive, signal, and pass knowledge on**. The goal is not "an agent that
 plays a game well." The goal is **emergence**: language, culture, and proto-
 cognition arising purely from selection pressure.
 
-**Current state (Jun 2026):** **Phase 16 (Open-Ended Combinatorial Complexity)** on `feature/phase15-cumulative-culture`.
+**Current state (Jun 2026):** **Phase 16.5 (Environmental Enrichment)** drafted on `feature/phase16-5-enrichment`.
 **Phase 15 is COMPLETE!** — The `nn.GRUCell` decoupled magnitude explosion from temporal BPTT gradients, resulting in mathematical confirmation of both Episodic Memory ($p < 0.05$) and Cumulative Culture ($p < 0.001$) at Lag-10.
-**Phase 16 is ACTIVE!** — Combinatorial Syntax Scaffold introduced with `Big Green` prey (requires 2+ simultaneous strikes), 8-dimensional action space, and a 100k-step CtD phase gate to bootstrap noun/verb compositionality. PosDis and TRE metrics added to signal decoder.
+**Phase 16 is COMPLETE!** — Reached 980k. Offline ATE (Average Treatment Effect) using the Frozen Counterfactual Causal Test on Token 3 (Strike) vs Token 55 (Flee) showed an effect size of **0.0000**. The agents are ignoring the communication channel; it remains functionally ungrounded.
+**Phase 16.5 DRAFTED** — `feature/phase16-5-enrichment` branch: Barrier physics, 9-action space (`Build`), Feral Masking, Critic Shock discount. **Goal:** Force communication grounding.
 **Modal:** **`dragonbg`** — volume **`throng-runs`**.
-**Notebook:** 3 cells — setup / launch (`COLD_RESTART` toggle) / optional `tail -f`. See [THRONG.md §4](THRONG.md#p151c--modal-notebook-3-cells). **Do not Run All.**
 
 **Full ops / decode / roadmap:** [THRONG.md](THRONG.md) §0b (read first).
 
@@ -160,10 +160,10 @@ Each agent is a **Flax transformer** (`jax_sim/network_jax.py`):
 - 2–6 attention layers (`n_layers`), expanded dynamically by **brain-vote**.
 - 128-dim tokens through multi-head self-attention.
 - 256-dim recurrent **carry** persisting across the agent's lifetime.
-- Eight output heads (action, signal, symbol, culture-fast, culture-slow,
+- Eight output heads (nine on P16.5 branch: action includes Build) (action, signal, symbol, culture-fast, culture-slow,
   value, theory-of-mind, gain).
 - Observation dimension currently **2,335** at `n_layers=2, neighbor_k=6,
-  memory_buffer_size=5, env_ch=9`.
+  memory_buffer_size=5, env_ch=9 (10 on P16.5 branch)`.
 
 ### Learning
 
@@ -254,9 +254,14 @@ throng/
 │   ├── rl_jax.py              # PPO + GAE + minibatch updates
 │   ├── grid_jax.py            # GridState + obs builder + world generation
 │   ├── population_jax.py      # PopState + reproduction + mind-meld
-│   └── debug_metrics.py       # Sanity panel
+│   ├── debug_metrics.py       # Sanity panel
+│   ├── observations_jax.py    # Observation builder (env channels, neighbor signals)
+│   └── obs_layout.py          # Observation dimension constants
 ├── agents/, environment/, communication/, utils/   # Legacy PyTorch
 ├── main.py                    # Legacy CLI
+├── tools/
+│   ├── decode_signals.py      # Offline corpus analysis (blue/red)
+│   └── causal_intervention.py # Frozen counterfactual causal test (980k)
 ├── THRONG.md                  # Full research log + theory + roadmap
 └── README.md                  # You are here
 ```
@@ -304,24 +309,15 @@ All knobs live in `config_phase7.yaml`. The ones you actually touch:
 | Phase | Status |
 |-------|--------|
 | **12** | **COMPLETE** — dual brain, wiretap, spatial gate |
-| **12.2 decode** | 250k–320k: omnibus ON, pincer still ❌ |
 | **13.0** | **VALIDATED** — tax ~0.0018/step; no imagination collapse |
-| **14.1** | ✅ VQEL graduated → hard z_q + blue PPO |
-| **14.1b** | ✅ proprio_coef=0.15; continuous spatial LRT 31/32 |
-| **14.1c** | ❌ FAILED — catch 10.0; pincer p≈0.46 |
-| **14.2** | ✅ Metabolic Asymmetry — red_energy_decay=0.0001 |
-| **14.3** | ✅ **GWT Router** — energy-masked h_comms → VQ (`654400c`) |
-| **14.4** | ✅ **MERGED to master** — DCVQ + SimVQ; Direction LRT 29/32 p<0.05 at step 688k. Language confirmed. |
-| **15.0** | ✅ **LIVE** — MEDAL-ADR; `expert_dropouts≈80`/rollout |
-| **15.1e** | ✅ **SUCCESS** — Latent Heat shattered VQ singularity; `red_codes_active=52/64` |
-| **15.2** | ❌ **FAILED** — Episodic Memory LRT failed (p=0.8369). Novices failed to use episodic memory. |
-| **15.3** | ❌ **REVERTED** — Semantic Retention Loss (SRL) failed due to lack of BPTT and momentum corruption. |
-| **15.4** | **PREP** — Memory Architecture Pivot (Pending LSTM/GRU upgrade or manual BPTT) |
-| **16.0** | **PREP** — Open-Ended Combinatorial Complexity via expanded topology |
-| **17.0** | **PREP** — The Rosetta Stone (Extraction) autoencoder mapping to English |
-| **18.0** | **PREP** — The Hive-Mind Interface bidirectional text terminal |
-
-Do **not** merge to **`master`** until P15 decode gate passes (novice episodic memory LRT **p < 0.05** at step 730k).
+| **14.1–14.4** | ✅ **COMPLETE** — VQEL graduated → hard z_q; proprio wedge; GWT Router; DCVQ+SimVQ |
+| **15.0–15.5** | ✅ **COMPLETE** — MEDAL-ADR + GRUCell pivot. Episodic Memory ($p < 0.05$) and Cumulative Culture ($p < 0.001$) at Lag-10 confirmed. |
+| **16.0** | ✅ **COMPLETE** — Open-Ended Combinatorial Complexity. Big Green prey, 8-action space. Offline causal decode revealed 0.0 ATE on communication channel. |
+| **16.5** | 🔧 **DRAFTED** — Barrier physics, 9 actions (Build), Feral Masking, Critic Shock. Goal: Force channel grounding. |
+| **17.0** | **PREP** — The Rosetta Stone (Extraction autoencoder) |
+| **18.0** | **PREP** — The Hive-Mind Interface |
+| **19.0** | **PREP** — The Marketplace (Barter/Trade economy) |
+| **20.0** | **PREP** — Cross-Species Diplomacy (Cataclysm events) |
 
 ---
 
@@ -386,7 +382,7 @@ These are organised by *cost and risk*, so the cheap wins land first.
 ### 🗂️ Deprioritised / on ice
 
 - Hierarchical RL (redundant with carry + value head).
-- Crafting / construction (high engineering, weak hypothesis).
+- Crafting / construction — **PARTIALLY ADDRESSED** in Phase 16.5 (barrier building). Full tool-use deferred.
 - Generic "scale up before adding architecture" — the current 64×64 / N=100
   setup is sufficient to observe vocabulary formation if the architecture is
   right; scale is not the bottleneck.
