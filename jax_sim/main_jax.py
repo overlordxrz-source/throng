@@ -847,6 +847,8 @@ def _run_simulation_impl(
             memory_slots=config.get("memory_slots", 0),
             cross_attn_enabled=_red_cross,
             cross_attn_num_heads=_cross_heads,
+            env_channels=int(config.get("env_channels", 9)),
+            n_actions=int(config.get("n_actions", 8)),
         )
         r_model_apply = make_model_apply(model_red)
 
