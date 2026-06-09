@@ -1189,6 +1189,7 @@ GPU-resident PPO — **`d4cf614` revert** on `master`.
 * **908k:** **Massive Predator Adaptation Spike**. Red agents learned to utilize `Push` and `Guard` actions, shattering the blue agents' stable traversal paths and causing a massive death wave (`blue_caught=378`). This confirms the combinatorial physics engine is fully active and highly lethal, forcing the blue agents to discover multi-agent counter-tactics.
 * **915k:** Blues fully adapted to the predator's new `Push/Guard` trapping tactics. Deaths returned to `blue_caught=0`. `Strk=5% Push=4% Grd=4%` stable. Co-evolutionary arms race confirmed.
 * **920k:** Stable equilibrium holding. `codes_active=52/64`, `carry_rank=61`, `carry_H=8949`. System grinding toward 980k decode milestone.
+* **924k:** Perfect stability. `codes_active=50/64`, `carry_H=9508`. Combinatorial action space holding steady (`Strk=5% Push=5% Grd=5%`). Big Green sum tracking live.
 
 ---
 
