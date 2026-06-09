@@ -32,7 +32,8 @@ Tokens are categorized by thresholding their vectors across the three axes:
 *   `noun`: High $V_{noun}$, low others
 *   `verb`: High $V_{verb}$, low others
 *   `adverb`: High $V_{adverb}$, low others
-*   `composite`: High on **2 or more** axes simultaneously (e.g., high $V_{noun}$ + high $V_{verb}$ = "barrier build")
+*   `composite`: High on **2 or more** axes simultaneously. 
+    * *CRITICAL:* The threshold must be **per-axis normalized** (e.g., `score_i > median(axis_i) + 1σ`), because axes like $V_{adverb}$ will have naturally higher baselines than sparse axes like $V_{noun}$.
 *   `unclassified`: Below threshold on all axes
 
 ### The Phase 16 Grammar Metric
