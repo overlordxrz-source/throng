@@ -176,7 +176,7 @@ class AgentNetworkJax(nn.Module):
         self.codebook = nn.Embed(self.vocab_size, self.signal_dim)
         self.head_symbol = nn.Dense(sym_d)       # symbol write
         self.head_value = nn.Dense(1, kernel_init=nn.initializers.normal(0.01), bias_init=nn.initializers.zeros)  # zero init for stable value learning
-        self.head_tom = nn.Dense(8)             # Theory-of-Mind per neighbour
+        self.head_tom = nn.Dense(self.n_actions)             # Theory-of-Mind per neighbour
         self.head_culture_fast = nn.Dense(sym_d)
         self.head_culture_slow = nn.Dense(sym_d)
 
@@ -185,7 +185,7 @@ class AgentNetworkJax(nn.Module):
         self.head_fwd_2 = nn.Dense(self.fwd_env_dim)
 
         # Self-prediction head (Phase 9.1): predicts own next action from carry_t
-        self.head_self_pred = nn.Dense(8)
+        self.head_self_pred = nn.Dense(self.n_actions)
 
         # Latent forward dynamics (Phase 11 / 9.2): carry_{t+1} from [carry_t, action_t]
         self.head_fwd_dyn_1 = nn.Dense(self.hidden_dim * 4)
@@ -578,7 +578,7 @@ class PredatorNetworkJax(nn.Module):
             kernel_init=nn.initializers.normal(0.01),
             bias_init=nn.initializers.zeros,
         )
-        self.head_tom = nn.Dense(8)
+        self.head_tom = nn.Dense(self.n_actions)
         self.head_culture_fast = nn.Dense(sym_d)
         self.head_culture_slow = nn.Dense(sym_d)
         self.head_proprio = nn.Dense(1)
