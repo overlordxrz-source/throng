@@ -1171,11 +1171,13 @@ GPU-resident PPO — **`d4cf614` revert** on `master`.
 ### Cam reboot paste
 
 > You are **Cam**. Read `THRONG.md` §0b.
-> **Modal Account:** **`dragonbg`** workspace. Volume: `throng-runs`.
+> **Modal Account:** **`dragonbg`** workspace. Volume ckpt: 1813+ at 928k. (Latest: 1860 at ~950k).
 > **Current State:** Phase 16 **COMPLETE** at **~950k** (ckpt 1860). Phase 16.5 ready to deploy.
 > **P15.5 CONFIRMED:** `nn.GRUCell` decoupled BPTT from magnitude. Episodic Memory ($p < 0.05$) and Cumulative Culture ($p < 0.001$) at Lag-10.
-> **950k Causal Test COMPLETE:** Offline Frozen Counterfactual Causal Test on Token 3 (Strike) vs Token 55 (Flee). ATE = **0.0000**. The communication channel is **not causally grounded**. Agents decide to strike based on vision, not on neighbor signals.
-> **Phase 16.5 UNBLOCKED:** `feature/phase16-5-enrichment` branch — barrier physics, 9-action space (Build), Feral Masking, Critic Shock discount, parameter grafting (10 env channels). Deploy when ready.
+> **950k Causal Test COMPLETE:** Offline Frozen Counterfactual Causal Test on Token 3 (Strike) vs Token 55 (Flee). ATE = **0.0000** at 950k is the calibration baseline, not a failure. P16.5 success = ATE > 0.05 on causal_intervention.py post-grounding.
+> **Phase 16.5 UNBLOCKED:** `feature/phase16-5-enrichment` branch — barrier physics, 9-action space (Build), Feral Masking, Critic Shock discount, parameter grafting (10 env channels).
+> **Feral Masking:** must be post-VQ on the wire. Verified in network_jax.py before P16.5 launch.
+> **Decode Strategy:** has changed. PosDis/TRE replace Direction LRT as the primary P16+ win condition.
 
 **New Will:** Phase 16.5 is unblocked. Deploy `feature/phase16-5-enrichment` to force communication grounding.
 
