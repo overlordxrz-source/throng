@@ -1,6 +1,7 @@
 import time
 import json
 import glob
+import os
 from pathlib import Path
 from visualization.dashboard import DashboardUpdate, _dashboard_process_main, DashboardProcess
 import threading
@@ -8,10 +9,10 @@ import multiprocessing as mp
 
 def tail_logs(run_dir):
     run_path = Path(run_dir)
-    # Find the most recently created log file
-    log_files = sorted(glob.glob(str(run_path / "*.jsonl")), key=os.path.getmtime)
+    # Find the most recently modified events.jsonl
+    log_files = sorted(glob.glob(str(run_path / "run_*" / "events.jsonl")), key=os.path.getmtime)
     if not log_files:
-        print("No log files found!")
+        print(f"No log files found in {run_path}/run_*/events.jsonl !")
         return
 
     latest_log = log_files[-1]
@@ -64,6 +65,7 @@ def tail_logs(run_dir):
                 elif rec.get("type") == "mi_snapshot":
                     mi_hist.append(rec)
                 
+                if not steps: continue
                 u = DashboardUpdate(
                     step=steps[-1], population_history=pops.copy(), step_history=steps.copy(),
                     mean_fitness_hist=mean_fit.copy(), max_fitness_hist=max_fit.copy(),
@@ -78,5 +80,4 @@ def tail_logs(run_dir):
                 pass
 
 if __name__ == "__main__":
-    import os
     tail_logs("/mnt/throng-runs")
