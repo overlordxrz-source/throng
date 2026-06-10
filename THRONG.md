@@ -24,7 +24,8 @@
 | **P15.0** | ✅ **MEDAL-ADR** — `expert_dropouts≈74–90`/rollout |
 | **P15.5** | 🏆 **Memory Architecture Pivot (CONFIRMED)** — `nn.GRUCell` decoupled magnitude explosion from temporal BPTT gradients. Episodic Memory ($p < 0.05$) and Cumulative Culture ($p < 0.001$) confirmed at Lag-10. |
 | **P16.0** | ✅ **Combinatorial Syntax Scaffold** — `Big Green` prey introduced. Offline Causal Intervention at 950k revealed ATE = 0.0000 on the communication channel. The channel remains ungrounded. |
-| **P16.5** | 🚀 **DEPLOYED** — Barrier physics, 9-action space (`Build`), Feral Masking (`jnp.where` zero-mask on `symbol_write`), Critic Shock discount, parameter grafting (10 env channels, 9 actions). Branch: `feature/phase16-5-enrichment`. **Goal:** Force channel grounding. |
+| **P16.5** | ✅ **Environmental Enrichment** — Barrier physics, 9-action space (`Build`), Feral Masking (`jnp.where` zero-mask on `symbol_write`), Critic Shock discount, parameter grafting (10 env channels, 9 actions). Branch: `feature/phase16-5-enrichment`. |
+| **P16.6** | 🚀 **DEPLOYED** — **GWT Router Metabolic Leak Sealed**. The GWT structural mask `obs.at[:, :4].set(0.0)` is now applied to both Blue and Red comms heads, surgically zeroing `norm_age` and `energy` from the VQ bottleneck. |
 | **Science bar (P15.5)** | ✅ **CONFIRMED**: Episodic Memory ($p < 0.05$) & Cumulative Culture ($p < 0.001$) at Lag-10! |
 | **Decode gate (P16.0)** | `python3 tools/decode_signals.py --red --metrics posdis,tre` |
 | **Cold-restart toggle** | **False** (MUST be false for all future resumes; `True` only for the original 866304 codebook surgery) |

@@ -11,6 +11,7 @@ cognition arising purely from selection pressure.
 **Phase 15 is COMPLETE!** — The `nn.GRUCell` decoupled magnitude explosion from temporal BPTT gradients, resulting in mathematical confirmation of both Episodic Memory ($p < 0.05$) and Cumulative Culture ($p < 0.001$) at Lag-10.
 **Phase 16 is COMPLETE!** — Reached 950k. Offline ATE (Average Treatment Effect) using the Frozen Counterfactual Causal Test on Token 3 (Strike) vs Token 55 (Flee) showed an effect size of **0.0000**. The agents are ignoring the communication channel; it remains functionally ungrounded.
 **Phase 16.5 DEPLOYED** — `feature/phase16-5-enrichment` branch: Barrier physics, 9-action space (`Build`), Feral Masking, Critic Shock discount. **Goal:** Force communication grounding. Red agents physically blocked from using `Build`.
+**Phase 16.6 DEPLOYED** — GWT Router Metabolic Leak Sealed. The GWT structural mask `obs.at[:, :4].set(0.0)` is now applied to both Blue and Red comms heads, surgically zeroing `norm_age` and `energy` from the VQ bottleneck.
 **Modal:** **`dragonbg`** — volume **`throng-runs`**.
 
 **Full ops / decode / roadmap:** [THRONG.md](THRONG.md) §0b (read first).
