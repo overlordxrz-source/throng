@@ -31,7 +31,8 @@ The philosophical and mathematical foundations of THRONG have been consolidated 
 | **Proto-Lexicon** | **Token 44**: Predator/Danger (NPMI 0.035). **Token 59**: Resource/Hunger (NPMI 0.154). **Token 50/47**: Guard (NPMI 0.114). **Token 13**: Exert Force/Build/Push (NPMI 0.082). |
 
 > [!NOTE]
-> **Phase 17 Preparations:** The discrete MARL language space has been proven causal. We are now preparing the Gromov-Wasserstein unsupervised translation layer in `jax_sim/rosetta_stone_jax.py` to geometrically align these 64 tokens with continuous human language embeddings.
+> **Phase 17 Preparations:** The discrete MARL language space has been proven causal. We have built the unsupervised translation layer in `jax_sim/rosetta_stone_jax.py` to geometrically align these 64 tokens with continuous human language embeddings.
+> **Architecture:** A Flax `nn.Module` featuring $F_\theta$ (discrete 64d -> continuous 50d) and $G_\phi$ (continuous 50d -> discrete 64d) using a Gumbel-Softmax STE. The loss function (`rosetta_stone_loss`) enforces Forward/Backward cycle consistency and uses `ott-jax`'s `LRGromovWasserstein` to geometrically align the MARL space against Stanford's **GloVe 50d** embeddings. The standalone offline training script is located at `scripts/train_rosetta.py`.
 | **Science bar (P15.5)** | ✅ **CONFIRMED**: Episodic Memory ($p < 0.05$) & Cumulative Culture ($p < 0.001$) at Lag-10! |
 | **Decode gate (P16.0)** | `python3 tools/decode_signals.py --red --metrics posdis,tre` |
 | **Cold-restart toggle** | **False** (MUST be false for all future resumes; `True` only for the original 866304 codebook surgery) |
