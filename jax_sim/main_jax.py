@@ -292,6 +292,10 @@ def make_sim_step(
         b_action_logits, b_signal_out, b_sym_w, b_vals, b_tom, b_token_ids, b_loss_vq, b_z_e, b_cult_f, b_cult_s = b_outs
         r_action_logits, r_signal_out, r_sym_w, r_vals, r_tom, r_token_ids, r_loss_vq, r_z_e, r_cult_f, r_cult_s = r_outs
 
+        # Reds cannot build barriers. Mask out action 8 to prevent PPO from exploring it.
+        if r_action_logits.shape[-1] > 8:
+            r_action_logits = r_action_logits.at[:, 8].set(-1e9)
+
         # ── Write VQ signals for neighbours ──
         # Phase 14.1c: monologue = wire cut (silence); post-graduation "hard" = discrete z_q only.
         if _vqel_monologue:
