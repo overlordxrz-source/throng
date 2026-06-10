@@ -604,6 +604,7 @@ def make_sim_step(
             "conf_gate_imagine_frac": b_conf_gate_frac,
             "imagination_metabolic_cost": cog_cost,
             "ignition": ignition,
+            "barrier_sum": jnp.sum(grid.barrier_hp_map),
         }
         r_rollout = {
             "obs": r_obs, "actions": r_actions, "log_probs": r_log_probs_taken,
@@ -1684,9 +1685,11 @@ def _run_simulation_impl(
             # Action distribution (N=stay, S, E, W, stay=0)
             alive_actions = b_act_all[b_alive_all]
             if len(alive_actions) > 0:
-                act_counts = np.bincount(alive_actions, minlength=8)
+                act_counts = np.bincount(alive_actions, minlength=config.get("n_actions", 8))
                 act_pct = act_counts / act_counts.sum() * 100
                 act_str = f"N={act_pct[1]:.0f}% S={act_pct[2]:.0f}% E={act_pct[3]:.0f}% W={act_pct[4]:.0f}% Stay={act_pct[0]:.0f}% Strk={act_pct[5]:.0f}% Push={act_pct[6]:.0f}% Grd={act_pct[7]:.0f}%"
+                if len(act_pct) > 8:
+                    act_str += f" Bld={act_pct[8]:.0f}%"
             else:
                 act_str = "no alive agents"
 
@@ -1698,12 +1701,14 @@ def _run_simulation_impl(
                 r_alive_all = np.array(rollout_data["red"]["alive"]).astype(bool)
                 r_alive_actions = r_act_all[r_alive_all]
                 if len(r_alive_actions) > 0:
-                    r_counts = np.bincount(r_alive_actions, minlength=8)
+                    r_counts = np.bincount(r_alive_actions, minlength=config.get("n_actions", 8))
                     r_pct = r_counts / r_counts.sum() * 100
                     red_act_str = (
                         f"N={r_pct[1]:.0f}% S={r_pct[2]:.0f}% E={r_pct[3]:.0f}% W={r_pct[4]:.0f}% Stay={r_pct[0]:.0f}% "
                         f"Strk={r_pct[5]:.0f}% Push={r_pct[6]:.0f}% Grd={r_pct[7]:.0f}%"
                     )
+                    if len(r_pct) > 8:
+                        red_act_str += f" Bld={r_pct[8]:.0f}%"
                 else:
                     red_act_str = "no alive reds"
             if _red_comms and "token_ids" in rollout_data["red"]:
@@ -1831,6 +1836,9 @@ def _run_simulation_impl(
             blue_caught_rollout = 0
             if "blue_caught" in rollout_data["blue"]:
                 blue_caught_rollout = int(np.asarray(rollout_data["blue"]["blue_caught"]).sum())
+            barrier_sum_val = 0
+            if "barrier_sum" in rollout_data["blue"]:
+                barrier_sum_val = float(np.asarray(rollout_data["blue"]["barrier_sum"]).mean())
             print(f"  VQ: loss={vq_loss_val:.4f} | codes_active={vq_codes_str} | clusters={active_clusters_str} | NB_GAIN↔surv: {sp_r:.3f}")
             medal_str = ""
             if "medal_dropouts" in rollout_data.get("red", {}):
@@ -1839,7 +1847,7 @@ def _run_simulation_impl(
             print(
                 f"  Ecology: blue_caught={blue_caught_rollout} this rollout | "
                 f"red_floor={red_curriculum_stages[red_curriculum_idx]} "
-                f"sustain={red_sustain_count}/{red_sustain_needed} | brain={n_layers}L{medal_str}"
+                f"sustain={red_sustain_count}/{red_sustain_needed} | brain={n_layers}L{medal_str} | barrier_sum={barrier_sum_val:.1f}"
             )
             if bool((_p9 or {}).get("imagination_gating_enabled", False)):
                 im_agree_val = float("nan")
