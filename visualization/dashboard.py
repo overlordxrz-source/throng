@@ -90,7 +90,7 @@ class DashboardHandler(SimpleHTTPRequestHandler):
 def _dashboard_process_main(data_queue: mp.Queue, update_interval: float) -> None:
     global _latest_update
     
-    server = HTTPServer(('127.0.0.1', 8050), DashboardHandler)
+    server = HTTPServer(('0.0.0.0', 8050), DashboardHandler)
     server_thread = threading.Thread(target=server.serve_forever, daemon=True)
     server_thread.start()
     
@@ -178,7 +178,7 @@ def run_offline_analysis(run_dir: str) -> None:
     print(f"              Serving {len(steps)} steps from {run_dir}")
     print("Press Ctrl+C to stop the server.\n")
     
-    server = HTTPServer(('127.0.0.1', 8050), DashboardHandler)
+    server = HTTPServer(('0.0.0.0', 8050), DashboardHandler)
     try:
         server.serve_forever()
     except KeyboardInterrupt:
