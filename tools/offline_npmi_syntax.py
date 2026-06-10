@@ -3,7 +3,7 @@ import argparse
 from collections import defaultdict
 import math
 
-def calculate_npmi(corpus_file, condition_key, condition_lambda):
+def calculate_npmi(corpus_file, condition_key, condition_lambda, min_step=0):
     # Counts
     N = 0
     token_counts = defaultdict(int)
@@ -16,6 +16,9 @@ def calculate_npmi(corpus_file, condition_key, condition_lambda):
             try:
                 data = json.loads(line)
             except:
+                continue
+                
+            if data.get('step', 0) < min_step:
                 continue
                 
             N += 1
@@ -71,6 +74,7 @@ def calculate_npmi(corpus_file, condition_key, condition_lambda):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Calculate NPMI between VQ tokens and environmental events")
     parser.add_argument('corpus', help="Path to signal_corpus.jsonl")
+    parser.add_argument('--min-step', type=int, default=0, help="Minimum step to consider")
     args = parser.parse_args()
     
     # 1. NOUN CLASSIFICATION (Static / State-Based Features)
@@ -94,11 +98,11 @@ if __name__ == "__main__":
     print("==========================================")
     for name, func in nouns.items():
         print(f"\nEvaluating Noun: {name}")
-        calculate_npmi(args.corpus, name, func)
+        calculate_npmi(args.corpus, name, func, min_step=args.min_step)
 
     print("\n==========================================")
     print("VERB CLASSIFICATION (Action-Based Semantics)")
     print("==========================================")
     for name, func in verbs.items():
         print(f"\nEvaluating Verb: {name}")
-        calculate_npmi(args.corpus, name, func)
+        calculate_npmi(args.corpus, name, func, min_step=args.min_step)
