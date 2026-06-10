@@ -7,11 +7,11 @@ to **survive, signal, and pass knowledge on**. The goal is not "an agent that
 plays a game well." The goal is **emergence**: language, culture, and proto-
 cognition arising purely from selection pressure.
 
-**Current state (Jun 2026):** **Phase 16.5 (Environmental Enrichment)** DEPLOYED on `feature/phase16-5-enrichment`.
+**Current state (Jun 2026):** **Phase 16.5 (Environmental Enrichment)** DEPLOYED. **The Great Burn-Off** is active at step 992k (VQ collapsed to `1/64` as structural masks successfully severed the metabolic proxy language).
 **Phase 15 is COMPLETE!** — The `nn.GRUCell` decoupled magnitude explosion from temporal BPTT gradients, resulting in mathematical confirmation of both Episodic Memory ($p < 0.05$) and Cumulative Culture ($p < 0.001$) at Lag-10.
 **Phase 16 is COMPLETE!** — Reached 950k. Offline ATE (Average Treatment Effect) using the Frozen Counterfactual Causal Test on Token 3 (Strike) vs Token 55 (Flee) showed an effect size of **0.0000**. The agents are ignoring the communication channel; it remains functionally ungrounded.
-**Phase 16.5 DEPLOYED** — `feature/phase16-5-enrichment` branch: Barrier physics, 9-action space (`Build`), Feral Masking, Critic Shock discount. **Goal:** Force communication grounding. Red agents physically blocked from using `Build`.
-**Phase 16.6 DEPLOYED** — GWT Router Metabolic Leak Sealed. The GWT structural mask `obs.at[:, :4].set(0.0)` is now applied to both Blue and Red comms heads, surgically zeroing `norm_age` and `energy` from the VQ bottleneck.
+**Phase 16.5 DEPLOYED** — `feature/phase16-5-enrichment` branch: Barrier physics, 9-action space (`Build`), Feral Masking, Critic Shock discount. **SUCCESS:** Burn-Off confirmed. Red agents structurally blocked from using metabolic channels.
+**Phase 16.6 DEPLOYED** — GWT Router Metabolic Leak Sealed. The GWT structural mask `obs.at[:, :4].set(0.0)` is applied to both Blue and Red comms heads, surgically zeroing `norm_age` and `energy` from the VQ bottleneck.
 **Modal:** **`dragonbg`** — volume **`throng-runs`**.
 
 **Full ops / decode / roadmap:** [THRONG.md](THRONG.md) §0b (read first).
@@ -323,11 +323,11 @@ All knobs live in `config_phase7.yaml`. The ones you actually touch:
 | **14.1–14.4** | ✅ **COMPLETE** — VQEL graduated → hard z_q; proprio wedge; GWT Router; DCVQ+SimVQ |
 | **15.0–15.5** | ✅ **COMPLETE** — MEDAL-ADR + GRUCell pivot. Episodic Memory ($p < 0.05$) and Cumulative Culture ($p < 0.001$) at Lag-10 confirmed. |
 | **16.0** | ✅ **COMPLETE** — Open-Ended Combinatorial Complexity. Big Green prey, 8-action space. Offline causal decode revealed 0.0 ATE on communication channel. |
-| **16.5** | 🔧 **DRAFTED** — Barrier physics, 9 actions (Build), Feral Masking, Critic Shock. Goal: Force channel grounding. |
-| **17.0** | **PREP** — The Rosetta Stone (Extraction autoencoder) |
-| **18.0** | **PREP** — The Hive-Mind Interface |
-| **19.0** | **PREP** — The Marketplace (Barter/Trade economy) |
-| **20.0** | **PREP** — Cross-Species Diplomacy (Cataclysm events) |
+| **16.5** | ✅ **COMPLETE** — The Great Burn-Off confirmed at 992k steps (`codes_active=1/64`). Feral Masking and GWT Router successfully forced semantic collapse. Awaiting vocabulary recovery. |
+| **17.0** | **PREP** — Combinatorial Tool Use (Crafting Trees & logic syntax) |
+| **18.0** | **PREP** — Cultural Transmission (Writing symbols to the grid permanently) |
+| **19.0** | **PREP** — Agriculture & Terraforming (Delayed resources & "Future Time" semantics) |
+| **20.0** | **PREP** — The Rosetta Stone (Unsupervised Semantic Translation via Topological Alignment) |
 
 ---
 

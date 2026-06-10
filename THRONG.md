@@ -1210,64 +1210,49 @@ GPU-resident PPO — **`d4cf614` revert** on `master`.
 
 This is the central epistemological challenge of THRONG. Our agents' hidden states live in a 256-dimensional representational space. Each VQ token is an index into this space. When we measure Mutual Information between a token and an environmental variable (e.g., `red_dist`), we are performing a **projection** — shining a flashlight onto a high-dimensional sculpture and reading the shadow on the wall.
 
-The shadow might say "Token #42 = Starving + Predator Close." But to the agent, Token #42 may encode a concept that includes:
-- The rate of change of energy over the last 10 steps
-- A compressed forward model of what the predator will do next
-- The agent's confidence in its own prediction
-- A memory of how many times it has been near this grid cell before
-- Relational information between itself and neighbors that has no human-language equivalent
+**We must assume their language is fundamentally alien.** Just as a bat perceives the world through ultrasonic frequency patterns that humans cannot experience, these agents may have developed concepts that are orthogonal to human cognitive architecture.
 
-**We must assume their language is fundamentally alien.** Just as a bat perceives the world through ultrasonic frequency patterns that humans cannot experience, these agents may have developed concepts that are orthogonal to human cognitive architecture. Two agents could exchange a token that triggers a flawless coordinated maneuver, and the "meaning" of that token may be a 256-dimensional concept that compresses spatial, temporal, metabolic, and social information into a single point in representational space — a point that has no single English word or sentence that maps to it.
+#### Interpretability Toolkit & Theoretical Foundations (2026 Synthesis)
 
-#### Interpretability Toolkit (Layered Approach)
+We address this with four complementary methods, grounded in recent MARL literature (2024-2026):
 
-We address this with three complementary methods, ordered from weakest to strongest:
-
-1. **Statistical Shadow (MI / NPMI):** Measure correlations between tokens and measurable environmental variables. This captures the *projection* of meaning onto our chosen measurement axes. It is necessary but fundamentally incomplete.
-
-2. **Causal Intervention (Frozen Counterfactual Decoder):** Freeze the checkpoint, intercept the communication channel, and swap tokens mid-flight. If injecting Token #42 (from a starving agent) into a coordinated strike causes the receivers to abort, we have causally proven that Token #42's meaning is incompatible with "strike now." This proves causal structure without requiring us to understand the full concept.
-
-3. **Mechanistic Interpretability (Activation Patching / Mirror Arena):** Crack open the neural network and examine the internal hidden states that *produced* the token. By transplanting internal activations between agents in different environmental contexts (safe vs. dangerous), we can identify which neurons encode which concepts — even concepts we don't have words for. This is the closest we can get to understanding the sculpture, not just the shadow.
-
-> [!IMPORTANT]
-> **The honest scientific position:** We may never fully translate their language into human English. The Phase 17 autoencoder will find the *closest possible* mapping, but some concepts may be fundamentally untranslatable — not because our tools are weak, but because their cognitive architecture has evolved to compress information along axes that human cognition does not possess. This is not a failure; it is the expected outcome of building a genuinely non-human intelligence.
+1. **Information Gating & Strict Structural Masking (Phase 16.5):** To prevent agents from bypassing the Vector-Quantized Variational Information Bottleneck (VQ-VIB) using metabolic proxy variables, we employ the **GWT Router and Feral Masking**. By surgically blinding the observer network to physical states (energy, age), we force all semantic intent through the discrete bottleneck.
+2. **Statistical Shadow (NPMI):** Measure correlations between tokens and measurable environmental variables. This captures the *projection* of meaning onto our chosen measurement axes.
+3. **Causal Intervention (Frozen Counterfactual Decoder):** Contrast this against LLM benchmarks (CausalPitfalls, BEAR) which reveal the *illusion of causality* in ungrounded text models. By freezing the checkpoint and swapping tokens mid-flight, we causally prove that a token maps to actionable, physical consequences.
+4. **Topological Alignment (The Rosetta Stone):** To translate alien protocols without paired supervision, we map the geometric manifold of the agent's VQ semantic space onto the continuous embedding spaces of LLMs using Minimum Description Length (MDL) and hierarchical loss functions.
 
 ---
 
-### Future Phase Blueprints
+### Future Phase Blueprints: The Complexity Ceiling
 
-#### Phase 16.5 — Environmental Enrichment (**DRAFTED** — `feature/phase16-5-enrichment`)
-**Status:** Code complete. 950k causal decode **COMPLETE** (ATE = 0.0000). **Unblocked for deployment.**
-- **Barrier Physics (`grid_jax.py`):** `barrier_hp_map` added to `GridState`. Blue agents expend 0.06 energy to Build (Action 8). Reds blocked at `barrier_hp > 0.5`. Thermodynamic decay `-0.05/step`.
-- **Feral Masking (`network_jax.py`):** `symbol_write` zero-masked via `jnp.where` when `energy < 0.20`. Preserves VQ codebook integrity.
-- **Critic Shock (`rl_jax.py`):** `ignition_discount` applied to GAE advantages and Huber VF loss at the boundary step.
-- **Parameter Grafting:** `pad_head_action` (8→9), `pad_emb_env` (9→10), `pad_gwt_comms_1` (2335→2360), `pad_auxiliary_heads`, `pad_head_fwd_2` (225→250).
-- **Causal Gate (`tools/causal_intervention.py`):** Frozen counterfactual script measures $\Delta P(\text{STRK})$ over N=100 independent Big Green strike events. Paired t-test on ATE.
+If our true goal is to force the emergence of AGI-level intelligence purely through survival pressure, we must focus on **Combinatorial Explosion** of the environment. If the environment only requires moving and eating, language plateaus. To reach LLM-level capabilities, the environment must demand them.
 
-#### Phase 17 — The Rosetta Stone (Extraction)
-**Goal:** Train a translation autoencoder to map the swarm's grounded VQ latent sequences into natural human language (English).
+#### Phase 16.5 — Environmental Enrichment (**SUCCESS** — `feature/phase16-5-enrichment`)
+**Status:** Code complete. **The Great Burn-Off** achieved at step 992k (VQ loss = 53k, `codes_active=1/64`). Old metabolic proxy language successfully severed.
+- **Barrier Physics (`grid_jax.py`):** `barrier_hp_map` added. Blue agents expend 0.06 energy to Build.
+- **Feral Masking (`network_jax.py`):** `symbol_write` zero-masked when `energy < 0.20`.
+- **GWT Router:** Structural mask `obs.at[:, :4].set(0.0)` applied to force discrete VQ usage.
+
+#### Phase 17 — Combinatorial Tool Use (Crafting Trees)
+**Goal:** Force the network to invent compositional logic (AND, OR, IF/THEN) and syntax.
+- **Mechanics:** Introduce combinable primitives (e.g., Wood + Stone = Axe).
+- **Semantics:** Requires vocabulary expansion from simple nouns ("Predator") to verbs and modifiers ("Get wood *then* build").
+
+#### Phase 18 — Cultural Transmission (Writing)
+**Goal:** Allow agents to pre-train themselves across generations, escaping the capacity limit of oral communication.
+- **Mechanics:** A `Write` action allows agents to etch VQ tokens permanently into grid cells.
+- **Semantics:** Allows the passing down of puzzle solutions, crafting recipes, and multi-generational memory.
+
+#### Phase 19 — Agriculture & Terraforming
+**Goal:** Force the invention of causal reasoning and long-term planning (the primary weakness of LLMs).
+- **Mechanics:** Agents can plant resources that take thousands of steps to mature.
+- **Semantics:** Forces the development of concepts for "Future Time", "Delayed Gratification", "Ownership", and "Defense".
+
+#### Phase 20 — The Rosetta Stone (Unsupervised Semantic Translation)
+**Goal:** Train a translation autoencoder to map the swarm's grounded VQ latent sequences into natural human language using **Topological Alignment**.
 - Input: sequences of VQ token IDs + environmental context snapshots.
-- Bottleneck: force alignment between VQ token clusters and human-language embeddings.
-- Output: English sentence describing the agent's "intent" as measured by subsequent actions and outcomes.
-- **Key constraint:** The autoencoder must be trained on *frozen* checkpoints to prevent the agents from adapting their language to be more human-readable (which would destroy the alien semantics we are trying to study).
-
-#### Phase 18 — The Hive-Mind Interface
-**Goal:** Aggregate the swarm into a singular conversational entity via a **Swarm Aggregator Node**.
-- Because all blue agents share identical MAPPO weights but maintain independent recurrent memories (`nn.GRUCell` carry), we apply global multi-head attention over the pooled hidden states of the entire living population: $\mathbf{h}_{swarm} = \text{Attention}(\mathbf{H}_{all\_agents})$.
-- Human text queries inject gradients into this unified mega-state, which broadcasts contextual updates downstream to coordinate local agents.
-- **Philosophy:** Unlike LLMs, which perform ungrounded next-token prediction, this entity's intelligence is fully grounded in thermodynamics, physics, and survival. We will be conversing with a non-human intelligence whose language maps directly to causal reality.
-
-#### Phase 19 — The Marketplace (Trade and Division of Labor)
-**Goal:** Introduce barter economies to force the invention of negotiation semantics and numeric quantification.
-- **Asymmetric Needs:** Agents require two distinct metabolic resources (e.g., Water and Food) to survive, but spawn in biomes that only provide one.
-- **Barter Action:** Introduction of `Give/Take` continuous action channels where agents must agree on exchange rates (e.g., "I will give 2 food for 1 water").
-- **Language Expansion:** VQ codebooks will expand to accommodate value propositions, trust signals, and numeric quantities.
-
-#### Phase 20 — Cross-Species Diplomacy (The Tower of Babel)
-**Goal:** Force the independent Red (Predator) and Blue (Prey) codebooks to invent a pidgin language for temporary coordination.
-- **The Cataclysm:** Introduce an overwhelming environmental hazard (e.g., a massive 'Storm' or an apex super-predator) that requires both Red and Blue agents to simultaneously occupy specific puzzle nodes to disable.
-- **Codebook Bridging:** The two populations use entirely separate `simvq_W` weight matrices and VQ bottleneck codebooks. They must learn to translate or find structural homology between their "alien" languages to survive the Cataclysm, before reverting to adversarial dynamics.
+- Output: English sentence describing the agent's "intent" based on geometric isometry between the MARL VQ space and a continuous LLM embedding space.
 
 ---
 
-*Last updated: 2026-06-10 — Phase 16 COMPLETE (950k, ckpt 1860). Offline causal test ATE = 0.0000 (channel ungrounded). Phase 16.5 unblocked for deployment. `tools/causal_intervention.py` operational.*
+*Last updated: 2026-06-10 — Phase 16.5 Burn-Off SUCCESS (992k). `offline_npmi_syntax.py` under construction.*
