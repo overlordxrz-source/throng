@@ -1983,9 +1983,15 @@ def _run_simulation_impl(
         r_carry_fwd_all = np.array(rollout_data["red"]["carries"])
         r_steps_since_dropout_all = np.array(rollout_data["red"]["steps_since_dropout"])
 
-        # loc_env is the 4th block in b_obs (8 channels: blue, red, wall, resource, shelter, contested, scent, puzzle)
+        # loc_env is the 4th block in b_obs (env_channels channels)
+        env_channels = int(config.get("env_channels", 8))
         idx_offset = 6 + (config["neighbor_k"] * config["signal_dim"]) + (25 * config["symbol_dim"])
-        idx_resource = idx_offset + (12 * 8) + 3  # 12th cell (center of 5x5), channel 3 = resource
+        idx_resource = idx_offset + (12 * env_channels) + 3  # 12th cell (center of 5x5), channel 3 = resource
+        
+        # Phase 17 NPMI spatial correlates
+        adj_cells = [7, 11, 12, 13, 17] # N, W, Center, E, S in 5x5 patch
+        idx_adj_bg = [idx_offset + (c * env_channels) + 8 for c in adj_cells]
+        idx_adj_barrier = [idx_offset + (c * env_channels) + 9 for c in adj_cells]
 
         gs_val = int(config["grid_size"])
         start_step = ui * T
@@ -2061,6 +2067,9 @@ def _run_simulation_impl(
                         for i in np.where(has_donor)[0]:
                             toks = _lag1_scout_tok[within_mask[i]].astype(np.int64)
                             nb_scout_token_lag1[i] = int(np.bincount(toks).argmax())
+                adj_red = red_dist <= 2.0
+                adj_bg = np.sum(b_obs_all[t, alive_idx][:, idx_adj_bg], axis=-1) > 0.5
+                adj_barrier = np.sum(b_obs_all[t, alive_idx][:, idx_adj_barrier], axis=-1) > 0.5
 
                 corpus_writer.maybe_record(
                     step=global_step,
@@ -2077,6 +2086,9 @@ def _run_simulation_impl(
                     nb_scout_sig_lag1=nb_scout_lag1,
                     nb_scout_dist_lag1=nb_scout_dist_lag1,
                     nb_scout_token_lag1=nb_scout_token_lag1,
+                    adj_bg=adj_bg,
+                    adj_barrier=adj_barrier,
+                    adj_red=adj_red,
                 )
                 if is_scout.any():
                     pos_b_alive_f = b_pos[alive_idx].astype(np.float32)

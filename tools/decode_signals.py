@@ -111,6 +111,10 @@ def load_corpus(path: str) -> dict:
     else:
         nb_tok_lag1 = None
 
+    adj_bg      = np.array([r.get("adj_bg", False) for r in records], dtype=bool)
+    adj_barrier = np.array([r.get("adj_barrier", False) for r in records], dtype=bool)
+    adj_red     = np.array([r.get("adj_red", False) for r in records], dtype=bool)
+
     return {
         "signals":      signals,
         "actions":      actions,
@@ -121,6 +125,9 @@ def load_corpus(path: str) -> dict:
         "nb_dist_lag1": nb_dist_lag1,
         "vq_tokens":    vq_tokens,
         "nb_tok_lag1":  nb_tok_lag1,
+        "adj_bg":       adj_bg,
+        "adj_barrier":  adj_barrier,
+        "adj_red":      adj_red,
         "n":            len(records),
     }
 
@@ -1750,6 +1757,170 @@ def _quick_withdrawal_metrics(corpus_path: str, seed: int = 42) -> dict:
     return result
 
 
+# ── Phase 17 NPMI Lexical Parser ──────────────────────────────────────────────
+
+def compute_npmi(x: np.ndarray, y: np.ndarray, eps: float = 1e-8) -> float:
+    """Compute Normalized Pointwise Mutual Information between two boolean arrays.
+    NPMI = ln(p(x,y) / (p(x)*p(y))) / -ln(p(x,y))
+    Range: [-1, 1], where 1 is perfect co-occurrence, 0 is independent.
+    """
+    p_x = x.mean() + eps
+    p_y = y.mean() + eps
+    p_xy = (x & y).mean() + eps
+    
+    pmi = np.log(p_xy / (p_x * p_y))
+    if pmi <= 0:
+        return 0.0 # We only care about positive mutual information for grammar classification
+        
+    npmi = pmi / -np.log(p_xy)
+    return float(npmi)
+
+def npmi_lexical_parse(data: dict) -> None:
+    """Phase 17 syntactic token classification."""
+    print(f"\n{'='*70}")
+    print(f"  PHASE 17: NPMI LEXICAL PARSER")
+    print(f"{'='*70}")
+    
+    vq_tokens = data.get("vq_tokens")
+    if vq_tokens is None or not (vq_tokens >= 0).any():
+        print("  ❌ No VQ tokens found in corpus. Cannot run lexical parse.")
+        return
+
+    # 1. Check if we have the new spatial correlates
+    adj_bg = data.get("adj_bg")
+    adj_barrier = data.get("adj_barrier")
+    adj_red = data.get("adj_red")
+    
+    if adj_bg is None or adj_barrier is None or adj_red is None:
+        print("  ❌ New spatial correlates (adj_bg, adj_barrier, adj_red) not found.")
+        print("  → Run the simulation longer with the new Phase 17 SignalCorpusWriter to accumulate data.")
+        return
+        
+    valid_mask = (vq_tokens >= 0)
+    tokens = vq_tokens[valid_mask]
+    n_samples = len(tokens)
+    
+    if n_samples < 1000:
+        print(f"  ⚠ Only {n_samples} valid token samples. Need more data for stable NPMI.")
+        
+    unique_tokens = np.unique(tokens)
+    
+    # Context features
+    actions = data["actions"][valid_mask]
+    ctx = data["ctx"]
+    resource = (ctx["resource"][valid_mask] > 0.5)
+    adj_bg_v = adj_bg[valid_mask]
+    adj_barrier_v = adj_barrier[valid_mask]
+    adj_red_v = adj_red[valid_mask]
+    
+    # Noun axes (Boolean entities)
+    noun_features = [adj_bg_v, adj_barrier_v, adj_red_v, resource]
+    
+    # Verb axes (Action execution)
+    verb_features = [(actions == a) for a in range(9) if a != 4] # Ignore STAY (4)
+    
+    # Adverb axes (Spatial geometry)
+    red_bear = ctx["red_bear"][valid_mask]
+    red_dist = ctx["red_dist"][valid_mask]
+    
+    bear_N = (red_bear >= 315) | (red_bear < 45)
+    bear_E = (red_bear >= 45) & (red_bear < 135)
+    bear_S = (red_bear >= 135) & (red_bear < 225)
+    bear_W = (red_bear >= 225) & (red_bear < 315)
+    
+    dist_close = red_dist <= 2.0
+    dist_mid = (red_dist > 2.0) & (red_dist <= 5.0)
+    dist_far = red_dist > 5.0
+    
+    adverb_bearings = [bear_N, bear_E, bear_S, bear_W]
+    adverb_dists = [dist_close, dist_mid, dist_far]
+
+    # Precompute scores
+    scores_noun = []
+    scores_verb = []
+    scores_adverb = []
+    
+    for t in unique_tokens:
+        tok_mask = (tokens == t)
+        if tok_mask.sum() < 5:
+            scores_noun.append(0.0)
+            scores_verb.append(0.0)
+            scores_adverb.append(0.0)
+            continue
+            
+        # Noun NPMI (Max across entities)
+        n_score = max([compute_npmi(tok_mask, f) for f in noun_features])
+        
+        # Verb NPMI (Max across actions)
+        v_score = max([compute_npmi(tok_mask, f) for f in verb_features])
+        
+        # Adverb NPMI (Sum of max bearing + max distance)
+        adv_b_score = max([compute_npmi(tok_mask, f) for f in adverb_bearings])
+        adv_d_score = max([compute_npmi(tok_mask, f) for f in adverb_dists])
+        adv_score = adv_b_score + adv_d_score
+        
+        scores_noun.append(n_score)
+        scores_verb.append(v_score)
+        scores_adverb.append(adv_score)
+        
+    scores_noun = np.array(scores_noun)
+    scores_verb = np.array(scores_verb)
+    scores_adverb = np.array(scores_adverb)
+    
+    # Per-axis normalization
+    med_n, std_n = np.median(scores_noun), np.std(scores_noun)
+    med_v, std_v = np.median(scores_verb), np.std(scores_verb)
+    med_a, std_a = np.median(scores_adverb), np.std(scores_adverb)
+    
+    thresh_n = med_n + 1.0 * std_n
+    thresh_v = med_v + 1.0 * std_v
+    thresh_a = med_a + 1.0 * std_a
+    
+    counts = {"noun": 0, "verb": 0, "adverb": 0, "composite": 0, "unclassified": 0}
+    
+    for i, t in enumerate(unique_tokens):
+        if scores_noun[i] == 0.0 and scores_verb[i] == 0.0 and scores_adverb[i] == 0.0:
+            continue # Skipped token
+            
+        is_n = scores_noun[i] > thresh_n
+        is_v = scores_verb[i] > thresh_v
+        is_a = scores_adverb[i] > thresh_a
+        
+        axes_cleared = sum([is_n, is_v, is_a])
+        
+        if axes_cleared >= 2:
+            counts["composite"] += 1
+        elif is_n:
+            counts["noun"] += 1
+        elif is_v:
+            counts["verb"] += 1
+        elif is_a:
+            counts["adverb"] += 1
+        else:
+            counts["unclassified"] += 1
+            
+    total = sum(counts.values())
+    if total == 0:
+        print("  ❌ No tokens had enough samples to classify.")
+        return
+        
+    print(f"  V_noun threshold   : > {thresh_n:.4f} (med={med_n:.4f}, std={std_n:.4f})")
+    print(f"  V_verb threshold   : > {thresh_v:.4f} (med={med_v:.4f}, std={std_v:.4f})")
+    print(f"  V_adverb threshold : > {thresh_a:.4f} (med={med_a:.4f}, std={std_a:.4f})")
+    print(f"{'-'*70}")
+    print(f"  Vocabulary Size : {total} active tokens")
+    print(f"  Nouns           : {counts['noun']} ({(counts['noun']/total)*100:.1f}%)")
+    print(f"  Verbs           : {counts['verb']} ({(counts['verb']/total)*100:.1f}%)")
+    print(f"  Adverbs         : {counts['adverb']} ({(counts['adverb']/total)*100:.1f}%)")
+    print(f"  Unclassified    : {counts['unclassified']} ({(counts['unclassified']/total)*100:.1f}%)")
+    print(f"  COMPOSITE       : {counts['composite']} ({(counts['composite']/total)*100:.1f}%)")
+    print(f"{'-'*70}")
+    if counts['composite'] > 0:
+        print(f"  ✅ SYNTACTIC GRAMMAR DETECTED. {counts['composite']} tokens span multiple orthogonal semantic axes.")
+    else:
+        print(f"  ❌ No combinatorial grammar detected. Tokens are still single-axis (holophrastic).")
+
+
 def withdrawal_comparison(baseline_path: str, withdrawal_path: str) -> None:
     """
     Compare pre- and post-withdrawal metrics side-by-side.
@@ -1866,6 +2037,8 @@ def main() -> None:
                     help="Phase 15.2b: Run Episodic Memory LRT for Cultural Transmission at specified lag")
     ap.add_argument("--metrics", type=str, default="",
                     help="Comma-separated list of metrics to compute (e.g. posdis,tre)")
+    ap.add_argument("--npmi", action="store_true",
+                    help="Phase 17: Run NPMI Lexical Parser (Noun, Verb, Adverb)")
     args = ap.parse_args()
 
     if args.red:
@@ -1904,6 +2077,12 @@ def main() -> None:
         data["nb_dist_lag1"] = data["nb_dist_lag1"][keep] if data["nb_dist_lag1"] is not None else None
         data["vq_tokens"]    = data["vq_tokens"][keep]
         data["nb_tok_lag1"]  = data["nb_tok_lag1"][keep]  if data["nb_tok_lag1"]  is not None else None
+        if "adj_bg" in data and data["adj_bg"] is not None:
+            data["adj_bg"] = data["adj_bg"][keep]
+        if "adj_barrier" in data and data["adj_barrier"] is not None:
+            data["adj_barrier"] = data["adj_barrier"][keep]
+        if "adj_red" in data and data["adj_red"] is not None:
+            data["adj_red"] = data["adj_red"][keep]
         data["n"]   = int(keep.sum())
 
     n       = data["n"]
@@ -2034,6 +2213,9 @@ def main() -> None:
         print(f"{'─'*70}")
         print("  nb_scout_sig_lag1 field absent — re-run after corpus accumulates")
         print("  records with the new SignalCorpusWriter (restart required).")
+
+    if args.npmi:
+        npmi_lexical_parse(data)
 
     print(f"\n{'='*70}")
     print("  Done. Interpret:")

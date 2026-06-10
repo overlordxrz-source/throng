@@ -366,6 +366,9 @@ class SignalCorpusWriter:
         nb_scout_sig_lag1:  Optional[np.ndarray] = None,
         nb_scout_dist_lag1: Optional[np.ndarray] = None,
         nb_scout_token_lag1: Optional[np.ndarray] = None,
+        adj_bg:            Optional[np.ndarray] = None,
+        adj_barrier:       Optional[np.ndarray] = None,
+        adj_red:           Optional[np.ndarray] = None,
     ) -> None:
         """Write sampled records; no-op if called more often than every_n_steps.
 
@@ -397,6 +400,12 @@ class SignalCorpusWriter:
                 "energy":    round(float(own_energy[i]), 4),
                 "neighbors": round(float(neighbor_count[i]), 4),
             }
+            if adj_bg is not None:
+                rec["adj_bg"] = bool(adj_bg[i])
+            if adj_barrier is not None:
+                rec["adj_barrier"] = bool(adj_barrier[i])
+            if adj_red is not None:
+                rec["adj_red"] = bool(adj_red[i])
             if token_ids is not None:
                 rec["vq_token"] = int(token_ids[idx])
             if nb_scout_sig_lag1 is not None:
