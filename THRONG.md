@@ -20,7 +20,7 @@ The philosophical and mathematical foundations of THRONG have been consolidated 
 
 **Blue SOTA (frozen on `master`):** **`465d8c6+`** — 9.4 cross-attn + 9.1 confidence + **11.3 epistemic gate** (Stay-collapse resolved).
 
-**Headline:** Phase 16 has reached the 950k milestone. We performed the offline Frozen Counterfactual Causal Test on the communication channel (Token 3 Strike vs Token 55 Flee) and found an Average Treatment Effect (ATE) of **0.0000**. The agents are completely ignoring the communication channel when making strike decisions. To force true grounding of this channel, Phase 16.5 introduces Environmental Enrichment (barrier physics, feral masking) to make the channel load-bearing.
+**Headline:** Phase 16 has reached the 1M milestone. We performed the offline Frozen Counterfactual Causal Test on the communication channel post-burn-off. Token 44 ("Predator/Danger") yielded a Null Hypothesis (ATE = 0.0003, p=0.217) even when strictly filtering for out-of-sight receivers (`--receiver-dist-min 10`). This proves Token 44 is pure correlational noise and is not load-bearing for flee behavior. The investigation has now pivoted to testing cooperative actions (Token 13, "Exert Force") where coordination is mandatory.
 
 | Live run (Phase 16.5) | Value |
 |-----------------------|--------|
@@ -28,7 +28,7 @@ The philosophical and mathematical foundations of THRONG have been consolidated 
 | **Modal workspace** | **`dragonbg`** (Jun 2026) |
 | **P16.5 LIVE** | ✅ **Environmental Enrichment & GWT Seal** — Barrier physics, 9-action space (`Build`), Feral Masking (`jnp.where` zero-mask on `symbol_write`), Critic Shock discount. `obs.at[:, :4].set(0.0)` applied to *both* Red and Blue. |
 | **Current Status** | ✅ **The Great Burn-Off Succeeded**. `codes_active` bottomed out at 1/64 (step 992k), gradient starvation forced external grounding, and the codebook recovered to a stable 5-token proto-language at step 1.008M. |
-| **Proto-Lexicon** | **Token 44**: Predator/Danger (NPMI 0.035). **Token 59**: Resource/Hunger (NPMI 0.154). **Token 50/47**: Guard (NPMI 0.114). **Token 13**: Exert Force/Build/Push (NPMI 0.082). |
+| **Proto-Lexicon** | **Token 44**: Predator/Danger (NPMI 0.035, **CAUSAL TEST FAILED**). **Token 59**: Resource/Hunger (NPMI 0.154). **Token 50/47**: Guard (NPMI 0.114). **Token 13**: Exert Force/Build/Push (NPMI 0.082). |
 
 > [!NOTE]
 > **Phase 17 Preparations:** The discrete MARL language space has been proven causal. We have built the unsupervised translation layer in `jax_sim/rosetta_stone_jax.py` to geometrically align these 64 tokens with continuous human language embeddings.

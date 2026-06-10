@@ -7,10 +7,10 @@ to **survive, signal, and pass knowledge on**. The goal is not "an agent that
 plays a game well." The goal is **emergence**: language, culture, and proto-
 cognition arising purely from selection pressure.
 
-**Current state (Jun 2026):** **Phase 16.5 (Environmental Enrichment)** COMPLETE. **The Great Burn-Off** successfully wiped the obsolete proxy language. The codebook collapsed to 1/64, gradient starvation forced external grounding, and a stable 5-token causally-grounded proto-language emerged (e.g., Token 44 = "Predator").
+**Current state (Jun 2026):** **Phase 16.5 (Environmental Enrichment)** LIVE. **The Great Burn-Off** successfully wiped the obsolete proxy language. The codebook collapsed to 1/64, gradient starvation forced external grounding, and a stable 5-token proto-language emerged.
 **Phase 15 is COMPLETE!** — The `nn.GRUCell` decoupled magnitude explosion from temporal BPTT gradients, resulting in mathematical confirmation of both Episodic Memory ($p < 0.05$) and Cumulative Culture ($p < 0.001$) at Lag-10.
-**Phase 16 is COMPLETE!** — Reached 950k. Offline ATE (Average Treatment Effect) using the Frozen Counterfactual Causal Test on Token 3 (Strike) vs Token 55 (Flee) showed an effect size of **0.0000**. The agents are ignoring the communication channel; it remains functionally ungrounded.
-**Phase 16.5 COMPLETE** — `feature/phase16-5-enrichment` branch: Barrier physics, 9-action space (`Build`), Feral Masking, Critic Shock discount. **SUCCESS:** Burn-Off confirmed and proto-lexicon successfully decoded.
+**Phase 16 Causal Test FAILED!** — Reached 1M. Offline ATE (Average Treatment Effect) using the strictly-scoped Frozen Counterfactual Causal Test (`--receiver-dist-min 10`) on Token 44 (Predator) showed an effect size of **0.0003** ($p=0.217$). The communication channel is completely ignored for individual fleeing behavior. We are pivoting to test cooperative/coordination contexts (Token 13, Exert Force).
+**Phase 16.5 LIVE** — `feature/phase16-5-enrichment` branch: Barrier physics, 9-action space (`Build`), Feral Masking, Critic Shock discount. 
 **Phase 17 ACTIVE** — The Rosetta Stone. Offline training of an Unsupervised Semantic Translation layer using `ott-jax` and Gromov-Wasserstein alignment to map the 64 discrete MARL VQ tokens to a continuous LLM embedding space.
 **Modal:** **`dragonbg`** — volume **`throng-runs`**.
 
