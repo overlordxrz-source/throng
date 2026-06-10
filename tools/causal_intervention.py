@@ -57,7 +57,7 @@ from flax.core.frozen_dict import unfreeze, freeze
 
 ACTION_NAMES = {0: "N", 1: "S", 2: "E", 3: "W", 4: "STAY", 5: "STRK", 6: "PUSH", 7: "GRD", 8: "BUILD"}
 
-def run_causal_intervention(checkpoint_dir: str, token_a: int, token_b: int, context: str, num_samples: int):
+def run_causal_intervention(checkpoint_dir: str, token_a: int, token_b: int, context: str, num_samples: int, receiver_dist_min: int = 10):
     # 1. Load config and ensure step-by-step control
     with open(ROOT / "config_phase7.yaml") as f:
         config = yaml.safe_load(f)
@@ -203,11 +203,15 @@ def run_causal_intervention(checkpoint_dir: str, token_a: int, token_b: int, con
                 for red_i in range(max_pop_red):
                     if r_alive[red_i]:
                         rdy, rdx = r_positions[red_i]
-                        if abs(rdy - ry) <= 5 and abs(rdx - rx) <= 5:
+                        # Compute true distance considering grid boundaries
+                        dist_y = min(abs(rdy - ry), gs - abs(rdy - ry))
+                        dist_x = min(abs(rdx - rx), gs - abs(rdx - rx))
+                        if dist_y < receiver_dist_min and dist_x < receiver_dist_min:
                             is_near_red = True
                             break
-                if not is_near_red:
-                    valid_event = True
+                if is_near_red:
+                    continue
+                valid_event = True
             elif context == "force":
                 # Force actions: 5 (STRK), 6 (PUSH), 8 (BUILD)
                 if actions[receiver_id] not in [5, 6, 8]: continue
@@ -307,6 +311,7 @@ if __name__ == "__main__":
     parser.add_argument("--token-b", type=int, required=True, help="Counterfactual Token ID (e.g. 46 for Safe)")
     parser.add_argument("--context", type=str, choices=["strike", "flee", "force"], required=True, help="Behavior context to test")
     parser.add_argument("--samples", type=int, default=100, help="Number of independent events to sample")
+    parser.add_argument("--receiver-dist-min", type=int, default=10, help="Minimum distance between receiver and target entity")
     
     # Optional flags passed by Cam that don't affect live sim rewind but are kept for CLI compatibility
     parser.add_argument("--corpus", type=str, default="", help="Ignored. Live rewind used.")
@@ -322,4 +327,4 @@ if __name__ == "__main__":
     except ImportError:
         sys.exit("scipy is required for statistical tests. pip install scipy")
         
-    run_causal_intervention(args.checkpoint, args.token_a, args.token_b, args.context, samples)
+    run_causal_intervention(args.checkpoint, args.token_a, args.token_b, args.context, samples, args.receiver_dist_min)
