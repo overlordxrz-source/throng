@@ -27,10 +27,11 @@ The philosophical and mathematical foundations of THRONG have been consolidated 
 | **Branch** | **`feature/phase16-5-enrichment`** |
 | **Modal workspace** | **`dragonbg`** (Jun 2026) |
 | **P16.5 LIVE** | ✅ **Environmental Enrichment & GWT Seal** — Barrier physics, 9-action space (`Build`), Feral Masking (`jnp.where` zero-mask on `symbol_write`), Critic Shock discount. `obs.at[:, :4].set(0.0)` applied to *both* Red and Blue. |
-| **Current Status** | ⏳ **The Great Burn-Off**. The GWT metabolic backdoor has been sealed. The VQ codebook is currently experiencing a planned collapse as the obsolete hunger-based vocabulary is wiped out. |
+| **Current Status** | ✅ **The Great Burn-Off Succeeded**. `codes_active` bottomed out at 1/64 (step 992k), gradient starvation forced external grounding, and the codebook recovered to a stable 5-token proto-language at step 1.008M. |
+| **Proto-Lexicon** | **Token 44**: Predator/Danger (NPMI 0.035). **Token 59**: Resource/Hunger (NPMI 0.154). **Token 50/47**: Guard (NPMI 0.114). **Token 13**: Exert Force/Build/Push (NPMI 0.082). |
 
-> [!WARNING]
-> **Do not stop the live run.** You will observe `RedVQ: loss` spike dramatically and `codes_active` drop to single digits. This is the mathematical consequence of severing the proxy variable. The system must run until the entropy recovers and `MI(signal, energy) < 0.05` across all 32 dimensions. Do not run `decode_signals.py` until the codebook stabilizes post-collapse.
+> [!NOTE]
+> **Phase 17 Preparations:** The discrete MARL language space has been proven causal. We are now preparing the Gromov-Wasserstein unsupervised translation layer in `jax_sim/rosetta_stone_jax.py` to geometrically align these 64 tokens with continuous human language embeddings.
 | **Science bar (P15.5)** | ✅ **CONFIRMED**: Episodic Memory ($p < 0.05$) & Cumulative Culture ($p < 0.001$) at Lag-10! |
 | **Decode gate (P16.0)** | `python3 tools/decode_signals.py --red --metrics posdis,tre` |
 | **Cold-restart toggle** | **False** (MUST be false for all future resumes; `True` only for the original 866304 codebook surgery) |
