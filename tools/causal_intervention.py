@@ -57,7 +57,7 @@ from flax.core.frozen_dict import unfreeze, freeze
 
 ACTION_NAMES = {0: "N", 1: "S", 2: "E", 3: "W", 4: "STAY", 5: "STRK", 6: "PUSH", 7: "GRD", 8: "BUILD"}
 
-def run_causal_intervention(checkpoint_dir: str, strike_token: int, flee_token: int, num_samples: int):
+def run_causal_intervention(checkpoint_dir: str, token_a: int, token_b: int, context: str, num_samples: int):
     # 1. Load config and ensure step-by-step control
     with open(ROOT / "config_phase7.yaml") as f:
         config = yaml.safe_load(f)
@@ -125,10 +125,8 @@ def run_causal_intervention(checkpoint_dir: str, strike_token: int, flee_token: 
     r_params = freeze(unfreeze(raw_restored)["r_params"])
     
     cb = b_params["codebook"]["embedding"]
-    flee_embedding = cb[flee_token]
-    strike_embedding = cb[strike_token]
-    print(f"[Causal Intervention] Checkpoint {_ckpt_latest} loaded.")
-    print(f"  Flee token {flee_token} embedding shape: {flee_embedding.shape}")
+    token_a_emb = cb[token_a]
+    token_b_emb = cb[token_b]
 
     # Initialize environment
     rng = jax.random.PRNGKey(42)
@@ -142,7 +140,7 @@ def run_causal_intervention(checkpoint_dir: str, strike_token: int, flee_token: 
     )
     r_pop = init_population(
         max_pop_red, red_hidden_d, sig_d, gs, team_id=1,
-        key=keys[1], n_agents=4, memory_slots=20,
+        key=keys[1], n_agents=max_pop_red, memory_slots=20,  # Ensure full red population is initialized for distances
     )
     b_carries = jnp.zeros((max_pop, hidden_d))
     r_carries = jnp.zeros((max_pop_red, red_hidden_d))
@@ -150,14 +148,13 @@ def run_causal_intervention(checkpoint_dir: str, strike_token: int, flee_token: 
     sim_step = make_sim_step(config, model, model_apply, r_model_apply=r_model_apply)
     
     samples_collected = 0
-    baseline_strike_probs = []
-    intervened_strike_probs = []
+    baseline_probs = []
+    intervened_probs = []
     
     print(f"[Causal Intervention] Checkpoint {_ckpt_latest} loaded.", flush=True)
-    print(f"  Flee token {flee_token} embedding shape: {flee_embedding.shape}", flush=True)
-    print(f"\n[Causal Intervention] Seeking {num_samples} isolated BG Strike Coordination events...", flush=True)
+    print(f"  Token A: {token_a} -> Token B: {token_b}")
+    print(f"\n[Causal Intervention] Seeking {num_samples} isolated '{context}' events...", flush=True)
     
-    # Run forward rollout loop to find events
     step_idx = 0
     while samples_collected < num_samples:
         step_idx += 1
@@ -165,58 +162,66 @@ def run_causal_intervention(checkpoint_dir: str, strike_token: int, flee_token: 
             print(f"  ... searched {step_idx} steps, found {samples_collected} samples...", flush=True)
         step_key = jax.random.fold_in(keys[2], step_idx)
         
-        # Save pre-step state to allow rewind
         pre_carry = (grid, b_pop, r_pop, b_carries, r_carries, b_params, r_params)
-        
-        # Forward pass
         post_carry, rollout = sim_step(pre_carry, (step_key, step_idx))
         grid_out, b_pop_out, r_pop_out, b_carries_out, r_carries_out, _, _ = post_carry
         
-        # Unpack arrays for analysis
         actions = np.asarray(rollout["blue"]["actions"])
         action_logits = np.asarray(rollout["blue"]["action_logits"])
-        vq_tokens = np.asarray(rollout["blue"]["token_ids"])
         alive = np.asarray(b_pop.alive)
         positions = np.asarray(b_pop.positions)
+        
+        r_alive = np.asarray(r_pop.alive)
+        r_positions = np.asarray(r_pop.positions)
         bg_mask = np.asarray(b_pop.is_big_green)
         
-        # Build grid map for fast lookup
         pos_map = {}
         for i in range(max_pop):
             if alive[i]:
                 py, px = positions[i]
                 pos_map.setdefault((py, px), []).append(i)
 
-        # We need to find an event where:
-        # 1. Receiver is adjacent to Big Green and performs Action 5 (STRK).
-        # 2. Receiver has a neighbor (Emitter) that transmitted `strike_token`.
         for receiver_id in range(max_pop):
-            if not alive[receiver_id] or actions[receiver_id] != 5:
+            if not alive[receiver_id]:
                 continue
                 
-            # Check adjacency to Big Green
             ry, rx = positions[receiver_id]
-            bg_positions = positions[bg_mask & alive]
-            adj_bg = False
-            for bgy, bgx in bg_positions:
-                if abs(bgy - ry) <= 1 and abs(bgx - rx) <= 1:
-                    adj_bg = True
-                    break
+            valid_event = False
             
-            if not adj_bg:
+            if context == "strike":
+                if actions[receiver_id] != 5: continue
+                bg_positions = positions[bg_mask & alive]
+                for bgy, bgx in bg_positions:
+                    if abs(bgy - ry) <= 1 and abs(bgx - rx) <= 1:
+                        valid_event = True
+                        break
+            elif context == "flee":
+                # Flee actions: 0, 1, 2, 3
+                if actions[receiver_id] not in [0, 1, 2, 3]: continue
+                # Ensure they are NOT near a red predator, so they only know about danger via signal
+                is_near_red = False
+                for red_i in range(max_pop_red):
+                    if r_alive[red_i]:
+                        rdy, rdx = r_positions[red_i]
+                        if abs(rdy - ry) <= 5 and abs(rdx - rx) <= 5:
+                            is_near_red = True
+                            break
+                if not is_near_red:
+                    valid_event = True
+
+            if not valid_event:
                 continue
                 
             emitter_id = -1
             prev_signals = np.asarray(b_pop.signals)
             
-            # Using pos_map for fast lookup of neighbors within radius 5
             for dy in range(-5, 6):
                 for dx in range(-5, 6):
                     ny, nx = (ry + dy) % gs, (rx + dx) % gs
                     agents_here = pos_map.get((ny, nx), [])
                     for eid in agents_here:
                         if eid != receiver_id:
-                            dist = np.linalg.norm(prev_signals[eid] - np.asarray(strike_embedding))
+                            dist = np.linalg.norm(prev_signals[eid] - np.asarray(token_a_emb))
                             if dist < 1e-4:
                                 emitter_id = eid
                                 break
@@ -226,63 +231,62 @@ def run_causal_intervention(checkpoint_dir: str, strike_token: int, flee_token: 
                     break
                         
             if emitter_id != -1:
-                # We found an event! 
-                # Receiver is striking Big Green, and Emitter transmitted strike_token.
-                # Now we perform the counterfactual rewind.
-                
-                # Compute baseline probability
+                # We found a valid event. Calculate baseline probabilities.
                 baseline_logits = action_logits[receiver_id]
-                baseline_probs = np.exp(baseline_logits) / np.sum(np.exp(baseline_logits))
-                p_strike_baseline = baseline_probs[5]
+                baseline_p = np.exp(baseline_logits) / np.sum(np.exp(baseline_logits))
+                
+                if context == "strike":
+                    p_base = baseline_p[5]
+                elif context == "flee":
+                    p_base = sum([baseline_p[a] for a in [0, 1, 2, 3]])
                 
                 # --- INTERVENTION ---
-                # Rewind to pre_carry, but swap emitter's signal
                 b_pop_intervened = b_pop.replace(
-                    signals=b_pop.signals.at[emitter_id].set(flee_embedding)
+                    signals=b_pop.signals.at[emitter_id].set(token_b_emb)
                 )
-                
                 intervened_carry = (grid, b_pop_intervened, r_pop, b_carries, r_carries, b_params, r_params)
                 
-                # Re-run simulation step with SAME key
                 _, rollout_int = sim_step(intervened_carry, (step_key, step_idx))
-                action_logits_int = np.asarray(rollout_int["blue"]["action_logits"])
+                int_logits = np.asarray(rollout_int["blue"]["action_logits"])[receiver_id]
+                int_p = np.exp(int_logits) / np.sum(np.exp(int_logits))
                 
-                # Compute intervened probability
-                int_logits = action_logits_int[receiver_id]
-                int_probs = np.exp(int_logits) / np.sum(np.exp(int_logits))
-                p_strike_int = int_probs[5]
+                if context == "strike":
+                    p_int = int_p[5]
+                elif context == "flee":
+                    p_int = sum([int_p[a] for a in [0, 1, 2, 3]])
                 
-                baseline_strike_probs.append(p_strike_baseline)
-                intervened_strike_probs.append(p_strike_int)
+                baseline_probs.append(p_base)
+                intervened_probs.append(p_int)
                 samples_collected += 1
                 
                 print(f"Sample {samples_collected:03d} | Receiver {receiver_id} Emitter {emitter_id} | "
-                      f"P(STRK|strike)={p_strike_baseline:.4f} -> P(STRK|flee)={p_strike_int:.4f} (Delta: {p_strike_int - p_strike_baseline:.4f})")
+                      f"P(Action|TokenA)={p_base:.4f} -> P(Action|TokenB)={p_int:.4f} (Delta: {p_int - p_base:.4f})")
                 
                 if samples_collected >= num_samples:
                     break
 
-        # Advance state naturally
         grid, b_pop, r_pop, b_carries, r_carries = grid_out, b_pop_out, r_pop_out, b_carries_out, r_carries_out
 
-    # Statistical Evaluation
-    baseline_strike_probs = np.array(baseline_strike_probs)
-    intervened_strike_probs = np.array(intervened_strike_probs)
+    baseline_probs = np.array(baseline_probs)
+    intervened_probs = np.array(intervened_probs)
     
-    mean_delta = np.mean(intervened_strike_probs - baseline_strike_probs)
-    t_stat, p_val = stats.ttest_rel(intervened_strike_probs, baseline_strike_probs)
+    # Delta is baseline (Token A) minus intervened (Token B).
+    # If Token A triggers the behavior, replacing it with Token B should drop the probability.
+    # Therefore, baseline - intervened > 0 indicates Token A causes the behavior.
+    mean_delta = np.mean(baseline_probs - intervened_probs) 
+    t_stat, p_val = stats.ttest_rel(baseline_probs, intervened_probs)
     
     print("\n" + "="*50)
-    print(" CAUSAL INTERVENTION RESULTS")
+    print(f" CAUSAL INTERVENTION RESULTS: Context '{context}'")
     print("="*50)
     print(f"Total Samples (N): {num_samples}")
-    print(f"Mean P(STRK|strike): {np.mean(baseline_strike_probs):.4f}")
-    print(f"Mean P(STRK|flee):   {np.mean(intervened_strike_probs):.4f}")
-    print(f"Mean Delta (ATE):    {mean_delta:.4f}")
-    print(f"Paired t-test:       t={t_stat:.2f}, p={p_val:.2e}")
-    if p_val < 0.05 and mean_delta < 0:
+    print(f"Mean P(Action|TokenA): {np.mean(baseline_probs):.4f}")
+    print(f"Mean P(Action|TokenB): {np.mean(intervened_probs):.4f}")
+    print(f"Mean Delta (ATE):      {mean_delta:.4f}")
+    print(f"Paired t-test:         t={t_stat:.2f}, p={p_val:.2e}")
+    if p_val < 0.05 and mean_delta > 0.05:
         print("\n[CONCLUSION] SIGNIFICANT CAUSAL DIVERGENCE DETECTED.")
-        print("The injected 'flee' VQ token conclusively suppressed the Strike behavior.")
+        print(f"Token {token_a} conclusively drives '{context}' behavior compared to Token {token_b}.")
     else:
         print("\n[CONCLUSION] NULL HYPOTHESIS.")
         print("The VQ token swap did not produce a statistically significant suppression.")
@@ -290,17 +294,24 @@ def run_causal_intervention(checkpoint_dir: str, strike_token: int, flee_token: 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--checkpoint", type=str, required=True, help="Path to checkpoint directory (e.g. runs/.../checkpoints/980000)")
-    parser.add_argument("--strike-token", type=int, required=True, help="Token ID representing Strike/Noun context")
-    parser.add_argument("--flee-token", type=int, required=True, help="Token ID representing Flee context")
+    parser.add_argument("--checkpoint", type=str, required=True, help="Path to checkpoint directory")
+    parser.add_argument("--token-a", type=int, required=True, help="Token ID causing the behavior (e.g. 44 for Predator)")
+    parser.add_argument("--token-b", type=int, required=True, help="Counterfactual Token ID (e.g. 46 for Safe)")
+    parser.add_argument("--context", type=str, choices=["strike", "flee"], required=True, help="Behavior context to test")
     parser.add_argument("--samples", type=int, default=100, help="Number of independent events to sample")
+    
+    # Optional flags passed by Cam that don't affect live sim rewind but are kept for CLI compatibility
+    parser.add_argument("--corpus", type=str, default="", help="Ignored. Live rewind used.")
+    parser.add_argument("--min-step", type=int, default=0, help="Ignored. Live rewind used.")
+    parser.add_argument("--n-events", type=int, default=0, help="Alias for --samples")
     
     args = parser.parse_args()
     
-    # Ensure scipy is available (used for ttest)
+    samples = args.n_events if args.n_events > 0 else args.samples
+    
     try:
         import scipy
     except ImportError:
         sys.exit("scipy is required for statistical tests. pip install scipy")
         
-    run_causal_intervention(args.checkpoint, args.strike_token, args.flee_token, args.samples)
+    run_causal_intervention(args.checkpoint, args.token_a, args.token_b, args.context, samples)
