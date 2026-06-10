@@ -38,7 +38,7 @@ def patched_build_obs(*args, **kwargs):
     import yaml
     with open(ROOT / "config_phase7.yaml") as f:
         cfg = yaml.safe_load(f)
-    env_channels = int(cfg.get("env_channels", 9))
+    env_channels = int(cfg.get("env_channels", 10))
     if env_channels == 9 and obs.shape[1] >= (598 + 250):
         part1 = obs[:, :598]
         loc_env = obs[:, 598:598+250].reshape((N, 25, 10))
@@ -85,8 +85,8 @@ def run_causal_intervention(checkpoint_dir: str, strike_token: int, flee_token: 
         fwd_env_dim=fwd_env_dim,
         cross_attn_enabled=config.get("phase9_canvas", {}).get("cross_attn_enabled", False),
         neighbor_k=int(config["neighbor_k"]),
-        n_actions=int(config.get("n_actions", 8)),
-        env_channels=int(config.get("env_channels", 9)),
+        n_actions=int(config.get("n_actions", 9)),
+        env_channels=int(config.get("env_channels", 10)),
     )
     model_apply = make_model_apply(model)
 
@@ -110,8 +110,8 @@ def run_causal_intervention(checkpoint_dir: str, strike_token: int, flee_token: 
         vq_dead_code_reset=bool(config.get("vq_dead_code_reset", True)),
         cross_attn_enabled=_red_cross,
         cross_attn_num_heads=_cross_heads,
-        n_actions=int(config.get("n_actions", 8)),
-        env_channels=int(config.get("env_channels", 9)),
+        n_actions=int(config.get("n_actions", 9)),
+        env_channels=int(config.get("env_channels", 10)),
     )
     r_model_apply = make_model_apply(model_red)
 

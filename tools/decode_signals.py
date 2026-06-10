@@ -366,7 +366,7 @@ def cluster_analysis(
             continue
         n        = int(mask.sum())
         scout_pct = 100 * scouts[mask].mean()
-        act_counts = np.bincount(actions[mask], minlength=5)
+        act_counts = np.bincount(actions[mask], minlength=9)
         dom_act  = ACTION_NAMES[int(act_counts.argmax())]
         ctx_vals = []
         for ck in feat_keys:
@@ -1377,7 +1377,7 @@ def decode_red_schema(
     print(
         "  Actions  : "
         + "  ".join(
-            f"{ACTION_NAMES[a]}={int((actions == a).sum())}" for a in range(5)
+            f"{ACTION_NAMES[a]}={int((actions == a).sum())}" for a in range(9)
         )
     )
 
@@ -2100,7 +2100,7 @@ def main() -> None:
     print(f"  Signal dim: {sig_dim}")
     print(f"  Scouts   : {scouts.sum():,}  ({100*scouts.mean():.1f}%)")
     print(f"  Actions  : " +
-          "  ".join(f"{ACTION_NAMES[a]}={int((actions==a).sum())}" for a in range(5)))
+          "  ".join(f"{ACTION_NAMES[a]}={int((actions==a).sum())}" for a in range(9)))
 
     print(f"\n{'─'*70}")
     print(f"  SIGNAL RANGE PER DIM")
