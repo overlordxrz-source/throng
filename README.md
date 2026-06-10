@@ -329,121 +329,13 @@ All knobs live in `config_phase7.yaml`. The ones you actually touch:
 | **19.0** | **PREP** — Cultural Transmission (Writing symbols to the grid permanently) |
 | **20.0** | **PREP** — Agriculture & Terraforming (Delayed resources & "Future Time" semantics) |
 
----
+## Research & Theory
 
-## Historical roadmap (Phase 9 plan — superseded)
+The sprawling philosophical foundations of THRONG, including the "Alien Semantics Problem" and our theories on the "Complexity Ceiling", have been migrated to the `research/` directory to keep this README ultra-lean.
 
-The sections below document the original Phase 9 design intent. Most are **done**
-on `master`. See THRONG.md for current work.
-
-- Transformer brains, capacity-based brain-vote (2L → 6L).
-- Eight environment channels, dual cultural grids, scent trails, contested
-  nodes, shelter, puzzles.
-- Discrete + continuous signals; **signal propagation fixed and live (May 28
-  2026)**.
-- Red curriculum with survival-gated graduation `[6, 15, 30, 75]`.
-- Episodic memory buffer per agent (20 slots).
-- Theory-of-Mind head predicting neighbour actions.
-- MAPPO + GAE + value clipping + grad clipping; numerically stable.
-- Orbax checkpointing (params-only; population restarts on resume).
-- Distillation pass (currently age-based; "human among apes" version queued).
-- Sanity-DEBUG panel that surfaces NaN / gradient anomalies the moment they
-  happen.
-
-### 🎯 Next, in order — Phase 9
-
-These are organised by *cost and risk*, so the cheap wins land first.
-
-**Phase 9.1 — Self-Model + Metacognition** (1–2 days)
-- `head_self_action(h_t)` predicting the agent's own next action.
-- Auxiliary cross-entropy loss against the actually sampled action.
-- Confidence head + low-confidence → "help" signal mode.
-- Gated mind-meld (only blend carries when both confident).
-
-**Phase 9.2 — Forward Dynamics Head** (~2 days)
-- `head_fwd(h_t, a_t, pooled_neighbour_signals) → predicted_obs_{t+1}`.
-- MSE auxiliary loss; coefficient ramps 0.05 → 0.2 over 50k steps.
-- **The signal channel is included in the input**, so signals become
-  load-bearing for prediction — a sharper selection pressure than survival.
-- Falsifiable test: ablating signals from `head_fwd` should *increase*
-  prediction MSE. If it doesn't, signals are still cosmetic and the
-  environment needs to be tightened further.
-
-**Phase 9.3 — Dreamer / Imagination Loop** (gated on 9.2 working)
-- At inference, use `head_fwd` + critic to score each candidate action by
-  imagined-2-step return.
-- Replace `argmax(action_logits)` with `argmax_a vf(fwd(h, a))`.
-- Fixed branching factor (8 actions × depth K) — JIT-friendly.
-
-**Phase 9.4 — Communication Upgrades** (post-9.3)
-- Multi-head attention over neighbour signals (replace mean-pool).
-- Variable-length message sequences (2–5 tokens / step).
-- Adversarial reds that can mimic blue signals.
-
-### 📊 Dashboard metrics queued
-
-- **Signal clusters (k-means, k=16)** — effective cluster count + occupancy
-  entropy. When this drops from ≈ N_alive toward a small fixed number with
-  survival still ≥80%, **a vocabulary is forming**.
-- **Self-prediction accuracy** (after Phase 9.1).
-- **Forward-dynamics MSE + signal-ablation Δ** (after Phase 9.2). This Δ is
-  the single sharpest test of whether communication is real.
-
-### 🗂️ Deprioritised / on ice
-
-- Hierarchical RL (redundant with carry + value head).
-- Crafting / construction — **PARTIALLY ADDRESSED** in Phase 16.5 (barrier building). Full tool-use deferred.
-- Generic "scale up before adding architecture" — the current 64×64 / N=100
-  setup is sufficient to observe vocabulary formation if the architecture is
-  right; scale is not the bottleneck.
-
----
-
-## Philosophy in One Paragraph
-
-Language and intelligence in biological organisms were not designed. They
-were *grown* under information asymmetry — animals that needed to coordinate
-to survive, in environments that did not hand them concepts. THRONG is the
-hypothesis that this growth process can be replicated computationally if four
-ingredients are present: (1) partial observability sharp enough to make
-silence costly, (2) coordination pressure that makes cooperation pay, (3) a
-communication channel that is load-bearing for at least one downstream task,
-and (4) cumulative memory so that a discovery by one agent can be inherited
-by the next generation. We've built (1), (2), and (4). Phase 9.2's
-signal-conditioned forward-dynamics head is what makes (3) *provably* the
-case for the first time.
-
-For the full version, with citations, see [THRONG.md](THRONG.md) — sections
-"Philosophical Foundations" and "The Architecture of Thought."
-
-### The Alien Semantics Problem
-
-A critical epistemic constraint of this project: **we must assume the agents'
-language is fundamentally alien.** Their hidden states live in a 256-dimensional
-representational space. When we measure Mutual Information between a VQ token
-and an environmental variable, we are projecting a high-dimensional concept onto
-our chosen measurement axes — reading the shadow of a sculpture, not the
-sculpture itself.
-
-A token might statistically correlate with "Predator Close + Low Energy." But to
-the agent, that same token may encode a compressed 256-dimensional concept that
-includes temporal memory, forward predictions, confidence estimates, and
-relational information between neighbors — concepts that may have no
-human-language equivalent whatsoever.
-
-We address this with a layered interpretability toolkit:
-
-1. **Statistical Shadow (MI / NPMI):** Correlations between tokens and
-   environmental variables. Necessary but fundamentally incomplete.
-2. **Causal Intervention (Frozen Counterfactual Decoder):** Freeze the
-   checkpoint, swap tokens mid-flight, observe behavioral changes. Proves
-   causal structure without requiring full conceptual understanding.
-3. **Mechanistic Interpretability (Activation Patching):** Examine and
-   transplant internal hidden states between agents in different contexts to
-   identify which neurons encode which concepts — even untranslatable ones.
-
-See [THRONG.md](THRONG.md) §"The Alien Semantics Problem" for the full
-treatment.
+If you are a researcher building on THRONG, start here:
+- **[marl_complexity_2026.md](file:///Users/overlord/CascadeProjects/throng/research/marl_complexity_2026.md)**: Our theoretical basis for VQ-VIB, Feral Masking, and why true causality requires survival pressure.
+- **[rosetta_stone_math.md](file:///Users/overlord/CascadeProjects/throng/research/rosetta_stone_math.md)**: The mathematical blueprints for Phase 17's Unsupervised Semantic Translation using Gromov-Wasserstein alignment.
 
 ---
 

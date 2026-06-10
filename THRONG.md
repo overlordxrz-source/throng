@@ -8,6 +8,14 @@
 
 ---
 
+## Research & Theory Synopsis
+
+The philosophical and mathematical foundations of THRONG have been consolidated into the `research/` directory to keep this Ops Manual focused.
+
+- **[marl_complexity_2026.md](file:///Users/overlord/CascadeProjects/throng/research/marl_complexity_2026.md)**: Details the "Complexity Ceiling" hypothesis. Proves that without survival pressure and complex environments (like Combinatorial Tool Use), communication plateaus. Explains why LLMs lack causal grounding and why the VQ bottleneck forces exteroceptive representations.
+- **[rosetta_stone_math.md](file:///Users/overlord/CascadeProjects/throng/research/rosetta_stone_math.md)**: The state-of-the-art blueprints for **Unsupervised Semantic Translation**. We will use `ott-jax` and Low-Rank Gromov-Wasserstein (LR-GW) to topologically align the discrete MARL VQ space with a continuous LLM embedding space, enforcing geometric isometry via Minimum Description Length (MDL).
+
+---
 ## 0b. Current state — **Phase 16.5 Environmental Enrichment** (Jun 2026)
 
 **Blue SOTA (frozen on `master`):** **`465d8c6+`** — 9.4 cross-attn + 9.1 confidence + **11.3 epistemic gate** (Stay-collapse resolved).
