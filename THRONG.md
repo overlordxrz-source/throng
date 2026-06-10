@@ -1233,25 +1233,25 @@ If our true goal is to force the emergence of AGI-level intelligence purely thro
 - **Feral Masking (`network_jax.py`):** `symbol_write` zero-masked when `energy < 0.20`.
 - **GWT Router:** Structural mask `obs.at[:, :4].set(0.0)` applied to force discrete VQ usage.
 
-#### Phase 17 — Combinatorial Tool Use (Crafting Trees)
+#### Phase 17 — The Rosetta Stone (Unsupervised Semantic Translation)
+**Goal:** Train a translation autoencoder to map the swarm's grounded VQ latent sequences into natural human language using **Topological Alignment**.
+- Input: sequences of VQ token IDs + environmental context snapshots.
+- Output: English sentence describing the agent's "intent" based on geometric isometry between the MARL VQ space and a continuous LLM embedding space.
+
+#### Phase 18 — Combinatorial Tool Use (Crafting Trees)
 **Goal:** Force the network to invent compositional logic (AND, OR, IF/THEN) and syntax.
 - **Mechanics:** Introduce combinable primitives (e.g., Wood + Stone = Axe).
 - **Semantics:** Requires vocabulary expansion from simple nouns ("Predator") to verbs and modifiers ("Get wood *then* build").
 
-#### Phase 18 — Cultural Transmission (Writing)
+#### Phase 19 — Cultural Transmission (Writing)
 **Goal:** Allow agents to pre-train themselves across generations, escaping the capacity limit of oral communication.
 - **Mechanics:** A `Write` action allows agents to etch VQ tokens permanently into grid cells.
 - **Semantics:** Allows the passing down of puzzle solutions, crafting recipes, and multi-generational memory.
 
-#### Phase 19 — Agriculture & Terraforming
+#### Phase 20 — Agriculture & Terraforming
 **Goal:** Force the invention of causal reasoning and long-term planning (the primary weakness of LLMs).
 - **Mechanics:** Agents can plant resources that take thousands of steps to mature.
 - **Semantics:** Forces the development of concepts for "Future Time", "Delayed Gratification", "Ownership", and "Defense".
-
-#### Phase 20 — The Rosetta Stone (Unsupervised Semantic Translation)
-**Goal:** Train a translation autoencoder to map the swarm's grounded VQ latent sequences into natural human language using **Topological Alignment**.
-- Input: sequences of VQ token IDs + environmental context snapshots.
-- Output: English sentence describing the agent's "intent" based on geometric isometry between the MARL VQ space and a continuous LLM embedding space.
 
 ---
 

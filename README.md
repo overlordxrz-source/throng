@@ -324,10 +324,10 @@ All knobs live in `config_phase7.yaml`. The ones you actually touch:
 | **15.0–15.5** | ✅ **COMPLETE** — MEDAL-ADR + GRUCell pivot. Episodic Memory ($p < 0.05$) and Cumulative Culture ($p < 0.001$) at Lag-10 confirmed. |
 | **16.0** | ✅ **COMPLETE** — Open-Ended Combinatorial Complexity. Big Green prey, 8-action space. Offline causal decode revealed 0.0 ATE on communication channel. |
 | **16.5** | ✅ **COMPLETE** — The Great Burn-Off confirmed at 992k steps (`codes_active=1/64`). Feral Masking and GWT Router successfully forced semantic collapse. Awaiting vocabulary recovery. |
-| **17.0** | **PREP** — Combinatorial Tool Use (Crafting Trees & logic syntax) |
-| **18.0** | **PREP** — Cultural Transmission (Writing symbols to the grid permanently) |
-| **19.0** | **PREP** — Agriculture & Terraforming (Delayed resources & "Future Time" semantics) |
-| **20.0** | **PREP** — The Rosetta Stone (Unsupervised Semantic Translation via Topological Alignment) |
+| **17.0** | **PREP** — The Rosetta Stone (Unsupervised Semantic Translation via Topological Alignment) |
+| **18.0** | **PREP** — Combinatorial Tool Use (Crafting Trees & logic syntax) |
+| **19.0** | **PREP** — Cultural Transmission (Writing symbols to the grid permanently) |
+| **20.0** | **PREP** — Agriculture & Terraforming (Delayed resources & "Future Time" semantics) |
 
 ---
 
