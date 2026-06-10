@@ -208,6 +208,10 @@ def run_causal_intervention(checkpoint_dir: str, token_a: int, token_b: int, con
                             break
                 if not is_near_red:
                     valid_event = True
+            elif context == "force":
+                # Force actions: 5 (STRK), 6 (PUSH), 8 (BUILD)
+                if actions[receiver_id] not in [5, 6, 8]: continue
+                valid_event = True
 
             if not valid_event:
                 continue
@@ -239,6 +243,8 @@ def run_causal_intervention(checkpoint_dir: str, token_a: int, token_b: int, con
                     p_base = baseline_p[5]
                 elif context == "flee":
                     p_base = sum([baseline_p[a] for a in [0, 1, 2, 3]])
+                elif context == "force":
+                    p_base = sum([baseline_p[a] for a in [5, 6, 8]])
                 
                 # --- INTERVENTION ---
                 b_pop_intervened = b_pop.replace(
@@ -254,6 +260,8 @@ def run_causal_intervention(checkpoint_dir: str, token_a: int, token_b: int, con
                     p_int = int_p[5]
                 elif context == "flee":
                     p_int = sum([int_p[a] for a in [0, 1, 2, 3]])
+                elif context == "force":
+                    p_int = sum([int_p[a] for a in [5, 6, 8]])
                 
                 baseline_probs.append(p_base)
                 intervened_probs.append(p_int)
@@ -297,7 +305,7 @@ if __name__ == "__main__":
     parser.add_argument("--checkpoint", type=str, required=True, help="Path to checkpoint directory")
     parser.add_argument("--token-a", type=int, required=True, help="Token ID causing the behavior (e.g. 44 for Predator)")
     parser.add_argument("--token-b", type=int, required=True, help="Counterfactual Token ID (e.g. 46 for Safe)")
-    parser.add_argument("--context", type=str, choices=["strike", "flee"], required=True, help="Behavior context to test")
+    parser.add_argument("--context", type=str, choices=["strike", "flee", "force"], required=True, help="Behavior context to test")
     parser.add_argument("--samples", type=int, default=100, help="Number of independent events to sample")
     
     # Optional flags passed by Cam that don't affect live sim rewind but are kept for CLI compatibility
