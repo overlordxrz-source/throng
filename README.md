@@ -74,6 +74,15 @@ By Phase 17 and 18, the goal is to build a translation autoencoder to map their 
 
 We try to falsify this daily. Every claim ("agents are communicating", "they are forming a vocabulary", "they are planning") has a *number* we watch in the dashboard (e.g., Lag-10 $p < 0.05$ for Episodic Memory, or NPMI scores for Syntax). If the number doesn't move, the claim is wrong, and the design is incomplete.
 
+## Beyond LLMs: The Symbol Grounding Advantage
+
+THRONG is not an attempt to build a better conversational agent. It is a fundamentally different cognitive architecture designed to solve the **Symbol Grounding Problem**—the epistemological wall that static Large Language Models cannot cross.
+
+* **LLMs** are statistical compressors over human symbolic output. They learn correlations between tokens that were produced by humans describing grounded experience. The grounding is secondhand, inherited, and frozen at training time. This lack of causal constraint is the root of hallucination.
+* **THRONG Agents** are direct compressors over causal physical reality. When a THRONG VQ token encodes "predator approaching," that encoding was forged by thermodynamic necessity: agents that failed to assign semantic weight to that token died. 
+
+In THRONG, intelligence emerges from continuous adaptation, spatial multi-agent coordination, and lethal selection pressure, mapping directly to physical reality rather than human text. The end goal is the **Hive-Mind Interface** (Phase 18): a conversable, decentralized intelligence whose language maps directly to causal reality, capable of continuous online learning without catastrophic forgetting.
+
 ---
 
 ## Quick Start (Colab / Kaggle T4)
