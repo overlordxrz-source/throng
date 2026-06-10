@@ -67,7 +67,8 @@ def rosetta_stone_loss(
     rng: jax.random.PRNGKey,
     temperature: float = 1.0,
     gw_rank: int = 10,
-    epsilon: float = 1e-2
+    epsilon: float = 1e-2,
+    freq_weights: jnp.ndarray = None
 ):
     """
     Computes the Unsupervised Semantic Translation Loss:
@@ -108,7 +109,13 @@ def rosetta_stone_loss(
     # We apply GW alignment to see how the mapped representations' geometry aligns 
     # with the target continuous geometry.
     geom_mapped_llm = geometry.Geometry(cost_matrix=compute_distance_matrix(mapped_llm))
-    prob_mapped = quadratic_problem.QuadraticProblem(geom_marl, geom_mapped_llm)
+    
+    if freq_weights is not None:
+        a = freq_weights / (jnp.sum(freq_weights) + 1e-8)
+    else:
+        a = None
+        
+    prob_mapped = quadratic_problem.QuadraticProblem(geom_marl, geom_mapped_llm, a=a)
     
     # Low-Rank Gromov-Wasserstein solver
     solver = gromov_wasserstein_lr.LRGromovWasserstein(
