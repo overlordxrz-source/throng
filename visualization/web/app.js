@@ -60,7 +60,7 @@ function initCharts() {
         type: 'line',
         data: { labels: [], datasets: [
             {
-                label: 'Mean Fitness',
+                label: 'Blue Entropy',
                 data: [],
                 borderColor: '#3fb950',
                 backgroundColor: 'rgba(63, 185, 80, 0.1)',
@@ -70,7 +70,7 @@ function initCharts() {
                 pointRadius: 0
             },
             {
-                label: 'Max Fitness',
+                label: 'Red VQ Loss',
                 data: [],
                 borderColor: '#e3b341',
                 borderWidth: 1.5,
