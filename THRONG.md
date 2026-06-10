@@ -24,7 +24,7 @@
 | **P15.0** | ✅ **MEDAL-ADR** — `expert_dropouts≈74–90`/rollout |
 | **P15.5** | 🏆 **Memory Architecture Pivot (CONFIRMED)** — `nn.GRUCell` decoupled magnitude explosion from temporal BPTT gradients. Episodic Memory ($p < 0.05$) and Cumulative Culture ($p < 0.001$) confirmed at Lag-10. |
 | **P16.0** | ✅ **Combinatorial Syntax Scaffold** — `Big Green` prey introduced. Offline Causal Intervention at 950k revealed ATE = 0.0000 on the communication channel. The channel remains ungrounded. |
-| **P16.5** | 🔧 **DRAFTED** — Barrier physics, 9-action space (`Build`), Feral Masking (`jnp.where` zero-mask on `symbol_write`), Critic Shock discount, parameter grafting (10 env channels, 9 actions). Branch: `feature/phase16-5-enrichment`. **Goal:** Force channel grounding. |
+| **P16.5** | 🚀 **DEPLOYED** — Barrier physics, 9-action space (`Build`), Feral Masking (`jnp.where` zero-mask on `symbol_write`), Critic Shock discount, parameter grafting (10 env channels, 9 actions). Branch: `feature/phase16-5-enrichment`. **Goal:** Force channel grounding. |
 | **Science bar (P15.5)** | ✅ **CONFIRMED**: Episodic Memory ($p < 0.05$) & Cumulative Culture ($p < 0.001$) at Lag-10! |
 | **Decode gate (P16.0)** | `python3 tools/decode_signals.py --red --metrics posdis,tre` |
 | **Cold-restart toggle** | **False** (MUST be false for all future resumes; `True` only for the original 866304 codebook surgery) |
