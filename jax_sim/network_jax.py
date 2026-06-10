@@ -180,6 +180,9 @@ class AgentNetworkJax(nn.Module):
         self.head_culture_fast = nn.Dense(sym_d)
         self.head_culture_slow = nn.Dense(sym_d)
 
+        # Phase 16.6 GWT Router for Blue
+        self.gwt_comms_1 = nn.Dense(d)
+
         # Forward dynamics head: predicts next-step flat loc_env from carry_t + action
         self.head_fwd_1 = nn.Dense(self.hidden_dim * 4)
         self.head_fwd_2 = nn.Dense(self.fwd_env_dim)
@@ -322,7 +325,12 @@ class AgentNetworkJax(nn.Module):
 
         # Output heads
         action_logits = self.head_action(pooled) / 2.0   # (N, 8)  temperature=2.0 for exploration
-        z_e = self.head_signal(pooled)                 # (N, signal_dim)
+        
+        # Phase 16.6 GWT Router for Blue
+        # Zero out age(0), mat(1), energy(2), layers(3) to completely sever the metabolic leak
+        exteroceptive_obs = obs.at[:, :4].set(0.0)
+        h_comms = nn.relu(self.gwt_comms_1(exteroceptive_obs))
+        z_e = self.head_signal(h_comms)                 # (N, signal_dim)
         codebook_w = self.codebook.embedding           # (vocab_size, signal_dim)
         signal_out, token_ids, loss_vq = vector_quantize_signals(
             z_e,
@@ -687,10 +695,8 @@ class PredatorNetworkJax(nn.Module):
         h_policy = pooled
 
         # h_comms: exteroceptive-ONLY pathway.
-        # obs[:, 2] is energy (own_state index 2 per THRONG obs schema).
-        # Zeroing it physically severs the metabolic gradient from the comms head,
-        # forcing the VQ codebook to maximise MI over blue geometry / neighbor signals.
-        exteroceptive_obs = obs.at[:, 2].set(0.0)
+        # Zero out age(0), mat(1), energy(2), layers(3) to completely sever the metabolic leak
+        exteroceptive_obs = obs.at[:, :4].set(0.0)
         h_comms = nn.relu(self.gwt_comms_1(exteroceptive_obs))
         if self.cross_attn_enabled:
             # Query = h_comms (exteroceptive embedding).
@@ -1113,11 +1119,14 @@ def ensure_aux_head_params(
     needs_vqel_recon = (
         "head_vqel_recon_1" not in flat or "head_vqel_recon_2" not in flat
     )
+    needs_gwt = "gwt_comms_1" not in flat
+
     if (
         all(k in flat for k in AUX_HEAD_KEYS)
         and not needs_vq
         and not needs_cross_attn
         and not needs_vqel_recon
+        and not needs_gwt
     ):
         return sanitize_agent_params(freeze(flat))
     carry = jnp.zeros((1, hidden_dim))
@@ -1151,6 +1160,15 @@ def ensure_aux_head_params(
         if "nb_cross_attn" in fresh_flat:
             flat["nb_cross_attn"] = fresh_flat["nb_cross_attn"]
             print("[JAX] Merged fresh nb_cross_attn (Phase 9.4) into restored checkpoint")
+            
+    if needs_gwt and obs_dim > 0:
+        obs = jnp.zeros((1, obs_dim))
+        fresh = model.init(rng, carry, obs, n_layers)["params"]
+        fresh_flat = unfreeze(fresh)
+        if "gwt_comms_1" in fresh_flat:
+            flat["gwt_comms_1"] = fresh_flat["gwt_comms_1"]
+            print("[JAX] Merged fresh gwt_comms_1 (Phase 16.6 GWT Router) into restored checkpoint")
+            
     return sanitize_agent_params(freeze(flat))
 
 
