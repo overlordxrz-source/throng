@@ -766,7 +766,7 @@ def ensure_predator_params(
     flat = unfreeze(params)
     pad_emb_own(flat, model.own_state_dim) # Phase 17 own_state grafting
     pad_head_action(flat, model.n_actions) # Phase 16 parameter grafting
-    pad_gwt_comms_1(flat)  # Phase 16 obs grafting for GWT Router
+    pad_gwt_comms_1(flat, model.obs_dim)  # Phase 16 obs grafting for GWT Router
     pad_auxiliary_heads(flat, hidden_dim, model.n_actions) # Phase 16 auxiliary grafting
     needs_codebook = "dcvq" not in flat or "simvq_W" not in flat or (
         "head_signal" in flat
@@ -1006,39 +1006,46 @@ def pad_head_action(flat_params: dict, target_actions: int = 8) -> None:
 
 
 
-def pad_gwt_comms_1(flat_params: dict, target_channels: int = 2360) -> None:
-    """Pad gwt_comms_1 kernel from 2335 to 2360 by interleaving zeros for the 10th env channel."""
+def pad_gwt_comms_1(flat_params: dict, target_channels: int) -> None:
+    """Pad gwt_comms_1 kernel from older observation dimensions (2335, 2360) to target_channels."""
     if "gwt_comms_1" not in flat_params:
         return
     gc1 = flat_params["gwt_comms_1"]
     kernel = gc1["kernel"]
-    if kernel.shape[0] < target_channels:
-        hidden_dim = kernel.shape[1]
-        
-        # Calculate exactly where loc_env starts in the flattened obs vector
-        K = 6  # neighbor_k
-        W = 25 # (2*2 + 1)**2
+    hidden_dim = kernel.shape[1]
+    
+    # 1. Pad own_state from 6 to 10 if needed
+    if kernel.shape[0] in (2335, 2360) and target_channels >= 2364:
+        missing_own = 4
+        padded_kernel = jnp.concatenate([
+            kernel[:6, :],
+            jnp.zeros((missing_own, hidden_dim), dtype=kernel.dtype),
+            kernel[6:, :]
+        ], axis=0)
+        kernel = padded_kernel
+        print(f"[JAX] Grafting own_state padding to gwt_comms_1: expanded +{missing_own}", flush=True)
+
+    # 2. Pad loc_env from 9 to 10 channels if needed
+    if kernel.shape[0] == 2339 and target_channels == 2364:
+        K = 6
+        W = 25
         sig_dim = 32
         sym_dim = 16
-        idx_start = 6 + K * sig_dim + W * sym_dim  # 598
+        idx_start = 10 + K * sig_dim + W * sym_dim  # 602
         
-        # We need to build the new kernel by inserting W rows of zeros
         new_kernel = jnp.zeros((target_channels, hidden_dim), dtype=kernel.dtype)
-        
-        # The new indices for the inserted 10th channel (index 9 in each W block)
         insert_indices = jnp.array([idx_start + 9 + i * 10 for i in range(W)])
         
-        # All other indices map to the old kernel
         mask = jnp.ones(target_channels, dtype=bool)
         mask = mask.at[insert_indices].set(False)
-        
         new_kernel = new_kernel.at[mask].set(kernel)
+        kernel = new_kernel
+        print(f"[JAX] Grafting interleaved padding to gwt_comms_1: expanded +25", flush=True)
         
-        flat_params["gwt_comms_1"] = {
-            "kernel": new_kernel,
-            "bias": gc1.get("bias", jnp.zeros(hidden_dim, dtype=kernel.dtype)),
-        }
-        print(f"[JAX] Grafting interleaved padding to gwt_comms_1: expanded from {kernel.shape[0]} to {target_channels}", flush=True)
+    flat_params["gwt_comms_1"] = {
+        "kernel": kernel,
+        "bias": gc1.get("bias", jnp.zeros(hidden_dim, dtype=kernel.dtype)),
+    }
 
 
 def pad_auxiliary_heads(flat_params: dict, hidden_dim: int, target_actions: int = 8) -> None:
