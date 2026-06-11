@@ -542,7 +542,7 @@ class PredatorNetworkJax(nn.Module):
             symbol_dim=self.symbol_dim,
             memory_slots=self.memory_slots,
             neighbor_k=self.neighbor_k,
-            local_cells=self.local_cells,
+            local_cells=(2 * self.local_obs_radius + 1) ** 2,
             env_channels=self.env_channels,
             own_state_dim=self.own_state_dim,
         )
