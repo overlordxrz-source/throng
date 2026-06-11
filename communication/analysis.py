@@ -362,6 +362,8 @@ class SignalCorpusWriter:
         local_resource:    np.ndarray,
         own_energy:        np.ndarray,
         neighbor_count:    np.ndarray,
+        norm_x:            Optional[np.ndarray] = None,
+        norm_y:            Optional[np.ndarray] = None,
         token_ids:         Optional[np.ndarray] = None,
         nb_scout_sig_lag1:  Optional[np.ndarray] = None,
         nb_scout_dist_lag1: Optional[np.ndarray] = None,
@@ -406,6 +408,10 @@ class SignalCorpusWriter:
                 rec["adj_barrier"] = bool(adj_barrier[i])
             if adj_red is not None:
                 rec["adj_red"] = bool(adj_red[i])
+            if norm_x is not None:
+                rec["norm_x"] = round(float(norm_x[i]), 4)
+            if norm_y is not None:
+                rec["norm_y"] = round(float(norm_y[i]), 4)
             if token_ids is not None:
                 rec["vq_token"] = int(token_ids[idx])
             if nb_scout_sig_lag1 is not None:
