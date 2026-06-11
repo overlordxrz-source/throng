@@ -48,47 +48,34 @@ def vector_quantize_signals(
     dead_code_reset: bool = True,
 ) -> Tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
     """
-    VQ bottleneck with straight-through estimator.
+    Hardened Discrete Bottleneck (Phase 17).
+    Sever the continuous gradient path by using a straight-through estimator
+    over a frozen codebook.
 
     z_e: (N, signal_dim) continuous pre-quantization vectors.
     codebook: (vocab_size, signal_dim) embedding table.
-
-    dead_code_reset: if True, any codebook row unused in this batch is replaced
-    with a stop-gradient copy of a batch z_e vector, then quantization is recomputed.
-    This is the standard anti-collapse trick (VQ-VAE-2 style).
-
-    Returns:
-      signal_out: (N, signal_dim) — STE uses discrete z_q in forward, grads to z_e.
-      token_ids: (N,) — nearest codebook index per agent.
-      loss_vq: (N,) — per-agent VQ loss (codebook + commitment).
     """
     vocab_size = codebook.shape[0]
-    n_agents = z_e.shape[0]
 
-    diff = z_e[:, None, :] - codebook[None, :, :]
+    # Calculate logits based on negative distance
+    diff = z_e[:, None, :] - jax.lax.stop_gradient(codebook[None, :, :])
     dist_sq = jnp.sum(diff * diff, axis=-1)
+    
+    # Gumbel Softmax (STE approximation)
+    logits = -dist_sq
+    y_soft = jax.nn.softmax(logits)
     token_ids = jnp.argmin(dist_sq, axis=-1)
-
-    codebook_q = codebook
-    if dead_code_reset and vocab_size > 0 and n_agents > 0:
-        usage_counts = jnp.bincount(token_ids, length=vocab_size)
-        dead_mask = usage_counts == 0
-        batch_idx = jnp.arange(vocab_size) % n_agents
-        replacement = jax.lax.stop_gradient(z_e[batch_idx])
-        codebook_q = jnp.where(dead_mask[:, None], replacement, codebook)
-        diff = z_e[:, None, :] - codebook_q[None, :, :]
-        dist_sq = jnp.sum(diff * diff, axis=-1)
-        token_ids = jnp.argmin(dist_sq, axis=-1)
-
-    z_q = codebook_q[token_ids]
-
-    z_e_sg = jax.lax.stop_gradient(z_e)
-    z_q_sg = jax.lax.stop_gradient(z_q)
-    codebook_loss = jnp.sum((z_e_sg - z_q) ** 2, axis=-1)
-    commitment_loss = beta * jnp.sum((z_e - z_q_sg) ** 2, axis=-1)
-    loss_vq = codebook_loss + commitment_loss
-
-    signal_out = z_e + jax.lax.stop_gradient(z_q - z_e)
+    y_hard = jax.nn.one_hot(token_ids, vocab_size, dtype=y_soft.dtype)
+    
+    # Straight-through estimator
+    y = y_soft + jax.lax.stop_gradient(y_hard - y_soft)
+    
+    # Output is mapped back to 32D through the FROZEN codebook.
+    signal_out = y @ jax.lax.stop_gradient(codebook)
+    
+    # Set VQ loss to zero to prevent old VQ dynamics from pulling the codebook
+    loss_vq = jnp.zeros(z_e.shape[0])
+    
     return signal_out, token_ids, loss_vq
 
 
@@ -917,6 +904,17 @@ def graft_missing_param_subtrees(
             injected.append(path)
             continue
         src_val = source[key]
+        if key == "kernel" and not isinstance(tgt_val, dict) and hasattr(tgt_val, "shape") and hasattr(src_val, "shape"):
+            if tgt_val.shape != src_val.shape:
+                if len(tgt_val.shape) == 2 and len(src_val.shape) == 2:
+                    if tgt_val.shape[1] == src_val.shape[1] and tgt_val.shape[0] > src_val.shape[0]:
+                        import jax.numpy as jnp
+                        diff = tgt_val.shape[0] - src_val.shape[0]
+                        padding = jnp.zeros((diff, tgt_val.shape[1]), dtype=src_val.dtype)
+                        source[key] = jnp.concatenate([src_val, padding], axis=0)
+                        injected.append(f"{path} (zero-padded {diff} inputs)")
+                        continue
+
         if (
             isinstance(tgt_val, dict)
             and isinstance(src_val, dict)

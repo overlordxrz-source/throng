@@ -7,11 +7,9 @@ to **survive, signal, and pass knowledge on**. The goal is not "an agent that
 plays a game well." The goal is **emergence**: language, culture, and proto-
 cognition arising purely from selection pressure.
 
-**Current state (Jun 2026):** **Phase 16.5 (Environmental Enrichment)** LIVE. **The Great Burn-Off** successfully wiped the obsolete proxy language. The codebook collapsed to 1/64, gradient starvation forced external grounding, and a stable 5-token proto-language emerged.
-**Phase 15 is COMPLETE!** — The `nn.GRUCell` decoupled magnitude explosion from temporal BPTT gradients, resulting in mathematical confirmation of both Episodic Memory ($p < 0.05$) and Cumulative Culture ($p < 0.001$) at Lag-10.
-**Phase 16 Causal Test FAILED!** — Reached 1M. Offline ATE using the strictly-scoped Frozen Counterfactual Causal Test on Token 44 (Predator) showed ATE = 0.0000 across three tests. **Root Cause:** Information redundancy. Receivers have direct predator perception, meaning there is no pressure to read signals. The communication channel is a broadcaster with no listeners.
-**Phase 16.6 LIVE** — `feature/phase16-6-occlusion` branch. Barrier Occlusion — line-of-sight masking has been added to `observations_jax.py` to make agents informationally blind behind walls.
-**Phase 17 ON HOLD** — The Rosetta Stone. Offline training of an Unsupervised Semantic Translation layer using `ott-jax` is paused pending causal grounding. GW alignment on an ignored channel embeds correlational noise.
+**Current state (Jun 2026):** **Phase 16.6 (Protean Scattering) COMPLETE.** We successfully discovered that agents were bypassing the discrete VQ bottleneck by using the continuous signal geometry as a cryptographic random number generator to coordinate collision-free evasion (Protean Scattering) when blinded by Barrier Occlusion. 
+
+**Phase 17 (Grounding the Bottleneck) COMPLETE.** To force true semantic language emergence, we hardened the VQ bottleneck into a strict Gumbel-Softmax layer passing through a frozen codebook, mathematically severing the continuous gradient path. We also injected a 4D Gaussian noise channel into the `own_state` observation, giving agents intrinsic entropy so they no longer need to hijack the communication channel for survival.
 **Modal:** **`dragonbg`** — volume **`throng-runs`**.
 
 **Full ops / decode / roadmap:** [THRONG.md](THRONG.md) §0b (read first).

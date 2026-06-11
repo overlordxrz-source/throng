@@ -96,7 +96,16 @@ def build_observations_jax(
     nl_norm = pop.n_layers.astype(jnp.float32) / 6.0
     mat_frac = jnp.zeros(N, dtype=jnp.float32)
 
-    own_state = jnp.stack([norm_age, mat_frac, energy, nl_norm, norm_x, norm_y], axis=1)
+    if key is not None:
+        key, k_ent = jax.random.split(key)
+        intrinsic_entropy = jax.random.normal(k_ent, (N, 4))
+    else:
+        intrinsic_entropy = jnp.zeros((N, 4), dtype=jnp.float32)
+
+    own_state = jnp.concatenate([
+        jnp.stack([norm_age, mat_frac, energy, nl_norm, norm_x, norm_y], axis=1),
+        intrinsic_entropy
+    ], axis=1)
 
     # Team-isolated by PopState: blues pass b_pop, reds pass r_pop (Phase 12 co-evolution).
     nb_sigs = get_neighbour_signals(
@@ -132,7 +141,7 @@ def build_observations_jax(
         loc_scent = jnp.where(visibility_mask, loc_scent, 0.0)
 
     loc_env = jnp.concatenate([
-        loc_pres, loc_wall, loc_res, loc_shelter, loc_contested, loc_scent, loc_puzzle, loc_blue_bg, loc_barrier
+        loc_pres, loc_wall, loc_res, loc_shelter, loc_contested, loc_scent, loc_puzzle, loc_blue_bg
     ], axis=-1)
 
     if key is not None:

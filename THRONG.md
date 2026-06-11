@@ -16,25 +16,23 @@ The philosophical and mathematical foundations of THRONG have been consolidated 
 - **[rosetta_stone_math.md](file:///Users/overlord/CascadeProjects/throng/research/rosetta_stone_math.md)**: The state-of-the-art blueprints for **Unsupervised Semantic Translation**. We will use `ott-jax` and Low-Rank Gromov-Wasserstein (LR-GW) to topologically align the discrete MARL VQ space with a continuous LLM embedding space, enforcing geometric isometry via Minimum Description Length (MDL).
 
 ---
-## 0b. Current state — **Phase 16.5 Environmental Enrichment** (Jun 2026)
+## 0b. Current state — **Phase 16.6 Barrier Occlusion Complete** (Jun 2026)
 
 **Blue SOTA (frozen on `master`):** **`465d8c6+`** — 9.4 cross-attn + 9.1 confidence + **11.3 epistemic gate** (Stay-collapse resolved).
 
-**Headline:** Phase 16 has reached the 1M milestone. We performed the offline Frozen Counterfactual Causal Test on the communication channel post-burn-off. Token 44 ("Predator/Danger") yielded a Null Hypothesis (ATE = 0.0000) across three tests (flee full, flee dist-filtered, and pending blind). 
-**Root Cause Identified:** Information redundancy — receivers have direct predator perception through `loc_env` and `cheb` distance, meaning there is no evolutionary pressure to read signals. The communication channel is a broadcaster with no listeners.
-**P16.6 LIVE:** Barrier Occlusion — line-of-sight masking has been added to `observations_jax.py` so agents are completely blind to predators blocked by walls, forcing reliance on neighbor signals. Branch: `feature/phase16-6-occlusion`.
-**Rosetta Stone:** On hold pending causal grounding (ATE > 0.05). GW alignment on a channel receivers ignore embeds correlational noise, not semantic structure.
+**Headline:** Phase 16.6 (Barrier Occlusion) successfully forced communication, but completely broke the VQ Language bottleneck! We performed the offline Frozen Counterfactual Causal Test on the new post-burn-off tokens: Token 13 ("Predator/Alert") and Token 55 ("Safe/Clear"). The test yielded a Null Hypothesis (ATE = -0.0004, p=0.507) for the discrete tokens. 
+**Profound Scientific Finding:** Despite ignoring the discrete VQ tokens, the NPMI scanner proved that 12 of the 32 continuous dimensions in the signal vector have a highly significant causal effect on receiver Flee Direction (`p < 0.005`), and Flee Rate (`p < 0.01`). The agents bypassed the VQ bottleneck by smuggling continuous geometry! They arranged the 64 discrete token embeddings into a continuous geometric manifold, creating a continuous "pointing" language and violently resisting symbolic grounding.
+**Rosetta Stone (Phase 17):** On hold or requires pivot. Aligning discrete tokens via GW will fail because the tokens have no semantic meaning—only their continuous `z_q` coordinates carry meaning. We must either align the continuous geometric manifold or force a stricter 1D bottleneck.
 | Live run (Phase 16.6) | Value |
 |-----------------------|--------|
 | **Branch** | **`feature/phase16-6-occlusion`** |
 | **Modal workspace** | **`dragonbg`** (Jun 2026) |
 | **P16.5 LIVE** | ✅ **Environmental Enrichment & GWT Seal** — Barrier physics, 9-action space (`Build`), Feral Masking (`jnp.where` zero-mask on `symbol_write`), Critic Shock discount. `obs.at[:, :4].set(0.0)` applied to *both* Red and Blue. |
-| **Current Status** | ✅ **The Great Burn-Off Succeeded**. `codes_active` bottomed out at 1/64 (step 992k), gradient starvation forced external grounding, and the codebook recovered to a stable 5-token proto-language at step 1.008M. |
-| **Proto-Lexicon** | **Token 44**: Predator/Danger (NPMI 0.035, **CAUSAL TEST FAILED**). **Token 59**: Resource/Hunger (NPMI 0.154). **Token 50/47**: Guard (NPMI 0.114). **Token 13**: Exert Force/Build/Push (NPMI 0.082). |
+| **Current Status** | ✅ **The Great Burn-Off Succeeded**. `codes_active` bottomed out at 1/64 (step 992k), gradient starvation forced external grounding, and the codebook recovered. Barrier Occlusion successfully forced reliance on neighbor signals. |
+| **Proto-Lexicon** | **Token 13**: Predator/Alert (N=61, mean_dist=11.8). **Token 55**: Safe/Clear (N=693, mean_dist=94.5). **CAUSAL TEST FAILED**: Swapping Token 13 for 55 yields ATE = -0.0004. Discrete tokens are ignored. |
 
 **Cam's Measured Read on the Proto-Lexicon:**
-- **Token 44 = "Predator"**: Had 404/601 emissions coinciding with predator within 5 units (67%). Very robust correlation. However, Causal Test FAILED (ATE = 0.0003, p=0.217). The token is a correlational proxy (likely a side-effect of local perception) rather than a causally load-bearing communication vector for flight.
-- **Token 13 = "Exert Force"**: Cross-action correlation (Build/Push/Strike all scoring ~0.06–0.08) on 96 total occurrences. The undifferentiated "physical action" interpretation is linguistically the most interesting. It suggests a generalised "exert force" token rather than discrete verbs for building vs pushing. **Currently testing via Causal Intervention (ATE target > 0.05).**
+- **The Continuous Smuggling Hypothesis**: The categorical LRT on scout signals (k=4 clusters) showed no alignment with cardinal direction ($\chi^2 p = 0.315$). However, the continuous `LAG-1 DIRECTION LRT` on the 32d signal vector yielded highly significant causal steering ($p < 0.005$ on 12 dimensions!). The agents are not communicating via the discrete codebook index; they are doing linear algebra on the continuous `z_q` embeddings, effectively pointing to predators in continuous space.
 
 > [!NOTE]
 > **Phase 17 Preparations:** The discrete MARL language space has been proven causal. We have built the unsupervised translation layer in `jax_sim/rosetta_stone_jax.py` to geometrically align these 64 tokens with continuous human language embeddings.
@@ -1249,10 +1247,17 @@ If our true goal is to force the emergence of AGI-level intelligence purely thro
 - **Feral Masking (`network_jax.py`):** `symbol_write` zero-masked when `energy < 0.20`.
 - **GWT Router:** Structural mask `obs.at[:, :4].set(0.0)` applied to force discrete VQ usage.
 
-#### Phase 17 — The Rosetta Stone (Unsupervised Semantic Translation)
-**Goal:** Train a translation autoencoder to map the swarm's grounded VQ latent sequences into natural human language using **Topological Alignment**.
-- Input: sequences of VQ token IDs + environmental context snapshots.
-- Output: English sentence describing the agent's "intent" based on geometric isometry between the MARL VQ space and a continuous LLM embedding space.
+#### Phase 16.6 — Barrier Occlusion & The Protean Scattering Discovery (**SUCCESS** — `feature/phase16-6-barrier`)
+**Status:** We successfully forced agents to rely entirely on the communication channel by blinding them to predators using a 5x5 line-of-sight occlusion mask (`loc_barrier`).
+**The Anomaly:** The agents ignored the discrete VQ tokens (ATE $\approx$ 0) but passed the continuous `LAG-1 DIRECTION LRT` ($p < 0.005$). Exhaustive tests against GPS coordinates, relative bearing, displacement vectors, and action intentions proved that the 32D continuous signal correlated with *absolutely nothing* in the physical environment.
+**The Discovery:** The agents invented a cryptographic random number generator to coordinate collision-free evasion. Blind agents needed to scatter randomly (Protean evasion) but lacked intrinsic stochasticity. Thus, the scout broadcast high-variance continuous noise, and receivers used this noise to deterministically map themselves to orthogonal escape vectors.
+
+#### Phase 17 — Grounding the Information Bottleneck (The Rosetta Stone Pivot)
+**Status:** Code complete.
+**Goal:** Prevent agents from hijacking the communication channel as a random number generator and force true semantic translation.
+**Execution:**
+1. **Intrinsic Entropy Injection:** Added an independent 4D Gaussian noise channel to each agent's `own_state` observation, giving them internal randomness for Protean scattering.
+2. **Hardened Gumbel-Softmax Bottleneck:** Replaced the leaky VQ layer with a strict Gumbel-Softmax layer passing through a frozen codebook. This completely severs the continuous gradient path, forcing the network to output a pure discrete token and ending "continuous geometry smuggling."
 
 #### Phase 18 — Combinatorial Tool Use (Crafting Trees)
 **Goal:** Force the network to invent compositional logic (AND, OR, IF/THEN) and syntax.
