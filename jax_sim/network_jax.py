@@ -766,7 +766,7 @@ def ensure_predator_params(
     flat = unfreeze(params)
     pad_emb_own(flat, model.own_state_dim) # Phase 17 own_state grafting
     pad_head_action(flat, model.n_actions) # Phase 16 parameter grafting
-    pad_gwt_comms_1(flat, model.obs_dim)  # Phase 16 obs grafting for GWT Router
+    pad_gwt_comms_1(flat, obs_dim)  # Phase 16 obs grafting for GWT Router
     pad_auxiliary_heads(flat, hidden_dim, model.n_actions) # Phase 16 auxiliary grafting
     needs_codebook = "dcvq" not in flat or "simvq_W" not in flat or (
         "head_signal" in flat
