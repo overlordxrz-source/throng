@@ -611,29 +611,29 @@ class PredatorNetworkJax(nn.Module):
         K = self.neighbor_k
         W = (2 * self.local_obs_radius + 1) ** 2
 
-        own_state = obs[:, :6]
-        nb_sigs = obs[:, 6 : 6 + K * self.signal_dim].reshape(N, K, self.signal_dim)
-        loc_sym = obs[:, 6 + K * self.signal_dim : 6 + K * self.signal_dim + W * sym_d].reshape(
+        own_state = obs[:, :10]
+        nb_sigs = obs[:, 10 : 10 + K * self.signal_dim].reshape(N, K, self.signal_dim)
+        loc_sym = obs[:, 10 + K * self.signal_dim : 10 + K * self.signal_dim + W * sym_d].reshape(
             N, W, sym_d
         )
         env_ch = self.env_channels
         loc_env = obs[
             :,
-            6 + K * self.signal_dim + W * sym_d : 6 + K * self.signal_dim + W * sym_d + W * env_ch,
+            10 + K * self.signal_dim + W * sym_d : 10 + K * self.signal_dim + W * sym_d + W * env_ch,
         ].reshape(N, W, env_ch)
         own_sig = obs[
             :,
-            6
+            10
             + K * self.signal_dim
             + W * sym_d
-            + W * env_ch : 6
+            + W * env_ch : 10
             + K * self.signal_dim
             + W * sym_d
             + W * env_ch
             + self.signal_dim,
         ]
 
-        idx = 6 + K * self.signal_dim + W * sym_d + W * env_ch + self.signal_dim
+        idx = 10 + K * self.signal_dim + W * sym_d + W * env_ch + self.signal_dim
         if self.memory_slots > 0:
             mem = obs[:, idx : idx + self.memory_slots * (self.signal_dim + 2)].reshape(
                 N, self.memory_slots, self.signal_dim + 2
@@ -759,7 +759,6 @@ def ensure_predator_params(
     """Fill missing dcvq / simvq_W / red_nb_cross_attn / gwt_comms_1 when resuming older predator ckpts."""
     flat = unfreeze(params)
     pad_head_action(flat)  # Phase 16 parameter grafting
-    pad_emb_env(flat)      # Phase 16 obs grafting
     pad_gwt_comms_1(flat)  # Phase 16 obs grafting for GWT Router
     pad_auxiliary_heads(flat, hidden_dim) # Phase 16 auxiliary grafting
     needs_codebook = "dcvq" not in flat or "simvq_W" not in flat or (
@@ -975,26 +974,6 @@ def pad_head_action(flat_params: dict, target_actions: int = 9) -> None:
         print(f"[JAX] Grafting padding to head_action: expanded from {kernel.shape[1]} to {target_actions} actions", flush=True)
 
 
-def pad_emb_env(flat_params: dict, target_channels: int = 10) -> None:
-    """Pad emb_env kernel from 9 to 10 channels if needed."""
-    if "emb_env" not in flat_params:
-        return
-    ee = flat_params["emb_env"]
-    kernel = ee["kernel"]
-    # Kernel shape: (in_channels, hidden_dim)
-    if kernel.shape[0] < target_channels:
-        hidden_dim = kernel.shape[1]
-        missing = target_channels - kernel.shape[0]
-        padded_kernel = jnp.concatenate([
-            kernel,
-            jnp.zeros((missing, hidden_dim), dtype=kernel.dtype)
-        ], axis=0)
-        flat_params["emb_env"] = {
-            "kernel": padded_kernel,
-            "bias": ee.get("bias", jnp.zeros(hidden_dim, dtype=kernel.dtype)),
-        }
-        print(f"[JAX] Grafting padding to emb_env: expanded from {kernel.shape[0]} to {target_channels} channels", flush=True)
-
 
 def pad_gwt_comms_1(flat_params: dict, target_channels: int = 2360) -> None:
     """Pad gwt_comms_1 kernel from 2335 to 2360 by interleaving zeros for the 10th env channel."""
@@ -1101,7 +1080,6 @@ def ensure_aux_head_params(
     """Fill missing auxiliary-head / VQ / monologue params when resuming."""
     flat = unfreeze(params)
     pad_head_action(flat)  # Phase 16 parameter grafting
-    pad_emb_env(flat)      # Phase 16 obs grafting
     pad_auxiliary_heads(flat, hidden_dim) # Phase 16 auxiliary grafting
     pad_head_fwd_2(flat)   # Phase 16 env prediction grafting
     needs_vq = (
