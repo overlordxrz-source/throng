@@ -41,6 +41,36 @@ def _mask_loc_env_red_channel(
     )
 
 
+def compute_5x5_visibility_mask(W: jnp.ndarray) -> jnp.ndarray:
+    """
+    Computes a 5x5 line-of-sight visibility mask.
+    W is a boolean array of shape (N, 5, 5) where True means a wall/barrier is present.
+    Returns V, a boolean array of shape (N, 5, 5) where True means the cell is visible from (2, 2).
+    """
+    V = jnp.ones_like(W)
+    
+    V = V.at[:, 0, 2].set(~W[:, 1, 2])
+    V = V.at[:, 4, 2].set(~W[:, 3, 2])
+    V = V.at[:, 2, 0].set(~W[:, 2, 1])
+    V = V.at[:, 2, 4].set(~W[:, 2, 3])
+    V = V.at[:, 0, 0].set(~W[:, 1, 1])
+    V = V.at[:, 4, 4].set(~W[:, 3, 3])
+    V = V.at[:, 0, 4].set(~W[:, 1, 3])
+    V = V.at[:, 4, 0].set(~W[:, 3, 1])
+    
+    V = V.at[:, 0, 1].set(~(W[:, 1, 1] | W[:, 1, 2]))
+    V = V.at[:, 0, 3].set(~(W[:, 1, 3] | W[:, 1, 2]))
+    V = V.at[:, 4, 1].set(~(W[:, 3, 1] | W[:, 3, 2]))
+    V = V.at[:, 4, 3].set(~(W[:, 3, 3] | W[:, 3, 2]))
+    
+    V = V.at[:, 1, 0].set(~(W[:, 1, 1] | W[:, 2, 1]))
+    V = V.at[:, 3, 0].set(~(W[:, 3, 1] | W[:, 2, 1]))
+    V = V.at[:, 1, 4].set(~(W[:, 1, 3] | W[:, 2, 3]))
+    V = V.at[:, 3, 4].set(~(W[:, 3, 3] | W[:, 2, 3]))
+    
+    return V
+
+
 def build_observations_jax(
     pop: PopState,
     grid: GridState,
@@ -89,6 +119,17 @@ def build_observations_jax(
     loc_puzzle = get_local_patches(grid.puzzle_grid, pop.positions, r, gs)[..., None]
     loc_blue_bg = get_local_patches(blue_bg_map.astype(jnp.float32), pop.positions, r, gs)[..., None]
     loc_barrier = get_local_patches(grid.barrier_hp_map, pop.positions, r, gs)[..., None]
+
+    if r == 2:
+        W_wall = loc_wall[..., 0] > 0.0
+        W_barrier = loc_barrier[..., 0] > 0.0
+        W_combined = W_wall | W_barrier
+        visibility_mask = compute_5x5_visibility_mask(W_combined)[..., None]
+        
+        loc_pres = loc_pres.at[:, :, :, 1].set(
+            jnp.where(visibility_mask[..., 0], loc_pres[:, :, :, 1], 0.0)
+        )
+        loc_scent = jnp.where(visibility_mask, loc_scent, 0.0)
 
     loc_env = jnp.concatenate([
         loc_pres, loc_wall, loc_res, loc_shelter, loc_contested, loc_scent, loc_puzzle, loc_blue_bg, loc_barrier

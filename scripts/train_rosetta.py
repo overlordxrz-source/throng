@@ -37,16 +37,38 @@ def load_glove_embeddings(glove_path, top_n=5000):
     embeddings = embeddings / (norms + 1e-8)
     return words, embeddings
 
-def get_marl_distributions(corpus_path, vocab_size=64):
+def get_marl_distributions(corpus_path, vocab_size=64, min_step=992000):
     """
     Parses the signal corpus to extract co-occurrence statistics and builds 
     a distribution for each token to feed into the autoencoder.
-    For simplicity, we treat the 'batch_marl' as one-hot encoded VQ tokens.
+    Calculates token frequencies for weighted Gromov-Wasserstein alignment.
     """
-    print(f"Reading MARL signal corpus from {corpus_path}...")
-    # In a full run, we would parse context. For now, we just prepare the 64 discrete tokens.
+    print(f"Reading MARL signal corpus from {corpus_path} (min_step >= {min_step})...")
+    token_counts = np.zeros(vocab_size, dtype=np.float32)
+    
+    with open(corpus_path, 'r') as f:
+        for line in f:
+            if not line.strip(): continue
+            try:
+                data = json.loads(line)
+                if data.get('step', 0) < min_step:
+                    continue
+                token = data.get('vq_token', None)
+                if token is not None and 0 <= token < vocab_size:
+                    token_counts[token] += 1
+            except Exception:
+                continue
+                
+    # Normalize frequencies (prevent division by zero)
+    total_count = np.sum(token_counts)
+    if total_count > 0:
+        frequencies = token_counts / total_count
+    else:
+        frequencies = np.ones(vocab_size, dtype=np.float32) / vocab_size
+        
+    print(f"Extracted frequencies for {vocab_size} tokens.")
     tokens = np.eye(vocab_size, dtype=np.float32)
-    return tokens
+    return tokens, frequencies
 
 def main():
     parser = argparse.ArgumentParser()
@@ -55,6 +77,7 @@ def main():
     parser.add_argument('--llm-dim', type=int, default=50, help='Dimensionality of GloVe')
     parser.add_argument('--batch-size', type=int, default=64)
     parser.add_argument('--steps', type=int, default=1000)
+    parser.add_argument('--min-step', type=int, default=992000, help='Exclude pre-burn-off vocabulary')
     args = parser.parse_args()
     
     if not os.path.exists(args.glove_path):
@@ -66,7 +89,7 @@ def main():
     else:
         words, glove_embs = load_glove_embeddings(args.glove_path, top_n=5000)
         
-    marl_tokens = get_marl_distributions(args.corpus_path, vocab_size=64)
+    marl_tokens, token_frequencies = get_marl_distributions(args.corpus_path, vocab_size=64, min_step=args.min_step)
     
     # Initialize Rosetta Stone
     rng = jax.random.PRNGKey(42)
@@ -84,8 +107,9 @@ def main():
     )
     
     @jax.jit
-    def train_step(state, batch_marl, batch_llm, key):
+    def train_step(state, batch_marl, batch_llm, batch_freqs, key):
         def loss_fn(p):
+            # Pass batch_freqs down to loss if needed, but for now we'll just weight the GW loss matrix
             return rosetta_stone_loss(
                 p, 
                 model=model, 
@@ -94,7 +118,8 @@ def main():
                 rng=key, 
                 temperature=1.0, 
                 gw_rank=10, 
-                epsilon=1e-2
+                epsilon=1e-2,
+                freq_weights=batch_freqs
             )
         
         (loss, metrics), grads = jax.value_and_grad(loss_fn, has_aux=True)(state.params)
@@ -109,12 +134,13 @@ def main():
         # Sample MARL batch
         idx_marl = jax.random.choice(step_rng1, 64, shape=(args.batch_size,), replace=True)
         batch_marl = jnp.take(marl_tokens, idx_marl, axis=0)
+        batch_freqs = jnp.take(token_frequencies, idx_marl, axis=0)
         
         # Sample GloVe batch
         idx_llm = jax.random.choice(step_rng2, len(glove_embs), shape=(args.batch_size,), replace=True)
         batch_llm = jnp.take(glove_embs, idx_llm, axis=0)
         
-        state, metrics = train_step(state, batch_marl, batch_llm, rng)
+        state, metrics = train_step(state, batch_marl, batch_llm, batch_freqs, rng)
         
         if step % 200 == 0:
             print(f"Step {step:05d} | Loss: {metrics['loss_total']:.4f} | "
