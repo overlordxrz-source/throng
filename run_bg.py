@@ -21,4 +21,4 @@ if __name__ == "__main__":
         "8 actions, 10 env channels, barrier occlusion; n_steps=1_000_000",
         flush=True,
     )
-    run_simulation(build_cfg(), seed=42, n_steps=1_000_000)
+    run_simulation(build_cfg(), seed=42, n_steps=3_000_000)
