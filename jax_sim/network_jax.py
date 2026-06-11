@@ -765,9 +765,9 @@ def ensure_predator_params(
     """Fill missing dcvq / simvq_W / red_nb_cross_attn / gwt_comms_1 when resuming older predator ckpts."""
     flat = unfreeze(params)
     pad_emb_own(flat, model.own_state_dim) # Phase 17 own_state grafting
-    pad_head_action(flat)  # Phase 16 parameter grafting
+    pad_head_action(flat, model.n_actions) # Phase 16 parameter grafting
     pad_gwt_comms_1(flat)  # Phase 16 obs grafting for GWT Router
-    pad_auxiliary_heads(flat, hidden_dim) # Phase 16 auxiliary grafting
+    pad_auxiliary_heads(flat, hidden_dim, model.n_actions) # Phase 16 auxiliary grafting
     needs_codebook = "dcvq" not in flat or "simvq_W" not in flat or (
         "head_signal" in flat
         and flat["head_signal"]["kernel"].shape[-1] != model.signal_dim
@@ -973,8 +973,8 @@ def pad_emb_own(flat_params: dict, target_dim: int = 10) -> None:
         print(f"[JAX] Grafting padding to emb_own: expanded inputs from {kernel.shape[0]} to {target_dim}", flush=True)
 
 
-def pad_head_action(flat_params: dict, target_actions: int = 9) -> None:
-    """Pad head_action weights/biases from 8 to 9 actions if needed."""
+def pad_head_action(flat_params: dict, target_actions: int = 8) -> None:
+    """Pad or truncate head_action weights/biases to match target_actions."""
     if "head_action" not in flat_params:
         return
     ha = flat_params["head_action"]
@@ -992,11 +992,17 @@ def pad_head_action(flat_params: dict, target_actions: int = 9) -> None:
             bias,
             jnp.zeros((missing,), dtype=bias.dtype)
         ], axis=0)
-        flat_params["head_action"] = {
-            "kernel": padded_kernel,
-            "bias": padded_bias,
-        }
+        flat_params["head_action"] = dict(ha)
+        flat_params["head_action"]["kernel"] = padded_kernel
+        flat_params["head_action"]["bias"] = padded_bias
         print(f"[JAX] Grafting padding to head_action: expanded from {kernel.shape[1]} to {target_actions} actions", flush=True)
+    elif kernel.shape[1] > target_actions:
+        truncated_kernel = kernel[:, :target_actions]
+        truncated_bias = bias[:target_actions]
+        flat_params["head_action"] = dict(ha)
+        flat_params["head_action"]["kernel"] = truncated_kernel
+        flat_params["head_action"]["bias"] = truncated_bias
+        print(f"[JAX] Truncating head_action: reduced from {kernel.shape[1]} to {target_actions} actions", flush=True)
 
 
 
@@ -1035,33 +1041,40 @@ def pad_gwt_comms_1(flat_params: dict, target_channels: int = 2360) -> None:
         print(f"[JAX] Grafting interleaved padding to gwt_comms_1: expanded from {kernel.shape[0]} to {target_channels}", flush=True)
 
 
-def pad_auxiliary_heads(flat_params: dict, hidden_dim: int, target_actions: int = 9) -> None:
-    """Pad auxiliary heads to handle the expanded 9-dimensional action_oh vector."""
+def pad_auxiliary_heads(flat_params: dict, hidden_dim: int, target_actions: int = 8) -> None:
+    """Pad or truncate auxiliary heads to handle the target_actions vector length."""
     
-    # 1. Output heads: pad axis=1 (like head_action)
+    # 1. Output heads: pad or truncate axis=1 (like head_action)
     for k in ["head_self_pred", "head_tom"]:
         if k in flat_params:
-            d = flat_params[k]["kernel"]
+            ha = flat_params[k]
+            d = ha["kernel"]
+            bias = ha.get("bias", jnp.zeros(d.shape[1], dtype=d.dtype))
             if d.shape[1] < target_actions:
                 missing = target_actions - d.shape[1]
                 padded_kernel = jnp.concatenate([d, jnp.zeros((d.shape[0], missing), dtype=d.dtype)], axis=1)
-                bias = flat_params[k].get("bias", jnp.zeros(d.shape[1], dtype=d.dtype))
                 padded_bias = jnp.concatenate([bias, jnp.zeros((missing,), dtype=bias.dtype)], axis=0)
                 flat_params[k] = {"kernel": padded_kernel, "bias": padded_bias}
                 print(f"[JAX] Grafting padding to {k}: expanded outputs to {target_actions}")
+            elif d.shape[1] > target_actions:
+                flat_params[k] = {"kernel": d[:, :target_actions], "bias": bias[:target_actions]}
+                print(f"[JAX] Truncating {k}: reduced outputs to {target_actions}")
 
-    # 2. Input heads: pad axis=0 because action_oh is concatenated at the END of carry_t
+    # 2. Input heads: pad or truncate axis=0 because action_oh is concatenated at the END of carry_t
     for k in ["head_fwd_1", "head_fwd_dyn_1", "head_confidence_1"]:
         if k in flat_params:
-            d = flat_params[k]["kernel"]
-            if d.shape[0] < hidden_dim + target_actions:
-                missing = (hidden_dim + target_actions) - d.shape[0]
+            ha = flat_params[k]
+            d = ha["kernel"]
+            bias = ha.get("bias", jnp.zeros(d.shape[1], dtype=d.dtype))
+            target_dim = hidden_dim + target_actions
+            if d.shape[0] < target_dim:
+                missing = target_dim - d.shape[0]
                 padded_kernel = jnp.concatenate([d, jnp.zeros((missing, d.shape[1]), dtype=d.dtype)], axis=0)
-                flat_params[k] = {
-                    "kernel": padded_kernel,
-                    "bias": flat_params[k].get("bias", jnp.zeros(d.shape[1], dtype=d.dtype)),
-                }
-                print(f"[JAX] Grafting padding to {k}: expanded inputs to {hidden_dim + target_actions}")
+                flat_params[k] = {"kernel": padded_kernel, "bias": bias}
+                print(f"[JAX] Grafting padding to {k}: expanded inputs to {target_dim}")
+            elif d.shape[0] > target_dim:
+                flat_params[k] = {"kernel": d[:target_dim, :], "bias": bias}
+                print(f"[JAX] Truncating {k}: reduced inputs to {target_dim}")
 
 
 def pad_head_fwd_2(flat_params: dict, target_outputs: int = 250) -> None:
@@ -1105,8 +1118,8 @@ def ensure_aux_head_params(
     """Fill missing auxiliary-head / VQ / monologue params when resuming."""
     flat = unfreeze(params)
     pad_emb_own(flat, model.own_state_dim) # Phase 17 own_state grafting
-    pad_head_action(flat)  # Phase 16 parameter grafting
-    pad_auxiliary_heads(flat, hidden_dim) # Phase 16 auxiliary grafting
+    pad_head_action(flat, model.n_actions) # Phase 16 parameter grafting
+    pad_auxiliary_heads(flat, hidden_dim, model.n_actions) # Phase 16 auxiliary grafting
     pad_head_fwd_2(flat)   # Phase 16 env prediction grafting
     needs_vq = (
         "codebook" not in flat
