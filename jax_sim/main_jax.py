@@ -802,6 +802,10 @@ def _run_simulation_impl(
     _conf_coef = float(_p9.get("confidence_coef", 0.05)) if _conf_enabled else 0.0
     _red_cross = bool(_p12.get("red_cross_attn_enabled", True)) if _red_comms else False
     _red_vocab = int(_p12.get("red_vocab_size", config.get("vocab_size", 64)))
+    
+    obs_dim = compute_obs_dim_torch(config)
+    print(f"[JAX] obs_dim = {obs_dim}")
+    
     model = AgentNetworkJax(
         hidden_dim=hidden_d,
         n_heads=config["n_heads"],
@@ -859,9 +863,7 @@ def _run_simulation_impl(
         )
         r_model_apply = make_model_apply(model_red)
 
-    # Compute exact obs_dim and init model
-    obs_dim = compute_obs_dim_torch(config)
-    print(f"[JAX] obs_dim = {obs_dim}")
+    # Initialize model memory buffers
     _ppo_mb = int(config.get("ppo_minibatch_size", 512))
     if _ppo_mb > 768:
         print(
