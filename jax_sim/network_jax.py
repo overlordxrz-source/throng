@@ -1126,6 +1126,7 @@ def ensure_aux_head_params(
     flat = unfreeze(params)
     pad_emb_own(flat, model.own_state_dim) # Phase 17 own_state grafting
     pad_head_action(flat, model.n_actions) # Phase 16 parameter grafting
+    pad_gwt_comms_1(flat, obs_dim)         # Phase 17 GWT Router grafting
     pad_auxiliary_heads(flat, hidden_dim, model.n_actions) # Phase 16 auxiliary grafting
     pad_head_fwd_2(flat)   # Phase 16 env prediction grafting
     needs_vq = (
