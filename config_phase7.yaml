@@ -40,6 +40,7 @@ symbol_dim: 16
 neighbor_k: 6
 local_obs_radius: 2              # 5×5 patch
 env_channels: 10                 # blue, red, wall, res, shelter, contested, scent, puzzle, blue_bg, barrier
+own_state_dim: 10                # Phase 17: 6 base + 4 intrinsic entropy
 
 # Theory of mind head
 tom_enabled: true

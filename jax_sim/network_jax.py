@@ -133,6 +133,7 @@ class AgentNetworkJax(nn.Module):
     neighbor_k: int = 6
     local_cells: int = 25
     env_channels: int = 9
+    own_state_dim: int = 10
     n_actions: int = 8
 
     def setup(self):
@@ -204,6 +205,7 @@ class AgentNetworkJax(nn.Module):
             neighbor_k=self.neighbor_k,
             local_cells=self.local_cells,
             env_channels=self.env_channels,
+            own_state_dim=self.own_state_dim,
         )
 
     def extract_spatial_ego(self, obs: jnp.ndarray) -> jnp.ndarray:
@@ -532,6 +534,18 @@ class PredatorNetworkJax(nn.Module):
     cross_attn_num_heads: int = 4
     n_actions: int = 8
     env_channels: int = 9
+    own_state_dim: int = 10
+
+    def _obs_layout(self):
+        return make_obs_layout(
+            signal_dim=self.signal_dim,
+            symbol_dim=self.symbol_dim,
+            memory_slots=self.memory_slots,
+            neighbor_k=self.neighbor_k,
+            local_cells=self.local_cells,
+            env_channels=self.env_channels,
+            own_state_dim=self.own_state_dim,
+        )
 
     def setup(self):
         d = self.hidden_dim
@@ -610,30 +624,22 @@ class PredatorNetworkJax(nn.Module):
         sym_d = self.symbol_dim
         K = self.neighbor_k
         W = (2 * self.local_obs_radius + 1) ** 2
+        layout = self._obs_layout()
 
-        own_state = obs[:, :10]
-        nb_sigs = obs[:, 10 : 10 + K * self.signal_dim].reshape(N, K, self.signal_dim)
-        loc_sym = obs[:, 10 + K * self.signal_dim : 10 + K * self.signal_dim + W * sym_d].reshape(
+        own_state = obs[:, layout.own_state_start : layout.own_state_end]
+        nb_sigs = obs[:, layout.nb_sigs_start : layout.nb_sigs_end].reshape(
+            N, K, self.signal_dim
+        )
+        loc_sym = obs[:, layout.loc_sym_start : layout.loc_sym_end].reshape(
             N, W, sym_d
         )
         env_ch = self.env_channels
-        loc_env = obs[
-            :,
-            10 + K * self.signal_dim + W * sym_d : 10 + K * self.signal_dim + W * sym_d + W * env_ch,
-        ].reshape(N, W, env_ch)
-        own_sig = obs[
-            :,
-            10
-            + K * self.signal_dim
-            + W * sym_d
-            + W * env_ch : 10
-            + K * self.signal_dim
-            + W * sym_d
-            + W * env_ch
-            + self.signal_dim,
-        ]
+        loc_env = obs[:, layout.loc_env_start : layout.loc_env_end].reshape(
+            N, W, env_ch
+        )
+        own_sig = obs[:, layout.own_sig_start : layout.own_sig_end]
 
-        idx = 10 + K * self.signal_dim + W * sym_d + W * env_ch + self.signal_dim
+        idx = layout.mem_start
         if self.memory_slots > 0:
             mem = obs[:, idx : idx + self.memory_slots * (self.signal_dim + 2)].reshape(
                 N, self.memory_slots, self.signal_dim + 2

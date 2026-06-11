@@ -806,7 +806,7 @@ def _run_simulation_impl(
         hidden_dim=hidden_d,
         n_heads=config["n_heads"],
         n_layers=n_layers,
-        obs_dim=0,  # computed inside
+        obs_dim=obs_dim,
         signal_dim=config["signal_dim"],
         symbol_dim=config["symbol_dim"],
         vocab_size=config["vocab_size"],
@@ -817,6 +817,7 @@ def _run_simulation_impl(
         cross_attn_enabled=_cross_attn,
         cross_attn_num_heads=_cross_heads,
         env_channels=int(config.get("env_channels", 9)),
+        own_state_dim=int(config.get("own_state_dim", 10)),
         n_actions=int(config.get("n_actions", 8)),
     )
     model_apply = make_model_apply(model)
@@ -853,6 +854,7 @@ def _run_simulation_impl(
             cross_attn_enabled=_red_cross,
             cross_attn_num_heads=_cross_heads,
             env_channels=int(config.get("env_channels", 9)),
+            own_state_dim=int(config.get("own_state_dim", 10)),
             n_actions=int(config.get("n_actions", 8)),
         )
         r_model_apply = make_model_apply(model_red)
@@ -2083,6 +2085,8 @@ def _run_simulation_impl(
                     local_resource=loc_res,
                     own_energy=b_energy_all[t, alive_idx],
                     neighbor_count=nb_count,
+                    norm_x=b_pos[alive_idx, 0] / gs_val,
+                    norm_y=b_pos[alive_idx, 1] / gs_val,
                     nb_scout_sig_lag1=nb_scout_lag1,
                     nb_scout_dist_lag1=nb_scout_dist_lag1,
                     nb_scout_token_lag1=nb_scout_token_lag1,

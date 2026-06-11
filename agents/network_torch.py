@@ -348,8 +348,9 @@ def loc_env_flat_bounds(config: dict) -> tuple[int, int]:
     symd = config.get("symbol_dim", 16)
     r = config["local_obs_radius"]
     env_ch = int(config.get("env_channels", 9))
+    own_sd = int(config.get("own_state_dim", 10))  # Phase 17: 6 base + 4 intrinsic entropy
     W = (2 * r + 1) ** 2
-    start = 6 + K * sd + W * symd
+    start = own_sd + K * sd + W * symd
     end = start + W * env_ch
     return start, end
 
@@ -369,7 +370,8 @@ def compute_obs_dim_torch(config: dict) -> int:
     r    = config["local_obs_radius"]
     W    = (2 * r + 1) ** 2
     env_ch = int(config.get("env_channels", 9))
-    base = 6 + K * sd + W * symd + W * env_ch + sd
+    own_sd = int(config.get("own_state_dim", 10))  # Phase 17: 6 base + 4 intrinsic entropy
+    base = own_sd + K * sd + W * symd + W * env_ch + sd
     # Phase 7: episodic memory buffer
     mem_slots = int(config.get("memory_buffer_size", 0))
     if mem_slots > 0 and config.get("memory_buffer_enabled", False):
