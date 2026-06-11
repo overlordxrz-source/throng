@@ -10,7 +10,7 @@ cognition arising purely from selection pressure.
 **Current state (Jun 2026):** **Phase 16.5 (Environmental Enrichment)** LIVE. **The Great Burn-Off** successfully wiped the obsolete proxy language. The codebook collapsed to 1/64, gradient starvation forced external grounding, and a stable 5-token proto-language emerged.
 **Phase 15 is COMPLETE!** — The `nn.GRUCell` decoupled magnitude explosion from temporal BPTT gradients, resulting in mathematical confirmation of both Episodic Memory ($p < 0.05$) and Cumulative Culture ($p < 0.001$) at Lag-10.
 **Phase 16 Causal Test FAILED!** — Reached 1M. Offline ATE using the strictly-scoped Frozen Counterfactual Causal Test on Token 44 (Predator) showed ATE = 0.0000 across three tests. **Root Cause:** Information redundancy. Receivers have direct predator perception, meaning there is no pressure to read signals. The communication channel is a broadcaster with no listeners.
-**Phase 16.6 DRAFTED:** Barrier Occlusion — adding line-of-sight masking to `observations_jax.py` to make agents informationally blind behind walls.
+**Phase 16.6 LIVE** — `feature/phase16-6-occlusion` branch. Barrier Occlusion — line-of-sight masking has been added to `observations_jax.py` to make agents informationally blind behind walls.
 **Phase 17 ON HOLD** — The Rosetta Stone. Offline training of an Unsupervised Semantic Translation layer using `ott-jax` is paused pending causal grounding. GW alignment on an ignored channel embeds correlational noise.
 **Modal:** **`dragonbg`** — volume **`throng-runs`**.
 

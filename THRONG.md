@@ -22,11 +22,11 @@ The philosophical and mathematical foundations of THRONG have been consolidated 
 
 **Headline:** Phase 16 has reached the 1M milestone. We performed the offline Frozen Counterfactual Causal Test on the communication channel post-burn-off. Token 44 ("Predator/Danger") yielded a Null Hypothesis (ATE = 0.0000) across three tests (flee full, flee dist-filtered, and pending blind). 
 **Root Cause Identified:** Information redundancy — receivers have direct predator perception through `loc_env` and `cheb` distance, meaning there is no evolutionary pressure to read signals. The communication channel is a broadcaster with no listeners.
-**P16.6 DRAFTED:** Barrier Occlusion — line-of-sight masking will be added to `observations_jax.py` so agents are completely blind to predators blocked by walls, forcing reliance on neighbor signals.
+**P16.6 LIVE:** Barrier Occlusion — line-of-sight masking has been added to `observations_jax.py` so agents are completely blind to predators blocked by walls, forcing reliance on neighbor signals. Branch: `feature/phase16-6-occlusion`.
 **Rosetta Stone:** On hold pending causal grounding (ATE > 0.05). GW alignment on a channel receivers ignore embeds correlational noise, not semantic structure.
-| Live run (Phase 16.5) | Value |
+| Live run (Phase 16.6) | Value |
 |-----------------------|--------|
-| **Branch** | **`feature/phase16-5-enrichment`** |
+| **Branch** | **`feature/phase16-6-occlusion`** |
 | **Modal workspace** | **`dragonbg`** (Jun 2026) |
 | **P16.5 LIVE** | ✅ **Environmental Enrichment & GWT Seal** — Barrier physics, 9-action space (`Build`), Feral Masking (`jnp.where` zero-mask on `symbol_write`), Critic Shock discount. `obs.at[:, :4].set(0.0)` applied to *both* Red and Blue. |
 | **Current Status** | ✅ **The Great Burn-Off Succeeded**. `codes_active` bottomed out at 1/64 (step 992k), gradient starvation forced external grounding, and the codebook recovered to a stable 5-token proto-language at step 1.008M. |

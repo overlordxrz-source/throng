@@ -123,11 +123,11 @@ def build_observations_jax(
     if r == 2:
         W_wall = loc_wall[..., 0] > 0.0
         W_barrier = loc_barrier[..., 0] > 0.0
-        W_combined = W_wall | W_barrier
-        visibility_mask = compute_5x5_visibility_mask(W_combined)[..., None]
+        W_combined = (W_wall | W_barrier).reshape(N, 5, 5)
+        visibility_mask = compute_5x5_visibility_mask(W_combined).reshape(N, 25, 1)
         
-        loc_pres = loc_pres.at[:, :, :, 1].set(
-            jnp.where(visibility_mask[..., 0], loc_pres[:, :, :, 1], 0.0)
+        loc_pres = loc_pres.at[:, :, 1].set(
+            jnp.where(visibility_mask[..., 0], loc_pres[:, :, 1], 0.0)
         )
         loc_scent = jnp.where(visibility_mask, loc_scent, 0.0)
 
