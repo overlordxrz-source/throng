@@ -764,6 +764,7 @@ def ensure_predator_params(
 ) -> Any:
     """Fill missing dcvq / simvq_W / red_nb_cross_attn / gwt_comms_1 when resuming older predator ckpts."""
     flat = unfreeze(params)
+    pad_emb_own(flat, model.own_state_dim) # Phase 17 own_state grafting
     pad_head_action(flat)  # Phase 16 parameter grafting
     pad_gwt_comms_1(flat)  # Phase 16 obs grafting for GWT Router
     pad_auxiliary_heads(flat, hidden_dim) # Phase 16 auxiliary grafting
@@ -954,6 +955,24 @@ def sanitize_agent_params(params: Any) -> Any:
     return params
 
 
+def pad_emb_own(flat_params: dict, target_dim: int = 10) -> None:
+    """Pad emb_own weights from 6 to target_dim to accommodate Phase 17 entropy addition."""
+    if "emb_own" not in flat_params:
+        return
+    eo = flat_params["emb_own"]
+    kernel = eo["kernel"]
+    if kernel.shape[0] < target_dim:
+        missing = target_dim - kernel.shape[0]
+        out_dim = kernel.shape[1]
+        padded_kernel = jnp.concatenate([
+            kernel,
+            jnp.zeros((missing, out_dim), dtype=kernel.dtype)
+        ], axis=0)
+        flat_params["emb_own"] = dict(eo)  # make a copy to avoid mutating frozen dicts accidentally
+        flat_params["emb_own"]["kernel"] = padded_kernel
+        print(f"[JAX] Grafting padding to emb_own: expanded inputs from {kernel.shape[0]} to {target_dim}", flush=True)
+
+
 def pad_head_action(flat_params: dict, target_actions: int = 9) -> None:
     """Pad head_action weights/biases from 8 to 9 actions if needed."""
     if "head_action" not in flat_params:
@@ -1085,6 +1104,7 @@ def ensure_aux_head_params(
 ) -> Any:
     """Fill missing auxiliary-head / VQ / monologue params when resuming."""
     flat = unfreeze(params)
+    pad_emb_own(flat, model.own_state_dim) # Phase 17 own_state grafting
     pad_head_action(flat)  # Phase 16 parameter grafting
     pad_auxiliary_heads(flat, hidden_dim) # Phase 16 auxiliary grafting
     pad_head_fwd_2(flat)   # Phase 16 env prediction grafting
