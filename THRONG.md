@@ -1276,4 +1276,4 @@ If our true goal is to force the emergence of AGI-level intelligence purely thro
 
 ---
 
-*Last updated: 2026-06-10 — Phase 16.5 Burn-Off SUCCESS (992k). `offline_npmi_syntax.py` under construction.*
+*Last updated: 2026-06-12 — Phase 17 Gumbel-Softmax bottleneck hardening + intrinsic entropy injection COMPLETE. Verification run in progress.*

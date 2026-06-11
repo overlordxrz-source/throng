@@ -39,6 +39,7 @@ symbol_dim: 16
 
 neighbor_k: 6
 local_obs_radius: 2              # 5×5 patch
+env_channels: 10                 # blue, red, wall, res, shelter, contested, scent, puzzle, blue_bg, barrier
 
 # Theory of mind head
 tom_enabled: true

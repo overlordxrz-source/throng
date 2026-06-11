@@ -141,7 +141,7 @@ def build_observations_jax(
         loc_scent = jnp.where(visibility_mask, loc_scent, 0.0)
 
     loc_env = jnp.concatenate([
-        loc_pres, loc_wall, loc_res, loc_shelter, loc_contested, loc_scent, loc_puzzle, loc_blue_bg
+        loc_pres, loc_wall, loc_res, loc_shelter, loc_contested, loc_scent, loc_puzzle, loc_blue_bg, loc_barrier
     ], axis=-1)
 
     if key is not None:

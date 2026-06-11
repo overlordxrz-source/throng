@@ -17,8 +17,8 @@ from scripts.modal_train import build_cfg, run_simulation  # noqa: E402
 
 if __name__ == "__main__":
     print(
-        "run_bg.py: Phase 16.5 Environmental Enrichment — "
-        "9 actions (Build), 10 env channels (barrier), feral masking; n_steps=1_500_000",
+        "run_bg.py: Phase 17 — Gumbel-Softmax bottleneck + intrinsic entropy; "
+        "8 actions, 10 env channels, barrier occlusion; n_steps=1_000_000",
         flush=True,
     )
-    run_simulation(build_cfg(), seed=42, n_steps=1_500_000)
+    run_simulation(build_cfg(), seed=42, n_steps=1_000_000)

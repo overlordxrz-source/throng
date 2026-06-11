@@ -17,7 +17,9 @@ REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO))
 os.chdir(REPO)
 
-os.environ.setdefault("XLA_PYTHON_CLIENT_MEM_FRACTION", "0.80")
+# Let JAX allocate GPU memory on demand instead of pre-allocating a fixed fraction.
+# This prevents the OOM-then-hardstuck failure mode.
+os.environ.setdefault("XLA_PYTHON_CLIENT_PREALLOCATE", "false")
 os.environ.setdefault("TF_GPU_ALLOCATOR", "cuda_malloc_async")
 os.environ["JAX_COMPILATION_CACHE_DIR"] = "/tmp/throng_jax_cache"
 os.makedirs("/tmp/throng_jax_cache", exist_ok=True)
@@ -52,10 +54,10 @@ def build_cfg() -> dict:
     cfg["max_age"] = 1000
     cfg["vq_dead_code_reset"] = True
     cfg["ppo_rollout_steps"] = 512
-    cfg["ppo_minibatch_size"] = 512
-    # Phase 16.5 — Environmental Enrichment
-    cfg["n_actions"] = 9        # N, S, E, W, Stay, Strike, Push, Guard, Build
-    cfg["env_channels"] = 10    # +barrier_hp_map channel
+    cfg["ppo_minibatch_size"] = 1024  # Phase 17: doubled from 512 (safe with dynamic GPU alloc)
+    # Phase 17 — Gumbel-Softmax bottleneck + intrinsic entropy
+    cfg["n_actions"] = 8        # N, S, E, W, Stay, Strike, Push, Guard
+    cfg["env_channels"] = 10    # blue, red, wall, res, shelter, contested, scent, puzzle, blue_bg, barrier
     return cfg
 
 
