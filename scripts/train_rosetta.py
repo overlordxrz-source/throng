@@ -16,26 +16,37 @@ import sys
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from jax_sim.rosetta_stone_jax import RosettaStone, rosetta_stone_loss
 
-def load_glove_embeddings(glove_path, top_n=5000):
-    """Loads a subset of GloVe embeddings, L2 normalized."""
-    embeddings = []
-    words = []
-    print(f"Loading top {top_n} GloVe vectors from {glove_path}...")
-    with open(glove_path, 'r', encoding='utf8') as f:
-        for i, line in enumerate(f):
-            if i >= top_n:
-                break
-            parts = line.strip().split()
-            word = parts[0]
-            vector = np.array([float(x) for x in parts[1:]], dtype=np.float32)
-            words.append(word)
-            embeddings.append(vector)
-            
-    embeddings = np.array(embeddings)
-    # L2 Normalization
-    norms = np.linalg.norm(embeddings, axis=1, keepdims=True)
-    embeddings = embeddings / (norms + 1e-8)
-    return words, embeddings
+def generate_geometric_primitives():
+    """Generates 12 ecologically grounded anchor vectors."""
+    words = [
+        "North", "South", "East", "West",
+        "Close", "Mid", "Far", "Out-of-Range",
+        "Move", "Stay", "Attack", "Defend"
+    ]
+    embs = np.zeros((12, 12), dtype=np.float32)
+    
+    # 0-3: Cardinal (Opposites are -1)
+    embs[0, 0] = 1.0; embs[0, 1] = 0.0 # North
+    embs[1, 0] = -1.0; embs[1, 1] = 0.0 # South
+    embs[2, 0] = 0.0; embs[2, 1] = 1.0 # East
+    embs[3, 0] = 0.0; embs[3, 1] = -1.0 # West
+    
+    # 4-7: Distance (Scalar magnitude on dim 2)
+    embs[4, 2] = 1.0 # Close
+    embs[5, 2] = 2.0 # Mid
+    embs[6, 2] = 3.0 # Far
+    embs[7, 2] = 4.0 # Out
+    
+    # 8-11: Actions (One-hot on dims 3-6)
+    embs[8, 3] = 1.0 # Move
+    embs[9, 4] = 1.0 # Stay
+    embs[10, 5] = 1.0 # Attack
+    embs[11, 6] = 1.0 # Defend
+    
+    # Normalize
+    norms = np.linalg.norm(embs, axis=1, keepdims=True)
+    embs = embs / (norms + 1e-8)
+    return words, embs
 
 def get_marl_distributions(corpus_path, vocab_size=64, min_step=992000):
     """
@@ -72,22 +83,13 @@ def get_marl_distributions(corpus_path, vocab_size=64, min_step=992000):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--glove-path', type=str, default='glove.6B.50d.txt', help='Path to GloVe embeddings')
-    parser.add_argument('--corpus-path', type=str, default='/mnt/throng-runs/signal_corpus.jsonl')
-    parser.add_argument('--llm-dim', type=int, default=50, help='Dimensionality of GloVe')
+    parser.add_argument('--llm-dim', type=int, default=12, help='Dimensionality of geometric space')
     parser.add_argument('--batch-size', type=int, default=64)
     parser.add_argument('--steps', type=int, default=1000)
     parser.add_argument('--min-step', type=int, default=992000, help='Exclude pre-burn-off vocabulary')
     args = parser.parse_args()
     
-    if not os.path.exists(args.glove_path):
-        print(f"WARNING: GloVe file {args.glove_path} not found. Using random continuous data for dry-run testing.")
-        words = [f"word_{i}" for i in range(5000)]
-        glove_embs = np.random.randn(5000, args.llm_dim).astype(np.float32)
-        norms = np.linalg.norm(glove_embs, axis=1, keepdims=True)
-        glove_embs = glove_embs / (norms + 1e-8)
-    else:
-        words, glove_embs = load_glove_embeddings(args.glove_path, top_n=5000)
+    words, target_embs = generate_geometric_primitives()
         
     marl_tokens, token_frequencies = get_marl_distributions(args.corpus_path, vocab_size=64, min_step=args.min_step)
     
@@ -136,9 +138,9 @@ def main():
         batch_marl = jnp.take(marl_tokens, idx_marl, axis=0)
         batch_freqs = jnp.take(token_frequencies, idx_marl, axis=0)
         
-        # Sample GloVe batch
-        idx_llm = jax.random.choice(step_rng2, len(glove_embs), shape=(args.batch_size,), replace=True)
-        batch_llm = jnp.take(glove_embs, idx_llm, axis=0)
+        # Sample target batch
+        idx_llm = jax.random.choice(step_rng2, len(target_embs), shape=(args.batch_size,), replace=True)
+        batch_llm = jnp.take(target_embs, idx_llm, axis=0)
         
         state, metrics = train_step(state, batch_marl, batch_llm, batch_freqs, rng)
         
@@ -149,7 +151,17 @@ def main():
                   f"GW: {metrics['loss_gw']:.4f} | "
                   f"Iso: {metrics['loss_isometry']:.4f}")
 
-    print("Training complete! Model is ready for translation queries.")
+    print("\n--- THE GEOMETRIC ROSETTA STONE ---")
+    mapped_anchors = model.apply(params, marl_tokens, mode="fwd") # [64, 12]
+    for i in range(64):
+        # Find nearest 2 words
+        dists = jnp.linalg.norm(target_embs - mapped_anchors[i], axis=1)
+        top_indices = jnp.argsort(dists)[:2]
+        top_words = [words[idx] for idx in top_indices]
+        if token_frequencies[i] > 0.001:
+            print(f"Token {i:02d} (freq {token_frequencies[i]:.3f}) -> {top_words}")
+    
+    print("Translation complete!")
 
 if __name__ == '__main__':
     main()

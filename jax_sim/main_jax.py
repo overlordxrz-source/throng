@@ -297,14 +297,13 @@ def make_sim_step(
             r_action_logits = r_action_logits.at[:, 8].set(-1e9)
 
         # ── Write VQ signals for neighbours ──
-        # Phase 14.1c: monologue = wire cut (silence); post-graduation "hard" = discrete z_q only.
+        # ── Write VQ signals for neighbours ──
+        # Phase 18: Timescale Grammar. b_signal_out is a 32D concatenated vector (30D spatial + 2D one-hot alarm)
         if _vqel_monologue:
             b_sig_broadcast = jnp.zeros_like(b_signal_out)
-        elif _dialogue_signal_mode == "hard":
-            _cb = b_params_sg["codebook"]["embedding"]
-            b_sig_broadcast = _cb[b_token_ids]
         else:
             b_sig_broadcast = b_signal_out
+            
         b_pop = b_pop.replace(
             signals=jnp.where(b_pop.alive[:, None], b_sig_broadcast, 0.0)
         )
@@ -382,7 +381,14 @@ def make_sim_step(
         new_barrier_hp = decay_barrier_grid(new_barrier_hp, _barrier_decay_rate)
         grid = grid.replace(barrier_hp_map=new_barrier_hp)
         
+        # Apply Barrier Build Cost
         b_pop = b_pop.replace(energy=jnp.clip(b_pop.energy - (b_building.astype(jnp.float32) * _barrier_build_cost), 0.0, 1.0))
+
+        # ── Phase 18: Timescale Grammar Metabolic Cost ─────────────────
+        # b_token_ids represents the discrete 1-bit alarm channel index (0 = Safe, 1 = Alarm)
+        alarm_triggered = (b_token_ids == 1) & b_pop.alive
+        _alarm_metabolic_cost = 0.05
+        b_pop = b_pop.replace(energy=jnp.clip(b_pop.energy - (alarm_triggered.astype(jnp.float32) * _alarm_metabolic_cost), 0.0, 1.0))
 
         # ── Scent trails (reds deposit scent) ───────────────────
         new_scent = update_scent_trails(

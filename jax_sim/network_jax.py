@@ -160,8 +160,9 @@ class AgentNetworkJax(nn.Module):
         # Output heads
         self.final_norm = nn.LayerNorm()
         self.head_action = nn.Dense(self.n_actions)           # N actions (N, S, E, W, Stay, Strike, Push, Guard, [Build])
-        self.head_signal = nn.Dense(self.signal_dim)  # continuous z_e pre-VQ
+        self.head_signal = nn.Dense(self.signal_dim - 2)  # 30D continuous spatial geometry
         self.codebook = nn.Embed(self.vocab_size, self.signal_dim)
+        self.head_alarm = nn.Dense(2)            # Phase 18: 1-bit discrete alarm channel
         self.head_symbol = nn.Dense(sym_d)       # symbol write
         self.head_value = nn.Dense(1, kernel_init=nn.initializers.normal(0.01), bias_init=nn.initializers.zeros)  # zero init for stable value learning
         self.head_tom = nn.Dense(self.n_actions)             # Theory-of-Mind per neighbour
@@ -319,14 +320,22 @@ class AgentNetworkJax(nn.Module):
         # Zero out age(0), mat(1), energy(2), layers(3) to completely sever the metabolic leak
         exteroceptive_obs = obs.at[:, :4].set(0.0)
         h_comms = nn.relu(self.gwt_comms_1(exteroceptive_obs))
-        z_e = self.head_signal(h_comms)                 # (N, signal_dim)
-        codebook_w = self.codebook.embedding           # (vocab_size, signal_dim)
-        signal_out, token_ids, loss_vq = vector_quantize_signals(
-            z_e,
-            codebook_w,
-            beta=self.vq_beta,
-            dead_code_reset=self.vq_dead_code_reset,
-        )
+        z_e = self.head_signal(h_comms)                 # (N, signal_dim - 2)
+        
+        # Phase 18: Timescale Grammar (Continuous spatial + 1-bit discrete alarm)
+        loss_vq = jnp.zeros(N) # VQ bottleneck removed
+        
+        # 1-bit discrete alarm channel (Gumbel-Softmax STE)
+        alarm_logits = self.head_alarm(h_comms) # (N, 2)
+        alarm_soft = jax.nn.softmax(alarm_logits)
+        alarm_idx = jnp.argmax(alarm_soft, axis=-1)
+        alarm_hard = jax.nn.one_hot(alarm_idx, 2, dtype=alarm_soft.dtype)
+        alarm_out = alarm_soft + jax.lax.stop_gradient(alarm_hard - alarm_soft)
+        
+        signal_out = jnp.concatenate([z_e, alarm_out], axis=-1) # (N, signal_dim)
+        
+        # Return alarm_idx in place of token_ids for backward compatibility
+        token_ids = alarm_idx
         symbol_write = self.head_symbol(pooled)              # (N, sym_d)
         feral_mask = jax.lax.stop_gradient(obs[:, 2] < 0.20)
         symbol_write = jnp.where(feral_mask[:, None], 0.0, symbol_write)
@@ -346,7 +355,7 @@ class AgentNetworkJax(nn.Module):
 
         return new_carries, (
             action_logits, signal_out, symbol_write, values,
-            tom_logits, token_ids, loss_vq, z_e, culture_fast, culture_slow,
+            tom_logits, token_ids, alarm_out, z_e, culture_fast, culture_slow,
         )
 
     def monologue_forward(

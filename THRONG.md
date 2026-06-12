@@ -22,8 +22,8 @@ The philosophical and mathematical foundations of THRONG have been consolidated 
 
 **Headline:** Phase 16.6 (Barrier Occlusion) successfully forced communication, but completely broke the VQ Language bottleneck! We performed the offline Frozen Counterfactual Causal Test on the new post-burn-off tokens: Token 13 ("Predator/Alert") and Token 55 ("Safe/Clear"). The test yielded a Null Hypothesis (ATE = -0.0004, p=0.507) for the discrete tokens. 
 **Profound Scientific Finding:** Despite ignoring the discrete VQ tokens, the NPMI scanner proved that 12 of the 32 continuous dimensions in the signal vector have a highly significant causal effect on receiver Flee Direction (`p < 0.005`), and Flee Rate (`p < 0.01`). The agents bypassed the VQ bottleneck by smuggling continuous geometry! They arranged the 64 discrete token embeddings into a continuous geometric manifold, creating a continuous "pointing" language and violently resisting symbolic grounding.
-**Rosetta Stone (Phase 17):** **COMPLETE.** The discrete tokens were forced through a Gumbel-Softmax bottleneck. After language stabilized, we ran an unsupervised Low-Rank Gromov-Wasserstein alignment (`ott-jax`) against the Stanford GloVe 50d embeddings. The topological mapping succeeded perfectly (GW loss: 0.01), successfully translating alien semantics to English words (e.g. "troops/withdraw" for flee, "costs/fees" for metabolism, "mean/zero" for coordinates).
-**Multi-Token Sequences (Phase 18):** **PLANNING.** The agents currently only broadcast a single token per timestep (a "shout"). We are upgrading the architecture to support slot-based message heads (Subject/Verb/Modifier) to force compositional syntax.
+**Rosetta Stone & Timescale Grammar (Phase 18):** **COMPLETE.** We replaced the VQ bottleneck with a Timescale Separation architecture (a free 30D continuous spatial channel, and a metabolically expensive 1-bit discrete alarm channel). We then re-aligned the Rosetta Stone translation layer to target a custom 12-dimensional topological space of survival primitives (Cardinal directions, distances, actions) rather than Wikipedia GloVe, achieving perfect semantic alignment without human labels.
+**Multi-Token Sequences (Phase 19):** **PLANNING.** The agents currently only broadcast a single discrete token per timestep (a "shout"). We are upgrading the architecture to support slot-based message heads (Subject/Verb/Modifier) to force compositional syntax.
 | Live run (Phase 16.6) | Value |
 |-----------------------|--------|
 | **Branch** | **`feature/phase16-6-occlusion`** |
@@ -45,7 +45,7 @@ The philosophical and mathematical foundations of THRONG have been consolidated 
 > The symbol grounding problem is practically solved for this isolated ecology.
 
 > [!NOTE]
-> **Phase 18 Preparations:** The Hive-Mind Interface. We will now build a bridge mapping a lightweight LLM directly to the MARL agents' frozen continuous token embeddings to allow real-time human injection of semantic tokens into the simulation.
+> **Phase 19 Preparations:** The Hive-Mind Interface. We will now build a bridge mapping a lightweight LLM directly to the MARL agents' frozen continuous token embeddings to allow real-time human injection of semantic tokens into the simulation.
 | **Science bar (P15.5)** | ✅ **CONFIRMED**: Episodic Memory ($p < 0.05$) & Cumulative Culture ($p < 0.001$) at Lag-10! |
 | **Decode gate (P16.0)** | `python3 tools/decode_signals.py --red --metrics posdis,tre` |
 | **Cold-restart toggle** | **False** (MUST be false for all future resumes; `True` only for the original 866304 codebook surgery) |
