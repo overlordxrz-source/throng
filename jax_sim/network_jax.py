@@ -919,9 +919,9 @@ def graft_missing_param_subtrees(
             injected.append(path)
             continue
         src_val = source[key]
-        if key == "kernel" and not isinstance(tgt_val, dict) and hasattr(tgt_val, "shape") and hasattr(src_val, "shape"):
+        if not isinstance(tgt_val, dict) and hasattr(tgt_val, "shape") and hasattr(src_val, "shape"):
             if tgt_val.shape != src_val.shape:
-                if len(tgt_val.shape) == 2 and len(src_val.shape) == 2:
+                if key == "kernel" and len(tgt_val.shape) == 2 and len(src_val.shape) == 2:
                     if tgt_val.shape[1] == src_val.shape[1] and tgt_val.shape[0] > src_val.shape[0]:
                         import jax.numpy as jnp
                         diff = tgt_val.shape[0] - src_val.shape[0]
@@ -929,6 +929,10 @@ def graft_missing_param_subtrees(
                         source[key] = jnp.concatenate([src_val, padding], axis=0)
                         injected.append(f"{path} (zero-padded {diff} inputs)")
                         continue
+                # If shapes mismatch and not handled above, reset to template
+                source[key] = jax.tree_util.tree_map(lambda x: x, tgt_val)
+                injected.append(f"{path} (shape mismatch {src_val.shape} -> {tgt_val.shape}, reinitialized)")
+                continue
 
         if (
             isinstance(tgt_val, dict)
