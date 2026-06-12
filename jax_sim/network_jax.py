@@ -937,7 +937,6 @@ def graft_missing_param_subtrees(
         if (
             isinstance(tgt_val, dict)
             and isinstance(src_val, dict)
-            and _is_nested_param_dict(tgt_val)
         ):
             injected.extend(graft_missing_param_subtrees(src_val, tgt_val, path))
     return injected
