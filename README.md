@@ -9,7 +9,7 @@ cognition arising purely from selection pressure.
 
 **Current state (Jun 2026):** **Phase 16.6 (Protean Scattering) COMPLETE.** We successfully discovered that agents were bypassing the discrete VQ bottleneck by using the continuous signal geometry as a cryptographic random number generator to coordinate collision-free evasion (Protean Scattering) when blinded by Barrier Occlusion. 
 
-**Phase 17 (Grounding the Bottleneck) COMPLETE.** To force true semantic language emergence, we hardened the VQ bottleneck into a strict Gumbel-Softmax layer passing through a frozen codebook, mathematically severing the continuous gradient path. We also injected a 4D Gaussian noise channel into the `own_state` observation, giving agents intrinsic entropy so they no longer need to hijack the communication channel for survival.
+**Phase 17 (Grounding the Bottleneck) LIVE.** To force true semantic language emergence, we hardened the VQ bottleneck into a strict Gumbel-Softmax layer passing through a frozen codebook, mathematically severing the continuous gradient path. We also injected a 4D Gaussian noise channel into the `own_state` observation, giving agents intrinsic entropy so they no longer need to hijack the communication channel for survival. The simulation is currently stable at 2048 minibatch size on a B200 and generating the new Rosetta Stone corpus.
 **Modal:** **`dragonbg`** — volume **`throng-runs`**.
 
 **Full ops / decode / roadmap:** [THRONG.md](THRONG.md) §0b (read first).
@@ -322,7 +322,7 @@ All knobs live in `config_phase7.yaml`. The ones you actually touch:
 | **15.0–15.5** | ✅ **COMPLETE** — MEDAL-ADR + GRUCell pivot. Episodic Memory ($p < 0.05$) and Cumulative Culture ($p < 0.001$) at Lag-10 confirmed. |
 | **16.0** | ✅ **COMPLETE** — Open-Ended Combinatorial Complexity. Big Green prey, 8-action space. Offline causal decode revealed 0.0 ATE on communication channel. |
 | **16.5** | ✅ **COMPLETE** — The Great Burn-Off confirmed at 992k steps (`codes_active=1/64`). Feral Masking and GWT Router successfully forced semantic collapse. Awaiting vocabulary recovery. |
-| **17.0** | **PREP** — The Rosetta Stone (Unsupervised Semantic Translation via Topological Alignment) |
+| **17.0** | **LIVE** — The Rosetta Stone (Unsupervised Semantic Translation). Gumbel-Softmax + 10D Biological Entropy successfully deployed and running stably on B200 to force discrete semantic grounding. |
 | **18.0** | **PREP** — Combinatorial Tool Use (Crafting Trees & logic syntax) |
 | **19.0** | **PREP** — Cultural Transmission (Writing symbols to the grid permanently) |
 | **20.0** | **PREP** — Agriculture & Terraforming (Delayed resources & "Future Time" semantics) |
