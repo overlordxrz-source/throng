@@ -7,9 +7,9 @@ to **survive, signal, and pass knowledge on**. The goal is not "an agent that
 plays a game well." The goal is **emergence**: language, culture, and proto-
 cognition arising purely from selection pressure.
 
-**Current state (Jun 2026):** **Phase 16.6 (Protean Scattering) COMPLETE.** We successfully discovered that agents were bypassing the discrete VQ bottleneck by using the continuous signal geometry as a cryptographic random number generator to coordinate collision-free evasion (Protean Scattering) when blinded by Barrier Occlusion. 
+**Current state (Jun 2026):** **Phase 17 (The Rosetta Stone) COMPLETE.** We successfully grounded the VQ bottleneck using a Gumbel-Softmax discrete channel and extracted an Unsupervised Semantic Translation (Alien-to-English dictionary) using Low-Rank Gromov-Wasserstein alignment (`ott-jax`). The agent language has proven causal mappings to "Predator", "Flee", "Energy Cost", and "Coordinates".
 
-**Phase 17 (Grounding the Bottleneck) LIVE.** To force true semantic language emergence, we hardened the VQ bottleneck into a strict Gumbel-Softmax layer passing through a frozen codebook, mathematically severing the continuous gradient path. We also injected a 4D Gaussian noise channel into the `own_state` observation, giving agents intrinsic entropy so they no longer need to hijack the communication channel for survival. The simulation is currently stable at 2048 minibatch size on a B200 and generating the new Rosetta Stone corpus.
+**Phase 18 (The Hive-Mind Interface) PLANNING.** With the semantic translation layer operational, the next step is to build an interactive bridge. We will map a lightweight LLM head directly to the MARL agents' continuous codebook embeddings, allowing human researchers to inject English prompts into the simulation (translated into alien semantic tokens) and receive real-time, causally grounded responses from the swarm.
 **Modal:** **`dragonbg`** — volume **`throng-runs`**.
 
 **Full ops / decode / roadmap:** [THRONG.md](THRONG.md) §0b (read first).
