@@ -127,6 +127,7 @@ puzzle_timeout: 100              # steps before puzzle resets
 
 # ── Energy mechanics ─────────────────────────────────────────────────────────
 energy_decay: 0.001
+alarm_metabolic_cost: 0.006
 starvation_threshold: 0.1
 reward_starvation: -0.5
 reward_resource: 0.1
