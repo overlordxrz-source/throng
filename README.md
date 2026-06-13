@@ -7,10 +7,10 @@ to **survive, signal, and pass knowledge on**. The goal is not "an agent that
 plays a game well." The goal is **emergence**: language, culture, and proto-
 cognition arising purely from selection pressure.
 
-**Current state (Jun 2026):** **Phase 17.5 (Timescale Grammar) COMPLETE.** 
-We restored the VQ bottleneck after identifying that a free continuous channel allowed agents to smuggle information and bypass symbolic representation. We implemented a dual-channel **Timescale Separation** architecture: a strictly bottlenecked 32D VQ channel for symbolic data, and a metabolically expensive 1-bit discrete channel for categorical urgency (Alarm/Safe). We also reverted the Rosetta Stone translation layer to target the GloVe 50D vocabulary, preserving the test for alien semantics.
+**Current state (Jun 2026):** **Phase 17.5 (Timescale Grammar) LIVE.** 
+Currently training on branch `feature/phase17-5-timescale-alarm`. Monitoring the dual-channel discrete architecture (Gate 1: Alarm_Rate stabilization). See `THRONG.md` for the full scientific roadmap and status.
 
-**Phase 18 (Combinatorial Tool Use) PLANNING.** The next step is to introduce crafting and combination of environmental resources.
+**Phase 19 (Multi-Token Sequences) PLANNING.** The next step is to introduce compositional syntax.
 **Modal:** **`dragonbg`** — volume **`throng-runs`**.
 
 **Full ops / decode / roadmap:** [THRONG.md](THRONG.md) §0b (read first).

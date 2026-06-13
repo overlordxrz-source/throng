@@ -348,6 +348,7 @@ Cam's persona + triad workflow live in Git so reboots recover identity:
 13. **Phase 14.3** — ✅ **GWT Router** (`3eaec6a`); `gwt_comms_1` energy-masked at `obs[:, 2]` (energy, not age); `head_signal` reads `h_comms`. Checkpoint bug fixed (`fbc2f2e`). Docs HEAD: `84742a9`.
 14. **Transient boolean bug** — **do not patch** until decode science extracted.
 15. **Merge** — **no** merge until red pincer **p < 0.05**.
+16. **Session Start Protocol (Will — mandatory):** Before writing any code or making any architectural decision, read `THRONG.md` §0 (Standing Directives), §3 (Phase History), and §4 (Current Experiment) in full. If the current phase has a `_NOTES.md` file, read that too. Do not proceed from memory or Antigravity summary alone.
 
 ### Branch policy
 
@@ -472,12 +473,12 @@ train_entry.run_simulation()  →  main_jax._run_simulation_impl()
 
 ---
 
-## 4. Current experiment — Phase **15.2 Episodic Memory LRT** (`feature/phase15-cumulative-culture`)
+## 4. Current experiment — Phase **17.5 Timescale Grammar** (`feature/phase17-5-timescale-alarm`)
 
-**Status:** **P15.2 completed — FAILED.** While Phase 15.1e Latent Heat successfully recovered the VQ codebook (maintaining ~54/64 active codes), the Phase 15.2 Lag-10 Episodic Memory LRT test definitively failed. Novice agents do not significantly retain bearing memory (p=0.1038) nor do their actions reflect expert signals from 10 steps prior (p=0.8369). The system has not achieved Cumulative Culture.
+**Status:** Phase 17.5 is live at step ~1,083,000, running on a single process. The alarm penalty is active at 0.02. Currently monitoring until PPO 2140 to verify **Gate 1**: Alarm_Rate dropping to a stable 0.05–0.30 range.
 
 > [!IMPORTANT]
-> **B200 run is live on `f7e04a4`.** After `git pull origin feature/phase15-cumulative-culture`, ensure `reset_red_vq_on_resume` is `false` to preserve the recovered codebook. Run decode scripts offline with `--lag10` once step 813k is passed.
+> **Gate 2 (next decode):** Run `causal_intervention.py` with alarm token swap. Freeze weights, inject alarm=1 into agents who were silent, measure ΔP(flee). If ATE > 0 at p < 0.05, Phase 17.5 is confirmed successful. Both Gates must clear before any Phase 19 architecture is proposed.
 
 **Monitor:**
 
@@ -1173,7 +1174,29 @@ GPU-resident PPO — **`d4cf614` revert** on `master`.
 
 ---
 
-## 12. Legacy pointers
+## 12. Known Failure Modes and Prohibited Actions
+
+**DO NOT remove the VQ bottleneck from the primary signal channel.**
+Reason: Phase 16.5–16.6 proved this resurrects Protean Scattering (cryptographic salt mechanism). r ≈ 0 against all environmental correlates.
+
+**DO NOT run pkill + relaunch without confirming process count afterward.**
+Reason: Phase 17.5 launched 3 simultaneous training processes on the same GPU, corrupting log output and risking checkpoint collision.
+
+**DO NOT replace GloVe with hand-crafted geometric primitives as Rosetta Stone target.**
+Reason: This converts the alignment test into supervised semantic shaping, invalidating the "no-supervision" scientific claim.
+
+**DO NOT wipe checkpoints without explicit Cam approval.**
+Reason: Phase 17.5 checkpoint at step 1M+ represents weeks of Modal compute. Grafting missing heads is preferred over cold restart in almost all cases.
+
+**DO NOT interpret a null ATE result as "the channel is working differently."**
+Reason: ATE = 0 on causal intervention means receivers ignore the signal. No reframing rescues a null causal test. Run the intervention before claiming success.
+
+**DO NOT commit architectural changes to THRONG.md as "COMPLETE" before Cam review.**
+Reason: Phase 18 was logged as complete before architectural approval, overwriting a planned roadmap milestone.
+
+---
+
+## 13. Legacy pointers
 
 | Path | Status |
 |------|--------|
