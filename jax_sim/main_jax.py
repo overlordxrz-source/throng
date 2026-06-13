@@ -1784,6 +1784,16 @@ def _run_simulation_impl(
                 active_clusters = int((counts > thresh).sum())
                 active_clusters_str = f"{active_clusters}/16"
             
+            # Alarm Rate
+            alarm_rate = 0.0
+            if "alarm_out" in rollout_data["blue"]:
+                _alarm_out_all = np.array(rollout_data["blue"]["alarm_out"]) # (T, N, 2)
+                if b_alive_all.sum() > 0:
+                    _alarms_triggered = (_alarm_out_all[:, :, 1] > 0.5) & b_alive_all
+                    alarm_rate = float(_alarms_triggered.sum() / b_alive_all.sum())
+            if isinstance(b_metrics, dict):
+                b_metrics["Alarm_Rate"] = alarm_rate
+            
             # Reward breakdown
             rew_alive = b_rew_all[b_alive_all]
             rew_mean = float(rew_alive.mean()) if len(rew_alive) > 0 else 0
@@ -1836,7 +1846,7 @@ def _run_simulation_impl(
                 carry_rank = 0
                 carry_entropy = float('nan')
             print(f"  Values:  mean={val_mean:.4f} | VF_loss={vf_loss:.4f} | Clip={clip_frac:.3f}")
-            print(f"  Reward:  mean={rew_mean:.4f} | Entropy: {ent_val:.4f}")
+            print(f"  Reward:  mean={rew_mean:.4f} | Entropy: {ent_val:.4f} | Alarm_Rate: {alarm_rate:.3f}")
             _aux_conf = (
                 f" | conf_loss={conf_loss_val:.6f} conf_pred={conf_pred_val:.6f}"
                 if _conf_enabled
