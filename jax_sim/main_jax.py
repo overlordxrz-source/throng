@@ -390,7 +390,7 @@ def make_sim_step(
         # b_token_ids now represents the VQ code. We need to derive the alarm from b_alarm_out.
         # b_alarm_out is shape (N, 2), one-hot encoded (0 = Safe, 1 = Alarm).
         alarm_triggered = (b_alarm_out[:, 1] > 0.5) & b_pop.alive
-        _alarm_metabolic_cost = 0.006
+        _alarm_metabolic_cost = float(config.get("alarm_metabolic_cost", 0.006))
         b_pop = b_pop.replace(energy=jnp.clip(b_pop.energy - (alarm_triggered.astype(jnp.float32) * _alarm_metabolic_cost), 0.0, 1.0))
 
         # ── Scent trails (reds deposit scent) ───────────────────
