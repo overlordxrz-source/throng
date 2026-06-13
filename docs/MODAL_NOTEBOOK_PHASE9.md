@@ -7,84 +7,60 @@ Mount volume **`throng-runs`** at **`/mnt/throng-runs`** before running cells.
 
 ---
 
-## Cell 1 — Clone repo + enable cross-attention (Python)
+## Cell 1 — Universal Launch (Clone, Pull, and Popen)
 
-Run this **first**. Do not use bare `cd /root/throng` without the clone block.
-
-```python
-import os, subprocess, sys
-from pathlib import Path
-
-REPO = Path("/root/throng")
-BRANCH = "feature/phase9-canvas"
-REMOTE = "https://github.com/overlordxrz-source/throng.git"
-
-if not REPO.exists():
-    subprocess.run(
-        ["git", "clone", "-b", BRANCH, REMOTE, str(REPO)],
-        check=True,
-    )
-else:
-    subprocess.run(["git", "-C", str(REPO), "fetch", "origin"], check=True)
-    subprocess.run(["git", "-C", str(REPO), "checkout", BRANCH], check=True)
-    subprocess.run(["git", "-C", str(REPO), "pull", "origin", BRANCH], check=True)
-
-sha = subprocess.check_output(
-    ["git", "-C", str(REPO), "rev-parse", "--short", "HEAD"],
-    text=True,
-).strip()
-print(f"throng @ {BRANCH} git={sha}")
-
-assert (REPO / "run_bg.py").is_file(), "run_bg.py missing — clone failed"
-assert (REPO / "config_phase7.yaml").is_file()
-
-import yaml
-cfg_path = REPO / "config_phase7.yaml"
-with open(cfg_path) as f:
-    cfg = yaml.safe_load(f)
-p9 = cfg.setdefault("phase9_canvas", {})
-p9["cross_attn_enabled"] = True
-p9["cross_attn_num_heads"] = 4
-with open(cfg_path, "w") as f:
-    yaml.dump(cfg, f, default_flow_style=False, sort_keys=False)
-
-Path("/mnt/throng-runs/checkpoints").mkdir(parents=True, exist_ok=True)
-os.environ["TF_GPU_ALLOCATOR"] = "cuda_malloc_async"
-os.environ["XLA_PYTHON_CLIENT_MEM_FRACTION"] = "0.80"
-os.environ["JAX_COMPILATION_CACHE_DIR"] = "/tmp/throng_jax_cache"
-Path("/tmp/throng_jax_cache").mkdir(parents=True, exist_ok=True)
-
-print("cross_attn_enabled:", p9["cross_attn_enabled"])
-print("run_bg exists:", REPO / "run_bg.py")
-```
-
----
-
-## Cell 2 — Start training (Python `Popen`, not shell `cd`)
-
-Modal Jupyter often breaks on `!cd ... && nohup`. Use **`subprocess.Popen`**:
+Run this cell to clone the repo (if missing), pull the latest branch, configure the environment, and safely launch `run_bg.py` in an isolated process group.
 
 ```python
-import subprocess, sys
-from pathlib import Path
+import subprocess, os, time
 
-REPO = Path("/root/throng")
-if not (REPO / "run_bg.py").is_file():
-    raise FileNotFoundError("Run Cell 1 first — /root/throng not cloned")
+# ── CONFIG — only edit this block when switching phases or accounts ──────────
+BRANCH   = "feature/phase17-5-timescale-alarm"
+REPO_URL = "https://github.com/overlordxrz-source/throng.git"
+REPO_DIR = "/root/throng"
+LOG_PATH = "/mnt/throng-runs/train.log"
+# ─────────────────────────────────────────────────────────────────────────────
 
-# Stop a prior bad launch if any
-subprocess.run(["pkill", "-f", "run_bg.py"], check=False)
+# 1. Kill any existing run
+subprocess.run("pkill -9 -f run_bg.py", shell=True)
+time.sleep(2)
 
-log_path = "/mnt/throng-runs/train.log"
-log = open(log_path, "a")
-proc = subprocess.Popen(
-    [sys.executable, "-u", str(REPO / "run_bg.py")],
-    cwd=str(REPO),
-    stdout=log,
-    stderr=subprocess.STDOUT,
-    start_new_session=True,
+# 2. Clone if missing, pull if exists
+if not os.path.exists(REPO_DIR):
+    subprocess.run(f"git clone {REPO_URL} {REPO_DIR}", shell=True, check=True)
+subprocess.run(
+    f"cd {REPO_DIR} && git fetch origin && "
+    f"git checkout {BRANCH} && git pull origin {BRANCH}",
+    shell=True, check=True
 )
-print(f"Igniting Phase 9.4. PID={proc.pid} log={log_path}")
+
+# 3. Verify SHA (catch stale cache issues)
+sha = subprocess.run("git -C /root/throng log --oneline -1",
+                     shell=True, capture_output=True, text=True)
+print("SHA:", sha.stdout.strip())
+
+# 4. Configure env
+env = os.environ.copy()
+env["TF_GPU_ALLOCATOR"]               = "cuda_malloc_async"
+env["XLA_PYTHON_CLIENT_MEM_FRACTION"] = "0.80"
+env["JAX_COMPILATION_CACHE_DIR"]      = "/tmp/throng_jax_cache"
+
+# 5. Launch — NEVER remove start_new_session=True
+proc = subprocess.Popen(
+    ["python", "-u", "run_bg.py"],
+    cwd=REPO_DIR,
+    env=env,
+    stdout=open(LOG_PATH, "w"),
+    stderr=subprocess.STDOUT,
+    start_new_session=True
+)
+time.sleep(5)
+
+# 6. Verify exactly one training process
+r = subprocess.run("pgrep -a -f run_bg.py", shell=True, capture_output=True, text=True)
+print("Processes:\n", r.stdout.strip())
+print(f"PID: {proc.pid}")
+assert r.stdout.count("python -u run_bg.py") == 1, "⚠️ Multiple run_bg.py processes!"
 ```
 
 ---

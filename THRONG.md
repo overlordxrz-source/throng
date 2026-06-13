@@ -4,7 +4,7 @@
 
 **Read this file first.** Full historical lab notebook (~290KB) lives in [`docs/THRONG_ARCHIVE.md`](docs/THRONG_ARCHIVE.md) if you need old run logs.
 
-**Cam reboot (60 seconds):** Read **§0b** → **§0** (directives) → **§4** (B200 ops) → **§7** (`--red` decode) → **§11** roadmap → Cam paste at **§12 bottom**.
+**Cam reboot (60 seconds):** Read **§0b** → **§0** (directives) → **§4** (ops) → **§7** (`--red` decode) → **§11** roadmap → Cam paste at **§12 bottom**.
 
 ---
 
@@ -676,8 +676,10 @@ python tools/decode_signals.py signal_corpus.jsonl --k 16 --min-step 63488
 
 **Resume restores:** weights only. Population, grid, curriculum counters, optimizer → **fresh**.
 
-### Hardware: Blackwell B200 (current)
+### Hardware: NVIDIA A100 / B200
 
+> [!NOTE]
+> Environment is typically an **A100-SXM4-80GB** or **B200** via Modal. Ensure your `ppo_minibatch_size` in config matches the available VRAM to prevent backward pass OOMs. For an 80GB A100 running 500 agents, use `ppo_minibatch_size=512` (not 1024).
 | Item | Detail |
 |------|--------|
 | VRAM | **192GB HBM3** |
@@ -762,7 +764,7 @@ tail -f /mnt/throng-runs/train.log
 Modal restarts wipe `/root/throng`. Always clone and pull `feature/phase15-cumulative-culture` first, then restore the `1689` backup checkpoint.
 
 **Cell 2 — Launch:**
-Kills old `run_bg.py`, sets B200 env vars (`TF_GPU_ALLOCATOR`, `XLA_PYTHON_CLIENT_MEM_FRACTION`), and `Popen` streams `run_bg.py`.
+Kills old `run_bg.py`, sets env vars (`TF_GPU_ALLOCATOR`, `XLA_PYTHON_CLIENT_MEM_FRACTION`), and `Popen` streams `run_bg.py`.
 
 **Cell 3 — Live tail:** 
 `!tail -f -n 100 /mnt/throng-runs/train.log`

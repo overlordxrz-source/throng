@@ -12,6 +12,8 @@ Before ANY code or architectural decision:
 - Never mark architectural changes COMPLETE in THRONG.md before Cam review
 - Never pkill + relaunch without verifying process count with pgrep afterward
 - Never interpret ATE = 0 as anything except: receivers ignore the signal
+- ANY launch cell generated must include `start_new_session=True` as a mandatory non-negotiable parameter in `subprocess.Popen`.
+- Before telling the user it's safe to stop a monitoring cell, first confirm the training process was launched with `start_new_session=True`.
 
 ## WORKFLOW
 - Cam sets architecture. Will implements and verifies.
