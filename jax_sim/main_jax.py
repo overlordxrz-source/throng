@@ -561,6 +561,11 @@ def make_sim_step(
         b_rew = b_rew + _reward_move * b_moved.astype(jnp.float32)
         b_rew = b_rew + _puzzle_reward * p_rew
         b_rew = b_rew + contested_gain * 0.5
+        
+        # ── Phase 17.5 Direct Alarm Penalty ─────────────────────
+        _alarm_penalty_coef = float(config.get("alarm_penalty_coef", 0.02))
+        alarm_fired = b_alarm_out.argmax(-1).astype(jnp.float32)  # 1 if alarmed, 0 if silent
+        b_rew = b_rew - _alarm_penalty_coef * alarm_fired
 
         r_rew = _rew_small_blue * r_caught_small
         r_rew = r_rew + (_rew_big_green_coop + _rew_coord) * r_caught_big_coop
