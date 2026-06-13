@@ -1,0 +1,21 @@
+# THRONG Agent Standing Rules — Read before any action
+
+## MANDATORY SESSION START
+Before writing any code or making any architectural decision:
+1. Read THRONG.md §0 (Standing Directives), §3 (Phase History), §4 (Current Experiment)
+2. Read docs/THRONG_ARCHIVE.md §Known Failure Modes
+3. Do NOT proceed from Antigravity summary alone — it loses scientific context
+
+## HARD PROHIBITIONS
+- Never remove the VQ bottleneck from the primary signal channel
+- Never wipe checkpoints without explicit Cam approval in the current session
+- Never replace GloVe with hand-crafted primitives in the Rosetta Stone
+- Never commit architectural changes to THRONG.md as COMPLETE before Cam review
+- Never pkill + relaunch without verifying process count afterward with pgrep
+- Never interpret ATE = 0 as anything other than: receivers ignore the signal
+
+## WORKFLOW
+- Cam sets architecture and science. Will implements and verifies.
+- Implementation prompts come AFTER all diagnostic data is gathered.
+- Smoke test must explicitly pass before Modal compute is spent.
+- All architectural decisions are relayed through the User to Cam first.
