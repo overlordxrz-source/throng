@@ -11,12 +11,16 @@ class ObsLayout:
     own_state_end: int
     nb_sigs_start: int
     nb_sigs_end: int
+    nb_alarms_start: int
+    nb_alarms_end: int
     loc_sym_start: int
     loc_sym_end: int
     loc_env_start: int
     loc_env_end: int
     own_sig_start: int
     own_sig_end: int
+    own_alarm_start: int
+    own_alarm_end: int
     mem_start: int
     mem_end: int
     loc_cult_fast_start: int
@@ -57,6 +61,10 @@ def make_obs_layout(
     idx += neighbor_k * signal_dim
     nb_sigs_end = idx
 
+    nb_alarms_start = idx
+    idx += neighbor_k * 2
+    nb_alarms_end = idx
+
     loc_sym_start = idx
     idx += local_cells * symbol_dim
     loc_sym_end = idx
@@ -68,6 +76,10 @@ def make_obs_layout(
     own_sig_start = idx
     idx += signal_dim
     own_sig_end = idx
+
+    own_alarm_start = idx
+    idx += 2
+    own_alarm_end = idx
 
     mem_start = idx
     idx += memory_slots * (signal_dim + 2)
@@ -86,12 +98,16 @@ def make_obs_layout(
         own_state_end=own_state_end,
         nb_sigs_start=nb_sigs_start,
         nb_sigs_end=nb_sigs_end,
+        nb_alarms_start=nb_alarms_start,
+        nb_alarms_end=nb_alarms_end,
         loc_sym_start=loc_sym_start,
         loc_sym_end=loc_sym_end,
         loc_env_start=loc_env_start,
         loc_env_end=loc_env_end,
         own_sig_start=own_sig_start,
         own_sig_end=own_sig_end,
+        own_alarm_start=own_alarm_start,
+        own_alarm_end=own_alarm_end,
         mem_start=mem_start,
         mem_end=mem_end,
         loc_cult_fast_start=loc_cult_fast_start,

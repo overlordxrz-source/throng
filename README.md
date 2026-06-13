@@ -7,10 +7,10 @@ to **survive, signal, and pass knowledge on**. The goal is not "an agent that
 plays a game well." The goal is **emergence**: language, culture, and proto-
 cognition arising purely from selection pressure.
 
-**Current state (Jun 2026):** **Phase 18 (Timescale Grammar & Geometric Alignment) COMPLETE.** 
-We abandoned the VQ bottleneck because agents were smuggling continuous vectors through rapid token oscillation (chattering). We implemented a dual-channel **Timescale Separation** architecture: a free 30D continuous channel for high-bandwidth spatial pointing, and a metabolically expensive 1-bit discrete channel for categorical urgency (Alarm/Safe). We also updated the Rosetta Stone translation layer to target a custom 12-dimensional topological space of survival primitives (Cardinal directions, distances, actions) rather than GloVe, achieving perfect semantic alignment without human labels.
+**Current state (Jun 2026):** **Phase 17.5 (Timescale Grammar) COMPLETE.** 
+We restored the VQ bottleneck after identifying that a free continuous channel allowed agents to smuggle information and bypass symbolic representation. We implemented a dual-channel **Timescale Separation** architecture: a strictly bottlenecked 32D VQ channel for symbolic data, and a metabolically expensive 1-bit discrete channel for categorical urgency (Alarm/Safe). We also reverted the Rosetta Stone translation layer to target the GloVe 50D vocabulary, preserving the test for alien semantics.
 
-**Phase 19 (Multi-Token Sequences) PLANNING.** The next step is to allow the agent to emit multiple discrete tokens per step via slot-based message heads (Noun + Verb), expanding the grammar.
+**Phase 18 (Combinatorial Tool Use) PLANNING.** The next step is to introduce crafting and combination of environmental resources.
 **Modal:** **`dragonbg`** — volume **`throng-runs`**.
 
 **Full ops / decode / roadmap:** [THRONG.md](THRONG.md) §0b (read first).
@@ -80,7 +80,7 @@ THRONG is not an attempt to build a better conversational agent. It is a fundame
 * **LLMs** are statistical compressors over human symbolic output. They learn correlations between tokens that were produced by humans describing grounded experience. The grounding is secondhand, inherited, and frozen at training time. This lack of causal constraint is the root of hallucination.
 * **THRONG Agents** are direct compressors over causal physical reality. When a THRONG VQ token encodes "predator approaching," that encoding was forged by thermodynamic necessity: agents that failed to assign semantic weight to that token died. 
 
-In THRONG, intelligence emerges from continuous adaptation, spatial multi-agent coordination, and lethal selection pressure, mapping directly to physical reality rather than human text. The end goal is the **Hive-Mind Interface** (Phase 18): a conversable, decentralized intelligence whose language maps directly to causal reality, capable of continuous online learning without catastrophic forgetting.
+In THRONG, intelligence emerges from continuous adaptation, spatial multi-agent coordination, and lethal selection pressure, mapping directly to physical reality rather than human text. The end goal is the **Hive-Mind Interface** (Phase 19) and **Combinatorial Tool Use** (Phase 18): a conversable, decentralized intelligence whose language maps directly to causal reality, capable of continuous online learning without catastrophic forgetting.
 
 ---
 

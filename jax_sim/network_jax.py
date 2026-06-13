@@ -160,9 +160,9 @@ class AgentNetworkJax(nn.Module):
         # Output heads
         self.final_norm = nn.LayerNorm()
         self.head_action = nn.Dense(self.n_actions)           # N actions (N, S, E, W, Stay, Strike, Push, Guard, [Build])
-        self.head_signal = nn.Dense(self.signal_dim - 2)  # 30D continuous spatial geometry
+        self.head_signal = nn.Dense(self.signal_dim)  # continuous z_e pre-VQ
         self.codebook = nn.Embed(self.vocab_size, self.signal_dim)
-        self.head_alarm = nn.Dense(2)            # Phase 18: 1-bit discrete alarm channel
+        self.head_alarm = nn.Dense(2)            # Phase 17.5: 1-bit discrete alarm channel
         self.head_symbol = nn.Dense(sym_d)       # symbol write
         self.head_value = nn.Dense(1, kernel_init=nn.initializers.normal(0.01), bias_init=nn.initializers.zeros)  # zero init for stable value learning
         self.head_tom = nn.Dense(self.n_actions)             # Theory-of-Mind per neighbour
@@ -248,6 +248,10 @@ class AgentNetworkJax(nn.Module):
         nb_sigs = obs[:, layout.nb_sigs_start : layout.nb_sigs_end].reshape(
             N, K, self.signal_dim
         )
+        nb_alarms = obs[:, layout.nb_alarms_start : layout.nb_alarms_end].reshape(
+            N, K, 2
+        )
+        nb_combined = jnp.concatenate([nb_sigs, nb_alarms], axis=-1)
         loc_sym = obs[:, layout.loc_sym_start : layout.loc_sym_end].reshape(
             N, W, sym_d
         )
@@ -255,6 +259,8 @@ class AgentNetworkJax(nn.Module):
             N, W, layout.env_channels
         )
         own_sig = obs[:, layout.own_sig_start : layout.own_sig_end]
+        own_alarm = obs[:, layout.own_alarm_start : layout.own_alarm_end]
+        own_combined = jnp.concatenate([own_sig, own_alarm], axis=-1)
 
         idx = layout.mem_start
 
@@ -274,7 +280,7 @@ class AgentNetworkJax(nn.Module):
         # Embed tokens
         self_encoded = self.emb_own(own_state)    # (N, d)
         t1 = self_encoded[:, None, :]             # (N, 1, d)
-        nb_kv = self.emb_nb(nb_sigs)              # (N, K, d)
+        nb_kv = self.emb_nb(nb_combined)          # (N, K, d)
         if self.cross_attn_enabled:
             processed = self.nb_cross_attn(self_encoded, carries, nb_kv)
             t2 = processed[:, None, :]            # (N, 1, d) — attended Other
@@ -282,7 +288,7 @@ class AgentNetworkJax(nn.Module):
             t2 = nb_kv                            # (N, K, d) — per-neighbor tokens
         t3 = self.emb_sym(loc_sym)                # (N, W, d)
         t4 = self.emb_env(loc_env)                # (N, W, d)
-        t5 = self.emb_sig(own_sig)[:, None, :]    # (N, 1, d)
+        t5 = self.emb_sig(own_combined)[:, None, :] # (N, 1, d)
         tokens = [t1, t2, t3, t4, t5]
         if mem is not None:
             tokens.append(self.emb_mem(mem))      # (N, mem_slots, d)
@@ -320,22 +326,22 @@ class AgentNetworkJax(nn.Module):
         # Zero out age(0), mat(1), energy(2), layers(3) to completely sever the metabolic leak
         exteroceptive_obs = obs.at[:, :4].set(0.0)
         h_comms = nn.relu(self.gwt_comms_1(exteroceptive_obs))
-        z_e = self.head_signal(h_comms)                 # (N, signal_dim - 2)
+        z_e = self.head_signal(h_comms)                 # (N, signal_dim)
+        codebook_w = self.codebook.embedding           # (vocab_size, signal_dim)
+        signal_out, token_ids, loss_vq = vector_quantize_signals(
+            z_e,
+            codebook_w,
+            beta=self.vq_beta,
+            dead_code_reset=self.vq_dead_code_reset,
+        )
         
-        # Phase 18: Timescale Grammar (Continuous spatial + 1-bit discrete alarm)
-        loss_vq = jnp.zeros(N) # VQ bottleneck removed
-        
-        # 1-bit discrete alarm channel (Gumbel-Softmax STE)
+        # Phase 17.5: Timescale Grammar 1-bit discrete alarm channel (Gumbel-Softmax STE)
         alarm_logits = self.head_alarm(h_comms) # (N, 2)
         alarm_soft = jax.nn.softmax(alarm_logits)
         alarm_idx = jnp.argmax(alarm_soft, axis=-1)
         alarm_hard = jax.nn.one_hot(alarm_idx, 2, dtype=alarm_soft.dtype)
         alarm_out = alarm_soft + jax.lax.stop_gradient(alarm_hard - alarm_soft)
         
-        signal_out = jnp.concatenate([z_e, alarm_out], axis=-1) # (N, signal_dim)
-        
-        # Return alarm_idx in place of token_ids for backward compatibility
-        token_ids = alarm_idx
         symbol_write = self.head_symbol(pooled)              # (N, sym_d)
         feral_mask = jax.lax.stop_gradient(obs[:, 2] < 0.20)
         symbol_write = jnp.where(feral_mask[:, None], 0.0, symbol_write)
@@ -355,7 +361,7 @@ class AgentNetworkJax(nn.Module):
 
         return new_carries, (
             action_logits, signal_out, symbol_write, values,
-            tom_logits, token_ids, alarm_out, z_e, culture_fast, culture_slow,
+            tom_logits, token_ids, alarm_out, loss_vq, z_e, culture_fast, culture_slow,
         )
 
     def monologue_forward(
@@ -374,8 +380,9 @@ class AgentNetworkJax(nn.Module):
 
         _, outs = self(carries, obs_masked, n_layers)
         token_ids = outs[5]
-        loss_vq = outs[6]
-        z_e = outs[7]
+        alarm_out = outs[6]
+        loss_vq = outs[7]
+        z_e = outs[8]
         z_q = z_e + jax.lax.stop_gradient(outs[1] - z_e)
         spatial_ego_hat = self.head_vqel_recon_2(nn.relu(self.head_vqel_recon_1(z_q)))
         spatial_ego_target = self.extract_spatial_ego(obs)
@@ -639,6 +646,10 @@ class PredatorNetworkJax(nn.Module):
         nb_sigs = obs[:, layout.nb_sigs_start : layout.nb_sigs_end].reshape(
             N, K, self.signal_dim
         )
+        nb_alarms = obs[:, layout.nb_alarms_start : layout.nb_alarms_end].reshape(
+            N, K, 2
+        )
+        nb_combined = jnp.concatenate([nb_sigs, nb_alarms], axis=-1)
         loc_sym = obs[:, layout.loc_sym_start : layout.loc_sym_end].reshape(
             N, W, sym_d
         )
@@ -647,6 +658,8 @@ class PredatorNetworkJax(nn.Module):
             N, W, env_ch
         )
         own_sig = obs[:, layout.own_sig_start : layout.own_sig_end]
+        own_alarm = obs[:, layout.own_alarm_start : layout.own_alarm_end]
+        own_combined = jnp.concatenate([own_sig, own_alarm], axis=-1)
 
         idx = layout.mem_start
         if self.memory_slots > 0:
@@ -663,7 +676,7 @@ class PredatorNetworkJax(nn.Module):
 
         self_encoded = self.emb_own(own_state)
         t1 = self_encoded[:, None, :]
-        nb_kv = self.emb_nb(nb_sigs)
+        nb_kv = self.emb_nb(nb_combined)
         if self.cross_attn_enabled:
             processed = self.red_nb_cross_attn(self_encoded, carries, nb_kv)
             t2 = processed[:, None, :]
@@ -671,7 +684,7 @@ class PredatorNetworkJax(nn.Module):
             t2 = nb_kv
         t3 = self.emb_sym(loc_sym)
         t4 = self.emb_env(loc_env)
-        t5 = self.emb_sig(own_sig)[:, None, :]
+        t5 = self.emb_sig(own_combined)[:, None, :]
         tokens = [t1, t2, t3, t4, t5]
         if mem is not None:
             tokens.append(self.emb_mem(mem))

@@ -42,6 +42,7 @@ class PopState:
         # Neural state
         self.carries = jnp.zeros((max_pop, hidden_dim), dtype=jnp.float32)
         self.signals = jnp.zeros((max_pop, signal_dim), dtype=jnp.float32)
+        self.alarms = jnp.zeros((max_pop, 2), dtype=jnp.float32)
         self.nb_gain = jnp.ones(max_pop, dtype=jnp.float32)
 
         # Episodic memory (optional)
@@ -67,7 +68,7 @@ class PopState:
             self.positions, self.ages, self.alive, self.energy, self.team,
             self.n_layers, self.carries, self.signals, self.nb_gain,
             self.offspring_count, self.steps_since_catch, self.steps_since_dropout,
-            self.lineage_ids, self.next_lineage_id, self.is_big_green,
+            self.lineage_ids, self.next_lineage_id, self.is_big_green, self.alarms,
         ]
         if self.memory_buffer is not None:
             children.append(self.memory_buffer)
@@ -85,9 +86,9 @@ class PopState:
         (pop.positions, pop.ages, pop.alive, pop.energy, pop.team,
          pop.n_layers, pop.carries, pop.signals, pop.nb_gain,
          pop.offspring_count, pop.steps_since_catch, pop.steps_since_dropout,
-         pop.lineage_ids, pop.next_lineage_id, pop.is_big_green) = children[:15]
+         pop.lineage_ids, pop.next_lineage_id, pop.is_big_green, pop.alarms) = children[:16]
         if memory_slots > 0:
-            pop.memory_buffer = children[15]
+            pop.memory_buffer = children[16]
         else:
             pop.memory_buffer = None
         return pop
@@ -107,6 +108,7 @@ class PopState:
         pop.n_layers = kwargs.get("n_layers", self.n_layers)
         pop.carries = kwargs.get("carries", self.carries)
         pop.signals = kwargs.get("signals", self.signals)
+        pop.alarms = kwargs.get("alarms", self.alarms)
         pop.nb_gain = kwargs.get("nb_gain", self.nb_gain)
         pop.offspring_count = kwargs.get("offspring_count", self.offspring_count)
         pop.steps_since_catch = kwargs.get("steps_since_catch", self.steps_since_catch)
@@ -169,11 +171,13 @@ def kill_agents(pop: PopState, mask: jnp.ndarray) -> PopState:
     # Zero out dead agents' neural state
     new_carries = jnp.where(mask[:, None], 0.0, pop.carries)
     new_signals = jnp.where(mask[:, None], 0.0, pop.signals)
+    new_alarms = jnp.where(mask[:, None], 0.0, pop.alarms)
     new_energy = jnp.where(mask, 0.0, pop.energy)
     return pop.replace(
         alive=new_alive,
         carries=new_carries,
         signals=new_signals,
+        alarms=new_alarms,
         energy=new_energy,
     )
 
@@ -264,6 +268,10 @@ def apply_auto_reproduce(
     new_layers = jnp.where(activate_mask, parent_layers, pop.n_layers)
     new_carries = jnp.where(activate_mask[:, None], parent_carries, pop.carries)
     new_signals = jnp.where(activate_mask[:, None], parent_signals, pop.signals)
+    
+    parent_alarms = pop.alarms[assigned_parents]
+    new_alarms = jnp.where(activate_mask[:, None], parent_alarms, pop.alarms)
+    
     new_nb_gain = jnp.where(activate_mask, 1.0, pop.nb_gain)
     
     # We maintain the type of the parent
@@ -279,6 +287,7 @@ def apply_auto_reproduce(
         n_layers=new_layers,
         carries=new_carries,
         signals=new_signals,
+        alarms=new_alarms,
         nb_gain=new_nb_gain,
         is_big_green=new_is_big_green
     )

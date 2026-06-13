@@ -111,6 +111,10 @@ def build_observations_jax(
     nb_sigs = get_neighbour_signals(
         pop.positions, pop.signals, pop.alive, K, gs,
     )
+    
+    nb_alarms = get_neighbour_signals(
+        pop.positions, pop.alarms, pop.alive, K, gs,
+    )
 
     if blue_bg_map is None:
         blue_bg_map = jnp.zeros_like(blue_map)
@@ -168,9 +172,11 @@ def build_observations_jax(
     parts = [
         own_state,
         nb_sigs.reshape(N, -1),
+        nb_alarms.reshape(N, -1),
         loc_sym.reshape(N, -1),
         loc_env.reshape(N, -1),
         pop.signals,
+        pop.alarms,
     ]
 
     if pop.memory_buffer is not None:

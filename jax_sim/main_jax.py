@@ -68,7 +68,7 @@ from jax_sim.rl_jax import (
     vqel_monologue_update,
 )
 from jax_sim.obs_layout import make_obs_layout
-from agents.network_torch import compute_obs_dim_torch, compute_fwd_env_dim, loc_env_flat_bounds
+
 from jax_sim.observations_jax import (
     RED_NEIGHBOR_SIGNAL_API_VERSION,
     RED_SENSE_API_VERSION,
@@ -289,7 +289,7 @@ def make_sim_step(
         b_new_c, b_outs = model_apply(b_params_sg, b_carries, b_obs, _n_layers)
         r_new_c, r_outs = _r_apply(r_params_sg, r_carries, r_obs, _n_layers, rngs={'dropout': noise_key})
 
-        b_action_logits, b_signal_out, b_sym_w, b_vals, b_tom, b_token_ids, b_loss_vq, b_z_e, b_cult_f, b_cult_s = b_outs
+        b_action_logits, b_signal_out, b_sym_w, b_vals, b_tom, b_token_ids, b_alarm_out, b_loss_vq, b_z_e, b_cult_f, b_cult_s = b_outs
         r_action_logits, r_signal_out, r_sym_w, r_vals, r_tom, r_token_ids, r_loss_vq, r_z_e, r_cult_f, r_cult_s = r_outs
 
         # Reds cannot build barriers. Mask out action 8 to prevent PPO from exploring it.
@@ -305,10 +305,12 @@ def make_sim_step(
             b_sig_broadcast = b_signal_out
             
         b_pop = b_pop.replace(
-            signals=jnp.where(b_pop.alive[:, None], b_sig_broadcast, 0.0)
+            signals=jnp.where(b_pop.alive[:, None], b_sig_broadcast, 0.0),
+            alarms=jnp.where(b_pop.alive[:, None], b_alarm_out, 0.0)
         )
         r_pop = r_pop.replace(
-            signals=jnp.where(r_pop.alive[:, None], r_signal_out, 0.0)
+            signals=jnp.where(r_pop.alive[:, None], r_signal_out, 0.0),
+            alarms=jnp.where(r_pop.alive[:, None], jnp.zeros((r_pop.max_pop, 2)), 0.0)
         )
 
         # ── Sample actions (Phase 11.3 epistemic gate on blues) ──
@@ -384,10 +386,11 @@ def make_sim_step(
         # Apply Barrier Build Cost
         b_pop = b_pop.replace(energy=jnp.clip(b_pop.energy - (b_building.astype(jnp.float32) * _barrier_build_cost), 0.0, 1.0))
 
-        # ── Phase 18: Timescale Grammar Metabolic Cost ─────────────────
-        # b_token_ids represents the discrete 1-bit alarm channel index (0 = Safe, 1 = Alarm)
-        alarm_triggered = (b_token_ids == 1) & b_pop.alive
-        _alarm_metabolic_cost = 0.05
+        # ── Phase 17.5: Timescale Grammar Metabolic Cost ─────────────────
+        # b_token_ids now represents the VQ code. We need to derive the alarm from b_alarm_out.
+        # b_alarm_out is shape (N, 2), one-hot encoded (0 = Safe, 1 = Alarm).
+        alarm_triggered = (b_alarm_out[:, 1] > 0.5) & b_pop.alive
+        _alarm_metabolic_cost = 0.006
         b_pop = b_pop.replace(energy=jnp.clip(b_pop.energy - (alarm_triggered.astype(jnp.float32) * _alarm_metabolic_cost), 0.0, 1.0))
 
         # ── Scent trails (reds deposit scent) ───────────────────
@@ -604,6 +607,7 @@ def make_sim_step(
             "loss_vq": b_loss_vq,
             "z_e": b_z_e,
             "token_ids": b_token_ids,
+            "alarm_out": b_alarm_out,
             "positions": b_pop.positions,
             "signals": b_pop.signals,
             "energy": b_pop.energy,
@@ -799,8 +803,19 @@ def _run_simulation_impl(
     )
 
     # ── Init model ──────────────────────────────────────────
-    _loc_env_start, _loc_env_end = loc_env_flat_bounds(config)
-    _fwd_env_dim = compute_fwd_env_dim(config)
+    _layout = make_obs_layout(
+        signal_dim=config["signal_dim"],
+        symbol_dim=config.get("symbol_dim", 8),
+        memory_slots=config.get("memory_slots", 0),
+        neighbor_k=config["neighbor_k"],
+        local_cells=(2 * config["local_obs_radius"] + 1)**2,
+        env_channels=int(config.get("env_channels", 10)),
+        own_state_dim=int(config.get("own_state_dim", 10)),
+    )
+    _loc_env_start = _layout.loc_env_start
+    _loc_env_end = _layout.loc_env_end
+    _fwd_env_dim = _loc_env_end - _loc_env_start
+    
     _p9 = config.get("phase9_canvas") or {}
     _cross_attn = bool(_p9.get("cross_attn_enabled", False))
     _cross_heads = int(_p9.get("cross_attn_num_heads", config["n_heads"]))
@@ -809,7 +824,7 @@ def _run_simulation_impl(
     _red_cross = bool(_p12.get("red_cross_attn_enabled", True)) if _red_comms else False
     _red_vocab = int(_p12.get("red_vocab_size", config.get("vocab_size", 64)))
     
-    obs_dim = compute_obs_dim_torch(config)
+    obs_dim = _layout.total_dim
     print(f"[JAX] obs_dim = {obs_dim}")
     
     model = AgentNetworkJax(
@@ -826,9 +841,11 @@ def _run_simulation_impl(
         fwd_env_dim=_fwd_env_dim,
         cross_attn_enabled=_cross_attn,
         cross_attn_num_heads=_cross_heads,
-        env_channels=int(config.get("env_channels", 9)),
+        env_channels=int(config.get("env_channels", 10)),
         own_state_dim=int(config.get("own_state_dim", 10)),
         n_actions=int(config.get("n_actions", 8)),
+        local_cells=(2 * config["local_obs_radius"] + 1)**2,
+        neighbor_k=config["neighbor_k"],
     )
     model_apply = make_model_apply(model)
     vqel_monologue_apply = make_vqel_monologue_apply(model)
@@ -863,7 +880,7 @@ def _run_simulation_impl(
             memory_slots=config.get("memory_slots", 0),
             cross_attn_enabled=_red_cross,
             cross_attn_num_heads=_cross_heads,
-            env_channels=int(config.get("env_channels", 9)),
+            env_channels=int(config.get("env_channels", 10)),
             own_state_dim=int(config.get("own_state_dim", 10)),
             n_actions=int(config.get("n_actions", 8)),
         )
@@ -1580,7 +1597,7 @@ def _run_simulation_impl(
                 memory_slots=0,
                 neighbor_k=int(config.get("red_neighbor_k", config["neighbor_k"])),
                 local_cells=int(config.get("local_cells", 25)),
-                env_channels=int(config.get("env_channels", 8)),
+                env_channels=int(config.get("env_channels", 10)),
             )
             _r_nb_sigs_np = _r_obs_np[:, :, _layout.nb_sigs_start:_layout.nb_sigs_end]
             
@@ -1994,7 +2011,7 @@ def _run_simulation_impl(
         r_steps_since_dropout_all = np.array(rollout_data["red"]["steps_since_dropout"])
 
         # loc_env is the 4th block in b_obs (env_channels channels)
-        env_channels = int(config.get("env_channels", 8))
+        env_channels = int(config.get("env_channels", 10))
         idx_offset = 6 + (config["neighbor_k"] * config["signal_dim"]) + (25 * config["symbol_dim"])
         idx_resource = idx_offset + (12 * env_channels) + 3  # 12th cell (center of 5x5), channel 3 = resource
         

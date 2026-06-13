@@ -15,7 +15,7 @@ from ott.solvers.quadratic import gromov_wasserstein_lr
 
 class RosettaStone(nn.Module):
     vocab_size: int = 64
-    llm_dim: int = 12
+    llm_dim: int = 50
     
     @nn.compact
     def __call__(self, x: jnp.ndarray, mode: str = "fwd") -> jnp.ndarray:
