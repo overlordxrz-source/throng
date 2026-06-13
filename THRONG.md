@@ -1267,7 +1267,13 @@ If our true goal is to force the emergence of AGI-level intelligence purely thro
 **Execution:**
 1. **Intrinsic Entropy Injection:** Added an independent 4D Gaussian noise channel to each agent's `own_state` observation, giving them internal randomness for Protean scattering.
 2. **Hardened Gumbel-Softmax Bottleneck:** Replaced the leaky VQ layer with a strict Gumbel-Softmax layer passing through a frozen codebook. This completely severs the continuous gradient path, forcing the network to output a pure discrete token and ending "continuous geometry smuggling."
-
+#### Phase 17.5 — Timescale Grammar (The Dual-Band Channel)
+**Status:** Code complete. Verification run in progress.
+**Goal:** Prevent Protean scattering from inflating the continuous VQ bottleneck representation, while giving agents a fast-path for evasion.
+**Execution:**
+1. **Discrete Alarm Head:** Added a 1-bit metabolically expensive alarm channel output (`alarm_out`) parallel to the VQ semantic output.
+2. **Dimension Preservation:** Restricted `signal_out` to exactly 32D before the VQ layer, guaranteeing the bottleneck cannot be bypassed by high-variance continuous inputs.
+3. **Topology Zero-Padding:** `graft_missing_param_subtrees` cleanly handled upgrading the Phase 17 (32D `emb_nb` kernel) to Phase 17.5 (34D `emb_nb` kernel) by zero-padding the missing inputs, allowing agents to retain 1M steps of spatial survival skills while learning the new alarm grammar from scratch.
 #### Phase 18 — Combinatorial Tool Use (Crafting Trees)
 **Goal:** Force the network to invent compositional logic (AND, OR, IF/THEN) and syntax.
 - **Mechanics:** Introduce combinable primitives (e.g., Wood + Stone = Axe).
@@ -1285,4 +1291,4 @@ If our true goal is to force the emergence of AGI-level intelligence purely thro
 
 ---
 
-*Last updated: 2026-06-12 — Phase 17 Gumbel-Softmax bottleneck hardening + intrinsic entropy injection COMPLETE. Verification run in progress.*
+*Last updated: 2026-06-13 — Phase 17.5 Timescale Grammar (Discrete Alarm Head) COMPLETE. Verification run in progress.*

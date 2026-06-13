@@ -169,10 +169,9 @@ Each agent is a **Flax transformer** (`jax_sim/network_jax.py`):
 - 2–6 attention layers (`n_layers`), expanded dynamically by **brain-vote**.
 - 128-dim tokens through multi-head self-attention.
 - 256-dim recurrent **carry** persisting across the agent's lifetime.
-- Eight output heads (nine on P16.5 branch: action includes Build) (action, signal, symbol, culture-fast, culture-slow,
-  value, theory-of-mind, gain).
-- Observation dimension currently **2,335** at `n_layers=2, neighbor_k=6,
-  memory_buffer_size=5, env_ch=9 (10 on P16.5 branch)`.
+- Ten output heads (action, signal_vq, alarm, symbol, culture-fast, culture-slow,
+  value, theory-of-mind, gain, build).
+- Observation dimension dynamically computed (e.g., **554** for standard Phase 17.5 configurations, or **1234** with expanded memory buffers) at `n_layers=2, neighbor_k=6, env_ch=10`.
 
 ### Learning
 
@@ -195,8 +194,8 @@ Each agent is a **Flax transformer** (`jax_sim/network_jax.py`):
 
 Four channels, each with a different temporal and spatial scale:
 
-1. **Signals** (per-step, 32-dim continuous) — 6 nearest neighbours hear what
-   each agent broadcasts. **Live as of May 28 2026.**
+1. **Signals & Alarms** (per-step, 32-dim VQ discrete token + 1-bit Alarm) — 6 nearest neighbours hear what
+   each agent broadcasts. The discrete alarm incurs a metabolic penalty.
 2. **Cultural Fast grid** (decay 0.90, ~10 step memory) — danger traces.
 3. **Cultural Slow grid** (decay 0.995, ~200 step memory) — stable landmarks.
 4. **Parameter sharing (MAPPO gradient)** — what one blue learns, every blue
