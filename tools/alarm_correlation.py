@@ -81,7 +81,7 @@ def run_npmi_scan(checkpoint_dir: str, steps: int = 500, scout_range: int = 8):
         fwd_env_dim=fwd_env_dim,
         cross_attn_enabled=config.get("phase9_canvas", {}).get("cross_attn_enabled", False),
         neighbor_k=int(config["neighbor_k"]),
-        n_actions=int(config.get("n_actions", 9)),
+        n_actions=int(config.get("n_actions", 8)),
         env_channels=int(config.get("env_channels", 10)),
     )
     model_apply = make_model_apply(model)
@@ -100,7 +100,7 @@ def run_npmi_scan(checkpoint_dir: str, steps: int = 500, scout_range: int = 8):
         vq_dead_code_reset=bool(config.get("vq_dead_code_reset", True)),
         cross_attn_enabled=bool(_p14t.get("cross_attn_enabled", False)),
         cross_attn_num_heads=int(config.get("phase9_canvas", {}).get("cross_attn_num_heads", 4)),
-        n_actions=int(config.get("n_actions", 9)),
+        n_actions=int(config.get("n_actions", 8)),
         env_channels=int(config.get("env_channels", 10)),
     )
     r_model_apply = make_model_apply(model_red)
