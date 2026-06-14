@@ -145,6 +145,7 @@ ppo_gamma: 0.999                 # P10.5: long-horizon survival (500+ step credi
 ppo_gae_lam: 0.95
 ppo_value_coef: 0.1
 ppo_entropy_coef: 0.02
+alarm_ent_coef: 0.0
 action_entropy_coef: 0.05      # Explicit action diversity bonus
 ppo_max_grad_norm: 2.0
 

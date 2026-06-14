@@ -1506,6 +1506,7 @@ def _run_simulation_impl(
                 lam=float(config.get("ppo_gae_lam", 0.95)),
                 team="blue",
                 ignition_discount=float(config.get("phase16_5_enrichment", {}).get("ignition_discount", 0.1)),
+                alarm_ent_coef=float(config.get("alarm_ent_coef", 0.0)),
             )
             if ui == start_update:
                 print(
@@ -1576,6 +1577,7 @@ def _run_simulation_impl(
             gamma=float(config.get("ppo_gamma", 0.99)),
             lam=float(config.get("ppo_gae_lam", 0.95)),
             team="red",
+            alarm_ent_coef=float(config.get("alarm_ent_coef", 0.0)),
         )
         if ui == start_update:
             print(

@@ -81,6 +81,7 @@ def ppo_loss(
     rng_key: jax.Array = None,  # Added for noise
     ignition: jnp.ndarray = None, # (M,) bool
     ignition_discount: float = 0.1,
+    alarm_ent_coef: float = 0.0,
 ) -> Tuple[jnp.ndarray, Dict]:
     """
     PPO loss evaluated with exact historical carries per timestep.
@@ -148,8 +149,7 @@ def ppo_loss(
 
     # Entropy bonus
     action_probs = jax.nn.softmax(action_logits, axis=-1)
-    entropy = -jnp.sum(action_probs * jnp.log(action_probs + 1e-10), axis=-1)
-    entropy = entropy + alarm_entropy
+    spatial_entropy = -jnp.sum(action_probs * jnp.log(action_probs + 1e-10), axis=-1)
     
     # L2 penalty on logits to prevent vanishing entropy gradients when deterministic
     logit_penalty = 0.01 * jnp.mean(jnp.square(action_logits), axis=-1)
@@ -159,7 +159,9 @@ def ppo_loss(
         mask = alive.astype(jnp.float32)
         pg_loss = pg_loss * mask
         vf_loss = vf_loss * mask
-        entropy = entropy * mask
+        spatial_entropy = spatial_entropy * mask
+        if alarm_actions is not None:
+            alarm_entropy = alarm_entropy * mask
         logit_penalty = logit_penalty * mask
         denom = mask.sum() + 1e-8
     else:
@@ -168,7 +170,15 @@ def ppo_loss(
     # Aggregate
     loss_pg = pg_loss.sum() / denom
     loss_vf = vf_loss.sum() / denom
-    loss_ent = -ent_coef * entropy.sum() / denom
+    loss_spatial_ent = -ent_coef * spatial_entropy.sum() / denom
+    
+    loss_alarm_ent = jnp.array(0.0)
+    total_entropy_val = spatial_entropy.sum() / denom
+    if alarm_actions is not None:
+        loss_alarm_ent = -alarm_ent_coef * alarm_entropy.sum() / denom
+        total_entropy_val += alarm_entropy.sum() / denom
+        
+    loss_ent = loss_spatial_ent + loss_alarm_ent
 
     loss_logit_penalty = logit_penalty.sum() / denom
     total_loss = loss_pg + vf_coef * loss_vf + loss_ent + loss_logit_penalty
@@ -184,7 +194,7 @@ def ppo_loss(
     metrics = {
         "ppo_pg_loss":  loss_pg,
         "ppo_vf_loss":  loss_vf,
-        "ppo_entropy":  entropy.sum() / denom,
+        "ppo_entropy":  total_entropy_val,
         "ppo_logit_pen": loss_logit_penalty,
         "ppo_clip_frac": jnp.mean(jnp.abs(ratio - 1.0) > clip_eps),
         "ppo_vq_loss": loss_vq_mean,
@@ -206,14 +216,14 @@ def _minibatch_step(
     params, opt_state, apply_fn, optimizer,
     obs, actions, alarm_actions, old_log_probs, advantages, returns, carries,
     n_layers, old_values, clip_eps, vf_coef, ent_coef, vq_coef, loss_vq, alive, rng_key,
-    ignition, ignition_discount
+    ignition, ignition_discount, alarm_ent_coef
 ):
     grad_fn = jax.value_and_grad(ppo_loss, has_aux=True)
     (loss, metrics), grads = grad_fn(
         params, apply_fn, obs, actions, alarm_actions, old_log_probs,
         advantages, returns, carries, n_layers,
         old_values, clip_eps, vf_coef, ent_coef, vq_coef, loss_vq, alive=alive, rng_key=rng_key,
-        ignition=ignition, ignition_discount=ignition_discount
+        ignition=ignition, ignition_discount=ignition_discount, alarm_ent_coef=alarm_ent_coef
     )
     updates, new_opt_state = optimizer.update(grads, opt_state, params)
     new_params = optax.apply_updates(params, updates)
@@ -238,6 +248,7 @@ def ppo_update(
     lam: float = 0.95,
     team: str = "blue",
     ignition_discount: float = 0.1,
+    alarm_ent_coef: float = 0.0,
 ) -> Tuple[Dict, Any, Dict]:
     """
     Single gradient update step using minibatches.
@@ -331,7 +342,7 @@ def ppo_update(
             params, opt_state, apply_fn, optimizer,
             mb_obs, mb_act, mb_alarm_act, mb_lp, mb_adv, mb_ret, mb_c,
             n_layers, mb_v, clip_eps, vf_coef, ent_coef, vq_coef, mb_vq, mb_al, mb_key,
-            mb_ig, ignition_discount
+            mb_ig, ignition_discount, alarm_ent_coef
         )
 
         # Accumulate as Python floats to avoid holding 500 JAX arrays
