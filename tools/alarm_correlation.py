@@ -126,7 +126,11 @@ def run_npmi_scan(checkpoint_dir: str, steps: int = 500, scout_range: int = 8):
     sim_step = make_sim_step(config, model, model_apply, r_model_apply=r_model_apply)
 
     all_alarms = []
-    all_near = []
+    all_near_8 = []
+    all_near_3 = []
+    all_near_2 = []
+    all_low_energy = []
+    all_crowded = []
 
     print(f"Running NPMI Scan on checkpoint {_ckpt_latest} for {steps} steps...")
     carry = (grid, b_pop, r_pop, b_carries, r_carries, b_params, r_params)
@@ -148,43 +152,65 @@ def run_npmi_scan(checkpoint_dir: str, steps: int = 500, scout_range: int = 8):
         r_pos = np.asarray(r_pop_out.positions)
         r_alive = np.asarray(r_pop_out.alive)
         
+        b_energy = np.asarray(b_pop_out.energy)
+        
+        # Calculate neighbor counts
+        dy = np.abs(b_pos[:, None, 0] - b_pos[None, :, 0])
+        dx = np.abs(b_pos[:, None, 1] - b_pos[None, :, 1])
+        dy = np.minimum(dy, gs - dy)
+        dx = np.minimum(dx, gs - dx)
+        b_dist = np.maximum(dy, dx)
+        b_dist = np.where(alive[None, :], b_dist, 9999)
+        neighbors = np.sum(b_dist <= 1, axis=1) - 1
+        
         red_dists = get_red_dists(b_pos, alive, r_pos, r_alive, gs)
-        is_near = red_dists <= scout_range
         
         all_alarms.extend(alarm_fired[alive])
-        all_near.extend(is_near[alive])
+        all_near_8.extend((red_dists <= 8)[alive])
+        all_near_3.extend((red_dists <= 3)[alive])
+        all_near_2.extend((red_dists <= 2)[alive])
+        all_low_energy.extend((b_energy <= 0.3)[alive])
+        all_crowded.extend((neighbors >= 2)[alive])
         
         if (i+1) % 50 == 0:
             print(f"  Step {i+1}/{steps}...")
 
     all_alarms = np.array(all_alarms, dtype=bool)
-    all_near = np.array(all_near, dtype=bool)
-
-    # NPMI Calculation
-    p_alarm = np.mean(all_alarms)
-    p_near = np.mean(all_near)
-    p_both = np.mean(all_alarms & all_near)
-
-    print("\n" + "="*50)
-    print(" ALARM NPMI SCAN RESULTS")
-    print("="*50)
-    print(f"Total agent-steps: {len(all_alarms)}")
-    print(f"P(Alarm=1):        {p_alarm:.4f}")
-    print(f"P(Red Near):       {p_near:.4f}")
-    print(f"P(Alarm=1 & Near): {p_both:.4f}")
     
-    if p_both == 0 or p_alarm == 0 or p_near == 0:
-        print("NPMI: Undefined (Zero probabilities)")
-    else:
-        pmi = np.log(p_both / (p_alarm * p_near))
-        npmi = pmi / -np.log(p_both)
-        print(f"PMI:               {pmi:.4f}")
-        print(f"NPMI:              {npmi:.4f}")
+    def calc_npmi(cond_array, name):
+        p_alarm = np.mean(all_alarms)
+        p_cond = np.mean(cond_array)
+        p_both = np.mean(all_alarms & cond_array)
         
-        if npmi > 0.1:
-            print("\n[CONCLUSION] POSITIVE CORRELATION. Alarm firing is significantly correlated with predator proximity.")
-        else:
-            print("\n[CONCLUSION] NO MEANINGFUL CORRELATION. The alarm is firing randomly with respect to predators.")
+        if p_both == 0 or p_alarm == 0 or p_cond == 0:
+            return p_cond, p_both, 0.0, 0.0
+            
+        pmi = np.log(p_both / (p_alarm * p_cond))
+        npmi = pmi / -np.log(p_both)
+        return p_cond, p_both, pmi, npmi
+
+    print("\n" + "="*70)
+    print(" ALARM NPMI MULTI-HYPOTHESIS SCAN RESULTS")
+    print("="*70)
+    print(f"Total agent-steps: {len(all_alarms)}")
+    print(f"P(Alarm=1):        {np.mean(all_alarms):.4f}")
+    print("-" * 70)
+    print(f"{'Target Variable':<25} | {'P(Cond)':<8} | {'P(Both)':<8} | {'PMI':<8} | {'NPMI':<8}")
+    print("-" * 70)
+    
+    targets = [
+        ("Red Dist <= 8", np.array(all_near_8, dtype=bool)),
+        ("Red Dist <= 3", np.array(all_near_3, dtype=bool)),
+        ("Red Dist <= 2", np.array(all_near_2, dtype=bool)),
+        ("Energy <= 0.3", np.array(all_low_energy, dtype=bool)),
+        ("Crowding (Neighbors >= 2)", np.array(all_crowded, dtype=bool))
+    ]
+    
+    for name, cond_array in targets:
+        p_cond, p_both, pmi, npmi = calc_npmi(cond_array, name)
+        print(f"{name:<25} | {p_cond:<8.4f} | {p_both:<8.4f} | {pmi:<8.4f} | {npmi:<8.4f}")
+    
+    print("="*70)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
