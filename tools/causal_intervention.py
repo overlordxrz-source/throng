@@ -57,7 +57,7 @@ from flax.core.frozen_dict import unfreeze, freeze
 
 ACTION_NAMES = {0: "N", 1: "S", 2: "E", 3: "W", 4: "STAY", 5: "STRK", 6: "PUSH", 7: "GRD", 8: "BUILD"}
 
-def run_causal_intervention(checkpoint_dir: str, token_a: int, token_b: int, context: str, num_samples: int, receiver_dist_min: int = 10):
+def run_causal_intervention(checkpoint_dir: str, token_a: int, token_b: int, context: str, num_samples: int, receiver_dist_min: int = 10, alarm_test: bool = False):
     # 1. Load config and ensure step-by-step control
     with open(ROOT / "config_phase7.yaml") as f:
         config = yaml.safe_load(f)
@@ -124,9 +124,13 @@ def run_causal_intervention(checkpoint_dir: str, token_a: int, token_b: int, con
     b_params = freeze(unfreeze(raw_restored)["b_params"])
     r_params = freeze(unfreeze(raw_restored)["r_params"])
     
-    cb = b_params["codebook"]["embedding"]
-    token_a_emb = cb[token_a]
-    token_b_emb = cb[token_b]
+    if not alarm_test:
+        cb = b_params["codebook"]["embedding"]
+        token_a_emb = cb[token_a]
+        token_b_emb = cb[token_b]
+    else:
+        token_a_emb = None
+        token_b_emb = None
 
     # Initialize environment
     rng = jax.random.PRNGKey(42)
@@ -152,7 +156,10 @@ def run_causal_intervention(checkpoint_dir: str, token_a: int, token_b: int, con
     intervened_probs = []
     
     print(f"[Causal Intervention] Checkpoint {_ckpt_latest} loaded.", flush=True)
-    print(f"  Token A: {token_a} -> Token B: {token_b}")
+    if alarm_test:
+        print(f"  ALARM TEST: Injecting Alarm=1 into silent neighbors")
+    else:
+        print(f"  Token A: {token_a} -> Token B: {token_b}")
     print(f"\n[Causal Intervention] Seeking {num_samples} isolated '{context}' events...", flush=True)
     
     step_idx = 0
@@ -223,20 +230,37 @@ def run_causal_intervention(checkpoint_dir: str, token_a: int, token_b: int, con
             emitter_id = -1
             prev_signals = np.asarray(b_pop.signals)
             
-            for dy in range(-5, 6):
-                for dx in range(-5, 6):
-                    ny, nx = (ry + dy) % gs, (rx + dx) % gs
-                    agents_here = pos_map.get((ny, nx), [])
-                    for eid in agents_here:
-                        if eid != receiver_id:
-                            dist = np.linalg.norm(prev_signals[eid] - np.asarray(token_a_emb))
-                            if dist < 1e-4:
-                                emitter_id = eid
-                                break
+            if not alarm_test:
+                for dy in range(-5, 6):
+                    for dx in range(-5, 6):
+                        ny, nx = (ry + dy) % gs, (rx + dx) % gs
+                        agents_here = pos_map.get((ny, nx), [])
+                        for eid in agents_here:
+                            if eid != receiver_id:
+                                dist = np.linalg.norm(prev_signals[eid] - np.asarray(token_a_emb))
+                                if dist < 1e-4:
+                                    emitter_id = eid
+                                    break
+                        if emitter_id != -1:
+                            break
                     if emitter_id != -1:
                         break
-                if emitter_id != -1:
-                    break
+            else:
+                prev_alarms = np.asarray(b_pop.alarms)
+                for dy in range(-5, 6):
+                    for dx in range(-5, 6):
+                        ny, nx = (ry + dy) % gs, (rx + dx) % gs
+                        agents_here = pos_map.get((ny, nx), [])
+                        for eid in agents_here:
+                            if eid != receiver_id:
+                                # Find an agent who was silent (alarm=0)
+                                if prev_alarms[eid][1] < 0.5:
+                                    emitter_id = eid
+                                    break
+                        if emitter_id != -1:
+                            break
+                    if emitter_id != -1:
+                        break
                         
             if emitter_id != -1:
                 # We found a valid event. Calculate baseline probabilities.
@@ -251,9 +275,15 @@ def run_causal_intervention(checkpoint_dir: str, token_a: int, token_b: int, con
                     p_base = sum([baseline_p[a] for a in [5, 6, 8]])
                 
                 # --- INTERVENTION ---
-                b_pop_intervened = b_pop.replace(
-                    signals=b_pop.signals.at[emitter_id].set(token_b_emb)
-                )
+                if not alarm_test:
+                    b_pop_intervened = b_pop.replace(
+                        signals=b_pop.signals.at[emitter_id].set(token_b_emb)
+                    )
+                else:
+                    new_alarm = jnp.array([0.0, 1.0], dtype=jnp.float32)
+                    b_pop_intervened = b_pop.replace(
+                        alarms=b_pop.alarms.at[emitter_id].set(new_alarm)
+                    )
                 intervened_carry = (grid, b_pop_intervened, r_pop, b_carries, r_carries, b_params, r_params)
                 
                 _, rollout_int = sim_step(intervened_carry, (step_key, step_idx))
@@ -271,8 +301,12 @@ def run_causal_intervention(checkpoint_dir: str, token_a: int, token_b: int, con
                 intervened_probs.append(p_int)
                 samples_collected += 1
                 
-                print(f"Sample {samples_collected:03d} | Receiver {receiver_id} Emitter {emitter_id} | "
-                      f"P(Action|TokenA)={p_base:.4f} -> P(Action|TokenB)={p_int:.4f} (Delta: {p_int - p_base:.4f})")
+                if not alarm_test:
+                    print(f"Sample {samples_collected:03d} | Receiver {receiver_id} Emitter {emitter_id} | "
+                          f"P(Action|TokenA)={p_base:.4f} -> P(Action|TokenB)={p_int:.4f} (Delta: {p_int - p_base:.4f})")
+                else:
+                    print(f"Sample {samples_collected:03d} | Receiver {receiver_id} Emitter {emitter_id} | "
+                          f"P(Action|Silent)={p_base:.4f} -> P(Action|Alarm)={p_int:.4f} (Delta: {p_int - p_base:.4f})")
                 
                 if samples_collected >= num_samples:
                     break
@@ -282,36 +316,51 @@ def run_causal_intervention(checkpoint_dir: str, token_a: int, token_b: int, con
     baseline_probs = np.array(baseline_probs)
     intervened_probs = np.array(intervened_probs)
     
-    # Delta is baseline (Token A) minus intervened (Token B).
-    # If Token A triggers the behavior, replacing it with Token B should drop the probability.
-    # Therefore, baseline - intervened > 0 indicates Token A causes the behavior.
-    mean_delta = np.mean(baseline_probs - intervened_probs) 
-    t_stat, p_val = stats.ttest_rel(baseline_probs, intervened_probs)
+    # Delta logic
+    if alarm_test:
+        mean_delta = np.mean(intervened_probs - baseline_probs) 
+        t_stat, p_val = stats.ttest_rel(intervened_probs, baseline_probs)
+    else:
+        mean_delta = np.mean(baseline_probs - intervened_probs) 
+        t_stat, p_val = stats.ttest_rel(baseline_probs, intervened_probs)
     
     print("\n" + "="*50)
     print(f" CAUSAL INTERVENTION RESULTS: Context '{context}'")
     print("="*50)
     print(f"Total Samples (N): {num_samples}")
-    print(f"Mean P(Action|TokenA): {np.mean(baseline_probs):.4f}")
-    print(f"Mean P(Action|TokenB): {np.mean(intervened_probs):.4f}")
-    print(f"Mean Delta (ATE):      {mean_delta:.4f}")
-    print(f"Paired t-test:         t={t_stat:.2f}, p={p_val:.2e}")
-    if p_val < 0.05 and mean_delta > 0.05:
-        print("\n[CONCLUSION] SIGNIFICANT CAUSAL DIVERGENCE DETECTED.")
-        print(f"Token {token_a} conclusively drives '{context}' behavior compared to Token {token_b}.")
+    if alarm_test:
+        print(f"Mean P(Action|Silent): {np.mean(baseline_probs):.4f}")
+        print(f"Mean P(Action|Alarm):  {np.mean(intervened_probs):.4f}")
+        print(f"Mean Delta (ATE):      {mean_delta:.4f}")
+        print(f"Paired t-test:         t={t_stat:.2f}, p={p_val:.2e}")
+        if p_val < 0.05 and mean_delta > 0.05:
+            print("\n[CONCLUSION] SIGNIFICANT CAUSAL DIVERGENCE DETECTED.")
+            print(f"Injecting the alarm conclusively drives '{context}' behavior.")
+        else:
+            print("\n[CONCLUSION] NULL HYPOTHESIS.")
+            print("The alarm intervention did not produce a statistically significant increase.")
     else:
-        print("\n[CONCLUSION] NULL HYPOTHESIS.")
-        print("The VQ token swap did not produce a statistically significant suppression.")
+        print(f"Mean P(Action|TokenA): {np.mean(baseline_probs):.4f}")
+        print(f"Mean P(Action|TokenB): {np.mean(intervened_probs):.4f}")
+        print(f"Mean Delta (ATE):      {mean_delta:.4f}")
+        print(f"Paired t-test:         t={t_stat:.2f}, p={p_val:.2e}")
+        if p_val < 0.05 and mean_delta > 0.05:
+            print("\n[CONCLUSION] SIGNIFICANT CAUSAL DIVERGENCE DETECTED.")
+            print(f"Token {token_a} conclusively drives '{context}' behavior compared to Token {token_b}.")
+        else:
+            print("\n[CONCLUSION] NULL HYPOTHESIS.")
+            print("The VQ token swap did not produce a statistically significant suppression.")
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--checkpoint", type=str, required=True, help="Path to checkpoint directory")
-    parser.add_argument("--token-a", type=int, required=True, help="Token ID causing the behavior (e.g. 44 for Predator)")
-    parser.add_argument("--token-b", type=int, required=True, help="Counterfactual Token ID (e.g. 46 for Safe)")
+    parser.add_argument("--token-a", type=int, required=False, default=-1, help="Token ID causing the behavior (e.g. 44 for Predator)")
+    parser.add_argument("--token-b", type=int, required=False, default=-1, help="Counterfactual Token ID (e.g. 46 for Safe)")
     parser.add_argument("--context", type=str, choices=["strike", "flee", "force"], required=True, help="Behavior context to test")
     parser.add_argument("--samples", type=int, default=100, help="Number of independent events to sample")
     parser.add_argument("--receiver-dist-min", type=int, default=10, help="Minimum distance between receiver and target entity")
+    parser.add_argument("--alarm-test", action="store_true", help="Test the 1-bit alarm head instead of VQ tokens")
     
     # Optional flags passed by Cam that don't affect live sim rewind but are kept for CLI compatibility
     parser.add_argument("--corpus", type=str, default="", help="Ignored. Live rewind used.")
@@ -327,4 +376,4 @@ if __name__ == "__main__":
     except ImportError:
         sys.exit("scipy is required for statistical tests. pip install scipy")
         
-    run_causal_intervention(args.checkpoint, args.token_a, args.token_b, args.context, samples, args.receiver_dist_min)
+    run_causal_intervention(args.checkpoint, args.token_a, args.token_b, args.context, samples, args.receiver_dist_min, args.alarm_test)
