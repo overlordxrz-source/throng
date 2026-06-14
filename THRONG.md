@@ -476,15 +476,21 @@ train_entry.run_simulation()  →  main_jax._run_simulation_impl()
 
 ## 4. Current experiment — Phase **17.5 Timescale Grammar** (`feature/phase17-5-timescale-alarm`)
 
-**Status:** Phase 17.5 is live at step ~1,083,000, running on a single process. The alarm penalty is active at 0.02. Currently monitoring until PPO 2140 to verify **Gate 1**: Alarm_Rate dropping to a stable 0.05–0.30 range.
+**Status:** Phase 17.5.1 gradient fix is **LIVE and WORKING** at step ~1,100,000+. The alarm penalty (0.006 energy/step) correctly exerts thermodynamic pressure on the alarm action. `Alarm_Rate` plunged from 0.97 to 0.589 within the first 5 PPO updates. The discrete joint log-prob actor-critic architecture is completely validated.
 
-> [!IMPORTANT]
-> **Gate 2 (next decode):** Run `causal_intervention.py` with alarm token swap. Freeze weights, inject alarm=1 into agents who were silent, measure ΔP(flee). If ATE > 0 at p < 0.05, Phase 17.5 is confirmed successful. Both Gates must clear before any Phase 19 architecture is proposed.
+**Next Steps (Science):**
+1. **Gate 1:** Monitor `Alarm_Rate` over the next weekend run. Expected to stabilize in the 0.15–0.40 range.
+2. **Gate 2 (next decode):** Run `causal_intervention.py` with alarm token swap. Freeze weights, inject alarm=1 into agents who were silent, measure ΔP(flee). If ATE > 0 at p < 0.05, Phase 17.5 is confirmed successful. Both Gates must clear before any Phase 19 architecture is proposed.
+
+**Throughput Work Queue (Will's Engineering Roadmap once science equilibrates):**
+1. **Environment Parallelism:** Vmap over 8–16 parallel environments. Turn the 31s of `lax.scan` 0% GPU idle time into useful parallel rollout work. Target: 3 steps/sec → 20+ steps/sec.
+2. **CPU Shuffle Bottleneck:** Tighten the `flatten_to_cpu` → shuffle → `H2D` pipeline. Pin memory or pre-stage Red minibatches during the Blue backward pass to eliminate zero-SM gaps between PPO passes.
+3. **Hardware Escalation:** Request uncapped A100 or B200 instance if Modal is power-capping `pclk`.
 
 **Monitor:**
 
 ```bash
-tail -f -n 60 /mnt/throng-runs/train.log | grep --line-buffered -E "step|GWT|MEDAL|expert_dropouts"
+tail -f -n 60 /mnt/throng-runs/train.log | grep --line-buffered -E "step|GWT|MEDAL|expert_dropouts|Alarm"
 ```
 
 **Restart (pull Phase 15 commit + resume from latest ckpt):**
