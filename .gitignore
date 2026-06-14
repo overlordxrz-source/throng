@@ -21,3 +21,6 @@ __pycache__/
 
 # OS
 .DS_Store
+*.jsonl
+*.log
+*.patch

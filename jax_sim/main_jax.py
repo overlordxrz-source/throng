@@ -286,11 +286,17 @@ def make_sim_step(
 
         # ── Forward passes ──────────────────────────────────────
         noise_key, key_misc = jax.random.split(key_misc)
+        alarm_key, key_misc = jax.random.split(key_misc)
         b_new_c, b_outs = model_apply(b_params_sg, b_carries, b_obs, _n_layers)
         r_new_c, r_outs = _r_apply(r_params_sg, r_carries, r_obs, _n_layers, rngs={'dropout': noise_key})
 
-        b_action_logits, b_signal_out, b_sym_w, b_vals, b_tom, b_token_ids, b_alarm_out, b_loss_vq, b_z_e, b_cult_f, b_cult_s = b_outs
+        b_action_logits, b_signal_out, b_sym_w, b_vals, b_tom, b_token_ids, b_alarm_logits, b_loss_vq, b_z_e, b_cult_f, b_cult_s = b_outs
         r_action_logits, r_signal_out, r_sym_w, r_vals, r_tom, r_token_ids, r_loss_vq, r_z_e, r_cult_f, r_cult_s = r_outs
+
+        # Sample alarm action from logits
+        b_alarm_keys = jax.random.split(alarm_key, b_pop.max_pop)
+        b_alarm_action = jax.vmap(jax.random.categorical)(b_alarm_keys, b_alarm_logits)
+        b_alarm_out = jax.nn.one_hot(b_alarm_action, 2, dtype=jnp.float32)
 
         # Reds cannot build barriers. Mask out action 8 to prevent PPO from exploring it.
         if r_action_logits.shape[-1] > 8:
@@ -598,6 +604,10 @@ def make_sim_step(
         b_log_probs = jax.nn.log_softmax(b_action_logits, axis=-1)
         b_log_probs_taken = jnp.take_along_axis(b_log_probs, b_actions[:, None], axis=-1).squeeze(-1)
 
+        b_alarm_log_probs = jax.nn.log_softmax(b_alarm_logits, axis=-1)
+        b_alarm_log_probs_taken = jnp.take_along_axis(b_alarm_log_probs, b_alarm_action[:, None], axis=-1).squeeze(-1)
+        b_joint_log_probs_taken = b_log_probs_taken + b_alarm_log_probs_taken
+
         r_log_probs = jax.nn.log_softmax(r_action_logits, axis=-1)
         r_log_probs_taken = jnp.take_along_axis(r_log_probs, r_actions[:, None], axis=-1).squeeze(-1)
 
@@ -606,7 +616,7 @@ def make_sim_step(
         r_done = (~r_pop.alive).astype(jnp.float32)
 
         b_rollout = {
-            "obs": b_obs, "actions": b_actions, "action_logits": b_action_logits, "log_probs": b_log_probs_taken,
+            "obs": b_obs, "actions": b_actions, "alarm_actions": b_alarm_action, "action_logits": b_action_logits, "log_probs": b_joint_log_probs_taken,
             "values": b_vals, "rewards": b_rew, "dones": b_done,
             "carries": b_carries,
             "loss_vq": b_loss_vq,
@@ -1637,7 +1647,7 @@ def _run_simulation_impl(
             r_metrics["proprio_loss"] = r_proprio_loss
             r_metrics["retention_loss"] = r_retention_loss
 
-        if config.get("vq_dead_code_reset", True) and "z_e" in r_batch:
+        if config.get("vq_dead_code_reset", True) and "z_e" in r_batch and not _red_comms:
             _dc_key, update_key = jax.random.split(update_key)
             _tok = jnp.asarray(r_batch["token_ids"]).reshape(-1)
             _ze = jnp.asarray(r_batch["z_e"]).reshape(-1, int(config["signal_dim"]))

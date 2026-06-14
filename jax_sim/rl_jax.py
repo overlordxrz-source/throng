@@ -65,6 +65,7 @@ def ppo_loss(
     apply_fn: Any,  # model.apply
     obs: jnp.ndarray,          # (M, obs_dim)
     actions: jnp.ndarray,      # (M,) int
+    alarm_actions: jnp.ndarray, # (M,) int
     old_log_probs: jnp.ndarray, # (M,)
     advantages: jnp.ndarray,    # (M,)
     returns: jnp.ndarray,       # (M,)
@@ -108,6 +109,18 @@ def ppo_loss(
         action_log_probs, actions[..., None], axis=-1
     ).squeeze(-1)
 
+    alarm_entropy = 0.0
+    if alarm_actions is not None:
+        alarm_logits = outs[6]
+        alarm_log_probs = jax.nn.log_softmax(alarm_logits, axis=-1)
+        alarm_log_probs_taken = jnp.take_along_axis(
+            alarm_log_probs, alarm_actions[..., None], axis=-1
+        ).squeeze(-1)
+        log_probs_taken = log_probs_taken + alarm_log_probs_taken
+
+        alarm_probs = jax.nn.softmax(alarm_logits, axis=-1)
+        alarm_entropy = -jnp.sum(alarm_probs * jnp.log(alarm_probs + 1e-10), axis=-1)
+
     # Probability ratio
     ratio = jnp.exp(log_probs_taken - old_log_probs)
     ratio = jnp.clip(ratio, 0.0, 10.0)
@@ -136,6 +149,7 @@ def ppo_loss(
     # Entropy bonus
     action_probs = jax.nn.softmax(action_logits, axis=-1)
     entropy = -jnp.sum(action_probs * jnp.log(action_probs + 1e-10), axis=-1)
+    entropy = entropy + alarm_entropy
     
     # L2 penalty on logits to prevent vanishing entropy gradients when deterministic
     logit_penalty = 0.01 * jnp.mean(jnp.square(action_logits), axis=-1)
@@ -190,13 +204,13 @@ def create_optimizer(lr: float = 3e-4, max_grad_norm: float = 2.0) -> optax.Grad
 @functools.partial(jax.jit, static_argnames=("apply_fn", "optimizer", "n_layers"))
 def _minibatch_step(
     params, opt_state, apply_fn, optimizer,
-    obs, actions, old_log_probs, advantages, returns, carries,
+    obs, actions, alarm_actions, old_log_probs, advantages, returns, carries,
     n_layers, old_values, clip_eps, vf_coef, ent_coef, vq_coef, loss_vq, alive, rng_key,
     ignition, ignition_discount
 ):
     grad_fn = jax.value_and_grad(ppo_loss, has_aux=True)
     (loss, metrics), grads = grad_fn(
-        params, apply_fn, obs, actions, old_log_probs,
+        params, apply_fn, obs, actions, alarm_actions, old_log_probs,
         advantages, returns, carries, n_layers,
         old_values, clip_eps, vf_coef, ent_coef, vq_coef, loss_vq, alive=alive, rng_key=rng_key,
         ignition=ignition, ignition_discount=ignition_discount
@@ -232,6 +246,7 @@ def ppo_update(
     """
     obs = batch["obs"]
     actions = batch["actions"]
+    alarm_actions = batch.get("alarm_actions")
     old_log_probs = batch["log_probs"]
     rewards = batch["rewards"]
     dones = batch["dones"]
@@ -260,6 +275,7 @@ def ppo_update(
 
     flat_obs = flatten_to_cpu(obs)
     flat_actions = flatten_to_cpu(actions)
+    flat_alarm_actions = flatten_to_cpu(alarm_actions) if alarm_actions is not None else None
     flat_log_probs = flatten_to_cpu(old_log_probs)
     flat_adv = flatten_to_cpu(advantages)
     flat_ret = flatten_to_cpu(returns)
@@ -270,7 +286,7 @@ def ppo_update(
     flat_ignition = flatten_to_cpu(ignition)
 
     # Delete GPU references so XLA can reclaim VRAM
-    del obs, actions, old_log_probs, advantages, returns, carries, values, alive, loss_vq, ignition
+    del obs, actions, alarm_actions, old_log_probs, advantages, returns, carries, values, alive, loss_vq, ignition
     del batch
 
     # Shuffle on CPU (no GPU allocation for permutation array)
@@ -300,6 +316,7 @@ def ppo_update(
         # Transfer just this minibatch to GPU
         mb_obs = jnp.array(flat_obs[idx])
         mb_act = jnp.array(flat_actions[idx])
+        mb_alarm_act = jnp.array(flat_alarm_actions[idx]) if flat_alarm_actions is not None else None
         mb_lp = jnp.array(flat_log_probs[idx])
         mb_adv = jnp.array(flat_adv[idx])
         mb_ret = jnp.array(flat_ret[idx])
@@ -312,7 +329,7 @@ def ppo_update(
         key, mb_key = jax.random.split(key)
         params, opt_state, mb_mets, grads = _minibatch_step(
             params, opt_state, apply_fn, optimizer,
-            mb_obs, mb_act, mb_lp, mb_adv, mb_ret, mb_c,
+            mb_obs, mb_act, mb_alarm_act, mb_lp, mb_adv, mb_ret, mb_c,
             n_layers, mb_v, clip_eps, vf_coef, ent_coef, vq_coef, mb_vq, mb_al, mb_key,
             mb_ig, ignition_discount
         )

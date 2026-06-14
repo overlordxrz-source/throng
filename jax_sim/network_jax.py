@@ -335,12 +335,10 @@ class AgentNetworkJax(nn.Module):
             dead_code_reset=self.vq_dead_code_reset,
         )
         
-        # Phase 17.5: Timescale Grammar 1-bit discrete alarm channel (Gumbel-Softmax STE)
+        # Phase 17.5.1: Timescale Grammar 1-bit discrete alarm channel
         alarm_logits = self.head_alarm(h_comms) # (N, 2)
-        alarm_soft = jax.nn.softmax(alarm_logits)
-        alarm_idx = jnp.argmax(alarm_soft, axis=-1)
-        alarm_hard = jax.nn.one_hot(alarm_idx, 2, dtype=alarm_soft.dtype)
-        alarm_out = alarm_soft + jax.lax.stop_gradient(alarm_hard - alarm_soft)
+        # alarm_out is now raw logits, we sample in the environment step
+        alarm_out = alarm_logits
         
         symbol_write = self.head_symbol(pooled)              # (N, sym_d)
         feral_mask = jax.lax.stop_gradient(obs[:, 2] < 0.20)
