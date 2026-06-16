@@ -344,6 +344,10 @@ class AgentNetworkJax(nn.Module):
         feral_mask = jax.lax.stop_gradient(obs[:, 2] < 0.20)
         symbol_write = jnp.where(feral_mask[:, None], 0.0, symbol_write)
         signal_out = jnp.where(feral_mask[:, None], 0.0, signal_out)
+        
+        # Feral mask forces the alarm logit to highly favor class 0 (silent)
+        alarm_silence = jnp.array([10.0, -10.0], dtype=alarm_out.dtype) 
+        alarm_out = jnp.where(feral_mask[:, None], alarm_silence[None, :], alarm_out)
         values = self.head_value(value_input).squeeze(-1)  # (N,)  unbounded, Huber loss prevents explosion
         tom_logits = self.head_tom(pooled)[:, None, :]     # (N, 1, 8) — simplified; real version needs K
         tom_logits = jnp.broadcast_to(tom_logits, (N, K, self.n_actions))  # (N, K, n_actions)

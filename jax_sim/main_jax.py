@@ -264,10 +264,6 @@ def make_sim_step(
         
         blue_bg_map = jnp.zeros((gs, gs), dtype=jnp.bool_)
         blue_bg_map = blue_bg_map.at[b_pop.positions[:, 0], b_pop.positions[:, 1]].set(b_pop.alive & b_pop.is_big_green)
-        jax.lax.cond(
-            step_idx % 512 == 0,
-            lambda _: jax.debug.print("Step {step}: Big Green Map sum: {s}", step=step_idx, s=jnp.sum(blue_bg_map)),
-            lambda _: None,
             None
         )
         
@@ -320,8 +316,9 @@ def make_sim_step(
         )
 
         # ── Sample actions (Phase 11.3 epistemic gate on blues) ──
-        b_action_keys = jax.random.split(key_act, b_pop.max_pop)
-        r_action_keys = jax.random.split(key_act, r_pop.max_pop)
+        key_act_b, key_act_r = jax.random.split(key_act)
+        b_action_keys = jax.random.split(key_act_b, b_pop.max_pop)
+        r_action_keys = jax.random.split(key_act_r, r_pop.max_pop)
         b_actions_reactive = jax.vmap(jax.random.categorical)(b_action_keys, b_action_logits)
         r_actions = jax.vmap(jax.random.categorical)(r_action_keys, r_action_logits)
 
