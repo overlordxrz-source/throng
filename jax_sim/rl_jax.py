@@ -645,15 +645,6 @@ def red_auxiliary_update(
     return params, opt_state, proprio_sum / n_mb, retention_sum / n_mb
 
 
-# Keep old name as alias for backward compatibility with any external callers
-def fwd_dynamics_update(params, opt_state, optimizer, fwd_apply_fn,
-                        carries_np, actions_np, alive_np, key,
-                        minibatch_size=1024, fwd_coef=0.05):
-    """Deprecated: use auxiliary_update instead."""
-    import functools as _ft
-    raise NotImplementedError("fwd_dynamics_update requires obs_np and loc_env bounds; use auxiliary_update")
-    return p, o, fl
-
 
 # ── Phase 14.1b: VQEL monologue (reconstruction + information bottleneck) ───
 
