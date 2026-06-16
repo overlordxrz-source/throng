@@ -16,15 +16,15 @@ The philosophical and mathematical foundations of THRONG have been consolidated 
 - **[rosetta_stone_math.md](file:///Users/overlord/CascadeProjects/throng/research/rosetta_stone_math.md)**: The state-of-the-art blueprints for **Unsupervised Semantic Translation**. We will use `ott-jax` and Low-Rank Gromov-Wasserstein (LR-GW) to topologically align the discrete MARL VQ space with a continuous LLM embedding space, enforcing geometric isometry via Minimum Description Length (MDL).
 
 ---
-## 0b. Current state — **Phase 16.6 Barrier Occlusion Complete** (Jun 2026)
+## 0b. Current state — **Phase 17.5 Timescale Grammar & Entropy Paradox** (Jun 2026)
 
-**Blue SOTA (frozen on `master`):** **`465d8c6+`** — 9.4 cross-attn + 9.1 confidence + **11.3 epistemic gate** (Stay-collapse resolved).
+**Blue SOTA (frozen on `master`):** **`465d8c6+`** — 9.4 cross-attn + 9.1 confidence + **11.3 epistemic gate**.
 
-**Headline:** Phase 16.6 (Barrier Occlusion) successfully forced communication, but completely broke the VQ Language bottleneck! We performed the offline Frozen Counterfactual Causal Test on the new post-burn-off tokens: Token 13 ("Predator/Alert") and Token 55 ("Safe/Clear"). The test yielded a Null Hypothesis (ATE = -0.0004, p=0.507) for the discrete tokens. 
-**Profound Scientific Finding:** Despite ignoring the discrete VQ tokens, the NPMI scanner proved that 12 of the 32 continuous dimensions in the signal vector have a highly significant causal effect on receiver Flee Direction (`p < 0.005`), and Flee Rate (`p < 0.01`). The agents bypassed the VQ bottleneck by smuggling continuous geometry! They arranged the 64 discrete token embeddings into a continuous geometric manifold, creating a continuous "pointing" language and violently resisting symbolic grounding.
-**Phase 17.5 (Timescale Grammar):** We identified that a 30D continuous channel caused Protean Scattering. We restored the VQ Bottleneck and added a metabolically expensive 1-bit discrete alarm channel alongside the 32D VQ code, enforcing a Timescale Separation architecture without violating the bottleneck.
-**Phase 17.5.1 (Gradient Fix & DCVQ Bypass):** Wired the alarm head into the joint PPO multi-discrete log-probability, allowing proper actor-critic backprop and fixing the entropy initialization. **Operational Note (Deviation):** Red's legacy `dead_code_reset_codebook_params` has been explicitly bypassed in `main_jax.py` during PPO updates, because Red uses the split `DCVQ` architecture (Phase 14.4) instead of a flat `red_codebook`. This is acceptable and working as intended.
-**Multi-Token Sequences (Phase 19):** **PLANNING.** The agents currently only broadcast a single discrete token per timestep (a "shout"). We are upgrading the architecture to support slot-based message heads (Subject/Verb/Modifier) to force compositional syntax.
+**Headline:** Phase 16.6 proved agents were bypassing the VQ bottleneck by smuggling continuous geometry (NPMI p < 0.005 on 12 continuous dimensions). Phase 17.5 introduced a metabolically expensive 1-bit discrete alarm channel. After fixing the joint PPO actor-critic backprop, we observed the `Alarm_Rate` stabilize at exactly ~45%.
+**The Entropy Paradox:** A causal intervention test yielded a Null Hypothesis (ATE = -0.0003), proving receivers ignored the alarm. We realized the `ppo_entropy_coef = 0.02` was applied to the alarm head, actively rewarding 50/50 randomness and perfectly cancelling out the 0.006 metabolic cost. We have now surgically decoupled the alarm entropy (`alarm_ent_coef = 0.0`), leaving metabolic cost as the sole evolutionary pressure.
+**The Distress Signal Hypothesis:** Before decoupling the entropy, an NPMI multi-hypothesis scan revealed that the alarm had *zero* correlation with predator proximity, but crossed the 0.1 threshold for **Energy ≤ 0.3** (NPMI 0.1144). The agents did not invent a predator warning — they invented a hunger distress call. A Granger-style lag analysis is currently running to disambiguate causality (Did hunger cause the alarm, or did the alarm cost cause the hunger?).
+
+**Multi-Token Sequences (Phase 19):** **PLANNING.** If the alarm channel achieves grounded semantic causality, we will upgrade the architecture to support slot-based message heads (Subject/Verb/Modifier) to force compositional syntax.
 | Live run (Phase 16.6) | Value |
 |-----------------------|--------|
 | **Branch** | **`feature/phase16-6-occlusion`** |
@@ -476,11 +476,14 @@ train_entry.run_simulation()  →  main_jax._run_simulation_impl()
 
 ## 4. Current experiment — Phase **17.5 Timescale Grammar** (`feature/phase17-5-timescale-alarm`)
 
-**Status:** Phase 17.5.1 gradient fix is **LIVE and WORKING** at step ~1,100,000+. The alarm penalty (0.006 energy/step) correctly exerts thermodynamic pressure on the alarm action. `Alarm_Rate` plunged from 0.97 to 0.589 within the first 5 PPO updates. The discrete joint log-prob actor-critic architecture is completely validated.
+**Status:** Phase 17.5 entropy decoupling is **LIVE** at step 1,129,000+ (PPO 2206+). `alarm_ent_coef` has been set to 0.0. The 0.006 metabolic cost is now the sole thermodynamic pressure on the alarm action. 
+
+**Scientific Pivot:** The NPMI scan proved the alarm channel does not correlate with predator proximity (NPMI ~0.008). It correlates heavily with `Energy <= 0.3` (NPMI 0.1144). The agents may have evolved a **metabolic distress signal**.
 
 **Next Steps (Science):**
-1. **Gate 1:** Monitor `Alarm_Rate` over the next weekend run. Expected to stabilize in the 0.15–0.40 range.
-2. **Gate 2 (next decode):** Run `causal_intervention.py` with alarm token swap. Freeze weights, inject alarm=1 into agents who were silent, measure ΔP(flee). If ATE > 0 at p < 0.05, Phase 17.5 is confirmed successful. Both Gates must clear before any Phase 19 architecture is proposed.
+1. **Gate 1 (Lag Analysis):** Run `tools/alarm_lag_analysis.py` to disambiguate causality. Does low energy Granger-cause alarm firing (Direction A: distress signal)? Or does alarm firing Granger-cause low energy (Direction B: spurious correlation via metabolic cost)?
+2. **Gate 2 (Decoupled Equilibrium):** Monitor `Alarm_Rate` under pure metabolic pressure. It should break from the ~45% floor and reflect true selective pressure.
+3. **Gate 3 (Causal Test):** Rerun `causal_intervention.py` using `--context energy` to see if receivers change behavior when near a starving agent sounding the alarm.
 
 **Throughput Work Queue (Will's Engineering Roadmap once science equilibrates):**
 1. **Environment Parallelism:** Vmap over 8–16 parallel environments. Turn the 31s of `lax.scan` 0% GPU idle time into useful parallel rollout work. Target: 3 steps/sec → 20+ steps/sec.
