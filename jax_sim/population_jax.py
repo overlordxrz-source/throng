@@ -45,6 +45,11 @@ class PopState:
         self.alarms = jnp.zeros((max_pop, 2), dtype=jnp.float32)
         self.nb_gain = jnp.ones(max_pop, dtype=jnp.float32)
 
+        # Inventory (Phase 18)
+        self.inventory_wood = jnp.zeros(max_pop, dtype=jnp.int32)
+        self.inventory_stone = jnp.zeros(max_pop, dtype=jnp.int32)
+        self.inventory_axe = jnp.zeros(max_pop, dtype=jnp.bool_)
+
         # Episodic memory (optional)
         if memory_slots > 0:
             self.memory_buffer = jnp.zeros(
@@ -69,6 +74,7 @@ class PopState:
             self.n_layers, self.carries, self.signals, self.nb_gain,
             self.offspring_count, self.steps_since_catch, self.steps_since_dropout,
             self.lineage_ids, self.next_lineage_id, self.is_big_green, self.alarms,
+            self.inventory_wood, self.inventory_stone, self.inventory_axe,
         ]
         if self.memory_buffer is not None:
             children.append(self.memory_buffer)
@@ -86,9 +92,10 @@ class PopState:
         (pop.positions, pop.ages, pop.alive, pop.energy, pop.team,
          pop.n_layers, pop.carries, pop.signals, pop.nb_gain,
          pop.offspring_count, pop.steps_since_catch, pop.steps_since_dropout,
-         pop.lineage_ids, pop.next_lineage_id, pop.is_big_green, pop.alarms) = children[:16]
+         pop.lineage_ids, pop.next_lineage_id, pop.is_big_green, pop.alarms,
+         pop.inventory_wood, pop.inventory_stone, pop.inventory_axe) = children[:19]
         if memory_slots > 0:
-            pop.memory_buffer = children[16]
+            pop.memory_buffer = children[19]
         else:
             pop.memory_buffer = None
         return pop
@@ -117,6 +124,9 @@ class PopState:
         pop.next_lineage_id = kwargs.get("next_lineage_id", self.next_lineage_id)
         pop.memory_buffer = kwargs.get("memory_buffer", self.memory_buffer)
         pop.is_big_green = kwargs.get("is_big_green", self.is_big_green)
+        pop.inventory_wood = kwargs.get("inventory_wood", self.inventory_wood)
+        pop.inventory_stone = kwargs.get("inventory_stone", self.inventory_stone)
+        pop.inventory_axe = kwargs.get("inventory_axe", self.inventory_axe)
         return pop
 
 
@@ -179,6 +189,9 @@ def kill_agents(pop: PopState, mask: jnp.ndarray) -> PopState:
         signals=new_signals,
         alarms=new_alarms,
         energy=new_energy,
+        inventory_wood=jnp.where(mask, 0, pop.inventory_wood),
+        inventory_stone=jnp.where(mask, 0, pop.inventory_stone),
+        inventory_axe=jnp.where(mask, False, pop.inventory_axe),
     )
 
 

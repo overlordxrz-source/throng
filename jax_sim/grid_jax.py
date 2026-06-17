@@ -28,6 +28,10 @@ class GridState:
         self.cultural_fast = jnp.zeros((size, size, symbol_dim), dtype=jnp.float32)
         self.cultural_slow = jnp.zeros((size, size, symbol_dim), dtype=jnp.float32)
         self.barrier_hp_map = jnp.zeros((size, size), dtype=jnp.float32)
+        
+        # Phase 18 Crafting Materials
+        self.wood_grid = jnp.zeros((size, size), dtype=jnp.float32)
+        self.stone_grid = jnp.zeros((size, size), dtype=jnp.float32)
         # Puzzle
         self.puzzle_grid   = jnp.zeros((size, size), dtype=jnp.float32)
         self.puzzle_nodes  = jnp.zeros((3, 6), dtype=jnp.int32) # [ay, ax, by, bx, ry, rx]
@@ -41,6 +45,7 @@ class GridState:
             self.cultural_fast, self.cultural_slow, self.barrier_hp_map,
             self.puzzle_grid,
             self.puzzle_nodes, self.puzzle_active, self.puzzle_cooldown,
+            self.wood_grid, self.stone_grid,
         )
         aux = (self.size, self.symbol_dim)
         return children, aux
@@ -52,7 +57,8 @@ class GridState:
         (gs.symbols, gs.walls, gs.resources,
          gs.shelter_spots, gs.contested_res, gs.scent_trails,
          gs.cultural_fast, gs.cultural_slow, gs.barrier_hp_map, gs.puzzle_grid,
-         gs.puzzle_nodes, gs.puzzle_active, gs.puzzle_cooldown) = children
+         gs.puzzle_nodes, gs.puzzle_active, gs.puzzle_cooldown,
+         gs.wood_grid, gs.stone_grid) = children
         return gs
 
     def replace(self, **kwargs):
@@ -71,6 +77,8 @@ class GridState:
         gs.puzzle_nodes = kwargs.get("puzzle_nodes", self.puzzle_nodes)
         gs.puzzle_active = kwargs.get("puzzle_active", self.puzzle_active)
         gs.puzzle_cooldown = kwargs.get("puzzle_cooldown", self.puzzle_cooldown)
+        gs.wood_grid = kwargs.get("wood_grid", self.wood_grid)
+        gs.stone_grid = kwargs.get("stone_grid", self.stone_grid)
         return gs
 
 jax.tree_util.register_pytree_node(

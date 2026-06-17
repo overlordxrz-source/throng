@@ -1,4 +1,7 @@
 # Proposal for the Intel Neuromorphic Research Community (INRC)
+
+> **[ON HOLD] Pending ATE > 0 validation of the discrete channel per Cam's instructions.**
+
 **Project Title**: Scaling Causally Grounded Emergent Communication via Asynchronous Spiking Populations  
 **Principal Investigator**: [Your Name / Lab]  
 **Target Hardware**: Intel Loihi 2  
@@ -7,7 +10,7 @@
 
 Current large language models (LLMs) excel at statistical pattern matching but lack causal grounding; they manipulate symbols without understanding their physical or thermodynamic consequences. Project THRONG aims to solve the symbol grounding problem from the bottom up by evolving language in a massive, multi-agent reinforcement learning (MARL) ecosystem subject to physical survival pressures. 
 
-In Phase 18 of THRONG, we successfully demonstrated the emergence of a "Timescale Grammar"—the separation of continuous spatial geometry (pointing) and discrete, metabolically constrained signals (alerting). However, to scale this ecosystem to populations of millions of agents capable of sustaining multi-generational culture, we require hardware that maps naturally to asynchronous, continuous-time interactions. We propose porting the THRONG architecture to Intel's Loihi 2 neuromorphic processor to leverage its inherent asynchronous scaling and spike-timing-dependent plasticity (STDP).
+In Phase 17.5 of THRONG, we successfully demonstrated the emergence of a "Timescale Grammar"—the separation of continuous spatial geometry (pointing) and discrete, metabolically constrained signals (alerting). However, to scale this ecosystem to populations of millions of agents capable of sustaining multi-generational culture, we require hardware that maps naturally to asynchronous, continuous-time interactions. We propose porting the THRONG architecture to Intel's Loihi 2 neuromorphic processor to leverage its inherent asynchronous scaling and spike-timing-dependent plasticity (STDP).
 
 ## 2. The Theoretical Gap
 

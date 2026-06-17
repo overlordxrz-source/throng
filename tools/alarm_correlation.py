@@ -131,6 +131,11 @@ def run_npmi_scan(checkpoint_dir: str, steps: int = 500, scout_range: int = 8):
     all_near_2 = []
     all_low_energy = []
     all_crowded = []
+    all_res_at_pos = []
+    all_res_adj = []
+    all_puz_adj = []
+    all_c_res_at_pos = []
+    all_c_res_adj = []
 
     print(f"Running NPMI Scan on checkpoint {_ckpt_latest} for {steps} steps...")
     carry = (grid, b_pop, r_pop, b_carries, r_carries, b_params, r_params)
@@ -165,12 +170,63 @@ def run_npmi_scan(checkpoint_dir: str, steps: int = 500, scout_range: int = 8):
         
         red_dists = get_red_dists(b_pos, alive, r_pos, r_alive, gs)
         
+        grid_state = carry[0]
+        res_grid = np.asarray(grid_state.resources)
+        res_at_pos = res_grid[b_pos[:, 0], b_pos[:, 1]] > 0.01
+        
+        res_y, res_x = np.nonzero(res_grid > 0.01)
+        if len(res_y) > 0:
+            res_coords = np.stack([res_y, res_x], axis=1)
+            dy_res = np.abs(b_pos[:, None, 0] - res_coords[None, :, 0])
+            dx_res = np.abs(b_pos[:, None, 1] - res_coords[None, :, 1])
+            dy_res = np.minimum(dy_res, gs - dy_res)
+            dx_res = np.minimum(dx_res, gs - dx_res)
+            dist_res = np.maximum(dy_res, dx_res)
+            min_dist_res = np.min(dist_res, axis=1)
+        else:
+            min_dist_res = np.full(b_pos.shape[0], 9999)
+            
+        puz_grid = np.asarray(grid_state.puzzle_grid)
+        puz_y, puz_x = np.nonzero(puz_grid > 0.01)
+        if len(puz_y) > 0:
+            puz_coords = np.stack([puz_y, puz_x], axis=1)
+            dy_puz = np.abs(b_pos[:, None, 0] - puz_coords[None, :, 0])
+            dx_puz = np.abs(b_pos[:, None, 1] - puz_coords[None, :, 1])
+            dy_puz = np.minimum(dy_puz, gs - dy_puz)
+            dx_puz = np.minimum(dx_puz, gs - dx_puz)
+            dist_puz = np.maximum(dy_puz, dx_puz)
+            min_dist_puz = np.min(dist_puz, axis=1)
+        else:
+            min_dist_puz = np.full(b_pos.shape[0], 9999)
+            
+        c_res_grid = np.asarray(grid_state.contested_res)
+        if i == 0:
+            print(f"Max contested res on grid: {np.max(c_res_grid)}")
+        c_res_at_pos = c_res_grid[b_pos[:, 0], b_pos[:, 1]] > 0.01
+        
+        c_res_y, c_res_x = np.nonzero(c_res_grid > 0.01)
+        if len(c_res_y) > 0:
+            c_res_coords = np.stack([c_res_y, c_res_x], axis=1)
+            dy_c = np.abs(b_pos[:, None, 0] - c_res_coords[None, :, 0])
+            dx_c = np.abs(b_pos[:, None, 1] - c_res_coords[None, :, 1])
+            dy_c = np.minimum(dy_c, gs - dy_c)
+            dx_c = np.minimum(dx_c, gs - dx_c)
+            dist_c = np.maximum(dy_c, dx_c)
+            min_dist_c = np.min(dist_c, axis=1)
+        else:
+            min_dist_c = np.full(b_pos.shape[0], 9999)
+        
         all_alarms.extend(alarm_fired[alive])
         all_near_8.extend((red_dists <= 8)[alive])
         all_near_3.extend((red_dists <= 3)[alive])
         all_near_2.extend((red_dists <= 2)[alive])
         all_low_energy.extend((b_energy <= 0.3)[alive])
         all_crowded.extend((neighbors >= 2)[alive])
+        all_res_at_pos.extend(res_at_pos[alive])
+        all_res_adj.extend((min_dist_res <= 1)[alive])
+        all_puz_adj.extend((min_dist_puz <= 1)[alive])
+        all_c_res_at_pos.extend(c_res_at_pos[alive])
+        all_c_res_adj.extend((min_dist_c <= 1)[alive])
         
         if (i+1) % 50 == 0:
             print(f"  Step {i+1}/{steps}...")
@@ -198,15 +254,31 @@ def run_npmi_scan(checkpoint_dir: str, steps: int = 500, scout_range: int = 8):
     print(f"{'Target Variable':<25} | {'P(Cond)':<8} | {'P(Both)':<8} | {'PMI':<8} | {'NPMI':<8}")
     print("-" * 70)
     
-    targets = [
-        ("Red Dist <= 8", np.array(all_near_8, dtype=bool)),
-        ("Red Dist <= 3", np.array(all_near_3, dtype=bool)),
-        ("Red Dist <= 2", np.array(all_near_2, dtype=bool)),
-        ("Energy <= 0.3", np.array(all_low_energy, dtype=bool)),
-        ("Crowding (Neighbors >= 2)", np.array(all_crowded, dtype=bool))
-    ]
+    all_near_8 = np.array(all_near_8, dtype=bool)
+    all_near_3 = np.array(all_near_3, dtype=bool)
+    all_near_2 = np.array(all_near_2, dtype=bool)
+    all_low_energy = np.array(all_low_energy, dtype=bool)
+    all_crowded = np.array(all_crowded, dtype=bool)
+    all_res_at_pos = np.array(all_res_at_pos, dtype=bool)
+    all_res_adj = np.array(all_res_adj, dtype=bool)
+    all_puz_adj = np.array(all_puz_adj, dtype=bool)
+    all_c_res_at_pos = np.array(all_c_res_at_pos, dtype=bool)
+    all_c_res_adj = np.array(all_c_res_adj, dtype=bool)
     
-    for name, cond_array in targets:
+    target_variables = {
+        "Red Dist <= 8": all_near_8,
+        "Red Dist <= 3": all_near_3,
+        "Red Dist <= 2": all_near_2,
+        "Energy <= 0.3": all_low_energy,
+        "Crowding (Neighbors >= 2)": all_crowded,
+        "Resource At Position": all_res_at_pos,
+        "Resource Adjacent (<=1)": all_res_adj,
+        "Puzzle Adjacent (<=1)": all_puz_adj,
+        "Contested Res At Pos": all_c_res_at_pos,
+        "Contested Res Adj (<=1)": all_c_res_adj,
+    }
+
+    for name, cond_array in target_variables.items():
         p_cond, p_both, pmi, npmi = calc_npmi(cond_array, name)
         print(f"{name:<25} | {p_cond:<8.4f} | {p_both:<8.4f} | {pmi:<8.4f} | {npmi:<8.4f}")
     

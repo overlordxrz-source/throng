@@ -134,7 +134,7 @@ class AgentNetworkJax(nn.Module):
     local_cells: int = 25
     env_channels: int = 9
     own_state_dim: int = 10
-    n_actions: int = 8
+    n_actions: int = 12
 
     def setup(self):
         d = self.hidden_dim
@@ -160,8 +160,16 @@ class AgentNetworkJax(nn.Module):
         # Output heads
         self.final_norm = nn.LayerNorm()
         self.head_action = nn.Dense(self.n_actions)           # N actions (N, S, E, W, Stay, Strike, Push, Guard, [Build])
-        self.head_signal = nn.Dense(self.signal_dim)  # continuous z_e pre-VQ
-        self.codebook = nn.Embed(self.vocab_size, self.signal_dim)
+        # Phase 18: Continuous + 3 discrete slots
+        self.head_signal = nn.Dense(8)  # continuous z_e pre-VQ (truncated from 32D)
+        self.head_signal_slot0 = nn.Dense(12)
+        self.head_signal_slot1 = nn.Dense(8)
+        self.head_signal_slot2 = nn.Dense(12)
+        
+        self.codebook_0 = nn.Embed(self.vocab_size, 12)
+        self.codebook_1 = nn.Embed(self.vocab_size, 8)
+        self.codebook_2 = nn.Embed(self.vocab_size, 12)
+        
         self.head_alarm = nn.Dense(2)            # Phase 17.5: 1-bit discrete alarm channel
         self.head_symbol = nn.Dense(sym_d)       # symbol write
         self.head_value = nn.Dense(1, kernel_init=nn.initializers.normal(0.01), bias_init=nn.initializers.zeros)  # zero init for stable value learning
@@ -326,14 +334,25 @@ class AgentNetworkJax(nn.Module):
         # Zero out age(0), mat(1), energy(2), layers(3) to completely sever the metabolic leak
         exteroceptive_obs = obs.at[:, :4].set(0.0)
         h_comms = nn.relu(self.gwt_comms_1(exteroceptive_obs))
-        z_e = self.head_signal(h_comms)                 # (N, signal_dim)
-        codebook_w = self.codebook.embedding           # (vocab_size, signal_dim)
-        signal_out, token_ids, loss_vq = vector_quantize_signals(
-            z_e,
-            codebook_w,
-            beta=self.vq_beta,
-            dead_code_reset=self.vq_dead_code_reset,
-        )
+        
+        # Phase 18: 40D Wire (8D cont + 12/8/12 slots)
+        z_e_cont = self.head_signal(h_comms)                 # (N, 8)
+        z_e_0 = self.head_signal_slot0(h_comms)              # (N, 12)
+        z_e_1 = self.head_signal_slot1(h_comms)              # (N, 8)
+        z_e_2 = self.head_signal_slot2(h_comms)              # (N, 12)
+        
+        cb0_w = self.codebook_0.embedding
+        cb1_w = self.codebook_1.embedding
+        cb2_w = self.codebook_2.embedding
+        
+        sig_0, tok_0, loss_vq_0 = vector_quantize_signals(z_e_0, cb0_w, beta=self.vq_beta, dead_code_reset=self.vq_dead_code_reset)
+        sig_1, tok_1, loss_vq_1 = vector_quantize_signals(z_e_1, cb1_w, beta=self.vq_beta, dead_code_reset=self.vq_dead_code_reset)
+        sig_2, tok_2, loss_vq_2 = vector_quantize_signals(z_e_2, cb2_w, beta=self.vq_beta, dead_code_reset=self.vq_dead_code_reset)
+        
+        signal_out = jnp.concatenate([z_e_cont, sig_0, sig_1, sig_2], axis=-1)
+        token_ids = jnp.stack([tok_0, tok_1, tok_2], axis=-1)
+        loss_vq = loss_vq_0 + loss_vq_1 + loss_vq_2
+        z_e = jnp.concatenate([z_e_cont, z_e_0, z_e_1, z_e_2], axis=-1)
         
         # Phase 17.5.1: Timescale Grammar 1-bit discrete alarm channel
         alarm_logits = self.head_alarm(h_comms) # (N, 2)
@@ -1031,6 +1050,39 @@ def pad_head_action(flat_params: dict, target_actions: int = 8) -> None:
         flat_params["head_action"]["bias"] = truncated_bias
         print(f"[JAX] Truncating head_action: reduced from {kernel.shape[1]} to {target_actions} actions", flush=True)
 
+def pad_head_signal_cont(flat_params: dict, target_dim: int = 8) -> None:
+    """Truncate the old 32D head_signal down to 8D for the Phase 18 continuous wire."""
+    if "head_signal" not in flat_params:
+        return
+    hs = flat_params["head_signal"]
+    kernel = hs["kernel"]
+    if kernel.shape[1] > target_dim:
+        bias = hs.get("bias", jnp.zeros(kernel.shape[1], dtype=kernel.dtype))
+        
+        # Phase 18: Down-project 32D continuous wire to 8D using empirical PCA projection
+        try:
+            from jax_sim.pca_proj import PCA_PROJ_8D
+            # PCA_PROJ_8D is shape (32, 8). Project kernel (hidden_dim, 32) -> (hidden_dim, 8)
+            truncated_kernel = jnp.dot(kernel, jnp.array(PCA_PROJ_8D, dtype=kernel.dtype))
+            truncated_bias = jnp.dot(bias, jnp.array(PCA_PROJ_8D, dtype=bias.dtype))
+            print(f"[JAX] Down-projecting head_signal: {kernel.shape[1]} -> {target_dim} dims using PCA projection for Phase 18", flush=True)
+        except ImportError:
+            # Fallback to simple truncation if PCA matrix is missing
+            truncated_kernel = kernel[:, :target_dim]
+            truncated_bias = bias[:target_dim]
+            print(f"[JAX] Truncating head_signal: reduced from {kernel.shape[1]} to {target_dim} dims for Phase 18 continuous wire", flush=True)
+
+        flat_params["head_signal"] = {
+            "kernel": truncated_kernel,
+            "bias": truncated_bias
+        }
+
+def clean_old_codebook(flat_params: dict) -> None:
+    """Remove the old 32D codebook to allow the new 12/8/12 discrete slots to initialize cleanly."""
+    if "codebook" in flat_params:
+        del flat_params["codebook"]
+        print(f"[JAX] Removed old 32D codebook from params to allow Phase 18 discrete slots to init.", flush=True)
+
 
 
 def pad_gwt_comms_1(flat_params: dict, target_channels: int) -> None:
@@ -1156,11 +1208,19 @@ def ensure_aux_head_params(
     pad_gwt_comms_1(flat, obs_dim)         # Phase 17 GWT Router grafting
     pad_auxiliary_heads(flat, hidden_dim, model.n_actions) # Phase 16 auxiliary grafting
     pad_head_fwd_2(flat)   # Phase 16 env prediction grafting
+    pad_head_signal_cont(flat) # Phase 18 continuous wire truncation
+    clean_old_codebook(flat)   # Phase 18 discrete slots reset
+    
     needs_vq = (
-        "codebook" not in flat
+        "codebook_0" not in flat
+        or "codebook_1" not in flat
+        or "codebook_2" not in flat
+        or "head_signal_slot0" not in flat
+        or "head_signal_slot1" not in flat
+        or "head_signal_slot2" not in flat
         or (
             "head_signal" in flat
-            and flat["head_signal"]["kernel"].shape[-1] != model.signal_dim
+            and flat["head_signal"]["kernel"].shape[-1] != 8
         )
     )
     needs_cross_attn = bool(
@@ -1184,9 +1244,11 @@ def ensure_aux_head_params(
         obs = jnp.zeros((1, obs_dim))
         fresh = model.init(rng, carry, obs, n_layers)["params"]
         fresh_flat = unfreeze(fresh)
-        for k in ("codebook", "head_signal"):
+        for k in ("codebook_0", "codebook_1", "codebook_2", "head_signal_slot0", "head_signal_slot1", "head_signal_slot2"):
             flat[k] = fresh_flat[k]
-        print("[JAX] Merged fresh VQ params (codebook, head_signal) into restored checkpoint")
+        if "head_signal" not in flat:
+            flat["head_signal"] = fresh_flat["head_signal"]
+        print("[JAX] Merged fresh VQ params (Phase 18 slots) into restored checkpoint")
     if needs_vqel_recon and obs_dim > 0:
         obs = jnp.zeros((1, obs_dim))
         fresh = model.init(rng, carry, obs, n_layers)["params"]

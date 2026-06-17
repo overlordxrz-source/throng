@@ -84,7 +84,7 @@ DEFAULT_CONFIG = {
     "red_population_size": 75,
     "neighbor_k": 6,
     "local_obs_radius": 2,
-    "signal_dim": 32,
+    "signal_dim": 40,
     "symbol_dim": 16,
     "agent_hidden_dim": 256,
     "brain_n_heads": 4,
@@ -291,14 +291,37 @@ def make_sim_step(
         b_alarm_keys = jax.random.split(alarm_key, b_pop.max_pop)
         b_alarm_action = jax.vmap(jax.random.categorical)(b_alarm_keys, b_alarm_logits)
         b_alarm_out = jax.nn.one_hot(b_alarm_action, 2, dtype=jnp.float32)
+        
+        # Phase 18: Continuous-to-Discrete (CtD) bootstrap (100k-step decay ramp)
+        ctd_decay_steps = 100000.0
+        # step_idx goes from 0 upwards; alpha is 1.0 (continuous) -> 0.0 (discrete)
+        alpha = jnp.maximum(0.0, 1.0 - (step_idx / ctd_decay_steps))
+        b_sig_broadcast = (alpha * b_z_e) + ((1.0 - alpha) * b_signal_out)
+
+        # Phase 18: Tier-3 Causal Gates (Ablation)
+        ablate_slot0 = _cfg.get("ablate_slot0", False)
+        ablate_slot1 = _cfg.get("ablate_slot1", False)
+        
+        # Use lax.cond or jnp.where to handle the ablation safely inside JIT
+        from jax_sim.obs_layout import SIGNAL_SLOTS
+        b_sig_broadcast = jax.lax.cond(
+            ablate_slot0,
+            lambda s: s.at[:, SIGNAL_SLOTS['slot_0']].set(0.0),
+            lambda s: s,
+            b_sig_broadcast
+        )
+        b_sig_broadcast = jax.lax.cond(
+            ablate_slot1,
+            lambda s: s.at[:, SIGNAL_SLOTS['slot_1']].set(0.0),
+            lambda s: s,
+            b_sig_broadcast
+        )
 
         # Reds cannot build barriers. Mask out action 8 to prevent PPO from exploring it.
         if r_action_logits.shape[-1] > 8:
             r_action_logits = r_action_logits.at[:, 8].set(-1e9)
 
         # ── Write VQ signals for neighbours ──
-        # ── Write VQ signals for neighbours ──
-        # Phase 18: Timescale Grammar. b_signal_out is a 32D concatenated vector (30D spatial + 2D one-hot alarm)
         if _vqel_monologue:
             b_sig_broadcast = jnp.zeros_like(b_signal_out)
         else:
@@ -407,7 +430,61 @@ def make_sim_step(
             decay=float(config.get("resource_decay", 0.05))
         )
         grid = grid.replace(resources=new_res)
-        b_pop = b_pop.replace(energy=b_pop.energy + b_energy_gain)
+        
+        # ── Phase 18: Crafting Mechanics ────────────────────────
+        # 1. USE_TOOL (Action 11) -> multiplier
+        is_use_tool = (b_actions == 11) & b_pop.alive & b_pop.inventory_axe
+        b_energy_gain = jnp.where(is_use_tool, b_energy_gain * 2.0, b_energy_gain)
+
+        # 2. PICK_UP (Action 9) -> Capacity=1 enforcement
+        is_pickup = (b_actions == 9) & b_pop.alive
+        currently_empty = (b_pop.inventory_wood == 0) & (b_pop.inventory_stone == 0)
+        
+        on_wood = grid.wood_grid[b_pop.positions[:, 0], b_pop.positions[:, 1]] > 0
+        on_stone = grid.stone_grid[b_pop.positions[:, 0], b_pop.positions[:, 1]] > 0
+        
+        pickup_wood = is_pickup & on_wood & currently_empty
+        pickup_stone = is_pickup & on_stone & currently_empty & ~pickup_wood
+        
+        new_inv_wood = b_pop.inventory_wood + pickup_wood.astype(jnp.int32)
+        new_inv_stone = b_pop.inventory_stone + pickup_stone.astype(jnp.int32)
+        
+        new_wood_grid = grid.wood_grid.at[b_pop.positions[:, 0], b_pop.positions[:, 1]].add(-pickup_wood.astype(jnp.float32))
+        new_stone_grid = grid.stone_grid.at[b_pop.positions[:, 0], b_pop.positions[:, 1]].add(-pickup_stone.astype(jnp.float32))
+        grid = grid.replace(
+            wood_grid=jnp.maximum(new_wood_grid, 0.0),
+            stone_grid=jnp.maximum(new_stone_grid, 0.0)
+        )
+        
+        # 3. CRAFT (Action 10) -> shared reward
+        is_craft = (b_actions == 10) & b_pop.alive
+        has_wood = new_inv_wood > 0
+        has_stone = new_inv_stone > 0
+        craft_wood_ready = is_craft & has_wood
+        craft_stone_ready = is_craft & has_stone
+        
+        # Adjacency check
+        dx = jnp.abs(b_pop.positions[:, 0:1] - b_pop.positions[None, :, 0])
+        dy = jnp.abs(b_pop.positions[:, 1:2] - b_pop.positions[None, :, 1])
+        dx = jnp.minimum(dx, gs - dx)
+        dy = jnp.minimum(dy, gs - dy)
+        dist = jnp.maximum(dx, dy)
+        adjacent = dist <= 1
+        
+        wood_to_stone = craft_wood_ready[:, None] & craft_stone_ready[None, :] & adjacent
+        success_wood = wood_to_stone.any(axis=1)
+        success_stone = wood_to_stone.any(axis=0)
+        
+        new_inv_wood = new_inv_wood - success_wood.astype(jnp.int32)
+        new_inv_stone = new_inv_stone - success_stone.astype(jnp.int32)
+        new_inv_axe = b_pop.inventory_axe | success_wood | success_stone
+        
+        b_pop = b_pop.replace(
+            energy=jnp.clip(b_pop.energy + b_energy_gain, 0.0, 1.0),
+            inventory_wood=new_inv_wood,
+            inventory_stone=new_inv_stone,
+            inventory_axe=new_inv_axe
+        )
 
         # ── Contested resource bonus (requires 2+ agents) ──────
         agent_count = jnp.zeros((gs, gs), dtype=jnp.float32)
@@ -422,12 +499,21 @@ def make_sim_step(
         contested_gain = jnp.where(contested_at_agent, 0.1, 0.0)
         b_pop = b_pop.replace(energy=jnp.clip(b_pop.energy + contested_gain, 0.0, 1.0))
 
-        # ── Resource respawning ─────────────────────────────────
-        res_key = jax.random.split(key_misc)[0]
+        # ── Resource & Material respawning ──────────────────────
+        res_key, wood_key, stone_key = jax.random.split(jax.random.split(key_misc)[0], 3)
         regen_rate = float(config.get("resource_regen_rate", 0.005))
         spawn_mask = jax.random.bernoulli(res_key, regen_rate, (gs, gs))
         new_res = grid.resources + spawn_mask.astype(jnp.float32) * _resource_spawn_boost
-        grid = grid.replace(resources=jnp.clip(new_res, 0.0, _resource_max))
+        
+        # Symmetric material respawn
+        wood_spawn = jax.random.bernoulli(wood_key, regen_rate * 0.5, (gs, gs))
+        stone_spawn = jax.random.bernoulli(stone_key, regen_rate * 0.5, (gs, gs))
+        
+        grid = grid.replace(
+            resources=jnp.clip(new_res, 0.0, _resource_max),
+            wood_grid=jnp.clip(grid.wood_grid + wood_spawn.astype(jnp.float32), 0.0, 1.0),
+            stone_grid=jnp.clip(grid.stone_grid + stone_spawn.astype(jnp.float32), 0.0, 1.0)
+        )
 
         # ── Age ─────────────────────────────────────────────────
         b_pop = b_pop.replace(ages=b_pop.ages + 1)
@@ -1268,6 +1354,12 @@ def _run_simulation_impl(
         )
     elif _dialogue_signal_mode == "hard":
         print("[JAX] Phase14 dialogue_signal_mode=hard (discrete z_q broadcast on blue wire)")
+        
+    print(f"[JAX] Phase 18 action_space=12 (added PICK_UP=9, CRAFT=10, USE_TOOL=11)")
+    print(f"[JAX] Phase 18 Continuous-to-Discrete (CtD) bootstrap: 100k-step decay ramp active.")
+    print(f"[JAX] Phase 18 Wire budget: 40D (8D cont + 12/8/12 discrete slots). Codebooks initialized.")
+    print(f"[JAX] Phase 16.6 GWT Router mask active: Zero out age(0), mat(1), energy(2), layers(3)")
+    
     r_opt_state = r_optimizer.init(r_params)
 
     # ── Carries ─────────────────────────────────────────────

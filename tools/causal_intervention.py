@@ -223,6 +223,8 @@ def run_causal_intervention(checkpoint_dir: str, token_a: int, token_b: int, con
                 # Force actions: 5 (STRK), 6 (PUSH), 8 (BUILD)
                 if actions[receiver_id] not in [5, 6, 8]: continue
                 valid_event = True
+            elif context == "energy_high":
+                valid_event = True
 
             if not valid_event:
                 continue
@@ -273,6 +275,21 @@ def run_causal_intervention(checkpoint_dir: str, token_a: int, token_b: int, con
                     p_base = sum([baseline_p[a] for a in [0, 1, 2, 3]])
                 elif context == "force":
                     p_base = sum([baseline_p[a] for a in [5, 6, 8]])
+                elif context == "energy_high":
+                    ey, ex = positions[emitter_id]
+                    dy = ey - ry
+                    dx = ex - rx
+                    if dy > gs // 2: dy -= gs
+                    elif dy < -gs // 2: dy += gs
+                    if dx > gs // 2: dx -= gs
+                    elif dx < -gs // 2: dx += gs
+                    approach_actions = []
+                    if dy < 0: approach_actions.append(0) # N
+                    elif dy > 0: approach_actions.append(1) # S
+                    if dx > 0: approach_actions.append(2) # E
+                    elif dx < 0: approach_actions.append(3) # W
+                    if not approach_actions: continue
+                    p_base = sum([baseline_p[a] for a in approach_actions])
                 
                 # --- INTERVENTION ---
                 if not alarm_test:
@@ -296,6 +313,8 @@ def run_causal_intervention(checkpoint_dir: str, token_a: int, token_b: int, con
                     p_int = sum([int_p[a] for a in [0, 1, 2, 3]])
                 elif context == "force":
                     p_int = sum([int_p[a] for a in [5, 6, 8]])
+                elif context == "energy_high":
+                    p_int = sum([int_p[a] for a in approach_actions])
                 
                 baseline_probs.append(p_base)
                 intervened_probs.append(p_int)
@@ -303,10 +322,10 @@ def run_causal_intervention(checkpoint_dir: str, token_a: int, token_b: int, con
                 
                 if not alarm_test:
                     print(f"Sample {samples_collected:03d} | Receiver {receiver_id} Emitter {emitter_id} | "
-                          f"P(Action|TokenA)={p_base:.4f} -> P(Action|TokenB)={p_int:.4f} (Delta: {p_int - p_base:.4f})")
+                          f"P(Action|TokenA)={p_base:.4f} -> P(Action|TokenB)={p_int:.4f} (Delta: {p_int - p_base:.4f})", flush=True)
                 else:
                     print(f"Sample {samples_collected:03d} | Receiver {receiver_id} Emitter {emitter_id} | "
-                          f"P(Action|Silent)={p_base:.4f} -> P(Action|Alarm)={p_int:.4f} (Delta: {p_int - p_base:.4f})")
+                          f"P(Action|Silent)={p_base:.4f} -> P(Action|Alarm)={p_int:.4f} (Delta: {p_int - p_base:.4f})", flush=True)
                 
                 if samples_collected >= num_samples:
                     break
@@ -357,7 +376,7 @@ if __name__ == "__main__":
     parser.add_argument("--checkpoint", type=str, required=True, help="Path to checkpoint directory")
     parser.add_argument("--token-a", type=int, required=False, default=-1, help="Token ID causing the behavior (e.g. 44 for Predator)")
     parser.add_argument("--token-b", type=int, required=False, default=-1, help="Counterfactual Token ID (e.g. 46 for Safe)")
-    parser.add_argument("--context", type=str, choices=["strike", "flee", "force"], required=True, help="Behavior context to test")
+    parser.add_argument("--context", type=str, choices=["strike", "flee", "force", "energy_high"], required=True, help="Behavior context to test")
     parser.add_argument("--samples", type=int, default=100, help="Number of independent events to sample")
     parser.add_argument("--receiver-dist-min", type=int, default=10, help="Minimum distance between receiver and target entity")
     parser.add_argument("--alarm-test", action="store_true", help="Test the 1-bit alarm head instead of VQ tokens")

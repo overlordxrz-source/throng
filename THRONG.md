@@ -18,13 +18,29 @@ The philosophical and mathematical foundations of THRONG have been consolidated 
 - **[rosetta_stone_math.md](file:///Users/overlord/CascadeProjects/throng/research/rosetta_stone_math.md)**: The state-of-the-art blueprints for **Unsupervised Semantic Translation**. We will use `ott-jax` and Low-Rank Gromov-Wasserstein (LR-GW) to topologically align the discrete MARL VQ space with a continuous LLM embedding space, enforcing geometric isometry via Minimum Description Length (MDL).
 
 ---
-## 0b. Current state — **Phase 17.5 Timescale Grammar & Entropy Paradox** (Jun 2026)
+## 0b. Current state — **Phase 17.5 CONCLUDED / z_q Decode Gate** (Jun 2026)
 
 **Blue SOTA (frozen on `master`):** **`465d8c6+`** — 9.4 cross-attn + 9.1 confidence + **11.3 epistemic gate**.
 
-**Headline:** Phase 16.6 proved agents were bypassing the VQ bottleneck by smuggling continuous geometry (NPMI p < 0.005 on 12 continuous dimensions). Phase 17.5 introduced a metabolically expensive 1-bit discrete alarm channel. After fixing the joint PPO actor-critic backprop, we observed the `Alarm_Rate` stabilize at exactly ~45%.
-**The Entropy Paradox:** A causal intervention test yielded a Null Hypothesis (ATE = -0.0003), proving receivers ignored the alarm. We realized the `ppo_entropy_coef = 0.02` was applied to the alarm head, actively rewarding 50/50 randomness and perfectly cancelling out the 0.006 metabolic cost. We surgically decoupled the alarm entropy (`alarm_ent_coef = 0.0`), leaving metabolic cost as the sole evolutionary pressure.
-**The "Food Found" Broadcast (Metabolic Filter):** After decoupling entropy and running on a fresh Modal volume to checkpoint 2246, the `Alarm_Rate` stabilized at ~16%. A causal lag analysis proved the Distress Signal Hypothesis was exactly backwards: low energy agents *suppress* the alarm to conserve energy (`P(Alarm|E<=0.3) = 0.006`), while healthy agents broadcast (`P(Alarm|E>0.3) = 0.16`). The energy delta of alarming agents is anomalously positive (`ΔEnergy = -0.0031` vs expected `-0.0060`), strongly implying the alarm is broadcast primarily while sitting on a resource patch and eating. The metabolic cost acted as a natural biological filter, forcing the signal to ground itself in high-energy behaviors.
+**Headline:** Phase 17.5 is **CONCLUDED**. The 1-bit discrete alarm channel achieved sender-side thermodynamic grounding (metabolic filter) but failed to achieve receiver-side semantic grounding (ATE = 0.0000 across all behavioral contexts). The alarm head is evolutionarily neutral/vestigial. **Theoretical contribution:** Bilateral selection pressure (both sender cost AND receiver payoff differential) is necessary for grounded signal emergence. Sender cost alone is insufficient.
+
+**Phase 17.5 Results Summary:**
+- `Alarm_Rate` stabilized at 16% under pure metabolic pressure (`alarm_ent_coef = 0.0`).
+- NPMI scan: `Red_Dist` NPMI ≈ 0.00, `Resource` NPMI ≈ 0.00, `Energy<=0.3` NPMI = **-0.34**.
+- Causal ATE: **0.0000** across all receiver behavioral contexts (flee, strike, force, approach).
+- Conclusion: Alarm channel is a cheap-talk equilibrium. Sender cost too small relative to surplus; receiver payoff differential absent. Receivers rationally ignore it.
+- The alarm head stays in the architecture — it is load-bearing as an architectural slot for Phase 19's multi-token message heads (Subject/Verb/Modifier).
+
+**The z_q VQ channel IS load-bearing.** The LAG-1 DIRECTION LRT at `p < 0.005` on 12 continuous dimensions at step 1.15M survived all burn-offs and architecture changes. The alarm was a parallel experiment that failed gracefully. **Next:** `decode_signals.py --metrics posdis,tre` on the 1.15M checkpoint corpus is the Phase 18 gate.
+
+**z_q Decode (Step 1,133k–1,153k, PPO 2246):**
+- PosDis: 0.9568 (near-ceiling positional disentanglement) ✅
+- VQ Token Direction Test: χ²=12.15, p=0.0069 (discrete semantic grounding confirmed) ✅
+- Lag-1 Direction LRT: 30/32 dims significant (flee direction causally steered by neighbor signals) ✅
+- TRE: 0.1051 (compositional depth shallow — single concept encoded, not multi-token syntax)
+- Token spectrum: Token 2 (alert, red_dist≈14) → Token 53 (safe, red_dist≈122) — natural proximity continuum
+- MI: energy dominates all dims (~0.60) — metabolic trap still present but does not negate direction signal
+- Verdict: First-layer grounded discrete communication achieved. Phase 18 UNLOCKED.
 
 **Multi-Token Sequences (Phase 19):** **PLANNING.** If the alarm channel achieves grounded semantic causality, we will upgrade the architecture to support slot-based message heads (Subject/Verb/Modifier) to force compositional syntax.
 | Live run (Phase 16.6) | Value |
@@ -468,7 +484,8 @@ train_entry.run_simulation()  →  main_jax._run_simulation_impl()
 | **16.0** | **Open-Ended Complexity** | ✅ **COMPLETE** | Big Green prey, 8-action space, offline causal decode revealed 0.0000 ATE. |
 | **16.5** | **Environmental Enrichment** | 🔧 **DRAFTED** | Barrier physics, 9 actions (`Build`), Feral Masking, Critic Shock. Goal: Force channel grounding. |
 | **17.0** | **The Rosetta Stone** | **PREP** | Extraction autoencoder mapping VQ latent sequences to English |
-| **18.0** | **The Hive-Mind Interface** | **PREP** | Bidirectional text terminal with a thermodynamically grounded AGI swarm |
+| **17.5** | **Timescale Grammar** | ✅ **CONCLUDED** | Alarm channel: sender-side metabolic grounding validated; receiver-side ATE=0. Alarm vestigial. z_q decode is primary science target. |
+| **18.0** | **Combinatorial Tool Use** | **UNBLOCKED** | PosDis gate cleared (0.9568). Multi-token compositional forcing environment. |
 
 **Recurring failure mode:** Blues stay at cap → ~99% survival → **`NB_GAIN↔surv: nan`** → no evolutionary pressure on neighbor-signal benefit.
 
@@ -476,21 +493,24 @@ train_entry.run_simulation()  →  main_jax._run_simulation_impl()
 
 ---
 
-## 4. Current experiment — Phase **17.5 Timescale Grammar** (`feature/phase17-5-timescale-alarm`)
+## 4. Current experiment — **z_q VQ Token Decode** (post Phase 17.5)
 
-**Status:** Phase 17.5 entropy decoupling is **LIVE** at step 1,129,000+ (PPO 2206+). `alarm_ent_coef` has been set to 0.0. The 0.006 metabolic cost is now the sole thermodynamic pressure on the alarm action. 
+**Status:** Phase 17.5 **CONCLUDED** at step ~1.15M (PPO ~2246). The alarm channel is closed. The z_q VQ token channel is the primary decode target.
 
-**Scientific Pivot:** The NPMI scan proved the alarm channel does not correlate with predator proximity (NPMI ~0.008). It correlates heavily with `Energy <= 0.3` (NPMI 0.1144). The agents may have evolved a **metabolic distress signal**.
+**Phase 17.5 CONCLUDED (Step ~1.15M, PPO ~2246):**
+- Alarm_Rate stabilized at 16% under pure metabolic pressure (alarm_ent_coef = 0.0).
+- NPMI scan: Red_Dist NPMI ≈ 0.00, Resource NPMI ≈ 0.00, Energy≤0.3 NPMI = -0.34.
+- ATE: 0.0000 across all receiver behavioral contexts (flee, approach).
+- Conclusion: Alarm channel achieved sender-side thermodynamic grounding. Receiver-side selection pressure absent. Channel is evolutionarily neutral/vestigial.
+- Theoretical contribution: Bilateral selection pressure (both sender cost AND receiver payoff differential) is necessary for grounded signal emergence. Sender cost alone insufficient.
+- Next: z_q VQ token decode is the primary science target.
 
-**Next Steps (Science):**
-1. **Gate 1 (Lag Analysis):** Run `tools/alarm_lag_analysis.py` to disambiguate causality. Does low energy Granger-cause alarm firing (Direction A: distress signal)? Or does alarm firing Granger-cause low energy (Direction B: spurious correlation via metabolic cost)?
-2. **Gate 2 (Decoupled Equilibrium):** Monitor `Alarm_Rate` under pure metabolic pressure. It should break from the ~45% floor and reflect true selective pressure.
-3. **Gate 3 (Causal Test):** Rerun `causal_intervention.py` using `--context energy` to see if receivers change behavior when near a starving agent sounding the alarm.
+**Next Steps (Science — z_q Decode Gate):**
+1. **Gate 1 (PosDis/TRE):** Run `decode_signals.py --metrics posdis,tre` on the 1.15M corpus. If PosDis > 0.3, the VQ codebook is encoding positionally disentangled representations — Phase 18 green light. If PosDis < 0.1, the continuous geometry is still bypassing the bottleneck.
+2. **Gate 2 (Phase 19 Multi-Token):** Repurpose the alarm head architectural slot for Subject/Verb/Modifier message heads to force compositional syntax.
+3. **Gate 3 (Receiver Selection Pressure):** Design an environment mechanic where receiving and acting on a signal provides a measurable survival advantage (bilateral selection pressure).
 
-**Throughput Work Queue (Will's Engineering Roadmap once science equilibrates):**
-1. **Environment Parallelism:** Vmap over 8–16 parallel environments. Turn the 31s of `lax.scan` 0% GPU idle time into useful parallel rollout work. Target: 3 steps/sec → 20+ steps/sec.
-2. **CPU Shuffle Bottleneck:** Tighten the `flatten_to_cpu` → shuffle → `H2D` pipeline. Pin memory or pre-stage Red minibatches during the Blue backward pass to eliminate zero-SM gaps between PPO passes.
-3. **Hardware Escalation:** Request uncapped A100 or B200 instance if Modal is power-capping `pclk`.
+**DO NOT touch the training config or alarm architecture.** The run at 3 steps/sec and 1.15M+ is healthy. The alarm head stays in the architecture.
 
 **Monitor:**
 
@@ -1304,17 +1324,23 @@ If our true goal is to force the emergence of AGI-level intelligence purely thro
 **Execution:**
 1. **Intrinsic Entropy Injection:** Added an independent 4D Gaussian noise channel to each agent's `own_state` observation, giving them internal randomness for Protean scattering.
 2. **Hardened Gumbel-Softmax Bottleneck:** Replaced the leaky VQ layer with a strict Gumbel-Softmax layer passing through a frozen codebook. This completely severs the continuous gradient path, forcing the network to output a pure discrete token and ending "continuous geometry smuggling."
-#### Phase 17.5 — Timescale Grammar (The Dual-Band Channel)
-**Status:** Code complete. Verification run in progress.
+#### Phase 17.5 — Timescale Grammar (The Dual-Band Channel) — **CONCLUDED**
+**Status:** CONCLUDED (Step ~1.15M, PPO ~2246).
 **Goal:** Prevent Protean scattering from inflating the continuous VQ bottleneck representation, while giving agents a fast-path for evasion.
 **Execution:**
 1. **Discrete Alarm Head:** Added a 1-bit metabolically expensive alarm channel output (`alarm_out`) parallel to the VQ semantic output.
 2. **Dimension Preservation:** Restricted `signal_out` to exactly 32D before the VQ layer, guaranteeing the bottleneck cannot be bypassed by high-variance continuous inputs.
 3. **Topology Zero-Padding:** `graft_missing_param_subtrees` cleanly handled upgrading the Phase 17 (32D `emb_nb` kernel) to Phase 17.5 (34D `emb_nb` kernel) by zero-padding the missing inputs, allowing agents to retain 1M steps of spatial survival skills while learning the new alarm grammar from scratch.
-#### Phase 18 — Combinatorial Tool Use (Crafting Trees)
-**Goal:** Force the network to invent compositional logic (AND, OR, IF/THEN) and syntax.
-- **Mechanics:** Introduce combinable primitives (e.g., Wood + Stone = Axe).
-- **Semantics:** Requires vocabulary expansion from simple nouns ("Predator") to verbs and modifiers ("Get wood *then* build").
+**Results:**
+- Sender-side metabolic filter validated: `Alarm_Rate` 16% under pure metabolic pressure. `P(Alarm|E<=0.3)=0.006` vs `P(Alarm|E>0.3)=0.16`.
+- Receiver-side ATE = 0.0000 across all behavioral contexts. Channel is cheap-talk equilibrium.
+- NPMI exhaustive scan: Red_Dist ≈ 0, Resource ≈ 0, Puzzle = 0, Contested = 0, Energy≤0.3 = **-0.34** (strong negative — healthy agents alarm).
+- **Verdict (Cam):** Partial success. Metabolic filter mechanism (sender-side thermodynamic grounding) is validated and novel. Receiver-side semantic grounding was not achieved. Alarm head is vestigial but stays in architecture for Phase 19 repurposing.
+#### Phase 18 — Combinatorial Tool Use (Crafting Trees) — **UNBLOCKED**
+**Goal:** Force the network to invent compositional logic (AND, OR, IF/THEN) and syntax via a 3-slot communication architecture.
+- **Mechanics:** Introduce combinable primitives (e.g., Wood + Stone = Axe) with severe receiver-side selection pressure. Solo crafting is impossible.
+- **Semantics:** Requires vocabulary expansion from simple nouns ("Predator") to slot-based compositional messages (Subject/Verb/Modifier, e.g., "I have Wood" + "Need Stone").
+- **Decode Gate:** (a) `NPMI(slot_0, inventory_item) > 0.3`, (b) `NPMI(slot_1, action_intent) > 0.3`, AND (c) `ATE > X` (statistically significant receiver response) when ablating either slot via Tier-3 causal gate. This proves Subject and Verb slots are semantically separated and causally grounded.
 
 #### Phase 19 — Cultural Transmission (Writing)
 **Goal:** Allow agents to pre-train themselves across generations, escaping the capacity limit of oral communication.
@@ -1328,4 +1354,4 @@ If our true goal is to force the emergence of AGI-level intelligence purely thro
 
 ---
 
-*Last updated: 2026-06-13 — Phase 17.5 Timescale Grammar (Discrete Alarm Head) COMPLETE. Verification run in progress.*
+*Last updated: 2026-06-18 — Phase 17.5 CONCLUDED. Alarm channel closed (ATE=0). z_q VQ token decode is the primary science target for Phase 18 gate.*

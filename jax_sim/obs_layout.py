@@ -5,6 +5,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 
+SIGNAL_SLOTS = {
+    'cont': slice(0, 8),
+    'slot_0': slice(8, 20),
+    'slot_1': slice(20, 28),
+    'slot_2': slice(28, 40)
+}
+
 @dataclass(frozen=True)
 class ObsLayout:
     own_state_start: int
@@ -49,7 +56,7 @@ def make_obs_layout(
     neighbor_k: int = 6,
     local_cells: int = 25,
     env_channels: int = 10,
-    own_state_dim: int = 10,
+    own_state_dim: int = 13,
 ) -> ObsLayout:
     """Return canonical flat-observation slice boundaries."""
     idx = 0
