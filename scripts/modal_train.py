@@ -63,4 +63,4 @@ def build_cfg() -> dict:
 
 if __name__ == "__main__":
     print("modal_train.py: P10.5 Hard-Ceiling resume (hot ckpt on volume)", flush=True)
-    run_simulation(build_cfg(), seed=42, n_steps=150_000)
+    run_simulation(build_cfg(), seed=42, n_steps=2_000_000)
