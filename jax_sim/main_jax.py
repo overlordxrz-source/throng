@@ -299,23 +299,14 @@ def make_sim_step(
         b_sig_broadcast = (alpha * b_z_e) + ((1.0 - alpha) * b_signal_out)
 
         # Phase 18: Tier-3 Causal Gates (Ablation)
-        ablate_slot0 = _cfg.get("ablate_slot0", False)
-        ablate_slot1 = _cfg.get("ablate_slot1", False)
+        ablate_slot0 = config.get("ablate_slot0", False)
+        ablate_slot1 = config.get("ablate_slot1", False)
         
-        # Use lax.cond or jnp.where to handle the ablation safely inside JIT
         from jax_sim.obs_layout import SIGNAL_SLOTS
-        b_sig_broadcast = jax.lax.cond(
-            ablate_slot0,
-            lambda s: s.at[:, SIGNAL_SLOTS['slot_0']].set(0.0),
-            lambda s: s,
-            b_sig_broadcast
-        )
-        b_sig_broadcast = jax.lax.cond(
-            ablate_slot1,
-            lambda s: s.at[:, SIGNAL_SLOTS['slot_1']].set(0.0),
-            lambda s: s,
-            b_sig_broadcast
-        )
+        if ablate_slot0:
+            b_sig_broadcast = b_sig_broadcast.at[:, SIGNAL_SLOTS['slot_0']].set(0.0)
+        if ablate_slot1:
+            b_sig_broadcast = b_sig_broadcast.at[:, SIGNAL_SLOTS['slot_1']].set(0.0)
 
         # Reds cannot build barriers. Mask out action 8 to prevent PPO from exploring it.
         if r_action_logits.shape[-1] > 8:
