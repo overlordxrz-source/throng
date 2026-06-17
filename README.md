@@ -7,8 +7,8 @@ to **survive, signal, and pass knowledge on**. The goal is not "an agent that
 plays a game well." The goal is **emergence**: language, culture, and proto-
 cognition arising purely from selection pressure.
 
-**Current state (Jun 2026):** **Phase 17.5.1 (Timescale Grammar Gradient Fix) LIVE.** We successfully implemented a mathematically sound joint actor-critic gradient path for a discrete alarm head running in parallel with continuous VQ signals. The alarm is subjected to severe thermodynamic selection pressure (0.006 energy/step). Will's Throughput Queue (Environment Vmap & CPU Shuffle Tightening) is next.
-Currently training on branch `feature/phase17-5-timescale-alarm`. Monitoring the dual-channel discrete architecture (Gate 1: Alarm_Rate stabilization). See `THRONG.md` for the full scientific roadmap and status.
+**Current state (Jun 2026):** **Phase 17.5.1 (Timescale Grammar Gradient Fix) LIVE.** We successfully implemented a mathematically sound joint actor-critic gradient path for a discrete alarm head running in parallel with continuous VQ signals. The alarm is subjected to severe thermodynamic selection pressure (0.006 energy/step) and the entropy bonus was surgically decoupled. As a result, the Alarm Rate collapsed from 45% to ~16%. A lag analysis proved this grounded the alarm as a "Food Found" broadcast, where only healthy/eating agents can afford the metabolic cost to broadcast. Will's Throughput Queue (Environment Vmap & CPU Shuffle Tightening) is next.
+Currently training on branch `feature/phase17-5-timescale-alarm`. See `THRONG.md` for the full scientific roadmap and status.
 
 **Phase 19 (Multi-Token Sequences) PLANNING.** The next step is to introduce compositional syntax.
 **Modal:** **`dragonbg`** — volume **`throng-runs`**.
