@@ -1,6 +1,8 @@
 # THRONG — Agent Onboarding
 
-> Can proto-language emerge from multi-agent survival pressure alone — no human text, no communication rewards?
+> **CORE GOAL:** Achieve emergent intelligence surpassing Large Language Models (AGI) through causally grounded, multi-agent survival pressure, ultimately deploying the evolved spiking neural policies onto Intel's Loihi neuromorphic hardware.
+
+*Can proto-language and true reasoning emerge from thermodynamic pressure alone — completely bypassing the ungrounded statistical illusion of LLMs?*
 
 **Read this file first.** Full historical lab notebook (~290KB) lives in [`docs/THRONG_ARCHIVE.md`](docs/THRONG_ARCHIVE.md) if you need old run logs.
 
