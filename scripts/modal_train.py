@@ -52,11 +52,11 @@ def build_cfg() -> dict:
     cfg["resource_max"] = 0.5
     cfg["resource_spawn_boost"] = 0.1
     cfg["max_age"] = 1000
-    cfg["vq_dead_code_reset"] = True
+    cfg["vq_dead_code_reset"] = False
     cfg["ppo_rollout_steps"] = 512
     cfg["ppo_minibatch_size"] = 1024  # Phase 17: doubled from 512 (safe with dynamic GPU alloc)
-    # Phase 17 — Gumbel-Softmax bottleneck + intrinsic entropy
-    cfg["n_actions"] = 8        # N, S, E, W, Stay, Strike, Push, Guard
+    # Phase 18 — Continuous-to-Discrete bootstrap
+    cfg["n_actions"] = 12       # N, S, E, W, Stay, Strike, Push, Guard, Bld, PickUp, Craft, UseTool
     cfg["env_channels"] = 10    # blue, red, wall, res, shelter, contested, scent, puzzle, blue_bg, barrier
     return cfg
 
