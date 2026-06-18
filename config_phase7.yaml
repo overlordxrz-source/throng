@@ -34,7 +34,7 @@ brain_max_layers: 6
 brain_token_dim: 128
 brain_n_heads: 4
 agent_hidden_dim: 256
-signal_dim: 32
+signal_dim: 40
 symbol_dim: 16
 
 neighbor_k: 6
