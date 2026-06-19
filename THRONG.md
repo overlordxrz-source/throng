@@ -27,7 +27,7 @@ The philosophical and mathematical foundations of THRONG have been consolidated 
 **Phase 18 Launch Summary:**
 - **Crash Resolved:** The silent crash during PPO updates was isolated to `communication/analysis.py`. The Corpus Writer could not serialize the new 3-element `token_ids` arrays. This has been patched (`1ccc390`).
 - **Telemetry Patched:** The dashboard string was hardcoded to print only up to index 8 (`Bld`). It now prints `PU`, `Crf`, and `Use` (`12fb472`).
-- **Ecological State:** Early telemetry shows massive utilization of the new 3-slot discrete architecture (47/64 codes active, 11/16 clusters). The Epistemic Gate is triggering 67.5% of the time, heavily overriding basic reactive instincts (`imagination_agree=8.4%`). Red predators are at the population ceiling (250) and applying immense lethal pressure.
+- **Ecological State:** The system is launched and actively training, with the Continuous-to-Discrete (CtD) bootstrap ramp in progress (alpha ≈ 0.90). First diagnostic checkpoint will be at +50k steps. Early telemetry shows high epistemic gate triggering (67.5%), which requires close monitoring to ensure `Stay` percentage doesn't collapse.
 
 **Phase 17.5 Results Summary:**
 - `Alarm_Rate` stabilized at 16% under pure metabolic pressure (`alarm_ent_coef = 0.0`).
@@ -47,7 +47,6 @@ The philosophical and mathematical foundations of THRONG have been consolidated 
 - MI: energy dominates all dims (~0.60) — metabolic trap still present but does not negate direction signal
 - Verdict: First-layer grounded discrete communication achieved. Phase 18 UNLOCKED.
 
-**Multi-Token Sequences (Phase 19):** **MOVED TO PHASE 18.** We have upgraded the architecture to support slot-based message heads (Subject/Verb/Modifier) to force compositional syntax.
 | Live run (Phase 18.0) | Value |
 |-----------------------|--------|
 | **Branch** | **`feature/phase18-crafting`** |
@@ -1341,7 +1340,7 @@ If our true goal is to force the emergence of AGI-level intelligence purely thro
 - Receiver-side ATE = 0.0000 across all behavioral contexts. Channel is cheap-talk equilibrium.
 - NPMI exhaustive scan: Red_Dist ≈ 0, Resource ≈ 0, Puzzle = 0, Contested = 0, Energy≤0.3 = **-0.34** (strong negative — healthy agents alarm).
 - **Verdict (Cam):** Partial success. Metabolic filter mechanism (sender-side thermodynamic grounding) is validated and novel. Receiver-side semantic grounding was not achieved. Alarm head is vestigial but stays in architecture for Phase 19 repurposing.
-#### Phase 18 — Combinatorial Tool Use (Crafting Trees) — **UNBLOCKED**
+#### Phase 18 — Combinatorial Tool Use (Crafting Trees) — **LIVE**
 **Goal:** Force the network to invent compositional logic (AND, OR, IF/THEN) and syntax via a 3-slot communication architecture.
 - **Mechanics:** Introduce combinable primitives (e.g., Wood + Stone = Axe) with severe receiver-side selection pressure. Solo crafting is impossible.
 - **Semantics:** Requires vocabulary expansion from simple nouns ("Predator") to slot-based compositional messages (Subject/Verb/Modifier, e.g., "I have Wood" + "Need Stone").
@@ -1359,4 +1358,4 @@ If our true goal is to force the emergence of AGI-level intelligence purely thro
 
 ---
 
-*Last updated: 2026-06-18 — Phase 17.5 CONCLUDED. Alarm channel closed (ATE=0). z_q VQ token decode is the primary science target for Phase 18 gate.*
+*Last updated: 2026-06-19 — Phase 18 LIVE. CtD Bootstrap in progress.*

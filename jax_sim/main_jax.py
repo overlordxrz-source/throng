@@ -1868,7 +1868,13 @@ def _run_simulation_impl(
                 b_tok_last = np.array(rollout_data["blue"]["token_ids"])[-1]
                 if alive_mask_final.sum() > 0:
                     alive_toks = b_tok_last[alive_mask_final]
-                    vq_codes_str = f"{len(np.unique(alive_toks))}/{config.get('vocab_size', 64)}"
+                    if alive_toks.ndim == 2 and alive_toks.shape[1] == 3:
+                        u0 = len(np.unique(alive_toks[:, 0]))
+                        u1 = len(np.unique(alive_toks[:, 1]))
+                        u2 = len(np.unique(alive_toks[:, 2]))
+                        vq_codes_str = f"{u0}|{u1}|{u2}/64"
+                    else:
+                        vq_codes_str = f"{len(np.unique(alive_toks))}/{config.get('vocab_size', 64)}"
 
             # Signal vocabulary compression (k-means clusters with >2% occupancy)
             b_signals_np = np.array(b_pop_np.signals)
