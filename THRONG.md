@@ -18,11 +18,16 @@ The philosophical and mathematical foundations of THRONG have been consolidated 
 - **[rosetta_stone_math.md](file:///Users/overlord/CascadeProjects/throng/research/rosetta_stone_math.md)**: The state-of-the-art blueprints for **Unsupervised Semantic Translation**. We will use `ott-jax` and Low-Rank Gromov-Wasserstein (LR-GW) to topologically align the discrete MARL VQ space with a continuous LLM embedding space, enforcing geometric isometry via Minimum Description Length (MDL).
 
 ---
-## 0b. Current state — **Phase 17.5 CONCLUDED / z_q Decode Gate** (Jun 2026)
+## 0b. Current state — **Phase 18 LIVE / Combinatorial Tool Use & Multi-Slot Syntax** (Jun 2026)
 
 **Blue SOTA (frozen on `master`):** **`465d8c6+`** — 9.4 cross-attn + 9.1 confidence + **11.3 epistemic gate**.
 
-**Headline:** Phase 17.5 is **CONCLUDED**. The 1-bit discrete alarm channel achieved sender-side thermodynamic grounding (metabolic filter) but failed to achieve receiver-side semantic grounding (ATE = 0.0000 across all behavioral contexts). The alarm head is evolutionarily neutral/vestigial. **Theoretical contribution:** Bilateral selection pressure (both sender cost AND receiver payoff differential) is necessary for grounded signal emergence. Sender cost alone is insufficient.
+**Headline:** Phase 18 is **LIVE** on `feature/phase18-crafting`. The architecture has been successfully upgraded to support a 12-action space (`PickUp`, `Craft`, `UseTool`) and a 3-slot discrete communication sequence (12/8/12 vocabularies) over a 40D wire budget. The `Continuous-to-Discrete (CtD)` bootstrap ramp is active.
+
+**Phase 18 Launch Summary:**
+- **Crash Resolved:** The silent crash during PPO updates was isolated to `communication/analysis.py`. The Corpus Writer could not serialize the new 3-element `token_ids` arrays. This has been patched (`1ccc390`).
+- **Telemetry Patched:** The dashboard string was hardcoded to print only up to index 8 (`Bld`). It now prints `PU`, `Crf`, and `Use` (`12fb472`).
+- **Ecological State:** Early telemetry shows massive utilization of the new 3-slot discrete architecture (47/64 codes active, 11/16 clusters). The Epistemic Gate is triggering 67.5% of the time, heavily overriding basic reactive instincts (`imagination_agree=8.4%`). Red predators are at the population ceiling (250) and applying immense lethal pressure.
 
 **Phase 17.5 Results Summary:**
 - `Alarm_Rate` stabilized at 16% under pure metabolic pressure (`alarm_ent_coef = 0.0`).
@@ -42,12 +47,12 @@ The philosophical and mathematical foundations of THRONG have been consolidated 
 - MI: energy dominates all dims (~0.60) — metabolic trap still present but does not negate direction signal
 - Verdict: First-layer grounded discrete communication achieved. Phase 18 UNLOCKED.
 
-**Multi-Token Sequences (Phase 19):** **PLANNING.** If the alarm channel achieves grounded semantic causality, we will upgrade the architecture to support slot-based message heads (Subject/Verb/Modifier) to force compositional syntax.
-| Live run (Phase 16.6) | Value |
+**Multi-Token Sequences (Phase 19):** **MOVED TO PHASE 18.** We have upgraded the architecture to support slot-based message heads (Subject/Verb/Modifier) to force compositional syntax.
+| Live run (Phase 18.0) | Value |
 |-----------------------|--------|
-| **Branch** | **`feature/phase16-6-occlusion`** |
+| **Branch** | **`feature/phase18-crafting`** |
 | **Modal workspace** | **`dragonbg`** (Jun 2026) |
-| **P16.5 LIVE** | ✅ **Environmental Enrichment & GWT Seal** — Barrier physics, 9-action space (`Build`), Feral Masking (`jnp.where` zero-mask on `symbol_write`), Critic Shock discount. `obs.at[:, :4].set(0.0)` applied to *both* Red and Blue. |
+| **P18.0 LIVE** | ✅ **Combinatorial Tool Use & Multi-Slot Syntax** — 12-action space (`PickUp`, `Craft`, `UseTool`), 3-slot discrete tokens (12/8/12), Continuous-to-Discrete (CtD) bootstrap, 40D wire budget. |
 | **Current Status** | ✅ **The Great Burn-Off Succeeded**. `codes_active` bottomed out at 1/64 (step 992k), gradient starvation forced external grounding, and the codebook recovered. Barrier Occlusion successfully forced reliance on neighbor signals. |
 | **Proto-Lexicon** | **Token 13**: Predator/Alert (N=61, mean_dist=11.8). **Token 55**: Safe/Clear (N=693, mean_dist=94.5). **CAUSAL TEST FAILED**: Swapping Token 13 for 55 yields ATE = -0.0004. Discrete tokens are ignored. |
 
