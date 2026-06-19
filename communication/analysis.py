@@ -413,7 +413,11 @@ class SignalCorpusWriter:
             if norm_y is not None:
                 rec["norm_y"] = round(float(norm_y[i]), 4)
             if token_ids is not None:
-                rec["vq_token"] = int(token_ids[idx])
+                tok = token_ids[idx]
+                if isinstance(tok, (np.ndarray, list, tuple)):
+                    rec["vq_token"] = [int(v) for v in tok]
+                else:
+                    rec["vq_token"] = int(tok)
             if nb_scout_sig_lag1 is not None:
                 row = nb_scout_sig_lag1[i]
                 rec["nb_scout_sig_lag1"] = (
@@ -476,7 +480,11 @@ class SignalCorpusWriter:
                 "neighbors": round(float(neighbor_count[i]), 4),
             }
             if token_ids is not None:
-                rec["vq_token"] = int(token_ids[idx])
+                tok = token_ids[idx]
+                if isinstance(tok, (np.ndarray, list, tuple)):
+                    rec["vq_token"] = [int(v) for v in tok]
+                else:
+                    rec["vq_token"] = int(tok)
             if nb_hunter_sig_lag1 is not None:
                 row = nb_hunter_sig_lag1[i]
                 rec["nb_hunter_sig_lag1"] = (
