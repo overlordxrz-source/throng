@@ -1816,6 +1816,8 @@ def _run_simulation_impl(
                 act_str = f"N={act_pct[1]:.0f}% S={act_pct[2]:.0f}% E={act_pct[3]:.0f}% W={act_pct[4]:.0f}% Stay={act_pct[0]:.0f}% Strk={act_pct[5]:.0f}% Push={act_pct[6]:.0f}% Grd={act_pct[7]:.0f}%"
                 if len(act_pct) > 8:
                     act_str += f" Bld={act_pct[8]:.0f}%"
+                if len(act_pct) > 11:
+                    act_str += f" PU={act_pct[9]:.0f}% Crf={act_pct[10]:.0f}% Use={act_pct[11]:.0f}%"
             else:
                 act_str = "no alive agents"
 
@@ -1835,6 +1837,8 @@ def _run_simulation_impl(
                     )
                     if len(r_pct) > 8:
                         red_act_str += f" Bld={r_pct[8]:.0f}%"
+                    if len(r_pct) > 11:
+                        red_act_str += f" PU={r_pct[9]:.0f}% Crf={r_pct[10]:.0f}% Use={r_pct[11]:.0f}%"
                 else:
                     red_act_str = "no alive reds"
             if _red_comms and "token_ids" in rollout_data["red"]:
