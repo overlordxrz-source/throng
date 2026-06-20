@@ -54,7 +54,7 @@ def build_cfg() -> dict:
     cfg["max_age"] = 1000
     cfg["vq_dead_code_reset"] = False
     cfg["ppo_rollout_steps"] = 512
-    cfg["ppo_minibatch_size"] = 1024  # Phase 17: doubled from 512 (safe with dynamic GPU alloc)
+    cfg["ppo_minibatch_size"] = 512   # Phase 18: Reverted back to 512 to avoid A100 PPO backward OOM
     # Phase 18 — Continuous-to-Discrete bootstrap
     cfg["n_actions"] = 12       # N, S, E, W, Stay, Strike, Push, Guard, Bld, PickUp, Craft, UseTool
     cfg["env_channels"] = 10    # blue, red, wall, res, shelter, contested, scent, puzzle, blue_bg, barrier
