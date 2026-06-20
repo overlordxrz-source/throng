@@ -2208,7 +2208,10 @@ def _run_simulation_impl(
                         ) / w_sum[has_donor]
                         for i in np.where(has_donor)[0]:
                             toks = _lag1_scout_tok[within_mask[i]].astype(np.int64)
-                            nb_scout_token_lag1[i] = int(np.bincount(toks).argmax())
+                            toks_s0 = np.asarray(toks)
+                            if toks_s0.ndim > 1:
+                                toks_s0 = toks_s0[:, 0]
+                            nb_scout_token_lag1[i] = int(np.bincount(toks_s0.astype(int)).argmax())
                 adj_red = red_dist <= 2.0
                 adj_bg = np.sum(b_obs_all[t, alive_idx][:, idx_adj_bg], axis=-1) > 0.5
                 adj_barrier = np.sum(b_obs_all[t, alive_idx][:, idx_adj_barrier], axis=-1) > 0.5
@@ -2306,7 +2309,10 @@ def _run_simulation_impl(
                         ) / w_h_sum[has_hunter_donor]
                         for i in np.where(has_hunter_donor)[0]:
                             toks = _lag1_hunter_tok[within_h[i]].astype(np.int64)
-                            nb_hunter_token_lag1[i] = int(np.bincount(toks).argmax())
+                            toks_s0 = np.asarray(toks)
+                            if toks_s0.ndim > 1:
+                                toks_s0 = toks_s0[:, 0]
+                            nb_hunter_token_lag1[i] = int(np.bincount(toks_s0.astype(int)).argmax())
 
                 corpus_writer_red.maybe_record_red(
                     step=global_step,

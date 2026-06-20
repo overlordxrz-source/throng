@@ -955,13 +955,26 @@ def graft_missing_param_subtrees(
         src_val = source[key]
         if not isinstance(tgt_val, dict) and hasattr(tgt_val, "shape") and hasattr(src_val, "shape"):
             if tgt_val.shape != src_val.shape:
+                import jax.numpy as jnp
                 if key == "kernel" and len(tgt_val.shape) == 2 and len(src_val.shape) == 2:
                     if tgt_val.shape[1] == src_val.shape[1] and tgt_val.shape[0] > src_val.shape[0]:
-                        import jax.numpy as jnp
                         diff = tgt_val.shape[0] - src_val.shape[0]
                         padding = jnp.zeros((diff, tgt_val.shape[1]), dtype=src_val.dtype)
                         source[key] = jnp.concatenate([src_val, padding], axis=0)
                         injected.append(f"{path} (zero-padded {diff} inputs)")
+                        continue
+                    elif tgt_val.shape[0] == src_val.shape[0] and tgt_val.shape[1] > src_val.shape[1]:
+                        diff = tgt_val.shape[1] - src_val.shape[1]
+                        padding = jnp.zeros((tgt_val.shape[0], diff), dtype=src_val.dtype)
+                        source[key] = jnp.concatenate([src_val, padding], axis=1)
+                        injected.append(f"{path} (zero-padded {diff} outputs)")
+                        continue
+                elif key == "bias" and len(tgt_val.shape) == 1 and len(src_val.shape) == 1:
+                    if tgt_val.shape[0] > src_val.shape[0]:
+                        diff = tgt_val.shape[0] - src_val.shape[0]
+                        padding = jnp.zeros((diff,), dtype=src_val.dtype)
+                        source[key] = jnp.concatenate([src_val, padding], axis=0)
+                        injected.append(f"{path} (zero-padded {diff} bias elements)")
                         continue
                 # If shapes mismatch and not handled above, reset to template
                 source[key] = jax.tree_util.tree_map(lambda x: x, tgt_val)
