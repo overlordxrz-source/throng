@@ -1615,7 +1615,8 @@ def _run_simulation_impl(
 
         if config.get("vq_dead_code_reset", True) and "z_e" in b_batch:
             _dc_key, update_key = jax.random.split(update_key)
-            _tok = jnp.asarray(b_batch["token_ids"]).reshape(-1)
+            # Phase 18: tokens are (M, T, 3), z_e is (M, T, 40)
+            _tok = jnp.asarray(b_batch["token_ids"]).reshape(-1, 3)
             _ze = jnp.asarray(b_batch["z_e"]).reshape(-1, int(config["signal_dim"]))
             _alive = jnp.asarray(b_batch["alive"]).reshape(-1).astype(bool)
             b_params = dead_code_reset_codebook_params(

@@ -52,7 +52,7 @@ def build_cfg() -> dict:
     cfg["resource_max"] = 0.5
     cfg["resource_spawn_boost"] = 0.1
     cfg["max_age"] = 1000
-    cfg["vq_dead_code_reset"] = False
+    cfg["vq_dead_code_reset"] = True
     cfg["ppo_rollout_steps"] = 512
     cfg["ppo_minibatch_size"] = 512   # Phase 18: Reverted back to 512 to avoid A100 PPO backward OOM
     # Phase 18 — Continuous-to-Discrete bootstrap
