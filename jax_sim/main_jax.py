@@ -1615,17 +1615,32 @@ def _run_simulation_impl(
 
         if config.get("vq_dead_code_reset", True) and "z_e" in b_batch:
             _dc_key, update_key = jax.random.split(update_key)
-            # Phase 18: tokens are (M, T, 3), z_e is (M, T, 40)
-            _tok = jnp.asarray(b_batch["token_ids"]).reshape(-1, 3)
-            _ze = jnp.asarray(b_batch["z_e"]).reshape(-1, int(config["signal_dim"]))
+            _toks = jnp.asarray(b_batch["token_ids"])
+            _ze = jnp.asarray(b_batch["z_e"])
             _alive = jnp.asarray(b_batch["alive"]).reshape(-1).astype(bool)
-            b_params = dead_code_reset_codebook_params(
-                b_params,
-                _tok[_alive],
-                _ze[_alive],
-                int(config["vocab_size"]),
-                _dc_key,
-            )
+            
+            _toks_alive = _toks[_alive]
+            _ze_alive = _ze[_alive]
+            
+            if _toks_alive.ndim > 1 and _toks_alive.shape[-1] == 3:
+                # Phase 18: 3 slots. z_e layout: 8D cont + 12D slot0 + 8D slot1 + 12D slot2
+                _dc_key_0, _dc_key_1, _dc_key_2 = jax.random.split(_dc_key, 3)
+                _vocab_size = int(config["vocab_size"])
+                b_params = dead_code_reset_codebook_params(
+                    b_params, _toks_alive[:, 0], _ze_alive[:, 8:20], _vocab_size, _dc_key_0, "codebook_0"
+                )
+                b_params = dead_code_reset_codebook_params(
+                    b_params, _toks_alive[:, 1], _ze_alive[:, 20:28], _vocab_size, _dc_key_1, "codebook_1"
+                )
+                b_params = dead_code_reset_codebook_params(
+                    b_params, _toks_alive[:, 2], _ze_alive[:, 28:40], _vocab_size, _dc_key_2, "codebook_2"
+                )
+            else:
+                _toks_alive = _toks_alive.reshape(-1)
+                _ze_alive = _ze_alive.reshape(-1, int(config["signal_dim"]))
+                b_params = dead_code_reset_codebook_params(
+                    b_params, _toks_alive, _ze_alive, int(config["vocab_size"]), _dc_key, "codebook"
+                )
 
         if ui == start_update:
             import gc as _gc

@@ -98,6 +98,8 @@ def dead_code_reset_codebook_params(
     if z_e.shape[0] == 0:
         return params
     flat = unfreeze(params)
+    if codebook_key not in flat:
+        return params
     cb = flat[codebook_key]["embedding"]
     usage = jnp.bincount(token_ids, length=vocab_size)
     dead_mask = usage == 0
