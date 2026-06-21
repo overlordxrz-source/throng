@@ -57,7 +57,15 @@ from flax.core.frozen_dict import unfreeze, freeze
 
 ACTION_NAMES = {0: "N", 1: "S", 2: "E", 3: "W", 4: "STAY", 5: "STRK", 6: "PUSH", 7: "GRD", 8: "BUILD"}
 
-def run_causal_intervention(checkpoint_dir: str, token_a: int, token_b: int, context: str, num_samples: int, receiver_dist_min: int = 10, alarm_test: bool = False):
+def run_causal_intervention(checkpoint_dir: str, token_a: str, token_b: str, context: str, num_samples: int, receiver_dist_min: int = 10, alarm_test: bool = False):
+    
+    def parse_token(t_str):
+        if t_str == "-1": return None
+        return [int(x) for x in t_str.split(",")]
+        
+    t_a_list = parse_token(token_a)
+    t_b_list = parse_token(token_b)
+
     # 1. Load config and ensure step-by-step control
     with open(ROOT / "config_phase7.yaml") as f:
         config = yaml.safe_load(f)
@@ -121,13 +129,23 @@ def run_causal_intervention(checkpoint_dir: str, token_a: int, token_b: int, con
     if _ckpt_latest is None:
         sys.exit(f"No valid checkpoint found in {checkpoint_dir}")
     raw_restored = ckpt_mngr.restore(_ckpt_latest)
-    b_params = freeze(unfreeze(raw_restored)["b_params"])
-    r_params = freeze(unfreeze(raw_restored)["r_params"])
-    
-    if not alarm_test:
-        cb = b_params["codebook"]["embedding"]
-        token_a_emb = cb[token_a]
-        token_b_emb = cb[token_b]
+    b_params = unfreeze(raw_restored)["b_params"]
+    r_params = unfreeze(raw_restored)["r_params"]
+    from jax_sim.network_jax import ensure_aux_head_params
+    rng_init = jax.random.PRNGKey(0)
+    b_params = ensure_aux_head_params(
+        model=model, params=b_params, rng=rng_init, hidden_dim=hidden_d,
+        obs_dim=obs_dim, n_layers=n_layers
+    )
+    b_params = freeze(b_params)
+    r_params = freeze(r_params)
+    if not alarm_test and t_a_list is not None and t_b_list is not None:
+        cb0 = b_params["codebook_0"]["embedding"]
+        cb1 = b_params["codebook_1"]["embedding"]
+        cb2 = b_params["codebook_2"]["embedding"]
+        # Concatenate slots with the 8 dead continuous dimensions (zeros) at the front
+        token_a_emb = jnp.concatenate([jnp.zeros(8), cb0[t_a_list[0]], cb1[t_a_list[1]], cb2[t_a_list[2]]])
+        token_b_emb = jnp.concatenate([jnp.zeros(8), cb0[t_b_list[0]], cb1[t_b_list[1]], cb2[t_b_list[2]]])
     else:
         token_a_emb = None
         token_b_emb = None
@@ -374,8 +392,8 @@ def run_causal_intervention(checkpoint_dir: str, token_a: int, token_b: int, con
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--checkpoint", type=str, required=True, help="Path to checkpoint directory")
-    parser.add_argument("--token-a", type=int, required=False, default=-1, help="Token ID causing the behavior (e.g. 44 for Predator)")
-    parser.add_argument("--token-b", type=int, required=False, default=-1, help="Counterfactual Token ID (e.g. 46 for Safe)")
+    parser.add_argument("--token-a", type=str, required=False, default="-1", help="Comma-separated Slot IDs for Token A (e.g. 57,12,34)")
+    parser.add_argument("--token-b", type=str, required=False, default="-1", help="Comma-separated Slot IDs for Token B (e.g. 46,0,0)")
     parser.add_argument("--context", type=str, choices=["strike", "flee", "force", "energy_high"], required=True, help="Behavior context to test")
     parser.add_argument("--samples", type=int, default=100, help="Number of independent events to sample")
     parser.add_argument("--receiver-dist-min", type=int, default=10, help="Minimum distance between receiver and target entity")
