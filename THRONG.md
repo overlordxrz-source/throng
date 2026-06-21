@@ -29,6 +29,13 @@ The philosophical and mathematical foundations of THRONG have been consolidated 
 - **Telemetry Patched:** The dashboard string was hardcoded to print only up to index 8 (`Bld`). It now prints `PU`, `Crf`, and `Use` (`12fb472`).
 - **Ecological State:** The system is launched and actively training, with the Continuous-to-Discrete (CtD) bootstrap ramp in progress (alpha ≈ 0.90). First diagnostic checkpoint will be at +50k steps. Early telemetry shows high epistemic gate triggering (67.5%), which requires close monitoring to ensure `Stay` percentage doesn't collapse.
 
+**Phase 18 Post-Launch Bug Log:**
+- **Bincount Crash:** Multi-slot array `(N, 3)` crashed scalar `np.bincount` ops at lines 2211 & 2309. Fixed by explicitly slicing `toks[:, 0]` (commit `eea02af`).
+- **Grafting Amnesia:** Expanding `head_action` from 8 to 12 actions reinitialized the layer, wiping 1.15M steps of evasion policy. Fixed with a generic dynamic zero-pad (`axis=1` kernels, `axis=0` biases) in `graft_missing_param_subtrees` (commit `eea02af`).
+- **Codebook Collapse:** `codes_active` collapsed from 25→7 in 13 PPO updates (2278–2291).
+- **Dead Code Reset Disabled:** `vq_dead_code_reset: False` was incorrectly hardcoded in config. 
+- **VQ Gradient Disconnection:** `loss_vq=0.0000` because the Phase 17 discrete bottleneck manually zeroed the commitment loss. (Both VQ bugs fixed in `0ed2399`).
+
 **Phase 17.5 Results Summary:**
 - `Alarm_Rate` stabilized at 16% under pure metabolic pressure (`alarm_ent_coef = 0.0`).
 - NPMI scan: `Red_Dist` NPMI ≈ 0.00, `Resource` NPMI ≈ 0.00, `Energy<=0.3` NPMI = **-0.34**.
@@ -1183,6 +1190,11 @@ phase12_coevolution:           # feature/phase13-thermodynamics (inherited from 
 | **DCVQ + VQ-VIB** | **Divide-and-Conquer** | **Grammar fix.** Splitting the 32-dim latent space into parallel low-dim subspaces to create syntactic slots. VQ-VIB adds an explicit KL penalty to compress away internal noise. |
 | **Expert Dropout** | **MEDAL-ADR** | **Generational fix.** For Cumulative Culture. When training novices alongside "experts", randomly drop the experts mid-episode. Prevents passive physical imitation; forces novices to rely on semantic memory of the experts' signals. |
 | **DRCB** | **Circuit Breaker** | **Drift fix.** Detects dialect collapse (via codebook log entropy). Actively shuffles VQ centroids if the population falls back into the metabolic trap. |
+
+### Phase 18 — Combinatorial Tool Use & Multi-Slot Syntax
+**Phase 18 Gate Conditions (Engineering Tasks Before Ecology Deployment):**
+1. **Fix VQ Gradient Disconnection:** The Phase 17 discrete bottleneck zeroed out the VQ commitment loss. Ensure `loss_vq` computes correctly for the 3 slots so they can update. [DONE]
+2. **Re-Enable Dead Code Reset:** `vq_dead_code_reset` was incorrectly hardcoded to `False` in launch scripts. Ensure it is `True` to prevent the `codes_active` bleeding (25→7 in 13 updates). [DONE]
 
 ### Phase 12 — **COMPLETE** (frozen on `feature/phase12-red-coevolution`)
 
