@@ -50,7 +50,7 @@ RED_SEARCH_BLUE_DIST_MIN = 5.0
 
 # ── Loading ────────────────────────────────────────────────────────────────────
 
-def load_corpus(path: str) -> dict:
+def load_corpus(path: str, min_step: int = 0) -> dict:
     records = []
     with open(path) as fh:
         for line in fh:
@@ -58,7 +58,9 @@ def load_corpus(path: str) -> dict:
             if not line:
                 continue
             try:
-                records.append(json.loads(line))
+                r = json.loads(line)
+                if r["step"] >= min_step:
+                    records.append(r)
             except json.JSONDecodeError:
                 continue
 
@@ -2064,7 +2066,7 @@ def main() -> None:
         return
 
     print(f"\nLoading corpus from {args.corpus} …")
-    data = load_corpus(args.corpus)
+    data = load_corpus(args.corpus, min_step=args.min_step)
 
     keep = np.ones(len(data["steps"]), dtype=bool)
     if args.min_step > 0:
