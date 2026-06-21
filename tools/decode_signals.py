@@ -1562,13 +1562,17 @@ def vq_token_direction_test(
         print("  nb_scout_token_lag1 absent — re-run corpus after vq_token logging.")
         return
 
-    valid_tok = vq_tokens >= 0
+    tokens = vq_tokens
+    if tokens.ndim > 1:
+        tokens = tokens[:, 0]
+
     token_stats: dict[int, tuple[float, int]] = {}
-    for t in range(int(vq_tokens.max()) + 1 if valid_tok.any() else 0):
-        mask = valid_tok & (vq_tokens == t)
-        if int(mask.sum()) < 5:
-            continue
-        token_stats[t] = (float(ctx["red_dist"][mask].mean()), int(mask.sum()))
+    valid_tokens = np.unique(tokens[tokens >= 0])
+
+    for t in valid_tokens:
+        mask = (tokens == t)
+        if mask.sum() > 0:
+            token_stats[t] = (float(ctx["red_dist"][mask].mean()), int(mask.sum()))
 
     if not token_stats:
         print("  No vq_token field in corpus — accumulate data after training fix.")
