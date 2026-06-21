@@ -1617,6 +1617,13 @@ def _run_simulation_impl(
             _dc_key, update_key = jax.random.split(update_key)
             _toks = jnp.asarray(b_batch["token_ids"])
             _ze = jnp.asarray(b_batch["z_e"])
+            
+            # Reshape (steps, agents, features) to (steps * agents, features)
+            if _toks.ndim > 1:
+                _toks = _toks.reshape(-1, _toks.shape[-1])
+            if _ze.ndim > 1:
+                _ze = _ze.reshape(-1, _ze.shape[-1])
+                
             _alive = jnp.asarray(b_batch["alive"]).reshape(-1).astype(bool)
             
             _toks_alive = _toks[_alive]
