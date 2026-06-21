@@ -30,3 +30,9 @@ When switching Modal accounts:
 - **Always reauth first:** Run `modal token new` (or `.modal-cli/bin/modal token new`) and wait for browser approval BEFORE any volume operations.
 - **Upload script:** Use `./scripts/migrate_modal.sh upload ~/throng_backup` — it handles volume creation + upload.
 - **Log location:** When training is launched from a Modal Notebook (Jupyter), logs go to cell output, NOT to `/mnt/throng-runs/train.log` on the volume. Use `modal volume get` to fetch volume files, or ask the user to paste cell output.
+
+## 6. Strategic Roadmap Awareness
+When onboarding or making high-level architectural decisions, you **MUST** consult `docs/STRATEGIC_ROADMAP.md`. 
+- Do not mistake "adding features" (like crafting) for progress towards AGI. Features exist only to increase the **environmental complexity ceiling** and force **compositional syntax**.
+- The true path to AGI lies in: 1) Persistent Culture (Phase 19 writing system), 2) Open-Ended Complexity (Phase 21 procedural environments), 3) Internal Reasoning (Phase 22 language as a cognitive tool), and 4) Cross-Domain Transfer (Phase 23).
+- Always contextualize the current phase within this broader strategic trajectory.
