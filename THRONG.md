@@ -38,14 +38,19 @@ The philosophical and mathematical foundations of THRONG have been consolidated 
 - GWT Router: exteroceptive-only input (`obs[:, :4]` zeroed) → `h_comms` → VQ heads
 - Alarm channel: vestigial (ATE=0 from Phase 17.5), stays in architecture
 
-| Live run (Phase 18.1) | Value |
+**Phase 18.3 — Ecology + 12-Action Modal Deployment (Jun 21, 2026):**
+- **Checkpoint Validation:** Verified that the 1.19M checkpoint structurally holds shapes `[2594, 256]` (blue) and `[2594, 128]` (red) in the raw `.zarray` manifest. This perfectly matches the `10/10` vs `12/13` dimension graft expectations. `pad_gwt_comms_1` successfully zero-pads into the new `12/13` layout while preserving old bit-level weights (emb_own and emb_env differences are `0.00000000`).
+- **Action Logits Diagnostic:** `n_actions` history formally verified: it was exactly 8 prior to Phase 18. Build/Craft/UseTool gating in earlier phases was totally unreachable dead code.
+- **Early Frequency Check:** Because actions 8-11 were previously dead, they emerge with fresh zeroes. To check if they spam at deploy-time (since a zero logit may be a high-probability action compared to negatively biased old actions), `main_jax.py` now logs the frequency of actions 8-11 during the first 20 PPO updates.
+
+| Live run (Phase 18.3) | Value |
 |-----------------------|--------|
 | **Branch** | **`feature/phase18-crafting`** |
 | **Modal workspace** | **`twentyninegeese`** (Jun 21, 2026) |
-| **Git HEAD** | `37af4aa` (bypass amputation) + `2923c58` (ATE test) + `7a6e355` (AGENTS.md rules) |
+| **Git HEAD** | `c756318` (action frequency diagnostic logging) |
 | **Checkpoint** | 2304 (step 1,179,648) — restored on new Modal account |
-| **Status** | ✅ Training on pure discrete architecture. `blue_caught=0`, `codes_active=28|31|25/64`. |
-| **Next Gate** | Causal ATE > 0 with CI excluding zero on slot_0. Then ecology deployment. |
+| **Status** | ⏳ Deploying to Modal. Awaiting early action 8-11 frequency check. |
+| **Next Gate** | Confirm `blue_caught` baseline + 8-11 action frequency logging. Then run patched `causal_intervention.py`. |
 
 **Cam's Measured Read on the Proto-Lexicon:**
 - **The Continuous Smuggling Hypothesis**: The categorical LRT on scout signals (k=4 clusters) showed no alignment with cardinal direction ($\chi^2 p = 0.315$). However, the continuous `LAG-1 DIRECTION LRT` on the 32d signal vector yielded highly significant causal steering ($p < 0.005$ on 12 dimensions!). The agents are not communicating via the discrete codebook index; they are doing linear algebra on the continuous `z_q` embeddings, effectively pointing to predators in continuous space.
