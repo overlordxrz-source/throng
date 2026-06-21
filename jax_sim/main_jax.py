@@ -1119,16 +1119,22 @@ def _run_simulation_impl(
             restored = freeze(source_dict)
         except ValueError as exc:
             msg = str(exc)
-            if "do not match" in msg:
+            if "do not match" in msg or "Topology mismatch" in msg:
                 print(
-                    "[JAX] Orbax strict match failed (schema evolution). "
-                    "Merging new heads manually...",
+                    f"[JAX] Orbax strict match failed (schema evolution). "
+                    f"Merging new heads manually... ({msg})",
                     flush=True,
                 )
                 from flax.core import freeze, unfreeze
 
-                raw_restored = ckpt_mngr.restore(_ckpt_latest)
                 target_dict = unfreeze(abstract_tree)
+                source_dict = {"b_params": {}, "r_params": {}}
+                
+                try:
+                    raw_restored = ckpt_mngr.restore(_ckpt_latest)
+                except ValueError:
+                    raw_restored = ckpt_mngr.restore(_ckpt_latest, items=target_dict)
+                
                 source_dict = unfreeze(raw_restored)
                 _restore_agents = ("b_params", "r_params")
                 for agent_type in _restore_agents:
@@ -1616,6 +1622,16 @@ def _run_simulation_impl(
             b_metrics["conf_loss"] = b_conf_loss
             b_metrics["conf_pred"] = b_conf_pred
             b_metrics["proprio_loss"] = b_proprio_loss
+            
+            # Phase 18 early diagnostic: monitor actions 8-11 (Build, PickUp, Craft, UseTool)
+            if ui < start_update + 20:
+                _flat_actions = _b_actions_np[_b_alive_np] if _b_alive_np is not None else _b_actions_np
+                _flat_actions = _flat_actions.reshape(-1)
+                _tot = len(_flat_actions)
+                _new_action_count = np.sum((_flat_actions >= 8) & (_flat_actions <= 11))
+                _freq = _new_action_count / max(_tot, 1)
+                print(f"  [DEBUG] New Actions 8-11 frequency: {_freq*100:.2f}% (Count: {_new_action_count}/{_tot})", flush=True)
+
 
         if config.get("vq_dead_code_reset", True) and "z_e" in b_batch:
             _dc_key, update_key = jax.random.split(update_key)
