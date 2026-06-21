@@ -2039,6 +2039,8 @@ def main() -> None:
                     help="Comma-separated list of metrics to compute (e.g. posdis,tre)")
     ap.add_argument("--npmi", action="store_true",
                     help="Phase 17: Run NPMI Lexical Parser (Noun, Verb, Adverb)")
+    ap.add_argument("--slice-cols", type=int, default=None,
+                    help="Phase 18: Isolate the first N columns of the signal vector (e.g. 8 for the continuous bypass)")
     args = ap.parse_args()
 
     if args.red:
@@ -2087,6 +2089,8 @@ def main() -> None:
 
     n       = data["n"]
     signals = data["signals"]
+    if args.slice_cols is not None:
+        signals = signals[:, :args.slice_cols]
     actions = data["actions"]
     scouts  = data["scouts"]
     ctx     = data["ctx"]
