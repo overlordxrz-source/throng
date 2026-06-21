@@ -32,7 +32,7 @@ The philosophical and mathematical foundations of THRONG have been consolidated 
 - **Causal ATE (Preliminary):** Slot_0 ATE = +0.088, but 95% CI includes zero (n=920 receivers). Need ~50k+ post-amputation corpus records to reach statistical significance.
 
 **Phase 18 Architecture (Current):**
-- 12-action space: N, S, E, W, Stay, Strike, Push, Guard, Build, PickUp, Craft, UseTool
+- 12-action space: N, S, E, W, Stay, Strike, Push, Guard, Build, PickUp, Craft, UseTool *(Note: Phase 18 formally expanded the network's action head from 8 to 12. Prior to this phase, the logic for actions 8-11 existed in the environment but was physically unreachable dead code since the network could only emit 8 logits.)*
 - 3-slot discrete VQ: slot_0 (12D, 64 codes), slot_1 (8D, 64 codes), slot_2 (12D, 64 codes)
 - 8D continuous bypass: **DEAD** (zeroed in forward pass)
 - GWT Router: exteroceptive-only input (`obs[:, :4]` zeroed) → `h_comms` → VQ heads
@@ -1357,4 +1357,4 @@ If our true goal is to force the emergence of AGI-level intelligence purely thro
 
 ---
 
-*Last updated: 2026-06-21 — Phase 18 LIVE. Phase 18.3 Ecology Deployed (Spatial Bifurcation, Sensory Expansion). Frozen-checkpoint causal test queued.*
+*Last updated: 2026-06-21 — Phase 18.1 LIVE. Checkpoint grafting mathematically verified (zero discrepancy on forward pass equivalence). Causal ATE intervention script successfully refactored for Phase 18's 3-slot architecture. Pending Modal run.*
