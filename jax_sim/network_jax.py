@@ -339,7 +339,8 @@ class AgentNetworkJax(nn.Module):
         h_comms = nn.relu(self.gwt_comms_1(exteroceptive_obs))
         
         # Phase 18: 40D Wire (8D cont + 12/8/12 slots)
-        z_e_cont = self.head_signal(h_comms)                 # (N, 8)
+        # Amputate continuous bypass (Protean/Metabolic leak verified via Phase 18 diagnostic)
+        z_e_cont = jnp.zeros((obs.shape[0], 8), dtype=jnp.float32)  # (N, 8)
         z_e_0 = self.head_signal_slot0(h_comms)              # (N, 12)
         z_e_1 = self.head_signal_slot1(h_comms)              # (N, 8)
         z_e_2 = self.head_signal_slot2(h_comms)              # (N, 12)
