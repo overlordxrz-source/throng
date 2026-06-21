@@ -18,49 +18,33 @@ The philosophical and mathematical foundations of THRONG have been consolidated 
 - **[rosetta_stone_math.md](file:///Users/overlord/CascadeProjects/throng/research/rosetta_stone_math.md)**: The state-of-the-art blueprints for **Unsupervised Semantic Translation**. We will use `ott-jax` and Low-Rank Gromov-Wasserstein (LR-GW) to topologically align the discrete MARL VQ space with a continuous LLM embedding space, enforcing geometric isometry via Minimum Description Length (MDL).
 
 ---
-## 0b. Current state — **Phase 18 LIVE / Combinatorial Tool Use & Multi-Slot Syntax** (Jun 2026)
+## 0b. Current state — **Phase 18.1 LIVE / Post-Amputation Discrete-Only Training** (Jun 2026)
 
 **Blue SOTA (frozen on `master`):** **`465d8c6+`** — 9.4 cross-attn + 9.1 confidence + **11.3 epistemic gate**.
 
-**Headline:** Phase 18 is **LIVE** on `feature/phase18-crafting`. The architecture has been successfully upgraded to support a 12-action space (`PickUp`, `Craft`, `UseTool`) and a 3-slot discrete communication sequence (12/8/12 vocabularies) over a 40D wire budget. The `Continuous-to-Discrete (CtD)` bootstrap ramp is active.
+**Headline:** Phase 18 is **LIVE** on `feature/phase18-crafting`. The 8D continuous bypass has been **amputated** (`37af4aa`). Agents now communicate exclusively through 3 discrete VQ slots (12/8/12 vocabularies). Training resumed from checkpoint 2304 (step 1,179,648) on the `twentyninegeese` Modal workspace. The agents survived the amputation with **zero catch spike** — discrete slots had already learned the full evasion grammar in parallel.
 
-**Phase 18 Launch Summary:**
-- **Crash Resolved:** The silent crash during PPO updates was isolated to `communication/analysis.py`. The Corpus Writer could not serialize the new 3-element `token_ids` arrays. This has been patched (`1ccc390`).
-- **Telemetry Patched:** The dashboard string was hardcoded to print only up to index 8 (`Bld`). It now prints `PU`, `Crf`, and `Use` (`12fb472`).
-- **Ecological State:** The system is launched and actively training, with the Continuous-to-Discrete (CtD) bootstrap ramp in progress (alpha ≈ 0.90). First diagnostic checkpoint will be at +50k steps. Early telemetry shows high epistemic gate triggering (67.5%), which requires close monitoring to ensure `Stay` percentage doesn't collapse.
+**Phase 18.1 — Bypass Amputation (Jun 21, 2026):**
+- **Diagnostic Confirmed Protean Scattering:** `decode_signals.py --slice-cols 8` on steps 1,175,000–1,184,252 showed all 8 continuous dims mapped to `energy` (MI ≈ 0.41–0.47). The bypass was a metabolic leak / collision-evasion RNG, not semantic content.
+- **Surgery:** `z_e_cont = jnp.zeros((obs.shape[0], 8))` in `network_jax.py` line 342. Wire size preserved at 40D, checkpoint grafting unaffected. The `head_signal` Dense(8) layer is still in the model (weights frozen/unused) to avoid shape mismatches.
+- **Result:** `blue_caught=0` immediately post-amputation. No recovery period needed. The 3 discrete slots were already carrying the full load.
+- **Causal ATE (Preliminary):** Slot_0 ATE = +0.088, but 95% CI includes zero (n=920 receivers). Need ~50k+ post-amputation corpus records to reach statistical significance.
 
-**Phase 18 Post-Launch Bug Log:**
-- **Bincount Crash:** Multi-slot array `(N, 3)` crashed scalar `np.bincount` ops at lines 2211 & 2309. Fixed by explicitly slicing `toks[:, 0]` (commit `eea02af`).
-- **Grafting Amnesia:** Expanding `head_action` from 8 to 12 actions reinitialized the layer, wiping 1.15M steps of evasion policy. Fixed with a generic dynamic zero-pad (`axis=1` kernels, `axis=0` biases) in `graft_missing_param_subtrees` (commit `eea02af`).
-- **Codebook Collapse:** `codes_active` collapsed from 25→7 in 13 PPO updates (2278–2291).
-- **Dead Code Reset Disabled:** `vq_dead_code_reset: False` was incorrectly hardcoded in config. 
-- **VQ Gradient Disconnection:** `loss_vq=0.0000` because the Phase 17 discrete bottleneck manually zeroed the commitment loss. (Both VQ bugs fixed in `0ed2399`).
+**Phase 18 Architecture (Current):**
+- 12-action space: N, S, E, W, Stay, Strike, Push, Guard, Build, PickUp, Craft, UseTool
+- 3-slot discrete VQ: slot_0 (12D, 64 codes), slot_1 (8D, 64 codes), slot_2 (12D, 64 codes)
+- 8D continuous bypass: **DEAD** (zeroed in forward pass)
+- GWT Router: exteroceptive-only input (`obs[:, :4]` zeroed) → `h_comms` → VQ heads
+- Alarm channel: vestigial (ATE=0 from Phase 17.5), stays in architecture
 
-**Phase 17.5 Results Summary:**
-- `Alarm_Rate` stabilized at 16% under pure metabolic pressure (`alarm_ent_coef = 0.0`).
-- NPMI scan: `Red_Dist` NPMI ≈ 0.00, `Resource` NPMI ≈ 0.00, `Energy<=0.3` NPMI = **-0.34**.
-- Causal ATE: **0.0000** across all receiver behavioral contexts (flee, strike, force, approach).
-- Conclusion: Alarm channel is a cheap-talk equilibrium. Sender cost too small relative to surplus; receiver payoff differential absent. Receivers rationally ignore it.
-- The alarm head stays in the architecture — it is load-bearing as an architectural slot for Phase 19's multi-token message heads (Subject/Verb/Modifier).
-
-**The z_q VQ channel IS load-bearing.** The LAG-1 DIRECTION LRT at `p < 0.005` on 12 continuous dimensions at step 1.15M survived all burn-offs and architecture changes. The alarm was a parallel experiment that failed gracefully. **Next:** `decode_signals.py --metrics posdis,tre` on the 1.15M checkpoint corpus is the Phase 18 gate.
-
-**z_q Decode (Step 1,133k–1,153k, PPO 2246):**
-- PosDis: 0.9568 (near-ceiling positional disentanglement) ✅
-- VQ Token Direction Test: χ²=12.15, p=0.0069 (discrete semantic grounding confirmed) ✅
-- Lag-1 Direction LRT: 30/32 dims significant (flee direction causally steered by neighbor signals) ✅
-- TRE: 0.1051 (compositional depth shallow — single concept encoded, not multi-token syntax)
-- Token spectrum: Token 2 (alert, red_dist≈14) → Token 53 (safe, red_dist≈122) — natural proximity continuum
-- MI: energy dominates all dims (~0.60) — metabolic trap still present but does not negate direction signal
-- Verdict: First-layer grounded discrete communication achieved. Phase 18 UNLOCKED.
-
-| Live run (Phase 18.0) | Value |
+| Live run (Phase 18.1) | Value |
 |-----------------------|--------|
 | **Branch** | **`feature/phase18-crafting`** |
-| **Modal workspace** | **`dragonbg`** (Jun 2026) |
-| **P18.0 LIVE** | ✅ **Combinatorial Tool Use & Multi-Slot Syntax** — 12-action space (`PickUp`, `Craft`, `UseTool`), 3-slot discrete tokens (12/8/12), Continuous-to-Discrete (CtD) bootstrap, 40D wire budget. |
-| **Current Status** | ✅ **The Great Burn-Off Succeeded**. `codes_active` bottomed out at 1/64 (step 992k), gradient starvation forced external grounding, and the codebook recovered. Barrier Occlusion successfully forced reliance on neighbor signals. |
-| **Proto-Lexicon** | **Token 13**: Predator/Alert (N=61, mean_dist=11.8). **Token 55**: Safe/Clear (N=693, mean_dist=94.5). **CAUSAL TEST FAILED**: Swapping Token 13 for 55 yields ATE = -0.0004. Discrete tokens are ignored. |
+| **Modal workspace** | **`twentyninegeese`** (Jun 21, 2026) |
+| **Git HEAD** | `37af4aa` (bypass amputation) + `2923c58` (ATE test) + `7a6e355` (AGENTS.md rules) |
+| **Checkpoint** | 2304 (step 1,179,648) — restored on new Modal account |
+| **Status** | ✅ Training on pure discrete architecture. `blue_caught=0`, `codes_active=28|31|25/64`. |
+| **Next Gate** | Causal ATE > 0 with CI excluding zero on slot_0. Then ecology deployment. |
 
 **Cam's Measured Read on the Proto-Lexicon:**
 - **The Continuous Smuggling Hypothesis**: The categorical LRT on scout signals (k=4 clusters) showed no alignment with cardinal direction ($\chi^2 p = 0.315$). However, the continuous `LAG-1 DIRECTION LRT` on the 32d signal vector yielded highly significant causal steering ($p < 0.005$ on 12 dimensions!). The agents are not communicating via the discrete codebook index; they are doing linear algebra on the continuous `z_q` embeddings, effectively pointing to predators in continuous space.
@@ -496,7 +480,9 @@ train_entry.run_simulation()  →  main_jax._run_simulation_impl()
 | **16.5** | **Environmental Enrichment** | 🔧 **DRAFTED** | Barrier physics, 9 actions (`Build`), Feral Masking, Critic Shock. Goal: Force channel grounding. |
 | **17.0** | **The Rosetta Stone** | **PREP** | Extraction autoencoder mapping VQ latent sequences to English |
 | **17.5** | **Timescale Grammar** | ✅ **CONCLUDED** | Alarm channel: sender-side metabolic grounding validated; receiver-side ATE=0. Alarm vestigial. z_q decode is primary science target. |
-| **18.0** | **Combinatorial Tool Use** | **UNBLOCKED** | PosDis gate cleared (0.9568). Multi-token compositional forcing environment. |
+| **18.0** | **Combinatorial Tool Use** | ✅ **LIVE** | 12-action space, 3-slot discrete VQ (12/8/12), 40D wire, CtD bootstrap. |
+| **18.1** | **Bypass Amputation** | ✅ **COMPLETE** | 8D continuous bypass confirmed as Protean Scattering (metabolic leak). Severed via zero-tensor surgery (`37af4aa`). Agents survived with zero catch spike. |
+| **18.2** | **Causal ATE Gate** | 🔧 **IN PROGRESS** | Preliminary ATE=+0.088 (slot_0), CI includes zero. Accumulating post-amputation corpus for statistical power. Script: `tools/ate_swap_test.py`. |
 
 **Recurring failure mode:** Blues stay at cap → ~99% survival → **`NB_GAIN↔surv: nan`** → no evolutionary pressure on neighbor-signal benefit.
 
@@ -504,24 +490,23 @@ train_entry.run_simulation()  →  main_jax._run_simulation_impl()
 
 ---
 
-## 4. Current experiment — **z_q VQ Token Decode** (post Phase 17.5)
+## 4. Current experiment — **Phase 18.2 Causal ATE Gate** (post Bypass Amputation)
 
-**Status:** Phase 17.5 **CONCLUDED** at step ~1.15M (PPO ~2246). The alarm channel is closed. The z_q VQ token channel is the primary decode target.
+**Status:** Phase 18.1 **COMPLETE** — 8D continuous bypass amputated. Training live on pure discrete 3-slot architecture at step ~1,181,000 on `twentyninegeese` Modal workspace.
 
-**Phase 17.5 CONCLUDED (Step ~1.15M, PPO ~2246):**
-- Alarm_Rate stabilized at 16% under pure metabolic pressure (alarm_ent_coef = 0.0).
-- NPMI scan: Red_Dist NPMI ≈ 0.00, Resource NPMI ≈ 0.00, Energy≤0.3 NPMI = -0.34.
-- ATE: 0.0000 across all receiver behavioral contexts (flee, approach).
-- Conclusion: Alarm channel achieved sender-side thermodynamic grounding. Receiver-side selection pressure absent. Channel is evolutionarily neutral/vestigial.
-- Theoretical contribution: Bilateral selection pressure (both sender cost AND receiver payoff differential) is necessary for grounded signal emergence. Sender cost alone insufficient.
-- Next: z_q VQ token decode is the primary science target.
+**Gating Sequence (from implementation_plan.md):**
+1. ~~**Diagnostic Decode Pass (NPMI):**~~ ✅ Confirmed Protean Scattering. All 8 continuous dims → energy.
+2. ~~**Continuous Bypass Surgery:**~~ ✅ `z_e_cont = jnp.zeros(...)` in `network_jax.py`.
+3. **Causal Intervention (ATE Test):** 🔧 IN PROGRESS. Preliminary ATE=+0.088 on slot_0 but CI includes zero. Need more post-amputation corpus.
+4. **Ecology Deployment:** BLOCKED on ATE gate. Once ATE > 0 with CI excluding zero, deploy spatial resource bifurcation + cooperative crafting.
 
-**Next Steps (Science — z_q Decode Gate):**
-1. **Gate 1 (PosDis/TRE):** Run `decode_signals.py --metrics posdis,tre` on the 1.15M corpus. If PosDis > 0.3, the VQ codebook is encoding positionally disentangled representations — Phase 18 green light. If PosDis < 0.1, the continuous geometry is still bypassing the bottleneck.
-2. **Gate 2 (Phase 19 Multi-Token):** Repurpose the alarm head architectural slot for Subject/Verb/Modifier message heads to force compositional syntax.
-3. **Gate 3 (Receiver Selection Pressure):** Design an environment mechanic where receiving and acting on a signal provides a measurable survival advantage (bilateral selection pressure).
+**Next Steps:**
+1. Let training accumulate ~50k+ blind receiver records on the post-amputation discrete architecture.
+2. Run `python tools/ate_swap_test.py /mnt/throng-runs/signal_corpus.jsonl --min-step 1185000`.
+3. If ATE passes: deploy Phase 18 ecology (resource bifurcation, inventory limits, cooperative `Craft`, `UseTool` payoffs) from the frozen implementation plan.
+4. If ATE fails: the discrete slots are also cheap talk, and we need a fundamentally different environmental pressure design.
 
-**DO NOT touch the training config or alarm architecture.** The run at 3 steps/sec and 1.15M+ is healthy. The alarm head stays in the architecture.
+**DO NOT touch the training config or bypass surgery.** The run at 4 steps/sec and 1,181k+ is healthy. Let it accumulate corpus.
 
 **Monitor:**
 

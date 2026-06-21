@@ -7,11 +7,11 @@ to **survive, signal, and pass knowledge on**. The goal is not "an agent that
 plays a game well." The goal is **emergence**: language, culture, and proto-
 cognition arising purely from selection pressure.
 
-**Current state (Jun 2026):** **Phase 18 (Combinatorial Tool Use & Multi-Slot Syntax) LIVE.** We successfully implemented a 12-action space (`PickUp`, `Craft`, `UseTool`) and a 3-slot discrete communication sequence (12/8/12 vocabularies) over a 40D wire budget. The `Continuous-to-Discrete (CtD)` bootstrap ramp is active. Initial telemetry shows massive utilization of the new 3-slot architecture (47/64 codes active) and high Epistemic Gate triggering (67.5%), proving the agents are heavily relying on imagination and simulation to survive the extreme predation pressure.
+**Current state (Jun 2026):** **Phase 18.1 (Post-Amputation Discrete-Only Training) LIVE.** The 8D continuous bypass has been surgically severed after diagnostics confirmed it was a Protean Scattering metabolic leak. Agents now communicate exclusively through 3 discrete VQ slots (12/8/12 vocabularies). The Causal ATE Gate is in progress — preliminary ATE=+0.088 on slot_0 but CI includes zero; accumulating post-amputation corpus for statistical power. Once ATE clears, Phase 18 ecology (resource bifurcation, cooperative crafting) deploys.
 Currently training on branch `feature/phase18-crafting`. See `THRONG.md` for the full scientific roadmap and status.
 
-**Phase 19 (Cultural Transmission & Writing) PREP.** The next step is allowing agents to write these multi-token sequences to the environment.
-**Modal:** **`dragonbg`** — volume **`throng-runs`**.
+**Phase 19 (Cultural Transmission & Writing) PREP.** The next step is allowing agents to write multi-token sequences to the environment.
+**Modal:** **`twentyninegeese`** — volume **`throng-runs`**.
 
 **Full ops / decode / roadmap:** [THRONG.md](THRONG.md) §0b (read first).
 
@@ -23,7 +23,7 @@ tail -f -n 60 /mnt/throng-runs/train.log
 
 **Framework:** JAX + Flax (`lax.scan` rollout, CPU-offload PPO on B200)
 **Active config:** `config_phase7.yaml`
-**Active branch:** `feature/phase15-cumulative-culture` (not `master` for live train)
+**Active branch:** `feature/phase18-crafting` (not `master` for live train)
 **Working files:** `jax_sim/` (PyTorch in `agents/`, `main.py` is legacy).
 
 For the full research log, theory, philosophy, and per-phase post-mortems see
