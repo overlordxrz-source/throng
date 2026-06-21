@@ -16,6 +16,7 @@ The philosophical and mathematical foundations of THRONG have been consolidated 
 
 - **[marl_complexity_2026.md](file:///Users/overlord/CascadeProjects/throng/research/marl_complexity_2026.md)**: Details the "Complexity Ceiling" hypothesis. Proves that without survival pressure and complex environments (like Combinatorial Tool Use), communication plateaus. Explains why LLMs lack causal grounding and why the VQ bottleneck forces exteroceptive representations.
 - **[rosetta_stone_math.md](file:///Users/overlord/CascadeProjects/throng/research/rosetta_stone_math.md)**: The state-of-the-art blueprints for **Unsupervised Semantic Translation**. We will use `ott-jax` and Low-Rank Gromov-Wasserstein (LR-GW) to topologically align the discrete MARL VQ space with a continuous LLM embedding space, enforcing geometric isometry via Minimum Description Length (MDL).
+- **[STRATEGIC_ROADMAP.md](file:///Users/overlord/CascadeProjects/throng/docs/STRATEGIC_ROADMAP.md)**: The path from proto-language to general intelligence. Covers the gap between survival-pressure grounding and AGI, the role of open-ended evolution, and the full phase sequence through neuromorphic deployment. **Read this for the "why" behind every future phase.**
 
 ---
 ## 0b. Current state — **Phase 18.1 LIVE / Post-Amputation Discrete-Only Training** (Jun 2026)
