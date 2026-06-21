@@ -496,9 +496,13 @@ def make_sim_step(
         spawn_mask = jax.random.bernoulli(res_key, regen_rate, (gs, gs))
         new_res = grid.resources + spawn_mask.astype(jnp.float32) * _resource_spawn_boost
         
-        # Symmetric material respawn
-        wood_spawn = jax.random.bernoulli(wood_key, regen_rate * 0.5, (gs, gs))
-        stone_spawn = jax.random.bernoulli(stone_key, regen_rate * 0.5, (gs, gs))
+        # Spatial material respawn
+        x_coords = jnp.arange(gs)[None, :]
+        west_mask = x_coords < (gs // 2)
+        east_mask = x_coords >= (gs // 2)
+
+        wood_spawn = jax.random.bernoulli(wood_key, regen_rate * 0.5, (gs, gs)) & west_mask
+        stone_spawn = jax.random.bernoulli(stone_key, regen_rate * 0.5, (gs, gs)) & east_mask
         
         grid = grid.replace(
             resources=jnp.clip(new_res, 0.0, _resource_max),
@@ -2211,7 +2215,7 @@ def _run_simulation_impl(
 
                 nb_scout_lag1 = np.full((n_alive, _corpus_sig_dim), np.nan, dtype=np.float32)
                 nb_scout_dist_lag1 = np.full(n_alive, np.nan, dtype=np.float32)
-                nb_scout_token_lag1 = np.full(n_alive, -1, dtype=np.int32)
+                nb_scout_token_lag1 = np.full(n_alive, -1, dtype=object)
                 if _lag1_scout_pos is not None and len(_lag1_scout_pos) > 0:
                     pos_b_alive_f = pos_b_alive.astype(np.float32)
                     sp2 = _lag1_scout_pos.astype(np.float32)
@@ -2233,8 +2237,12 @@ def _run_simulation_impl(
                             toks = _lag1_scout_tok[within_mask[i]].astype(np.int64)
                             toks_s0 = np.asarray(toks)
                             if toks_s0.ndim > 1:
-                                toks_s0 = toks_s0[:, 0]
-                            nb_scout_token_lag1[i] = int(np.bincount(toks_s0.astype(int)).argmax())
+                                majority_toks = []
+                                for slot_idx in range(toks_s0.shape[1]):
+                                    majority_toks.append(int(np.bincount(toks_s0[:, slot_idx].astype(int)).argmax()))
+                                nb_scout_token_lag1[i] = majority_toks
+                            else:
+                                nb_scout_token_lag1[i] = int(np.bincount(toks_s0.astype(int)).argmax())
                 adj_red = red_dist <= 2.0
                 adj_bg = np.sum(b_obs_all[t, alive_idx][:, idx_adj_bg], axis=-1) > 0.5
                 adj_barrier = np.sum(b_obs_all[t, alive_idx][:, idx_adj_barrier], axis=-1) > 0.5

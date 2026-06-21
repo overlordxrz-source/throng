@@ -103,11 +103,20 @@ def load_corpus(path: str, min_step: int = 0) -> dict:
     vq_tokens = np.array(
         [r.get("vq_token", -1) for r in records], dtype=np.int32
     )
+    def _normalize_token(v):
+        if v is None:
+            return -1
+        if isinstance(v, list):
+            if len(v) == 0 or v[0] < 0:
+                return -1
+            return v[0]
+        return int(v) if v >= 0 else -1
+
     nb_tok_lag1_raw = [r.get("nb_scout_token_lag1", None) for r in records]
     has_tok_lag1 = any(v is not None for v in nb_tok_lag1_raw)
     if has_tok_lag1:
         nb_tok_lag1 = np.array(
-            [v if v is not None else -1 for v in nb_tok_lag1_raw],
+            [_normalize_token(v) for v in nb_tok_lag1_raw],
             dtype=np.int32,
         )
     else:

@@ -102,8 +102,12 @@ def build_observations_jax(
     else:
         intrinsic_entropy = jnp.zeros((N, 4), dtype=jnp.float32)
 
+    inv_wood = pop.inventory_wood.astype(jnp.float32)
+    inv_stone = pop.inventory_stone.astype(jnp.float32)
+    inv_axe = pop.inventory_axe.astype(jnp.float32)
+
     own_state = jnp.concatenate([
-        jnp.stack([norm_age, mat_frac, energy, nl_norm, norm_x, norm_y], axis=1),
+        jnp.stack([norm_age, mat_frac, energy, nl_norm, norm_x, norm_y, inv_wood, inv_stone, inv_axe], axis=1),
         intrinsic_entropy
     ], axis=1)
 
@@ -144,8 +148,11 @@ def build_observations_jax(
         )
         loc_scent = jnp.where(visibility_mask, loc_scent, 0.0)
 
+    loc_wood = get_local_patches(grid.wood_grid.astype(jnp.float32), pop.positions, r, gs)[..., None]
+    loc_stone = get_local_patches(grid.stone_grid.astype(jnp.float32), pop.positions, r, gs)[..., None]
+
     loc_env = jnp.concatenate([
-        loc_pres, loc_wall, loc_res, loc_shelter, loc_contested, loc_scent, loc_puzzle, loc_blue_bg, loc_barrier
+        loc_pres, loc_wall, loc_res, loc_shelter, loc_contested, loc_scent, loc_puzzle, loc_blue_bg, loc_barrier, loc_wood, loc_stone
     ], axis=-1)
 
     if key is not None:

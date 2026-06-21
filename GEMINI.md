@@ -2,7 +2,7 @@
 
 ## SESSION START (non-negotiable)
 Before ANY code or architectural decision:
-1. Read THRONG.md in full
+1. Read THRONG.md in full BEFORE any code changes
 2. Do NOT rely on chat summaries alone — they lose scientific nuance
 3. Always update the project's documentation file, THRONG.md, README, whatever it is(those are the ones for Throng-specific) after any change you make, whether it's code, architecture, design, or anything else. DO NOT FORGET THIS
 

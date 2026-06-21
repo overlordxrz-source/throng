@@ -1343,6 +1343,7 @@ If our true goal is to force the emergence of AGI-level intelligence purely thro
 - **Mechanics:** Introduce combinable primitives (e.g., Wood + Stone = Axe) with severe receiver-side selection pressure. Solo crafting is impossible.
 - **Semantics:** Requires vocabulary expansion from simple nouns ("Predator") to slot-based compositional messages (Subject/Verb/Modifier, e.g., "I have Wood" + "Need Stone").
 - **Decode Gate:** (a) `NPMI(slot_0, inventory_item) > 0.3`, (b) `NPMI(slot_1, action_intent) > 0.3`, AND (c) `ATE > X` (statistically significant receiver response) when ablating either slot via Tier-3 causal gate. This proves Subject and Verb slots are semantically separated and causally grounded.
+  - **Current Status:** Stratified ATE (Mantel-Haenszel observational adjustment) excludes zero on `slot_0` (ΔPACTION > 0.08), showing strong conditional correlation. True frozen-checkpoint causal intervention is queued to confirm causation. Phase 18.3 (Sensory Expansion and Spatial Bifurcation) deployed to unlock full combinatorial crafting dynamics.
 
 #### Phase 19 — Cultural Transmission (Writing)
 **Goal:** Allow agents to pre-train themselves across generations, escaping the capacity limit of oral communication.
@@ -1356,4 +1357,4 @@ If our true goal is to force the emergence of AGI-level intelligence purely thro
 
 ---
 
-*Last updated: 2026-06-19 — Phase 18 LIVE. CtD Bootstrap in progress.*
+*Last updated: 2026-06-21 — Phase 18 LIVE. Phase 18.3 Ecology Deployed (Spatial Bifurcation, Sensory Expansion). Frozen-checkpoint causal test queued.*

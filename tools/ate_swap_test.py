@@ -7,7 +7,7 @@ This script measures whether discrete VQ tokens *causally* influence receiver
 behavior, or whether the observed NPMI correlations are merely confounded by
 shared spatial context.
 
-Method: Offline Observational ATE via Inverse Propensity Weighting (IPW)
+Method: Offline Stratified Observational ATE (Mantel-Haenszel style)
 ========================================================================
 
 We cannot run a live frozen-checkpoint intervention from this offline script
@@ -23,7 +23,7 @@ who heard an "alert" token (from scouts near danger) vs. a "safe" token (from
 scouts far from danger), *after controlling for the receiver's own red_dist*.
 
 This is the standard econometric approach: stratified difference-in-means
-with propensity-score adjustment.
+(Mantel-Haenszel style observational adjustment).
 
 A positive ATE (Δ_flee > 0) means: hearing the alert token *causes* more
 fleeing beyond what the receiver's own proximity would predict.
@@ -124,7 +124,11 @@ def get_receiver_records(records, slot_idx=0):
             continue
         # Must have a valid lag-1 scout token
         lag1_tok = r.get("nb_scout_token_lag1")
-        if lag1_tok is None or (isinstance(lag1_tok, (int, float)) and lag1_tok < 0):
+        if isinstance(lag1_tok, list):
+            if len(lag1_tok) <= slot_idx or lag1_tok[slot_idx] < 0:
+                continue
+            r["nb_scout_token_lag1"] = lag1_tok[slot_idx]
+        elif lag1_tok is None or (isinstance(lag1_tok, (int, float)) and lag1_tok < 0):
             continue
         receivers.append(r)
     return receivers
@@ -160,11 +164,17 @@ def stratified_ate(receivers, alert_set, safe_set, n_strata=10):
     strata_weights = []
     strata_details = []
 
+    dropped_receivers = 0
+
     for s in range(n_strata):
         t_in_s = [r for r in treated if assign_stratum(r.get("red_dist", 999)) == s]
         c_in_s = [r for r in control if assign_stratum(r.get("red_dist", 999)) == s]
 
         if len(t_in_s) < 5 or len(c_in_s) < 5:
+            dropped = len(t_in_s) + len(c_in_s)
+            if dropped > 0:
+                dropped_receivers += dropped
+                print(f"[WARN] Dropping stratum {s} (red_dist {strata_edges[s]:.0f}-{strata_edges[s+1]:.0f}): treated={len(t_in_s)}, control={len(c_in_s)} (min 5 required)")
             continue
 
         t_flee = np.mean([r["action"] in FLEE_ACTIONS for r in t_in_s])
@@ -185,6 +195,8 @@ def stratified_ate(receivers, alert_set, safe_set, n_strata=10):
 
     if not strata_effects:
         return None, None, None
+
+    print(f"\n[INFO] Dropped {dropped_receivers} receivers due to insufficient stratum size (n < 5 in either arm).")
 
     weights = np.array(strata_weights, dtype=float)
     effects = np.array(strata_effects)
