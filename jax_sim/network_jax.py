@@ -71,13 +71,11 @@ def vector_quantize_signals(
     y = y_soft + jax.lax.stop_gradient(y_hard - y_soft)
     
     # Output is mapped back to 32D through the FROZEN codebook.
-    z_q = y @ codebook
-    signal_out = jax.lax.stop_gradient(z_q)
-    
-    # Phase 18: Restore VQ commitment loss
-    # Compute z_q_target without gradient
-    z_q_target = jax.lax.stop_gradient(y_hard @ codebook)
-    loss_vq = beta * jnp.sum((z_e - z_q_target) ** 2, axis=-1)
+    signal_out = y @ jax.lax.stop_gradient(codebook)
+    # VQ Codebook and Commitment Loss
+    z_q = codebook[token_ids]
+    loss_vq = jnp.sum((jax.lax.stop_gradient(z_e) - z_q) ** 2, axis=-1) + \
+              beta * jnp.sum((z_e - jax.lax.stop_gradient(z_q)) ** 2, axis=-1)
     
     return signal_out, token_ids, loss_vq
 
@@ -93,49 +91,23 @@ def dead_code_reset_codebook_params(
     """
   Persist dead-code reset into the codebook embedding (runs after PPO on CPU/GPU).
 
-  token_ids: (M,) or (M, 3) int — tokens used in the rollout window (alive agents only).
+  token_ids: (M,) int — tokens used in the rollout window (alive agents only).
   z_e: (M, signal_dim) matching encoder outputs for those rows.
   codebook_key: ``codebook`` (blue) or ``red_codebook`` (Phase 12 predator).
     """
     if z_e.shape[0] == 0:
         return params
     flat = unfreeze(params)
-
-    if token_ids.ndim == 2 and token_ids.shape[1] == 3:
-        # Phase 18 multi-slot: 3 slots (0, 1, 2). z_e has [cont(8), slot0(12), slot1(8), slot2(12)]
-        toks = [token_ids[:, 0], token_ids[:, 1], token_ids[:, 2]]
-        zes = [z_e[:, 8:20], z_e[:, 20:28], z_e[:, 28:40]]
-        keys = [f"{codebook_key}_0", f"{codebook_key}_1", f"{codebook_key}_2"]
-
-        for tok, ze, key in zip(toks, zes, keys):
-            if key not in flat:
-                continue
-            cb = flat[key]["embedding"]
-            usage = jnp.bincount(tok, length=vocab_size)
-            dead_mask = usage == 0
-            n_pool = ze.shape[0]
-            rand_idx = jax.random.randint(rng, (vocab_size,), 0, n_pool)
-            replacement = jax.lax.stop_gradient(ze[rand_idx])
-            flat[key] = {
-                **flat[key],
-                "embedding": jnp.where(dead_mask[:, None], replacement, cb),
-            }
-            rng, _ = jax.random.split(rng)
-    else:
-        # Legacy single-slot codebook
-        if codebook_key not in flat:
-            return params
-        cb = flat[codebook_key]["embedding"]
-        usage = jnp.bincount(token_ids, length=vocab_size)
-        dead_mask = usage == 0
-        n_pool = z_e.shape[0]
-        rand_idx = jax.random.randint(rng, (vocab_size,), 0, n_pool)
-        replacement = jax.lax.stop_gradient(z_e[rand_idx])
-        flat[codebook_key] = {
-            **flat[codebook_key],
-            "embedding": jnp.where(dead_mask[:, None], replacement, cb),
-        }
-
+    cb = flat[codebook_key]["embedding"]
+    usage = jnp.bincount(token_ids, length=vocab_size)
+    dead_mask = usage == 0
+    n_pool = z_e.shape[0]
+    rand_idx = jax.random.randint(rng, (vocab_size,), 0, n_pool)
+    replacement = jax.lax.stop_gradient(z_e[rand_idx])
+    flat[codebook_key] = {
+        **flat[codebook_key],
+        "embedding": jnp.where(dead_mask[:, None], replacement, cb),
+    }
     # Match container type — optax Adam state must stay aligned with params tree.
     return freeze(flat) if isinstance(params, FrozenDict) else flat
 
