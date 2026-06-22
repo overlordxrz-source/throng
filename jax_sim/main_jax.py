@@ -1235,7 +1235,7 @@ def _run_simulation_impl(
     except Exception as _apply_err:
         _apply_ok = False
         print(f"[DEBUG] apply smoke-test FAILED: {_apply_err}")
-    _vq_on = "codebook" in _bp
+    _vq_on = any(k in _bp for k in ("codebook", "codebook_0"))
     print(
         f"[JAX] signal_bottleneck={'VQ' if _vq_on else 'LEGACY softmax'} "
         f"| vocab={config.get('vocab_size', 64)} "
