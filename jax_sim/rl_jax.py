@@ -82,6 +82,7 @@ def ppo_loss(
     ignition: jnp.ndarray = None, # (M,) bool
     ignition_discount: float = 0.1,
     alarm_ent_coef: float = 0.0,
+    vq_loss_idx: int = 7,
 ) -> Tuple[jnp.ndarray, Dict]:
     """
     PPO loss evaluated with exact historical carries per timestep.
@@ -183,8 +184,14 @@ def ppo_loss(
     
     total_loss = loss_pg + vf_coef * loss_vf + loss_ent + loss_logit_penalty
     
-    # Phase 18 VQ Reconnection: use live gradients from forward pass (outs[7])
-    _loss_vq = outs[7]
+    # Phase 18 VQ Reconnection: use live gradients from forward pass.
+    # IMPORTANT: blue (AgentNetworkJax) and red (PredatorNetworkJax) have DIFFERENT
+    # output tuple layouts. Blue carries `alarm_out` at index 6, so loss_vq is at 7.
+    # Red has no alarm head, so loss_vq is at 6 and z_e is at 7. Indexing outs[7]
+    # unconditionally fed red the raw 40-D continuous wire (z_e) as if it were a VQ
+    # loss — driving Σz_e → -inf, collapsing the red codebook (2/64) and producing the
+    # spurious RedVQ ≈ -24225 telemetry. `vq_loss_idx` is threaded per-team to fix this.
+    _loss_vq = outs[vq_loss_idx]
     if _loss_vq.ndim > 1:
         _loss_vq = _loss_vq.sum(axis=-1)
         
@@ -212,19 +219,20 @@ def create_optimizer(lr: float = 3e-4, max_grad_norm: float = 2.0) -> optax.Grad
     return optax.adam(lr)
 
 
-@functools.partial(jax.jit, static_argnames=("apply_fn", "optimizer", "n_layers"))
+@functools.partial(jax.jit, static_argnames=("apply_fn", "optimizer", "n_layers", "vq_loss_idx"))
 def _minibatch_step(
     params, opt_state, apply_fn, optimizer,
     obs, actions, alarm_actions, old_log_probs, advantages, returns, carries,
     n_layers, old_values, clip_eps, vf_coef, ent_coef, vq_coef, loss_vq, alive, rng_key,
-    ignition, ignition_discount, alarm_ent_coef
+    ignition, ignition_discount, alarm_ent_coef, vq_loss_idx
 ):
     grad_fn = jax.value_and_grad(ppo_loss, has_aux=True)
     (loss, metrics), grads = grad_fn(
         params, apply_fn, obs, actions, alarm_actions, old_log_probs,
         advantages, returns, carries, n_layers,
         old_values, clip_eps, vf_coef, ent_coef, vq_coef, loss_vq, alive=alive, rng_key=rng_key,
-        ignition=ignition, ignition_discount=ignition_discount, alarm_ent_coef=alarm_ent_coef
+        ignition=ignition, ignition_discount=ignition_discount, alarm_ent_coef=alarm_ent_coef,
+        vq_loss_idx=vq_loss_idx,
     )
 
     # Phase 18: Per-Group Gradient Clipping
@@ -288,6 +296,12 @@ def ppo_update(
     Offloads rollout data to CPU; only one minibatch lives on GPU at a time.
     Returns (new_params, new_opt_state, metrics).
     """
+    # Per-team VQ-loss output index. Blue (AgentNetworkJax) returns alarm_out at
+    # index 6, so loss_vq sits at 7; red (PredatorNetworkJax) has no alarm head,
+    # so loss_vq is at 6 and z_e at 7. Mis-indexing red as 7 feeds raw z_e as a
+    # "VQ loss" and collapses the predator codebook — keep this team-aware.
+    vq_loss_idx = 7 if team == "blue" else 6
+
     obs = batch["obs"]
     actions = batch["actions"]
     alarm_actions = batch.get("alarm_actions")
@@ -375,7 +389,7 @@ def ppo_update(
             params, opt_state, apply_fn, optimizer,
             mb_obs, mb_act, mb_alarm_act, mb_lp, mb_adv, mb_ret, mb_c,
             n_layers, mb_v, clip_eps, vf_coef, ent_coef, vq_coef, mb_vq, mb_al, mb_key,
-            mb_ig, ignition_discount, alarm_ent_coef
+            mb_ig, ignition_discount, alarm_ent_coef, vq_loss_idx
         )
 
         # Accumulate as Python floats to avoid holding 500 JAX arrays

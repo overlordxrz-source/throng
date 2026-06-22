@@ -2081,6 +2081,37 @@ def _run_simulation_impl(
                             f"  MetabolicTax: mean_cost={float(_mc[_alive_mc].mean()):.5f} "
                             f"(delta={_delta} K={_k} max={_delta * _k:.4f}/think)"
                         )
+
+            # ── Phase 18.5 VQ health alert gate (H3) ───────────────────────────
+            # Cheap insurance against severance-class bugs. A VQ loss is a
+            # non-negative commitment cost; a healthy codebook keeps many codes live.
+            # A negative VQ loss or near-total codebook collapse means a learning
+            # signal is wired to the wrong tensor (e.g. the Phase 18.5 red index bug,
+            # where red minimized Σz_e and reported RedVQ≈-24225, codes 2/64).
+            # Make it LOUD so we notice on update 2, not update 2000.
+            def _min_codes_active(codes_str):
+                try:
+                    return min(int(x) for x in codes_str.split("/")[0].split("|"))
+                except Exception:
+                    return None
+            _vq_alerts = []
+            if np.isfinite(vq_loss_val) and vq_loss_val < 0.0:
+                _vq_alerts.append(
+                    f"blue VQ loss < 0 ({vq_loss_val:.2f}) — VQ likely wired to wrong network output"
+                )
+            _bc_min = _min_codes_active(vq_codes_str)
+            if _bc_min is not None and _bc_min < 4:
+                _vq_alerts.append(f"blue codes_active collapsed ({vq_codes_str})")
+            if _red_comms:
+                if np.isfinite(red_vq_val) and red_vq_val < 0.0:
+                    _vq_alerts.append(
+                        f"RedVQ loss < 0 ({red_vq_val:.2f}) — red VQ likely reading z_e (Phase 18.5 bug class)"
+                    )
+                _rc_min = _min_codes_active(red_codes_str)
+                if _rc_min is not None and _rc_min < 4:
+                    _vq_alerts.append(f"red codes_active collapsed ({red_codes_str})")
+            for _a in _vq_alerts:
+                print(f"  [ALERT] {_a}", flush=True)
             print(f"{'='*70}\n")
 
         # ── Evolutionary Distillation (CPU, Outer Loop) ─────────

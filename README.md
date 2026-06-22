@@ -7,10 +7,10 @@ to **survive, signal, and pass knowledge on**. The goal is not "an agent that
 plays a game well." The goal is **emergence**: language, culture, and proto-
 cognition arising purely from selection pressure.
 
-**Current state (Jun 2026):** **Phase 18.1 (Post-Amputation Discrete-Only Training) LIVE.** The 8D continuous bypass has been surgically severed after diagnostics confirmed it was a Protean Scattering metabolic leak. Agents now communicate exclusively through 3 discrete VQ slots (12/8/12 vocabularies). The Causal ATE Gate is in progress — preliminary ATE=+0.088 on slot_0 but CI includes zero; accumulating post-amputation corpus for statistical power. Once ATE clears, Phase 18 ecology (resource bifurcation, cooperative crafting) deploys.
-Currently training on branch `feature/phase18-crafting`. See `THRONG.md` for the full scientific roadmap and status.
+**Current state (Jun 2026):** **Phase 18.5 (VQ Reconnection, team-aware loss index) LIVE.** The 8D continuous bypass is amputated; agents communicate exclusively through **3 discrete VQ slots (12/8/12 vocabularies)** on a 40-D wire across a **12-action** space (movement + Strike/Push/Guard + Build/PickUp/Craft/UseTool). Phase 18.3 ecology (wood-west / stone-east bifurcation, inventory, cooperative crafting) is deployed; a `-0.20` futile-action penalty curbs `Craft`/`UseTool` spam. Phase 18.4 reconnected the VQ commitment loss to the live PPO autodiff tape; **Phase 18.5 fixes a latent index bug** where red's VQ loss was mis-read as the raw continuous wire (`z_e`), collapsing the predator codebook — now threaded team-aware in `rl_jax.py`. The Causal ATE Gate (Phase 18.2) resumes once the fix is live and the red codebook recovers.
+Currently training on branch `feature/phase18-crafting`. See `THRONG.md` §0b for the full scientific roadmap and status.
 
-**Phase 19 (Cultural Transmission & Writing) PREP.** The next step is allowing agents to write multi-token sequences to the environment.
+**Phase 19 (Cultural Transmission & Writing) PREP** — see `docs/STRATEGIC_ROADMAP.md`: the pivotal phase, allowing agents to write multi-token sequences permanently to the grid (external memory + cumulative culture).
 **Modal:** **`twentyninegeese`** — volume **`throng-runs`**.
 
 **Full ops / decode / roadmap:** [THRONG.md](THRONG.md) §0b (read first).
@@ -194,8 +194,10 @@ Each agent is a **Flax transformer** (`jax_sim/network_jax.py`):
 
 Four channels, each with a different temporal and spatial scale:
 
-1. **Signals & Alarms** (per-step, 32-dim VQ discrete token + 1-bit Alarm) — 6 nearest neighbours hear what
-   each agent broadcasts. The discrete alarm incurs a metabolic penalty.
+1. **Signals & Alarms** (per-step, 40-D wire = 3 discrete VQ slots [12/8/12] + a vestigial 8-D
+   continuous field, plus a 1-bit Alarm) — 6 nearest neighbours hear what each agent broadcasts.
+   The discrete alarm incurs a metabolic penalty. (The 8-D continuous field is zeroed — amputated in
+   Phase 18.1 after it was shown to be a Protean-scattering metabolic leak.)
 2. **Cultural Fast grid** (decay 0.90, ~10 step memory) — danger traces.
 3. **Cultural Slow grid** (decay 0.995, ~200 step memory) — stable landmarks.
 4. **Parameter sharing (MAPPO gradient)** — what one blue learns, every blue
@@ -288,7 +290,8 @@ All knobs live in `config_phase7.yaml`. The ones you actually touch:
 | `n_layers` | Initial transformer depth | 2–4 |
 | `brain_max_layers` | Cap for brain-vote expansion | 6 |
 | `brain_token_dim` | Transformer hidden | 128 |
-| `signal_dim` | Continuous signal embed | 32 |
+| `signal_dim` | Wire width (8 cont + 12/8/12 slots) | 40 |
+| `n_actions` | Action-space size (Phase 18) | 12 |
 | `signal_vocab_size` | Discrete signal vocab | 64 |
 | `symbol_dim` | Symbol / cultural vector dim | 16 |
 | `neighbor_k` | Visible neighbours | 6 |
@@ -321,11 +324,13 @@ All knobs live in `config_phase7.yaml`. The ones you actually touch:
 | **14.1–14.4** | ✅ **COMPLETE** — VQEL graduated → hard z_q; proprio wedge; GWT Router; DCVQ+SimVQ |
 | **15.0–15.5** | ✅ **COMPLETE** — MEDAL-ADR + GRUCell pivot. Episodic Memory ($p < 0.05$) and Cumulative Culture ($p < 0.001$) at Lag-10 confirmed. |
 | **16.0** | ✅ **COMPLETE** — Open-Ended Combinatorial Complexity. Big Green prey, 8-action space. Offline causal decode revealed 0.0 ATE on communication channel. |
-| **16.5** | ✅ **COMPLETE** — The Great Burn-Off confirmed at 992k steps (`codes_active=1/64`). Feral Masking and GWT Router successfully forced semantic collapse. Awaiting vocabulary recovery. |
-| **17.0** | **LIVE** — The Rosetta Stone (Unsupervised Semantic Translation). Gumbel-Softmax + 10D Biological Entropy successfully deployed and running stably on B200 to force discrete semantic grounding. |
-| **18.0** | **PREP** — Combinatorial Tool Use (Crafting Trees & logic syntax) |
-| **19.0** | **PREP** — Cultural Transmission (Writing symbols to the grid permanently) |
-| **20.0** | **PREP** — Agriculture & Terraforming (Delayed resources & "Future Time" semantics) |
+| **16.5–16.6** | ✅ **COMPLETE** — The Great Burn-Off (`codes_active=1/64`); Protean Scattering discovery (continuous channel was a cryptographic RNG, r≈0 to all environment correlates). |
+| **17.0–17.5** | ✅ **COMPLETE** — Rosetta Stone (GW alignment maps VQ tokens → GloVe concepts). Hardened Gumbel-Softmax bottleneck. Timescale-grammar alarm head: sender-side metabolic grounding validated, receiver-side ATE=0 (alarm vestigial). |
+| **18.0–18.1** | ✅ **COMPLETE** — Combinatorial Tool Use: 12-action space, 3-slot discrete VQ (12/8/12), 40-D wire; 8D continuous bypass amputated with zero catch spike. |
+| **18.3–18.5** | **LIVE** — Crafting ecology + futile-action penalty + Per-Group grad clip; VQ commitment loss reconnected to PPO; team-aware `vq_loss_idx` fix (18.5). |
+| **18.2** | 🔧 **IN PROGRESS** — Causal ATE Gate. Pass bar: ATE>0, 95% CI excludes zero, on ≥1 slot. |
+| **19.0** | **PREP (pivotal)** — Cultural Transmission: `WRITE` action etches VQ sequences to grid tiles (persistent culture + external memory). |
+| **20.0+** | **PREP** — Agriculture/terraforming, open-ended procedural complexity (POET), language-as-cognitive-tool, cross-domain transfer, Loihi. See `docs/STRATEGIC_ROADMAP.md`. |
 
 ## Research & Theory
 

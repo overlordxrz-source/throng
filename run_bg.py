@@ -17,8 +17,9 @@ from scripts.modal_train import build_cfg, run_simulation  # noqa: E402
 
 if __name__ == "__main__":
     print(
-        "run_bg.py: Phase 18 — Combinatorial Tool Use & Multi-Slot Syntax; "
-        "12 actions, 12 env channels, CtD bootstrap; n_steps=3_000_000",
+        "run_bg.py: Phase 18.5 — Combinatorial Tool Use & Multi-Slot Syntax; "
+        "12 actions, 12 env channels, CtD bootstrap; VQ reconnected (team-aware loss idx); "
+        "n_steps=3_000_000",
         flush=True,
     )
     run_simulation(build_cfg(), seed=42, n_steps=3_000_000)

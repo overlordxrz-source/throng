@@ -19,11 +19,13 @@ The philosophical and mathematical foundations of THRONG have been consolidated 
 - **[STRATEGIC_ROADMAP.md](file:///Users/overlord/CascadeProjects/throng/docs/STRATEGIC_ROADMAP.md)**: The path from proto-language to general intelligence. Covers the gap between survival-pressure grounding and AGI, the role of open-ended evolution, and the full phase sequence through neuromorphic deployment. **Read this for the "why" behind every future phase.**
 
 ---
-## 0b. Current state — **Phase 18.1 LIVE / Post-Amputation Discrete-Only Training** (Jun 2026)
+## 0b. Current state — **Phase 18.5 LIVE / VQ Reconnection (team-aware loss index)** (Jun 2026)
 
 **Blue SOTA (frozen on `master`):** **`465d8c6+`** — 9.4 cross-attn + 9.1 confidence + **11.3 epistemic gate**.
 
-**Headline:** Phase 18 is **LIVE** on `feature/phase18-crafting`. The 8D continuous bypass has been **amputated** (`37af4aa`). Agents now communicate exclusively through 3 discrete VQ slots (12/8/12 vocabularies). Training resumed from checkpoint 2304 (step 1,179,648) on the `twentyninegeese` Modal workspace. The agents survived the amputation with **zero catch spike** — discrete slots had already learned the full evasion grammar in parallel.
+**Headline (Phase 18.5, Jun 22):** A latent correctness bug in the Phase 18.4 VQ reconnection was found and fixed. `ppo_loss` read the VQ loss at a hard-coded `outs[7]`, which is correct for **blue** (`AgentNetworkJax` returns `alarm_out` at index 6, pushing `loss_vq` to 7) but **wrong for red** (`PredatorNetworkJax` has no alarm head: `loss_vq` is at index 6 and `z_e` at 7). Red PPO was therefore minimizing `vq_coef · Σz_e` (the raw 40-D continuous wire) instead of a VQ commitment loss — driving `RedVQ` telemetry to `≈ -24225` and collapsing the red codebook to `2/64`. The `.sum(axis=-1)` patch in `2559414` stopped the *crash* but not the *corruption*. Fix: `vq_loss_idx` is threaded per-team in `rl_jax.py` (`7` blue / `6` red). Blue behaviour is unchanged; red is restored to its long-standing DCVQ-loss-at-0.1 behaviour, now with a live gradient.
+
+**Prior headline (Phase 18.1):** The 8D continuous bypass was **amputated** (`37af4aa`). Agents now communicate exclusively through 3 discrete VQ slots (12/8/12 vocabularies). The agents survived the amputation with **zero catch spike** — discrete slots had already learned the full evasion grammar in parallel.
 
 **Phase 18.1 — Bypass Amputation (Jun 21, 2026):**
 - **Diagnostic Confirmed Protean Scattering:** `decode_signals.py --slice-cols 8` on steps 1,175,000–1,184,252 showed all 8 continuous dims mapped to `energy` (MI ≈ 0.41–0.47). The bypass was a metabolic leak / collision-evasion RNG, not semantic content.
@@ -48,14 +50,15 @@ The philosophical and mathematical foundations of THRONG have been consolidated 
 - **Intervention 1 (Failed):** Applied a `-0.01` reward penalty for invalid Craft/UseTool (`d638c4e`). At 39 updates post-intervention, the penalty was too small relative to the returns standard deviation (~5.6) and was drowned out by noise. Frequencies did not drop.
 - **Intervention 2 (Live):** Increased the penalty magnitude 20x to `-0.20` (`e12ae91`) to guarantee a sharp gradient signal. Also observed a massive total gradient norm spike (`67.42`) despite healthy actor/value gradients, indicating the trunk is receiving a massive gradient signal (potentially from auxiliary loss or VQ scaling), which might be squashing the actor gradients via global clipping.
 
-| Live run (Phase 18.4) | Value |
+| Live run (Phase 18.5) | Value |
 |-----------------------|--------|
 | **Branch** | **`feature/phase18-crafting`** |
 | **Modal workspace** | **`twentyninegeese`** (Jun 22, 2026) |
-| **Git HEAD** | `e12ae91` (Increase futile action penalty to -0.20) |
-| **Checkpoint** | 1228800 (ppo 2400) |
-| **Status** | ⏳ Training resumed. Awaiting 5-10 updates to see if the `-0.20` penalty suppresses futile actions. |
-| **Next Gate** | Confirm `Crf` & `Use` drop below 3%, and population recovers above 170. Then run patched `causal_intervention.py`. |
+| **Git HEAD (deployed band-aid)** | `2559414` (VQ shape `.sum(axis=-1)` — stops crash, still corrupts red) |
+| **Pending fix (uncommitted)** | Team-aware `vq_loss_idx` in `rl_jax.py` (7 blue / 6 red) + `n_actions:12` in YAML. **Operator must pull + restart to apply.** |
+| **Checkpoint** | ~1240064 (ppo 2422) |
+| **Status** | ⚠️ Run restarted on the band-aid `2559414`; red VQ is silently corrupted (`RedVQ≈-24225`, `red_codes_active=2/64`). Apply the 18.5 fix before continuing serious science. |
+| **Next Gate** | After 18.5 fix: confirm `RedVQ` returns to a small positive value and `red_codes_active` recovers (>16/64) over the 20-update window; `Crf`/`Use` < 3%; pop > 170. Then resume Phase 18.2 Causal ATE accumulation. |
 
 **Cam's Measured Read on the Proto-Lexicon:**
 - **The Continuous Smuggling Hypothesis**: The categorical LRT on scout signals (k=4 clusters) showed no alignment with cardinal direction ($\chi^2 p = 0.315$). However, the continuous `LAG-1 DIRECTION LRT` on the 32d signal vector yielded highly significant causal steering ($p < 0.005$ on 12 dimensions!). The agents are not communicating via the discrete codebook index; they are doing linear algebra on the continuous `z_q` embeddings, effectively pointing to predators in continuous space.
@@ -494,6 +497,9 @@ train_entry.run_simulation()  →  main_jax._run_simulation_impl()
 | **18.0** | **Combinatorial Tool Use** | ✅ **LIVE** | 12-action space, 3-slot discrete VQ (12/8/12), 40D wire, CtD bootstrap. |
 | **18.1** | **Bypass Amputation** | ✅ **COMPLETE** | 8D continuous bypass confirmed as Protean Scattering (metabolic leak). Severed via zero-tensor surgery (`37af4aa`). Agents survived with zero catch spike. |
 | **18.2** | **Causal ATE Gate** | 🔧 **IN PROGRESS** | Preliminary ATE=+0.088 (slot_0), CI includes zero. Accumulating post-amputation corpus for statistical power. Script: `tools/ate_swap_test.py`. |
+| **18.3** | **Ecology + 12-action Deploy** | ✅ **LIVE** | Resource bifurcation (wood W / stone E), inventory, `Craft`/`UseTool`. Checkpoint graft validated `10/10` vs `12/13`. |
+| **18.4** | **Futile-Action Penalty + VQ Reconnect** | ✅ **LIVE** | `-0.20` penalty on invalid `Craft`/`UseTool`; Per-Group grad clip isolates actor; live VQ gradient reconnected (0.5× warmup). VQ-severance + Ecological-Shock bugs fixed. |
+| **18.5** | **Red VQ Index Fix** | 🔧 **FIX READY** | `ppo_loss` mis-indexed red's VQ loss (`outs[7]`=`z_e` for red). Threaded team-aware `vq_loss_idx`; restores red DCVQ loss. **Operator must pull + restart.** |
 
 **Recurring failure mode:** Blues stay at cap → ~99% survival → **`NB_GAIN↔surv: nan`** → no evolutionary pressure on neighbor-signal benefit.
 
@@ -501,23 +507,18 @@ train_entry.run_simulation()  →  main_jax._run_simulation_impl()
 
 ---
 
-## 4. Current experiment — **Phase 18.2 Causal ATE Gate** (post Bypass Amputation)
+## 4. Current experiment — **Phase 18.5 VQ Reconnection Fix → resume 18.2 ATE accumulation**
 
-**Status:** Phase 18.1 **COMPLETE** — 8D continuous bypass amputated. Training live on pure discrete 3-slot architecture at step ~1,181,000 on `twentyninegeese` Modal workspace.
+**Status:** Phase 18.3/18.4 **LIVE** (ecology + 12 actions + futile-action penalty + VQ reconnection). A latent red VQ-loss index bug (see §0b headline) was found in 18.4's reconnection and fixed in 18.5. The live cluster at ppo ~2422 is still running the band-aid commit `2559414`, so **red comms are currently corrupting**. Apply the 18.5 fix (pull + restart) before resuming serious 18.2 ATE work.
 
-**Gating Sequence (from implementation_plan.md):**
-1. ~~**Diagnostic Decode Pass (NPMI):**~~ ✅ Confirmed Protean Scattering. All 8 continuous dims → energy.
-2. ~~**Continuous Bypass Surgery:**~~ ✅ `z_e_cont = jnp.zeros(...)` in `network_jax.py`.
-3. **Causal Intervention (ATE Test):** 🔧 IN PROGRESS. Preliminary ATE=+0.088 on slot_0 but CI includes zero. Need more post-amputation corpus.
-4. **Ecology Deployment:** BLOCKED on ATE gate. Once ATE > 0 with CI excluding zero, deploy spatial resource bifurcation + cooperative crafting.
+**Immediate sequence:**
+1. **Apply 18.5 fix:** Operator pulls the team-aware `vq_loss_idx` change to `rl_jax.py` (+ `n_actions:12` YAML), then restarts from the latest volume checkpoint. No checkpoint surgery — weights/codebooks are preserved.
+2. **Verify on PPO ~2423–2443:** `RedVQ:` returns to a small **positive** value (≈ blue's `0.1`), and `red_codes_active` climbs back above 16/64. Blue `VQ: loss≈0.1` and `codes_active=33|33|37/64` should be unchanged. Confirm the 0.5× blue warmup completes without VQ spikes (>5.0).
+3. **Resume 18.2 ATE accumulation:** let the (now-correct) discrete architecture accumulate ~50k+ blind-receiver records.
+4. Run `python tools/ate_swap_test.py /mnt/throng-runs/signal_corpus.jsonl --min-step <restart_step>`.
+5. If ATE passes (CI excludes zero on ≥1 slot): proceed to the Phase 18.3 compositional-syntax decode (NPMI per slot). If ATE fails: discrete slots are cheap talk → redesign bilateral selection (information-asymmetric cooperative crafting where the receiver cannot survive without decoding).
 
-**Next Steps:**
-1. Let training accumulate ~50k+ blind receiver records on the post-amputation discrete architecture.
-2. Run `python tools/ate_swap_test.py /mnt/throng-runs/signal_corpus.jsonl --min-step 1185000`.
-3. If ATE passes: deploy Phase 18 ecology (resource bifurcation, inventory limits, cooperative `Craft`, `UseTool` payoffs) from the frozen implementation plan.
-4. If ATE fails: the discrete slots are also cheap talk, and we need a fundamentally different environmental pressure design.
-
-**DO NOT touch the training config or bypass surgery.** The run at 4 steps/sec and 1,181k+ is healthy. Let it accumulate corpus.
+**DO NOT touch the bypass surgery, reward structure, or `vq_beta`.** The only pending code change is the 18.5 loss-index fix + the `n_actions` YAML safeguard.
 
 **Monitor:**
 
@@ -1356,10 +1357,11 @@ If our true goal is to force the emergence of AGI-level intelligence purely thro
   - **Current Status (Phase 18.4):** 3-slot discrete VQ, 12 actions. The -0.20 futile action penalty is live to curb Craft/Use action spam.
   - **The VQ Severance Bug (Fixed!):** We discovered that the VQ codebook and continuous signal heads were completely severed from the PPO autodiff tape throughout Phase 18. The `loss_vq_rollout` static array was erroneously used in `ppo_loss` instead of the live network loss `outs[7]`.
   - **Ecological Shock & Per-Group Clip:** Before reconnecting the VQ loss, we discovered `dead_code_reset` spikes were causing massive `trunk_norm` gradient explosions (Ecological Shock), which suffocated the actor head via the global clip. A Per-Group gradient clip was implemented in `rl_jax.py` to isolate the actor head. Verification passed.
-  - **VQ Reconnection:** Live `outs[7]` gradient has been reconnected in `rl_jax.py` with a mandatory 0.5x coefficient warmup for 20 updates in `main_jax.py`.
+  - **VQ Reconnection:** Live `outs[7]` gradient was reconnected in `rl_jax.py` with a mandatory 0.5x coefficient warmup for 20 updates in `main_jax.py`.
   - **NB_GAIN Collapse:** The metric was confirmed to be a severed "ghost metric" (initialized to 1.0, never updated during rollout) — the causal ATE test methodology remains completely valid.
+  - **The Red VQ Index Bug (Phase 18.5, FIXED):** The reconnection indexed `outs[7]` unconditionally. Blue's `AgentNetworkJax` returns `(... token_ids, alarm_out[6], loss_vq[7], z_e[8], ...)`; red's `PredatorNetworkJax` returns `(... token_ids, loss_vq[6], z_e[7], ...)` (no alarm head). So red PPO minimized `vq_coef · Σz_e` (raw 40-D wire), not a commitment loss — explaining `RedVQ≈-24225` and `red_codes_active=2/64`. The `2559414` `.sum(axis=-1)` patch only stopped the crash. **Fix:** `vq_loss_idx` threaded per-team in `rl_jax.py` (`ppo_update` sets `7` for blue, `6` for red; `_minibatch_step` carries it as a jit-static arg). Also added `n_actions: 12` to `config_phase7.yaml` so direct-YAML loads (README quickstart, decode/test tools) don't default to 8 and overflow the aux one-hot on actions 8–11.
 
-*Last updated: 2026-06-22 — Phase 18.4 LIVE. Per-Group Clip deployed. Futile action penalty verified (-0.20 shaping behavior). VQ Gradient Reconnected with 0.5x warmup.*
+*Last updated: 2026-06-22 — Phase 18.5. Found & fixed the red VQ-loss index bug (team-aware `vq_loss_idx`). Operator must pull + restart to apply (current run is on the band-aid `2559414`).*
 
 #### Phase 19 — Cultural Transmission (Writing)
 **Goal:** Allow agents to pre-train themselves across generations, escaping the capacity limit of oral communication.
@@ -1373,4 +1375,4 @@ If our true goal is to force the emergence of AGI-level intelligence purely thro
 
 ---
 
-*Last updated: 2026-06-22 — Phase 18.4 LIVE. Diagnosed the VQ Gradient Severance bug and Ecological Shock mechanism. Preparing staged reconnection of VQ gradient with 0.5x warmup.*
+*Last updated: 2026-06-22 — Phase 18.5. Fixed the red VQ-loss index bug (team-aware `vq_loss_idx`) and added `n_actions:12` YAML safeguard. Operator must pull + restart to apply (live cluster is on the band-aid `2559414`).*

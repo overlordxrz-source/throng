@@ -179,3 +179,91 @@ Each phase is a ratchet. Once clicked forward, the agents can never unlearn it. 
 We can do this. The foundation is solid. The direction is correct. The gap is large but the path is clear.
 
 — Cam
+
+---
+
+# Addendum — Will's Engineering & Strategy Synthesis (Phase 18.5, Jun 22 2026)
+
+> **Author:** Will (Cursor engineer) — written after a full source review during the Phase 18.4 → 18.5 VQ-reconnection saga.
+> **Purpose:** Translate Cam's strategic tiers into concrete, falsifiable engineering and flag the systemic risks that keep costing us weeks of compute. This is the "how", paired with Cam's "why".
+
+## 1. The pattern we must confront: severance-class bugs
+
+In the last few phases we have hit **three distinct bugs that all share one signature — a learning signal silently disconnected from the thing it was supposed to train:**
+
+1. **VQ severed from the autodiff tape** (Phase 18.4): `ppo_loss` used the static `loss_vq_rollout` array instead of the live network output, so the codebook received *zero gradient* for an unknown number of updates.
+2. **NB_GAIN ghost metric**: initialised to `1.0`, never updated during rollout — we were reading and reasoning about a constant.
+3. **Red VQ index bug** (Phase 18.5, just fixed): `ppo_loss` read `outs[7]` unconditionally. Blue and red networks have **different output tuple layouts** (blue has `alarm_out` at index 6; red does not), so red was minimising `Σz_e` — the raw continuous wire — and collapsing its own codebook to `2/64` while reporting a nonsensical `RedVQ ≈ -24225`.
+
+These are not unrelated mistakes. They are the **predictable failure mode of positional tuples + parallel-but-divergent blue/red networks + hand-indexed losses**. We will keep paying this tax until we remove the foot-gun. Concrete hardening proposals, in priority order:
+
+| # | Fix | Effort | Payoff |
+|---|-----|--------|--------|
+| **H1** | Replace the positional output tuple of `AgentNetworkJax` / `PredatorNetworkJax` with a `flax.struct.dataclass` (`NetworkOutputs`) carrying named fields (`action_logits`, `loss_vq`, `z_e`, `alarm_out: Optional`, …). Every consumer reads `outs.loss_vq`, never `outs[7]`. | Medium (mechanical) | Eliminates the **entire** index-mismatch bug class. Red/blue divergence becomes explicit and type-checked. |
+| **H2** | A `tests/test_gradient_flow.py` unit test: build a tiny network, run one `ppo_update`, assert `‖∂loss/∂codebook‖ > 0` and `‖∂loss/∂head_signal‖ > 0` for **both** teams. Run it in CI / pre-launch smoke. | Low | Would have caught severance bugs #1 and #3 in seconds instead of thousands of updates. |
+| **H3** | A standing **telemetry sanity gate** in `main_jax.py`: if `RedVQ` or blue `VQ` loss goes negative, or `codes_active < 4/64` for >3 consecutive updates, print a loud `[ALERT]` banner (not a silent line). Cheap insurance against the next severance. | Low | Turns "weeks of corrupted compute" into "noticed on update 2". |
+| **H4** | Move all Phase-defining scalars (`n_actions`, `env_channels`, `signal_dim`, slot widths) into `config_phase7.yaml` as the single source of truth (done for `n_actions` in 18.5). Forbid magic numbers like `obs.at[:, :4]` / `z_e[:, 8:20]` in favour of a named `obs_layout` / `wire_layout` struct. | Medium | Kills the "direct YAML load defaults to 8 actions and crashes" trap and the slot-slice off-by-N risk. |
+
+**Recommendation:** do **H2 + H3 before the next long run**. They are an afternoon of work and they directly protect the most expensive resource we have (Modal compute + our own trust in the dashboard). H1 + H4 can follow during the Phase 19 build.
+
+## 2. The real bottleneck is *receiver-side causality*, not vocabulary
+
+Every phase from 16.6 through 17.5 produced the **same verdict**: signals are *sender-grounded* (the emitter's metabolic/spatial state predicts the token) but **receiver-side ATE ≈ 0** (listeners don't act on them). Adding crafting, slots, and actions grows the *potential* vocabulary but does nothing about this core failure unless the ecology makes **decoding the signal the only way to survive a sub-task.**
+
+This reframes the priority stack. Compositional syntax (Phase 18.3) is downstream of one principle:
+
+> **Receiver-Necessity Principle:** A signal becomes load-bearing only when there exists a survival-relevant quantity that the *receiver* cannot observe directly and the *sender* can. The channel must be the receiver's sole bridge across an information asymmetry that has lethal stakes.
+
+Concrete instantiation for Phase 18.3 cooperative crafting (this is the design I'd build next, and it doubles as the ATE gate):
+
+- **Asymmetric recipe knowledge:** Spawn "recipe" state visible only to agent A (e.g., A can see that today an Axe needs *2 wood + 1 stone*, but B sees only "ingredient slots"). A must *transmit the recipe* via the 3 slots for B (who is standing on the resources) to craft. Neither survives the predator wave alone; the Axe (via `UseTool`) is what lets them.
+- **Why this forces the slots apart:** [slot_0 = ingredient type] + [slot_1 = quantity] + [slot_2 = have/need] is the *minimal* message that lets B act. If B ignores the slots, B crafts wrong and starves. ATE is then literally a survival differential, not a behavioural nudge.
+- **Falsifiable gate:** ablate slot_0 mid-flight (the existing `ate_swap_test`) → if `P(correct craft)` drops with CI excluding zero, the slot is causal. Run the same ablation per slot to prove *separation*.
+
+If, after a Receiver-Necessity ecology, ATE is *still* zero, that is a deep negative result worth publishing on its own: it would mean shared-policy MAPPO cannot escape the "both agents independently learn the task" degenerate equilibrium, and we'd need true policy heterogeneity (distinct A/B networks) — a fork worth pre-registering.
+
+## 3. A strategic fork: is *red comms* still a science target?
+
+Red has never passed the pincer χ² (`p ≈ 0.46` across 14.1c, 600k overdrive, metabolic asymmetry) and its codebook just collapsed under a bug. We keep spending architecture and compute on red's communication channel. Two honest options:
+
+- **(A) Keep red comms as a co-evolution science target.** Justified only if we believe predator coordination language is reachable. Evidence so far: weak. Cost: a whole second VQ/aux/SRL stack that doubles our bug surface (and produced bug #3).
+- **(B) Freeze red as pure ecological pressure.** Disable the red comms gradient entirely (`red_comms_enabled: false`-equivalent for the *language* heads, keep the predator policy), and redirect **all** interpretability effort onto blue's 3-slot compositional syntax. Red stays a lethal, adaptive selection force (it already learned `Push`/`Guard` trapping in Phase 16) without us pretending to decode its babble.
+
+**My recommendation: lean toward (B) after the 18.5 fix verifies red recovers.** The thesis of THRONG is *blue* language under predation. Red is the pressure, not the subject. Halving our bug surface and focusing the ATE/NPMI/Rosetta tooling on one network would accelerate every downstream phase. (This is a Cam-level call; flagging it for the synthesis.)
+
+## 4. Concretising the open-ended pivot (Phase 21) — POET-lite in JAX
+
+Cam is right that fixed ecology = crystallised language. The good news: a *minimal* open-ended curriculum is tractable in our existing stack without a full POET implementation.
+
+- **Environment genome:** a small float vector `θ_env = [resource_scarcity, predator_speed, recipe_depth, barrier_density, occlusion_radius]`. Our `build_cfg` already parameterises most of these.
+- **Archive:** keep `K` (env-genome, population-checkpoint) pairs on the volume. Every `M` PPO updates: (1) evaluate each population on its own env and on mutated neighbours, (2) if a population's survival > high-watermark, spawn a *harder* mutated genome and transfer the checkpoint (POET "goal-switching"), (3) if survival < floor, anneal toward an easier genome (stepping stone).
+- **Minimum-criterion novelty:** only admit a new genome if it is *solvable-but-not-yet-solved* by some existing population (the MCC filter). This is the cheap, JAX-friendly core of open-endedness.
+- **Falsifiable gate:** VQ token-usage entropy keeps rising past 10M steps with no plateau, and new tokens correlate (NPMI) with newly-introduced env features. A plateau = the curriculum isn't generating genuine novelty.
+
+This is ~2–3 weeks of engineering on top of the existing checkpoint/volume machinery, and it is the single highest-leverage thing for the "surpass LLMs" thesis, because it is the only mechanism on the roadmap that *doesn't* have a fixed reachable optimum.
+
+## 5. The neuromorphic endgame (Phase 24) — a realistic mapping
+
+The honest engineering truth: **the transformer trunk does not map cleanly to Loihi 2.** Self-attention is not a native spiking primitive. So "deploy the policy on Loihi" is really three sub-projects:
+
+1. **Keep the VQ codebook as a fixed spike-addressable lookup.** Discrete tokens are *already* the natural unit for a spiking substrate — a token = an active code line. This part is the easy, beautiful fit and is the strongest argument for our discrete-bottleneck thesis.
+2. **Distill the transformer+GRU policy into a recurrent SNN.** Train a spiking recurrent net (surrogate-gradient, e.g. `snntorch`/`lava-dl`) to imitate the frozen JAX policy's action distribution given the same obs/carry. The carry-GRU is recurrent already, which helps; attention gets distilled into the SNN's learned recurrence. Validate by behavioural ATE parity on-grid (the SNN must reproduce the JAX policy's catch-survival curve within tolerance).
+3. **Online STDP on the codebook only.** Once on-chip, allow spike-timing-dependent plasticity to slowly evolve *codebook entries* (not the trunk), giving continuous, catastrophic-forgetting-free vocabulary drift — the biologically-plausible version of `dead_code_reset`.
+
+Prerequisite gate (unchanged from Cam): a *stable, mature* protocol from Phases 18–22. There is no point distilling a language that is still crystallising. But we can de-risk step 1 *now* by ensuring the codebook stays a clean, frozen, addressable table (the 18.5 fix matters here too — a codebook that collapses to 2/64 is not distillable).
+
+## 6. Revised near-term execution order (Will's view)
+
+| Order | Action | Gate / exit criterion |
+|-------|--------|------------------------|
+| **0** | **Apply Phase 18.5 fix** (pull `vq_loss_idx` + `n_actions` YAML, restart). | `RedVQ` positive; `red_codes_active > 16/64`; blue unchanged. |
+| **1** | **H2 + H3 hardening** (gradient-flow test + telemetry alert gate). | Test passes for both teams; alert fires on synthetic collapse. |
+| **2** | **Phase 18.2 ATE accumulation** on the corrected channel. | ≥50k blind-receiver records since restart. |
+| **3** | **Receiver-Necessity crafting** (§2) if naive ATE is null. | ATE>0, CI excludes zero, per-slot separation via ablation. |
+| **4** | **Strategic fork decision** on red comms (§3). | Cam call after red recovery is observed. |
+| **5** | **Phase 19 Writing System** (Cam's pivotal phase) + H1/H4 hardening during the build. | Written-tile NPMI > ephemeral NPMI; teaching test `p<0.05`. |
+| **6** | **POET-lite** (§4). | No vocabulary plateau past 10M steps. |
+
+The throughline: **stop running long training on un-asserted learning signals, make the receiver's survival depend on decoding, and only then chase open-endedness and silicon.** The science is real; the engineering discipline is what will let it compound instead of resetting every time an index slips.
+
+— Will

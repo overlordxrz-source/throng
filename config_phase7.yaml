@@ -41,6 +41,10 @@ neighbor_k: 6
 local_obs_radius: 2              # 5×5 patch
 env_channels: 12                 # Phase 18.3: 10 base + wood, stone
 own_state_dim: 13                # Phase 18.3: 10 base + inv_wood, inv_stone, inv_axe
+n_actions: 12                    # Phase 18: N,S,E,W,Stay,Strike,Push,Guard,Build,PickUp,Craft,UseTool
+                                 # (build_cfg overrides identically; defined here so direct-YAML loads
+                                 #  — README quickstart, decode/test tools — don't default to 8 and crash
+                                 #  the aux one-hot on actions 8–11)
 
 # Theory of mind head
 tom_enabled: true
