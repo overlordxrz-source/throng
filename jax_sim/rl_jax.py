@@ -184,10 +184,14 @@ def ppo_loss(
     total_loss = loss_pg + vf_coef * loss_vf + loss_ent + loss_logit_penalty
     
     # Phase 18 VQ Reconnection: use live gradients from forward pass (outs[7])
+    _loss_vq = outs[7]
+    if _loss_vq.ndim > 1:
+        _loss_vq = _loss_vq.sum(axis=-1)
+        
     if alive is not None:
-        loss_vq_mean = (outs[7] * mask).sum() / denom
+        loss_vq_mean = (_loss_vq * mask).sum() / denom
     else:
-        loss_vq_mean = jnp.mean(outs[7])
+        loss_vq_mean = jnp.mean(_loss_vq)
         
     total_loss = total_loss + vq_coef * loss_vq_mean
 
