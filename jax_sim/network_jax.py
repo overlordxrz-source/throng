@@ -103,6 +103,14 @@ def dead_code_reset_codebook_params(
     cb = flat[codebook_key]["embedding"]
     usage = jnp.bincount(token_ids, length=vocab_size)
     dead_mask = usage == 0
+    num_dead = jnp.sum(dead_mask)
+    
+    def _log_reset(nd, key):
+        if nd > 0:
+            print(f"[JAX] dead_code_reset ({key}): resetting {nd} dead codes", flush=True)
+            
+    jax.debug.callback(_log_reset, num_dead, codebook_key)
+    
     n_pool = z_e.shape[0]
     rand_idx = jax.random.randint(rng, (vocab_size,), 0, n_pool)
     replacement = jax.lax.stop_gradient(z_e[rand_idx])
