@@ -204,11 +204,8 @@ def ppo_loss(
 
 
 def create_optimizer(lr: float = 3e-4, max_grad_norm: float = 2.0) -> optax.GradientTransformation:
-    """Adam + gradient clipping."""
-    return optax.chain(
-        optax.clip_by_global_norm(max_grad_norm),
-        optax.adam(lr),
-    )
+    """Adam optimizer. Per-group clipping is now explicitly handled in _minibatch_step."""
+    return optax.adam(lr)
 
 
 @functools.partial(jax.jit, static_argnames=("apply_fn", "optimizer", "n_layers"))
@@ -225,6 +222,38 @@ def _minibatch_step(
         old_values, clip_eps, vf_coef, ent_coef, vq_coef, loss_vq, alive=alive, rng_key=rng_key,
         ignition=ignition, ignition_discount=ignition_discount, alarm_ent_coef=alarm_ent_coef
     )
+
+    # Phase 18: Per-Group Gradient Clipping
+    # Prevent ecological shock trunk-turbulence from suffocating the actor gradients
+    import flax.core
+    is_frozen = isinstance(grads, flax.core.FrozenDict)
+    grads_dict = grads.unfreeze() if is_frozen else dict(grads)
+    
+    # We assume 'params' is a flat dictionary of layer names (Flax style)
+    target_dict = grads_dict["params"] if "params" in grads_dict else grads_dict
+    
+    def _clip_group(group_dict, max_norm=2.0):
+        norm = jnp.sqrt(sum(jnp.sum(g**2) for g in jax.tree_util.tree_leaves(group_dict)))
+        scale = jnp.minimum(1.0, max_norm / (norm + 1e-6))
+        return jax.tree_util.tree_map(lambda g: g * scale, group_dict)
+        
+    actor_grads = {"head_action": target_dict["head_action"]} if "head_action" in target_dict else {}
+    critic_grads = {"head_value": target_dict["head_value"]} if "head_value" in target_dict else {}
+    trunk_grads = {k: v for k, v in target_dict.items() if k not in ["head_action", "head_value"]}
+    
+    actor_clipped = _clip_group(actor_grads, 2.0)
+    critic_clipped = _clip_group(critic_grads, 2.0)
+    trunk_clipped = _clip_group(trunk_grads, 2.0)
+    
+    for k, v in actor_clipped.items(): target_dict[k] = v
+    for k, v in critic_clipped.items(): target_dict[k] = v
+    for k, v in trunk_clipped.items(): target_dict[k] = v
+    
+    if is_frozen:
+        grads = flax.core.freeze(grads_dict)
+    else:
+        grads = grads_dict
+
     updates, new_opt_state = optimizer.update(grads, opt_state, params)
     new_params = optax.apply_updates(params, updates)
     metrics["total_loss"] = loss
