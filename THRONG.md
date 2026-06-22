@@ -1353,7 +1353,13 @@ If our true goal is to force the emergence of AGI-level intelligence purely thro
 - **Mechanics:** Introduce combinable primitives (e.g., Wood + Stone = Axe) with severe receiver-side selection pressure. Solo crafting is impossible.
 - **Semantics:** Requires vocabulary expansion from simple nouns ("Predator") to slot-based compositional messages (Subject/Verb/Modifier, e.g., "I have Wood" + "Need Stone").
 - **Decode Gate:** (a) `NPMI(slot_0, inventory_item) > 0.3`, (b) `NPMI(slot_1, action_intent) > 0.3`, AND (c) `ATE > X` (statistically significant receiver response) when ablating either slot via Tier-3 causal gate. This proves Subject and Verb slots are semantically separated and causally grounded.
-  - **Current Status:** Stratified ATE (Mantel-Haenszel observational adjustment) excludes zero on `slot_0` (ΔPACTION > 0.08), showing strong conditional correlation. True frozen-checkpoint causal intervention is queued to confirm causation. Phase 18.3 (Sensory Expansion and Spatial Bifurcation) deployed to unlock full combinatorial crafting dynamics.
+  - **Current Status (Phase 18.4):** 3-slot discrete VQ, 12 actions. The -0.20 futile action penalty is live to curb Craft/Use action spam.
+  - **The VQ Severance Bug (Fixed!):** We discovered that the VQ codebook and continuous signal heads were completely severed from the PPO autodiff tape throughout Phase 18. The `loss_vq_rollout` static array was erroneously used in `ppo_loss` instead of the live network loss `outs[7]`.
+  - **Ecological Shock & Per-Group Clip:** Before reconnecting the VQ loss, we discovered `dead_code_reset` spikes were causing massive `trunk_norm` gradient explosions (Ecological Shock), which suffocated the actor head via the global clip. A Per-Group gradient clip was implemented in `rl_jax.py` to isolate the actor head. Verification passed.
+  - **VQ Reconnection:** Live `outs[7]` gradient has been reconnected in `rl_jax.py` with a mandatory 0.5x coefficient warmup for 20 updates in `main_jax.py`.
+  - **NB_GAIN Collapse:** The metric was confirmed to be a severed "ghost metric" (initialized to 1.0, never updated during rollout) — the causal ATE test methodology remains completely valid.
+
+*Last updated: 2026-06-22 — Phase 18.4 LIVE. Per-Group Clip deployed. Futile action penalty verified (-0.20 shaping behavior). VQ Gradient Reconnected with 0.5x warmup.*
 
 #### Phase 19 — Cultural Transmission (Writing)
 **Goal:** Allow agents to pre-train themselves across generations, escaping the capacity limit of oral communication.
@@ -1367,4 +1373,4 @@ If our true goal is to force the emergence of AGI-level intelligence purely thro
 
 ---
 
-*Last updated: 2026-06-21 — Phase 18.1 LIVE. Checkpoint grafting mathematically verified (zero discrepancy on forward pass equivalence). Causal ATE intervention script successfully refactored for Phase 18's 3-slot architecture. Pending Modal run.*
+*Last updated: 2026-06-22 — Phase 18.4 LIVE. Diagnosed the VQ Gradient Severance bug and Ecological Shock mechanism. Preparing staged reconnection of VQ gradient with 0.5x warmup.*
