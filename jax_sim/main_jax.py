@@ -1702,13 +1702,22 @@ def _run_simulation_impl(
         _r_alive_np   = np.asarray(r_batch["alive"]) if "alive" in r_batch else None
         _t_rppo0 = __import__("time").time()
         _r_ppo_apply = r_model_apply if _red_comms else model_apply
+        # Phase 18.6: Red VQ is DECOUPLED from the PPO gradient (red_vq_loss_coef=0.0).
+        # Red language is forged by reward_red_catch only (standing directive #8 — no
+        # blind VQ shaping on red). Historically red's VQ loss was a static no-op; the
+        # Phase 18 blue reconnection accidentally fed red's (pathological, 1.5e11) DCVQ
+        # loss into its PPO objective, saturating the trunk clip at 2.0 and starving
+        # red's actual policy learning. Red remains a lethal ecological pressure: its
+        # policy/value train on catch reward and its proprio/SRL aux still run.
+        # Reversible: set red_vq_loss_coef>0 (+ a one-time cold restart to heal the
+        # collapsed codebook) if red comms is ever promoted back to a science target.
         r_params, r_opt_state, r_metrics = ppo_update(
             r_params, r_opt_state, r_optimizer, _r_ppo_apply,
             r_batch, n_layers, update_key,
             clip_eps=float(config.get("ppo_clip_eps", config.get("ppo_clip", 0.2))),
             vf_coef=float(config.get("ppo_value_coef", 0.25)),
             ent_coef=float(config.get("ppo_entropy_coef", 0.02)),
-            vq_coef=float(config.get("vq_loss_coef", 0.1)),
+            vq_coef=float(config.get("red_vq_loss_coef", 0.0)),
             minibatch_size=_fwd_mb,
             gamma=float(config.get("ppo_gamma", 0.99)),
             lam=float(config.get("ppo_gae_lam", 0.95)),
@@ -1985,8 +1994,11 @@ def _run_simulation_impl(
                 red_ent_val = float(r_metrics.get("ppo_entropy", float("nan")))
                 red_ret_val = float(r_metrics.get("retention_loss", float("nan")))
                 print(f"  Actions (red):  {red_act_str}")
+                # Phase 18.6: red VQ is decoupled from the gradient — this line is
+                # diagnostic only (a collapsed/huge value is expected and harmless;
+                # red hunts via policy, not comms).
                 print(
-                    f"  RedVQ: loss={red_vq_val:.4f} | red_codes_active={red_codes_str} "
+                    f"  RedVQ(decoupled): loss={red_vq_val:.4g} | red_codes_active={red_codes_str} "
                     f"| red_entropy={red_ent_val:.4f} | RedAux: ret_loss={red_ret_val:.4f}"
                 )
             print(f"  Energy:  mean={e_mean:.3f} std={e_std:.3f} | Age: mean={age_mean:.0f} max={age_max:.0f}")
@@ -2082,13 +2094,13 @@ def _run_simulation_impl(
                             f"(delta={_delta} K={_k} max={_delta * _k:.4f}/think)"
                         )
 
-            # ── Phase 18.5 VQ health alert gate (H3) ───────────────────────────
-            # Cheap insurance against severance-class bugs. A VQ loss is a
-            # non-negative commitment cost; a healthy codebook keeps many codes live.
-            # A negative VQ loss or near-total codebook collapse means a learning
-            # signal is wired to the wrong tensor (e.g. the Phase 18.5 red index bug,
-            # where red minimized Σz_e and reported RedVQ≈-24225, codes 2/64).
-            # Make it LOUD so we notice on update 2, not update 2000.
+            # ── VQ health alert gate (H3, Phase 18.5; scoped to blue in 18.6) ──────
+            # Cheap insurance against severance-class bugs on the *trained* channel.
+            # Blue VQ is gradient-trained, so a negative loss (wired to the wrong
+            # tensor) or a near-total codebook collapse is a real bug — make it LOUD so
+            # we notice on update 2, not update 2000. Red VQ is decoupled from the
+            # gradient (Phase 18.6), so its telemetry is diagnostic only and is NOT
+            # alerted on (a collapsed/huge RedVQ is expected and harmless).
             def _min_codes_active(codes_str):
                 try:
                     return min(int(x) for x in codes_str.split("/")[0].split("|"))
@@ -2102,14 +2114,6 @@ def _run_simulation_impl(
             _bc_min = _min_codes_active(vq_codes_str)
             if _bc_min is not None and _bc_min < 4:
                 _vq_alerts.append(f"blue codes_active collapsed ({vq_codes_str})")
-            if _red_comms:
-                if np.isfinite(red_vq_val) and red_vq_val < 0.0:
-                    _vq_alerts.append(
-                        f"RedVQ loss < 0 ({red_vq_val:.2f}) — red VQ likely reading z_e (Phase 18.5 bug class)"
-                    )
-                _rc_min = _min_codes_active(red_codes_str)
-                if _rc_min is not None and _rc_min < 4:
-                    _vq_alerts.append(f"red codes_active collapsed ({red_codes_str})")
             for _a in _vq_alerts:
                 print(f"  [ALERT] {_a}", flush=True)
             print(f"{'='*70}\n")

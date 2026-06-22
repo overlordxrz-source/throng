@@ -229,7 +229,7 @@ Red has never passed the pincer χ² (`p ≈ 0.46` across 14.1c, 600k overdrive,
 - **(A) Keep red comms as a co-evolution science target.** Justified only if we believe predator coordination language is reachable. Evidence so far: weak. Cost: a whole second VQ/aux/SRL stack that doubles our bug surface (and produced bug #3).
 - **(B) Freeze red as pure ecological pressure.** Disable the red comms gradient entirely (`red_comms_enabled: false`-equivalent for the *language* heads, keep the predator policy), and redirect **all** interpretability effort onto blue's 3-slot compositional syntax. Red stays a lethal, adaptive selection force (it already learned `Push`/`Guard` trapping in Phase 16) without us pretending to decode its babble.
 
-**My recommendation: lean toward (B) after the 18.5 fix verifies red recovers.** The thesis of THRONG is *blue* language under predation. Red is the pressure, not the subject. Halving our bug surface and focusing the ATE/NPMI/Rosetta tooling on one network would accelerate every downstream phase. (This is a Cam-level call; flagging it for the synthesis.)
+**DECISION TAKEN (Phase 18.6, Jun 22): (B).** Once the 18.5 fix went live, blue VQ was confirmed healthy (`loss≈0.003–0.007`, `codes 45|39|43/64`) but red's correctly-read DCVQ loss was pathological (`1.5e11`, `codes 1/64`, trunk grad clip-saturated). Rather than spend compute nursing a chronically-failed channel, we set `red_vq_loss_coef: 0.0` — red VQ is decoupled from the gradient. Red remains a lethal, adaptive selection force (policy/value + proprio/SRL aux still train; it already learned `Push`/`Guard` trapping in Phase 16) but its language heads are no longer trained. The thesis of THRONG is *blue* language under predation; red is the pressure, not the subject. This halves our bug surface and focuses all ATE/NPMI/Rosetta tooling on one network. **Reversible:** `red_vq_loss_coef>0` + a one-time cold restart re-promotes red comms to a science target if future evidence warrants.
 
 ## 4. Concretising the open-ended pivot (Phase 21) — POET-lite in JAX
 
@@ -256,13 +256,12 @@ Prerequisite gate (unchanged from Cam): a *stable, mature* protocol from Phases 
 
 | Order | Action | Gate / exit criterion |
 |-------|--------|------------------------|
-| **0** | **Apply Phase 18.5 fix** (pull `vq_loss_idx` + `n_actions` YAML, restart). | `RedVQ` positive; `red_codes_active > 16/64`; blue unchanged. |
-| **1** | **H2 + H3 hardening** (gradient-flow test + telemetry alert gate). | Test passes for both teams; alert fires on synthetic collapse. |
-| **2** | **Phase 18.2 ATE accumulation** on the corrected channel. | ≥50k blind-receiver records since restart. |
+| **0** | ✅ **Phase 18.5 fix** (`vq_loss_idx` + `n_actions` YAML) + **18.6 red VQ decoupled** (`red_vq_loss_coef:0.0`). | DONE — blue VQ healthy; red = pure ecological pressure. |
+| **1** | ✅ **H2 + H3 hardening** (regression test + telemetry alert gate, scoped to blue). | DONE — test passes; H3 fired correctly on the live collapse. |
+| **2** | **Phase 18.2 ATE accumulation** on the **blue** channel. | ≥50k blind-receiver records since restart. |
 | **3** | **Receiver-Necessity crafting** (§2) if naive ATE is null. | ATE>0, CI excludes zero, per-slot separation via ablation. |
-| **4** | **Strategic fork decision** on red comms (§3). | Cam call after red recovery is observed. |
-| **5** | **Phase 19 Writing System** (Cam's pivotal phase) + H1/H4 hardening during the build. | Written-tile NPMI > ephemeral NPMI; teaching test `p<0.05`. |
-| **6** | **POET-lite** (§4). | No vocabulary plateau past 10M steps. |
+| **4** | **Phase 19 Writing System** (Cam's pivotal phase) + H1/H4 hardening during the build. | Written-tile NPMI > ephemeral NPMI; teaching test `p<0.05`. |
+| **5** | **POET-lite** (§4). | No vocabulary plateau past 10M steps. |
 
 The throughline: **stop running long training on un-asserted learning signals, make the receiver's survival depend on decoding, and only then chase open-endedness and silicon.** The science is real; the engineering discipline is what will let it compound instead of resetting every time an index slips.
 
