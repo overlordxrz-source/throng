@@ -43,14 +43,19 @@ The philosophical and mathematical foundations of THRONG have been consolidated 
 - **Action Logits Diagnostic:** `n_actions` history formally verified: it was exactly 8 prior to Phase 18. Build/Craft/UseTool gating in earlier phases was totally unreachable dead code.
 - **Early Frequency Check:** Because actions 8-11 were previously dead, they emerge with fresh zeroes. To check if they spam at deploy-time (since a zero logit may be a high-probability action compared to negatively biased old actions), `main_jax.py` now logs the frequency of actions 8-11 during the first 20 PPO updates.
 
-| Live run (Phase 18.3) | Value |
+**Phase 18.4 — Futile Action Penalty (Jun 22, 2026):**
+- **Diagnosis:** ~11% of actions were being wasted on futile `Craft` and `UseTool` attempts. Since PPO initialized the new logits at zero, they spammed these actions, causing mass starvation.
+- **Intervention 1 (Failed):** Applied a `-0.01` reward penalty for invalid Craft/UseTool (`d638c4e`). At 39 updates post-intervention, the penalty was too small relative to the returns standard deviation (~5.6) and was drowned out by noise. Frequencies did not drop.
+- **Intervention 2 (Live):** Increased the penalty magnitude 20x to `-0.20` (`e12ae91`) to guarantee a sharp gradient signal. Also observed a massive total gradient norm spike (`67.42`) despite healthy actor/value gradients, indicating the trunk is receiving a massive gradient signal (potentially from auxiliary loss or VQ scaling), which might be squashing the actor gradients via global clipping.
+
+| Live run (Phase 18.4) | Value |
 |-----------------------|--------|
 | **Branch** | **`feature/phase18-crafting`** |
-| **Modal workspace** | **`twentyninegeese`** (Jun 21, 2026) |
-| **Git HEAD** | `c756318` (action frequency diagnostic logging) |
-| **Checkpoint** | 2304 (step 1,179,648) — restored on new Modal account |
-| **Status** | ⏳ Deploying to Modal. Awaiting early action 8-11 frequency check. |
-| **Next Gate** | Confirm `blue_caught` baseline + 8-11 action frequency logging. Then run patched `causal_intervention.py`. |
+| **Modal workspace** | **`twentyninegeese`** (Jun 22, 2026) |
+| **Git HEAD** | `e12ae91` (Increase futile action penalty to -0.20) |
+| **Checkpoint** | 1228800 (ppo 2400) |
+| **Status** | ⏳ Training resumed. Awaiting 5-10 updates to see if the `-0.20` penalty suppresses futile actions. |
+| **Next Gate** | Confirm `Crf` & `Use` drop below 3%, and population recovers above 170. Then run patched `causal_intervention.py`. |
 
 **Cam's Measured Read on the Proto-Lexicon:**
 - **The Continuous Smuggling Hypothesis**: The categorical LRT on scout signals (k=4 clusters) showed no alignment with cardinal direction ($\chi^2 p = 0.315$). However, the continuous `LAG-1 DIRECTION LRT` on the 32d signal vector yielded highly significant causal steering ($p < 0.005$ on 12 dimensions!). The agents are not communicating via the discrete codebook index; they are doing linear algebra on the continuous `z_q` embeddings, effectively pointing to predators in continuous space.
