@@ -653,7 +653,7 @@ def make_sim_step(
         craft_success = success_wood | success_stone
         futile_craft = (b_actions == 10) & b_pop.alive & ~craft_success
         futile_use = (b_actions == 11) & b_pop.alive & (b_pop.inventory_axe == 0)
-        b_rew = b_rew - 0.01 * (futile_craft | futile_use).astype(jnp.float32)
+        b_rew = b_rew - 0.20 * (futile_craft | futile_use).astype(jnp.float32)
 
         r_rew = _rew_small_blue * r_caught_small
         r_rew = r_rew + (_rew_big_green_coop + _rew_coord) * r_caught_big_coop
