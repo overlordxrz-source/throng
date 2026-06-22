@@ -395,7 +395,8 @@ def ppo_update(
         vf_grad_norm = _head_grad_norm(final_grads, "head_value")
         act_grad_norm = _head_grad_norm(final_grads, "head_action")
         total_grad_norm = jnp.sqrt(sum(jnp.sum(g**2) for g in jax.tree_util.tree_leaves(final_grads)))
-        print(f"    [DEBUG] grad_norms (last mb) total={float(total_grad_norm):.4f} vf={float(vf_grad_norm):.4f} act={float(act_grad_norm):.4f}")
+        trunk_grad_norm = jnp.sqrt(jnp.maximum(0.0, total_grad_norm**2 - vf_grad_norm**2 - act_grad_norm**2))
+        print(f"    [DEBUG] grad_norms (last mb) total={float(total_grad_norm):.4f} trunk={float(trunk_grad_norm):.4f} actor={float(act_grad_norm):.4f} critic={float(vf_grad_norm):.4f}")
 
     return params, opt_state, metrics
 

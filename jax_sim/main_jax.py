@@ -1966,6 +1966,8 @@ def _run_simulation_impl(
                     _ages = b_pop_np.ages[alive_mask_final].astype(float)
                     if _nb_g.std() > 1e-6:
                         sp_r, _ = spearmanr(_nb_g, _ages)
+                    else:
+                        print(f"  [DEBUG] NB_GAIN variance collapsed! Unique raw values: {np.unique(_nb_g)[:10]}")
                 except Exception:
                     pass
             
