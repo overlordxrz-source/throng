@@ -1624,13 +1624,17 @@ def _run_simulation_impl(
             b_metrics["proprio_loss"] = b_proprio_loss
             
             # Phase 18 early diagnostic: monitor actions 8-11 (Build, PickUp, Craft, UseTool)
-            if ui < start_update + 20:
+            if ui < start_update + 200:
                 _flat_actions = _b_actions_np[_b_alive_np] if _b_alive_np is not None else _b_actions_np
                 _flat_actions = _flat_actions.reshape(-1)
                 _tot = len(_flat_actions)
-                _new_action_count = np.sum((_flat_actions >= 8) & (_flat_actions <= 11))
-                _freq = _new_action_count / max(_tot, 1)
-                print(f"  [DEBUG] New Actions 8-11 frequency: {_freq*100:.2f}% (Count: {_new_action_count}/{_tot})", flush=True)
+                _c_bld = np.sum(_flat_actions == 8)
+                _c_pu = np.sum(_flat_actions == 9)
+                _c_crf = np.sum(_flat_actions == 10)
+                _c_use = np.sum(_flat_actions == 11)
+                _tot_new = _c_bld + _c_pu + _c_crf + _c_use
+                
+                print(f"  [DEBUG] New Actions 8-11: {(_tot_new/_tot)*100:.1f}% [Bld:{(_c_bld/_tot)*100:.1f}% PU:{(_c_pu/_tot)*100:.1f}% Crf:{(_c_crf/_tot)*100:.1f}% Use:{(_c_use/_tot)*100:.1f}%]", flush=True)
 
 
         if config.get("vq_dead_code_reset", True) and "z_e" in b_batch:
