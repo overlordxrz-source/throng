@@ -179,17 +179,17 @@ def ppo_loss(
         total_entropy_val += alarm_entropy.sum() / denom
         
     loss_ent = loss_spatial_ent + loss_alarm_ent
-
     loss_logit_penalty = logit_penalty.sum() / denom
+    
     total_loss = loss_pg + vf_coef * loss_vf + loss_ent + loss_logit_penalty
-
-    loss_vq_mean = jnp.array(0.0)
-    if loss_vq_rollout is not None:
-        vq = loss_vq_rollout
-        if alive is not None:
-            vq = vq * mask
-        loss_vq_mean = vq.sum() / denom
-        total_loss = total_loss + vq_coef * loss_vq_mean
+    
+    # Phase 18 VQ Reconnection: use live gradients from forward pass (outs[7])
+    if alive is not None:
+        loss_vq_mean = (outs[7] * mask).sum() / denom
+    else:
+        loss_vq_mean = jnp.mean(outs[7])
+        
+    total_loss = total_loss + vq_coef * loss_vq_mean
 
     metrics = {
         "ppo_pg_loss":  loss_pg,

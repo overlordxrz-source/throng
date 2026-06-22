@@ -1588,13 +1588,18 @@ def _run_simulation_impl(
         else:
             print("  [DEBUG] --- Blue PPO Update ---")
             _t_ppo0 = __import__("time").time()
+            
+            _base_vq_coef = float(config.get("vq_loss_coef", 0.1))
+            # Phase 18 VQ Reconnection Warmup (0.5x for 20 updates)
+            _vq_coef = _base_vq_coef * 0.5 if ui < start_update + 20 else _base_vq_coef
+            
             b_params, b_opt_state, b_metrics = ppo_update(
                 b_params, b_opt_state, b_optimizer, model_apply,
                 b_batch, n_layers, update_key,
                 clip_eps=float(config.get("ppo_clip_eps", config.get("ppo_clip", 0.2))),
                 vf_coef=float(config.get("ppo_value_coef", 0.25)),
                 ent_coef=float(config.get("ppo_entropy_coef", 0.02)),
-                vq_coef=float(config.get("vq_loss_coef", 0.1)),
+                vq_coef=_vq_coef,
                 minibatch_size=_fwd_mb,
                 gamma=float(config.get("ppo_gamma", 0.99)),
                 lam=float(config.get("ppo_gae_lam", 0.95)),
