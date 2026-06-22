@@ -106,10 +106,17 @@ def build_observations_jax(
     inv_stone = pop.inventory_stone.astype(jnp.float32)
     inv_axe = pop.inventory_axe.astype(jnp.float32)
 
-    own_state = jnp.concatenate([
-        jnp.stack([norm_age, mat_frac, energy, nl_norm, norm_x, norm_y, inv_wood, inv_stone, inv_axe], axis=1),
-        intrinsic_entropy
-    ], axis=1)
+    own_state_dim = int(config.get("own_state_dim", 13))
+    if own_state_dim == 10:
+        own_state = jnp.concatenate([
+            jnp.stack([norm_age, mat_frac, energy, nl_norm, norm_x, norm_y], axis=1),
+            intrinsic_entropy
+        ], axis=1)
+    else:
+        own_state = jnp.concatenate([
+            jnp.stack([norm_age, mat_frac, energy, nl_norm, norm_x, norm_y, inv_wood, inv_stone, inv_axe], axis=1),
+            intrinsic_entropy
+        ], axis=1)
 
     # Team-isolated by PopState: blues pass b_pop, reds pass r_pop (Phase 12 co-evolution).
     nb_sigs = get_neighbour_signals(
@@ -151,9 +158,15 @@ def build_observations_jax(
     loc_wood = get_local_patches(grid.wood_grid.astype(jnp.float32), pop.positions, r, gs)[..., None]
     loc_stone = get_local_patches(grid.stone_grid.astype(jnp.float32), pop.positions, r, gs)[..., None]
 
-    loc_env = jnp.concatenate([
-        loc_pres, loc_wall, loc_res, loc_shelter, loc_contested, loc_scent, loc_puzzle, loc_blue_bg, loc_barrier, loc_wood, loc_stone
-    ], axis=-1)
+    env_channels = int(config.get("env_channels", 12))
+    if env_channels == 10:
+        loc_env = jnp.concatenate([
+            loc_pres, loc_wall, loc_res, loc_shelter, loc_contested, loc_scent, loc_puzzle, loc_blue_bg, loc_barrier
+        ], axis=-1)
+    else:
+        loc_env = jnp.concatenate([
+            loc_pres, loc_wall, loc_res, loc_shelter, loc_contested, loc_scent, loc_puzzle, loc_blue_bg, loc_barrier, loc_wood, loc_stone
+        ], axis=-1)
 
     if key is not None:
         k_noise, k_gate = jax.random.split(key)

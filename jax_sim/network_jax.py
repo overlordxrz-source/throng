@@ -1033,7 +1033,30 @@ def pad_emb_own(flat_params: dict, target_dim: int = 10) -> None:
         ], axis=0)
         flat_params["emb_own"] = dict(eo)  # make a copy to avoid mutating frozen dicts accidentally
         flat_params["emb_own"]["kernel"] = padded_kernel
-        print(f"[JAX] Grafting padding to emb_own: expanded inputs from {kernel.shape[0]} to {target_dim}", flush=True)
+        print(f"[JAX] Grafting padding to emb_own: {kernel.shape[0]} -> {target_dim}", flush=True)
+
+def pad_emb_env(flat_params: dict, target_dim: int = 12) -> None:
+    """Pad emb_env weights to accommodate Phase 18 crafting channels addition."""
+    if "emb_env" not in flat_params:
+        return
+    ee = flat_params["emb_env"]
+    kernel = ee["kernel"]
+    if kernel.shape[0] < target_dim:
+        missing = target_dim - kernel.shape[0]
+        out_dim = kernel.shape[1]
+        padded_kernel = jnp.concatenate([
+            kernel,
+            jnp.zeros((missing, out_dim), dtype=kernel.dtype)
+        ], axis=0)
+        flat_params["emb_env"] = dict(ee)
+        flat_params["emb_env"]["kernel"] = padded_kernel
+        print(f"[JAX] Grafting padding to emb_env: {kernel.shape[0]} -> {target_dim}", flush=True)
+    elif kernel.shape[0] > target_dim:
+        truncated_kernel = kernel[:target_dim, :]
+        flat_params["emb_env"] = dict(ee)
+        flat_params["emb_env"]["kernel"] = truncated_kernel
+        print(f"[JAX] Truncating emb_env: {kernel.shape[0]} -> {target_dim}", flush=True)
+
 
 
 def pad_head_action(flat_params: dict, target_actions: int = 8) -> None:
@@ -1101,9 +1124,8 @@ def clean_old_codebook(flat_params: dict) -> None:
         print(f"[JAX] Removed old 32D codebook from params to allow Phase 18 discrete slots to init.", flush=True)
 
 
-
 def pad_gwt_comms_1(flat_params: dict, target_channels: int) -> None:
-    """Pad gwt_comms_1 kernel from older observation dimensions (2335, 2360) to target_channels."""
+    """Pad gwt_comms_1 kernel from older observation dimensions to target_channels."""
     if "gwt_comms_1" not in flat_params:
         return
     gc1 = flat_params["gwt_comms_1"]
@@ -1122,7 +1144,7 @@ def pad_gwt_comms_1(flat_params: dict, target_channels: int) -> None:
         print(f"[JAX] Grafting own_state padding to gwt_comms_1: expanded +{missing_own}", flush=True)
 
     # 2. Pad loc_env from 9 to 10 channels if needed
-    if kernel.shape[0] == 2339 and target_channels == 2364:
+    if kernel.shape[0] == 2339 and target_channels >= 2364:
         K = 6
         W = 25
         sig_dim = 32
@@ -1138,9 +1160,38 @@ def pad_gwt_comms_1(flat_params: dict, target_channels: int) -> None:
         kernel = new_kernel
         print(f"[JAX] Grafting interleaved padding to gwt_comms_1: expanded +25", flush=True)
         
+    # 3. Pad own_state 10->13 (Phase 18.3)
+    if kernel.shape[0] == 2594 and target_channels >= 2597:
+        part1 = kernel[:10, :]
+        pad_own = jnp.zeros((3, hidden_dim), dtype=kernel.dtype)
+        kernel = jnp.concatenate([part1, pad_own, kernel[10:]], axis=0)
+        print(f"[JAX] Grafting padding to gwt_comms_1: 2594 -> 2597 (+3 own_state)", flush=True)
+
+    # 4. Pad loc_env 10->12 (Phase 18 crafting channels)
+    if kernel.shape[0] == 2597 and target_channels >= 2647:
+        # loc_env starts at 13 (own_state) + 240 (nb_sigs) + 12 (nb_alarms) + 400 (loc_sym) = 665
+        part1 = kernel[:665, :]
+        loc_env_old = kernel[665:915, :].reshape(25, 10, hidden_dim)
+        pad_env = jnp.zeros((25, 2, hidden_dim), dtype=kernel.dtype)
+        loc_env_new = jnp.concatenate([loc_env_old, pad_env], axis=1).reshape(300, hidden_dim)
+        part3 = kernel[915:, :]
+        
+        kernel = jnp.concatenate([part1, loc_env_new, part3], axis=0)
+        print(f"[JAX] Grafting padding to gwt_comms_1: 2597 -> 2647 (+50 loc_env)", flush=True)
+        
+    # 5. Truncate loc_env 12->10 (Phase 18 fallback to Phase 17)
+    if kernel.shape[0] == 2647 and target_channels <= 2597:
+        part1 = kernel[:665, :]
+        loc_env_old = kernel[665:965, :].reshape(25, 12, hidden_dim)
+        loc_env_new = loc_env_old[:, :10, :].reshape(250, hidden_dim)
+        part3 = kernel[965:, :]
+        
+        kernel = jnp.concatenate([part1, loc_env_new, part3], axis=0)
+        print(f"[JAX] Truncating gwt_comms_1 loc_env: 2647 -> 2597 (-50 loc_env)", flush=True)
+        
     flat_params["gwt_comms_1"] = {
         "kernel": kernel,
-        "bias": gc1.get("bias", jnp.zeros(hidden_dim, dtype=kernel.dtype)),
+        "bias": gc1.get("bias", jnp.zeros(hidden_dim, dtype=kernel.dtype))
     }
 
 
@@ -1181,33 +1232,39 @@ def pad_auxiliary_heads(flat_params: dict, hidden_dim: int, target_actions: int 
 
 
 def pad_head_fwd_2(flat_params: dict, target_outputs: int = 250) -> None:
-    """Pad head_fwd_2 outputs from 225 to 250 by interleaving zeros for the 10th env channel."""
+    """Pad or truncate head_fwd_2 outputs by interleaving or truncating env channels."""
     if "head_fwd_2" not in flat_params:
         return
     hf2 = flat_params["head_fwd_2"]
     kernel = hf2["kernel"]
-    if kernel.shape[1] < target_outputs:
-        hidden_dim = kernel.shape[0]
+    if kernel.shape[1] == target_outputs:
+        return
         
-        W = 25 # (2*2 + 1)**2
+    hidden_dim = kernel.shape[0]
+    bias = hf2.get("bias", jnp.zeros(kernel.shape[1], dtype=kernel.dtype))
+    
+    W = 25 # (2*2 + 1)**2
+    old_channels = kernel.shape[1] // W
+    new_channels = target_outputs // W
+    
+    kernel_reshaped = kernel.reshape(hidden_dim, W, old_channels)
+    bias_reshaped = bias.reshape(W, old_channels)
+    
+    if new_channels > old_channels:
+        missing = new_channels - old_channels
+        pad_k = jnp.zeros((hidden_dim, W, missing), dtype=kernel.dtype)
+        pad_b = jnp.zeros((W, missing), dtype=bias.dtype)
+        new_k = jnp.concatenate([kernel_reshaped, pad_k], axis=2)
+        new_b = jnp.concatenate([bias_reshaped, pad_b], axis=1)
+    else:
+        new_k = kernel_reshaped[:, :, :new_channels]
+        new_b = bias_reshaped[:, :new_channels]
         
-        new_kernel = jnp.zeros((hidden_dim, target_outputs), dtype=kernel.dtype)
-        bias = hf2.get("bias", jnp.zeros(kernel.shape[1], dtype=kernel.dtype))
-        new_bias = jnp.zeros(target_outputs, dtype=bias.dtype)
-        
-        insert_indices = jnp.array([9 + i * 10 for i in range(W)])
-        
-        mask = jnp.ones(target_outputs, dtype=bool)
-        mask = mask.at[insert_indices].set(False)
-        
-        new_kernel = new_kernel.at[:, mask].set(kernel)
-        new_bias = new_bias.at[mask].set(bias)
-        
-        flat_params["head_fwd_2"] = {
-            "kernel": new_kernel,
-            "bias": new_bias,
-        }
-        print(f"[JAX] Grafting interleaved padding to head_fwd_2: expanded outputs from {kernel.shape[1]} to {target_outputs}", flush=True)
+    flat_params["head_fwd_2"] = {
+        "kernel": new_k.reshape(hidden_dim, target_outputs),
+        "bias": new_b.reshape(target_outputs),
+    }
+    print(f"[JAX] Grafting head_fwd_2: {kernel.shape[1]} -> {target_outputs}", flush=True)
 
 
 def ensure_aux_head_params(
@@ -1221,10 +1278,11 @@ def ensure_aux_head_params(
     """Fill missing auxiliary-head / VQ / monologue params when resuming."""
     flat = unfreeze(params)
     pad_emb_own(flat, model.own_state_dim) # Phase 17 own_state grafting
+    pad_emb_env(flat, model.env_channels)  # Phase 18 env_channels grafting
     pad_head_action(flat, model.n_actions) # Phase 16 parameter grafting
     pad_gwt_comms_1(flat, obs_dim)         # Phase 17 GWT Router grafting
     pad_auxiliary_heads(flat, hidden_dim, model.n_actions) # Phase 16 auxiliary grafting
-    pad_head_fwd_2(flat)   # Phase 16 env prediction grafting
+    pad_head_fwd_2(flat, 25 * model.env_channels)   # Phase 16 env prediction grafting
     pad_head_signal_cont(flat) # Phase 18 continuous wire truncation
     clean_old_codebook(flat)   # Phase 18 discrete slots reset
     
