@@ -1,91 +1,284 @@
-# THRONG v2 — Predator-Prey Intelligence Emergence (Phase 2: MAPPO)
-# Parameter-sharing MARL: one shared policy per team, trained via PPO.
-# Brain depth starts fixed; population "votes" to grow it when struggling.
+# THRONG v2 — Phase 7: Rich World + Episodic Memory + Red Co-evolution
+#
+# Three architectural additions:
+# 1. Episodic memory buffer per agent (20 slots of signal+action+survival)
+# 2. Three new world objects: shelter spots, contested resources, scent trails
+# 3. Red co-evolution: reds get their own PPO policy (hidden_dim=128)
+#
+# USE: python main.py --config config_phase7.yaml --fresh
 
-grid_size: 96
-window_size: 900
+grid_size: 128
+window_size: 1200
 
-population_size: 400
-red_population_size: 40
-min_population: 30
-min_red_population: 15     # 15 reds on 96x96 gives good dist_to_red variance for MI
+population_size: 200           # P10.5 Hard-Ceiling: cap blues (no 500-agent entropy explosion)
+max_population: 200
+max_pop: 200
+min_population: 150              # P10.5 Goldilocks: 150–200 high-stress band
+min_red_population: 250          # P4b: max red pressure immediately on resume
+repro_energy_thresh: 0.95        # P10.2 Metabolic Squeeze: rare clones (was 0.80)
+repro_energy_cost: 0.80          # P10.2: cloning nearly starves parent (was 0.40)
 
-# Curriculum: start reds at curriculum_red_count, grow to red_population_size
-# once blues sustain >= curriculum_blue_threshold for curriculum_sustain_steps consecutive steps
-curriculum_red_count: 4        # gentle start — let blues grow above 60 before graduating to full pressure
-curriculum_blue_threshold: 250 # require genuine recovery before graduating to full red pressure
-curriculum_sustain_steps: 3000 # consecutive steps needed to graduate 4 → min_red_population (15)
+# Curriculum
+curriculum_red_count: 6
+curriculum_blue_threshold: 80
+curriculum_sustain_steps: 2000
+curriculum_survival_threshold: 0.80   # blue survival rate to advance red floor
+curriculum_sustain_updates: 5         # consecutive PPO updates above threshold
 
-max_age: 20000
-base_maturation_steps: 200    # flat — no per-layer cost; survival drives brain depth
+max_age: 1000                 # P10.4 Safety Bubble: above JAX default 500; room for mean age 150+
+base_maturation_steps: 200
 
-# Brain architecture (shared policy)
-n_layers: 2                   # shared starting depth; grows via brain_vote_interval
-brain_max_layers: 6           # max allowed depth (model grows incrementally)
-brain_token_dim: 32
-brain_n_heads: 2
-agent_hidden_dim: 64
-signal_dim: 4                  # communication bottleneck: forces agents to prioritise WHAT to signal (was 16)
-symbol_dim: 8
+# Brain architecture — 4L from birth
+n_layers: 4
+brain_max_layers: 6
+brain_token_dim: 128
+brain_n_heads: 4
+agent_hidden_dim: 256
+signal_dim: 40
+symbol_dim: 16
 
 neighbor_k: 6
-local_obs_radius: 1
+local_obs_radius: 2              # 5×5 patch
+env_channels: 12                 # Phase 18.3: 10 base + wood, stone
+own_state_dim: 13                # Phase 18.3: 10 base + inv_wood, inv_stone, inv_axe
+n_actions: 12                    # Phase 18: N,S,E,W,Stay,Strike,Push,Guard,Build,PickUp,Craft,UseTool
+                                 # (build_cfg overrides identically; defined here so direct-YAML loads
+                                 #  — README quickstart, decode/test tools — don't default to 8 and crash
+                                 #  the aux one-hot on actions 8–11)
+
+# Theory of mind head
+tom_enabled: true
+tom_lr: 1.0e-4
+tom_reward_coef: 0.0            # ZERO artificial rewards in Phase 7
+tom_head_independent: true
+
+# Signal gate
+signal_gate_enabled: true
+signal_gate_mask_frac: 0.5
 
 symbol_decay: 0.993
 
 red_starvation_steps: 400
 red_spawn_step: 2000
-red_catch_radius: 0
+red_catch_radius: 1          # P4: adjacent reds catch blues (Chebyshev ≤ 1)
+red_catch_prob: 0.8          # P10.4: 20% predator jitter on in-range catches
 
-# ── MAPPO ─────────────────────────────────────────────────────────────────────
+# ── VQ signal bottleneck (P3) ─────────────────────────────────────────────────
+vocab_size: 64
+vq_beta: 0.25
+vq_loss_coef: 0.1               # blue VQ commitment coef (live PPO gradient)
+red_vq_loss_coef: 0.0           # Phase 18.6: red VQ DECOUPLED from gradient (red = pure
+                                # ecological pressure; language forged by catch reward only,
+                                # directive #8). Set >0 (+ one-time cold restart) only if red
+                                # comms is ever promoted back to a science target.
+vq_dead_code_reset: true
+gumbel_tau: 0.5
+
+# ── Anneal: diversity → crystallization ───────────────────────────────────────
+gumbel_tau_start: 0.5
+gumbel_tau_end: 0.5
+gumbel_tau_anneal_start: 20000
+gumbel_tau_anneal_end: 50000
+
+# ZERO signal entropy bonus — structure must arise from survival gradient
+signal_entropy_coef_start: 0.0
+signal_entropy_coef_end: 0.0
+signal_entropy_anneal_start: 20000
+signal_entropy_anneal_end: 50000
+
+# ── Procedural environment ────────────────────────────────────────────────────
+wall_density: 0.08
+resource_n_patches: 10           # P10.3 Famine: half map patches (was 20)
+resource_regen_rate: 0.0003      # P10.4 Safety Bubble: +20% vs P10.3 famine (0.00025)
+resource_max: 0.5                # P10.3: cap cell resources (default 1.0)
+resource_spawn_boost: 0.1       # P10.3: per-step spawn increment (was hardcoded 0.2)
+
+# ── Phase 7: New world objects ────────────────────────────────────────────────
+shelter_n_spots: 5              # shelter spots per map
+contested_n_nodes: 3           # contested resource nodes
+contested_yield_multiplier: 3.0 # 3× normal food, requires 2+ agents
+contested_min_harvesters: 2
+scent_decay_steps: 20          # scent trail fades over 20 steps
+scent_intensity: 0.8          # initial scent strength when red passes
+
+# ── Phase 7: Episodic memory ─────────────────────────────────────────────────
+memory_buffer_size: 20          # slots per agent (0 = disabled)
+memory_buffer_enabled: true
+
+# ── Phase 7: Red co-evolution ────────────────────────────────────────────────
+red_policy: true
+red_hidden_dim: 128             # half the blues' capacity (256→128)
+
+# ── Phase 7.5: Dual cultural memory grids ───────────────────────────────────
+culture_fast_decay: 0.90         # fast-decay layer: recent danger / coordination
+culture_slow_decay: 0.995        # slow-decay layer: stable landmarks / long-term memory
+culture_intensity: 0.3           # how strongly agents write to shared memory
+
+# ── Phase 7.5b: Mind-Melding (live knowledge transfer) ─────────────────────
+mind_meld_enabled: true
+mind_meld_radius: 1              # agents within 1 cell can meld
+mind_meld_rate: 0.1              # fraction of carry overwritten per step
+mind_meld_direction: older_to_younger  # or "bidirectional"
+
+# ── Phase 7.5c: Evolutionary Distillation ─────────────────────────────────
+distill_enabled: false         # P4b Selective Squeeze: off during raw selection test
+distill_interval: 10000          # steps between distillation events
+distill_keep_frac: 0.05          # top 5% survive
+distill_noise_std: 0.1           # Gaussian noise on cloned carries
+
+# ── Phase 7.5d: Cooperative Puzzle (Lock-and-Key) ──────────────────────────
+puzzle_enabled: true
+puzzle_n_nodes: 3                # number of lock-key pairs
+puzzle_switch_distance: 2        # how close to stand on switch
+puzzle_reward: 5.0               # massive reward for solving
+puzzle_timeout: 100              # steps before puzzle resets
+
+# ── Energy mechanics ─────────────────────────────────────────────────────────
+energy_decay: 0.001
+alarm_metabolic_cost: 0.006
+starvation_threshold: 0.1
+reward_starvation: -0.5
+reward_resource: 0.1
+resource_decay: 0.05                 # how much resource depletes per consumption step
+
+# ── MAPPO ──────────────────────────────────────────────────────────────────────
 ppo_rollout_steps: 512
-ppo_epochs: 2
-ppo_minibatch_size: 2048
-ppo_warmup_steps: 2        # was 15 — high catch rate means most agents die young; 15 excluded nearly everyone from pg
+ppo_epochs: 1
+ppo_minibatch_size: 512   # 500 agents × 512 steps; 2048 minibatch OOMs backward on A100
+ppo_warmup_steps: 15
 ppo_clip: 0.2
-ppo_lr: 5.0e-4
-ppo_gamma: 0.99
+ppo_clip_eps: 0.2
+ppo_lr: 3.0e-4
+ppo_gamma: 0.999                 # P10.5: long-horizon survival (500+ step credit)
 ppo_gae_lam: 0.95
-ppo_value_coef: 0.5            # standard PPO; was 0.25 and vf never dropped below 0.4 across all runs
-ppo_entropy_coef: 0.01         # was 0.05; with recurrent PPO the policy gradient is now real and 0.05 drowned it ~80x
-ppo_max_grad_norm: 2.0         # raised from 0.5; was clipping 96% of updates
-tom_reward_coef: 0.0     # PHASE 3 WITHDRAWAL — scaffolding removed; was 0.002
+ppo_value_coef: 0.1
+ppo_entropy_coef: 0.02
+alarm_ent_coef: 0.0
+action_entropy_coef: 0.05      # Explicit action diversity bonus
+ppo_max_grad_norm: 2.0
 
 # Rewards
-reward_blue_alive: 0.05       # stronger survival gradient
-reward_blue_caught: -1.0      # caught by a red
+reward_blue_alive: 0.05
+reward_blue_caught: -2.0      # P4: harsher death penalty for caught blues
 reward_blue_red_proximity: -0.01
-reward_red_catch: 1.0         # caught a blue
-reward_red_starve_per_step: -0.01   # hunger pressure
+reward_red_catch: 3.0         # P4: stronger hunt incentive
+reward_red_starve_per_step: -0.02
+reward_move: 0.01
+reward_red_move: 0.04        # P4: reward red movement (hunter aggression)
 
-# Partial observability — forces communication
-# A blue agent can only detect reds within this radius.
-# Agents outside it must rely on neighbour signals.
-red_detection_radius: 8       # cells; 0 = all-seeing (disables the mechanic)
+# ── P10.4 Safety Bubble (NB_GAIN temporal depth: mean age 150+) ───────────────
+# Predator jitter: red_catch_prob (not detection_radius — blues stay blind)
+# Slightly more regen than P10.3 famine; repro still squeezed (P10.2 thresholds)
 
-# Brain growth via population vote
-brain_vote_interval: 5000     # steps between checks
-brain_vote_survival_threshold: 0.55   # if blue survival rate < this, grow brain
+# ── P10.5 Hard-Ceiling (population 150–200, γ=0.999) ─────────────────────────
+# Blues capped at 200; min 150 — no hyper-breeding luxury band at 500
+
+# Observation constraints
+red_detection_radius: 0          # 0 = blind beyond 5×5 patch; need neighbor signals (Phase 10)
+red_curriculum_stages: [250]       # P4b: locked at max reds (hot-resume stays at 250)
+resource_obs_noise: 0.2         # 20% Gaussian noise on resource observations
+
+brain_vote_interval: 5000
+brain_vote_survival_threshold: 0.55
+force_brain_layers: 4
 
 # ── Misc ──────────────────────────────────────────────────────────────────────
 steps_per_render: 32
 target_fps: 60
 dashboard_update_interval: 20.0
 
-log_dir: runs
+log_dir: runs_large
 checkpoint_interval: 2000
 log_interval: 200
 
 mi_analysis_interval: 1000
 mi_window: 1000
-signal_cluster_k: 8
+signal_cluster_k: 12
 
-# Signal corpus (offline language analysis)
-corpus_sample_frac: 0.08     # fraction of alive agents sampled per record burst
-corpus_every_n_steps: 20     # record every N steps (sparse; negligible overhead)
+# Signal corpus (offline language analysis) — P10.6 tight causal lag (~4 env steps)
+corpus_sample_frac: 0.15
+corpus_every_n_steps: 4
+
+# Within-lifetime Hebbian learning
+hebb_lr: 0.001
 
 # Alarm call analysis
-# sig_range covers the ~6.6-cell k-NN communication radius (√(k/πρ) at 400 agents/96²)
-# min_group prevents nan without distorting the metric via too-tight a radius
 alarm_scout_range: 8
 alarm_min_group: 20
+
+# Phase 11 staging (feature/phase11-imagination only — not on master P10.6 run)
+carry_fwd_coef: 0.05   # MSE on carry_{t+1}; target always stop_gradient
+
+# Phase 9 canvas (feature/phase9-canvas) — cross-attention receiver for neighbor signals
+phase9_canvas:
+  cross_attn_enabled: false   # scaffold: set true to compile 9.4 path (new params)
+  cross_attn_num_heads: 4
+  confidence_enabled: false   # 9.1 — enable after git pull post P9.4 run (grafts head_confidence_*)
+  confidence_coef: 0.05
+  # Phase 11.3 — epistemic imagination gating (feature/phase11-3-epistemic-gate)
+  imagination_gating_enabled: true
+  confidence_multiplier: 1.0   # batch-relative gate: imagine if conf < mean(conf|alive)*mult
+  imagination_k: 5
+  imagination_gamma: 0.999
+  imagination_n_actions: 5     # how many actions the K-step mental rollout scores.
+                               # 5 = legacy (Stay + N/S/E/W only). Set to 12 to let the
+                               # gate deliberate over Strike/Push/Guard + tool actions.
+                               # Behavioural change — A/B against a fresh run before adopting.
+  # Phase 13.0 — metabolic cost per K-step thought (total = delta * K per gate use)
+  imagination_metabolic_delta: 0.0005
+
+# Phase 12 — adversarial co-evolution (feature/phase12-red-coevolution; off on production P11.3)
+phase12_coevolution:
+  red_comms_enabled: true        # branch default: 128-d PredatorNetwork (matches volume r_params)
+  red_cross_attn_enabled: true
+  red_vocab_size: 64
+  red_vq_noise_scale: 0.5
+  red_corpus_enabled: true       # 12.1 wiretap — signal_corpus_red.jsonl (requires red_comms_enabled)
+  hunt_scout_range: 8            # symmetric with alarm_scout_range (blue scout label)
+
+# Phase 14.1b/c — VQEL monologue + wire cut + graduation (feature/phase14-transcendental)
+phase14_vqel:
+  monologue_enabled: false       # post-600k: skip monologue; hard dialogue on startup
+  monologue_lr: 0.00003          # low LR to protect 320k MAPPO policy in shared trunk
+  recon_coef: 1.0
+  hash_penalty_coef: 0.5
+  vq_coef_monologue: 1.0
+  graduate_recon_mse: 0.02       # P14-1c: exit monologue when recon MSE stays below this
+  graduate_consecutive_updates: 10
+  dialogue_signal_mode: hard     # discrete z_q broadcast (graduated state)
+
+# Phase 14.1b — proprioceptive disentanglement (energy from carry, not VQ wire)
+proprio_coef: 0.15
+retention_coef: 0.1
+
+# Phase 14.2 — Metabolic Asymmetry (apex predators: slow red energy decay)
+phase14_transcendental:
+  red_energy_decay: 0.0001   # 10× slower than blue energy_decay (0.001); same starvation_threshold
+  # P14.4 SimVQ — stateless W bound (forward only; no new params; ckpt 1413 compatible)
+  simvq_w_clip: 2.0          # clip simvq_W at matmul time
+  simvq_out_scale: 2.0       # tanh projection × scale → signal in [-2, 2]
+  reset_red_vq_on_resume: false # SAFEGUARD: Phase 15 codebook is healed, do not nuke it again
+
+exit_on_graduation: false
+
+# Phase 15.0 — Cumulative Culture (MEDAL-ADR Expert Dropout)
+phase15_cumulative_culture:
+  medal_adr_prob: 0.002      # Probability of expert dropout per step (approx 64% over 512 steps)
+
+# Phase 16.0 — Open-Ended Combinatorial Complexity
+phase16_combinatorial_syntax:
+  reward_small_blue: 3.0
+  reward_big_green_success: 8.0
+  reward_big_green_solo_penalty: -1.0
+  reward_big_green_solo_catchable: 2.0  # Used during 0-100k step scaffold
+  r_coord: 1.5
+  coop_threshold_step: 100000
+  num_actions: 8
+  medal_adr_enabled: true
+
+# Phase 16.5 — Environmental Enrichment & Metabolic Routing
+phase16_5_enrichment:
+  barrier_build_cost: 0.06
+  feral_threshold: 0.20
+  barrier_decay_rate: 0.05
+  ignition_discount: 0.1

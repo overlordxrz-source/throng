@@ -6,7 +6,7 @@
 
 **Read this file first.** Full historical lab notebook (~290KB) lives in [`docs/THRONG_ARCHIVE.md`](docs/THRONG_ARCHIVE.md) if you need old run logs.
 
-**Cam reboot (60 seconds):** Read **§0b** → **§0** (directives) → **§4** (ops) → **§7** (`--red` decode) → **§11** roadmap → Cam paste at **§12 bottom**.
+**Cam reboot (60 seconds):** Read **§0b** → **§0** (directives) → **§4** (ops) → **§7** (`--red` decode) → **§11** roadmap → Cam paste at **§12 bottom**. **New (Jun 2026): read [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) (what the code actually does) and [`docs/STRATEGIC_ROADMAP.md`](docs/STRATEGIC_ROADMAP.md) v2 (where we're going + why) — these supersede drifted prose below.**
 
 ---
 
@@ -265,7 +265,7 @@ Continuous comms verified → unguarded active imagination **failed** → **reso
 | **Fields** | `hunter`, `blue_dist`, `blue_bear`, `vq_token`, `nb_hunter_sig_lag1`, `nb_hunter_dist_lag1`, `nb_hunter_token_lag1` |
 | **Symmetry** | `hunt_scout_range: 8` (= `alarm_scout_range`) |
 | **Guard** | Red corpus runs **even if blue locally extinct** |
-| **Flags** | `red_comms_enabled: true` + **`red_corpus_enabled: true`** in `config_phase7.yaml` — no notebook `sed` |
+| **Flags** | `red_comms_enabled: true` + **`red_corpus_enabled: true`** in `config.yaml` — no notebook `sed` |
 | **Writer** | [`communication/analysis.py`](communication/analysis.py) `maybe_record_red()` |
 
 ### Phase 12.2 — **DECODE @ ~250k–320k corpus** — continuous channel on; discrete pincer pending
@@ -412,9 +412,9 @@ Cam's persona + triad workflow live in Git so reboots recover identity:
 | **Blue** | Survive, eat, reproduce | MAPPO, `hidden_dim=256`, 4L transformer |
 | **Red** | Hunt blues | Separate MAPPO, `red_hidden_dim=128` |
 
-**Active codebase:** JAX in `jax_sim/` — **not** the legacy PyTorch `main.py` path for current experiments.
+**Active codebase:** JAX in `jax_sim/`. The legacy PyTorch trainer (`main.py` + `launch_*`/`resume_*` scripts + old `config_phase*.yaml`) was **retired Jun 2026** (recoverable from git history); only `agents/network_torch.py` survives, for the obs-dim helpers that `tools/` import. **For the code-grounded network / wire / measurement map, read [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — it is the source of truth when prose here drifts.**
 
-**Active config:** [`config_phase7.yaml`](config_phase7.yaml) — override in Modal cells or `scripts/modal_train.py`.
+**Active config:** [`config.yaml`](config.yaml) (renamed from `config_phase7.yaml`, Jun 2026 — now the single config) — override in Modal cells or `scripts/modal_train.py`.
 
 **Hypothesis:** Information asymmetry + lethal ecology → only signals that help neighbors survive get selected. **Do not** add scout/alarm shaped rewards; that invalidates the experiment.
 
@@ -436,7 +436,8 @@ train_entry.run_simulation()  →  main_jax._run_simulation_impl()
 |------|------|
 | [`jax_sim/train_entry.py`](jax_sim/train_entry.py) | **Always import here** — evicts stale modules after `git pull` |
 | [`jax_sim/main_jax.py`](jax_sim/main_jax.py) | Training loop, ecology, dashboard, checkpoints, corpus |
-| [`jax_sim/network_jax.py`](jax_sim/network_jax.py) | Transformer + VQ; **`NeighborCrossAttention`** (Phase 9.4) |
+| [`jax_sim/network_jax.py`](jax_sim/network_jax.py) | Blue `AgentNetworkJax` + red `PredatorNetworkJax` + VQ; **`NeighborCrossAttention`** (9.4) |
+| [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | **Code-grounded architecture reference** — heads, VQ wire, imagination gate, ecology, instruments, vestigial parts |
 | [`jax_sim/imagination_jax.py`](jax_sim/imagination_jax.py) | K-step imagined argmax (`head_fwd_dyn` + `value_from_carry`); gated in `sim_step` |
 | [`jax_sim/rl_jax.py`](jax_sim/rl_jax.py) | PPO + numpy GAE |
 | [`jax_sim/observations_jax.py`](jax_sim/observations_jax.py) | Obs builder; startup must print `red_sense_api=v2` |
@@ -446,7 +447,7 @@ train_entry.run_simulation()  →  main_jax._run_simulation_impl()
 | [`run_bg.py`](run_bg.py) | **Preferred** nohup entry (`python -u run_bg.py`) |
 | [`scripts/modal_train.py`](scripts/modal_train.py) | Same config as `run_bg.py` |
 
-**Network outputs:** `action_logits, signal_out, symbol_write, values, tom_logits, token_ids, loss_vq, z_e, culture_fast, culture_slow`.
+**Network outputs (order matters — full detail in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) §2–3):** blue returns **11** — `(action_logits, signal_out, symbol_write, values, tom_logits, token_ids, alarm_out, loss_vq, z_e, culture_fast, culture_slow)` (`loss_vq` at index **7**); red returns **10** with **no alarm head** (`loss_vq` at index **6**). PPO selects the right index via `vq_loss_idx` — this divergence caused the 18.5 severance bug.
 
 **World extras:** shelter spots, contested nodes, scent trails, dual cultural grids, episodic memory (20 slots), puzzles (optional).
 
@@ -537,7 +538,7 @@ export TF_GPU_ALLOCATOR=cuda_malloc_async
 export XLA_PYTHON_CLIENT_MEM_FRACTION=0.80
 export JAX_COMPILATION_CACHE_DIR=/tmp/throng_jax_cache
 # Disable Cold Restart
-sed -i 's/reset_red_vq_on_resume: true/reset_red_vq_on_resume: false/g' /root/throng/config_phase7.yaml
+sed -i 's/reset_red_vq_on_resume: true/reset_red_vq_on_resume: false/g' /root/throng/config.yaml
 python -u run_bg.py
 ```
 
@@ -665,7 +666,7 @@ python tools/decode_signals.py signal_corpus.jsonl --k 16 --min-step 63488
 
 ## 4b. Phase 10.5 “Hard-Ceiling” (superseded by 10.6 logging)
 
-### Config stack (`config_phase7.yaml` + overrides)
+### Config stack (`config.yaml` + overrides)
 
 | Knob | Value | Purpose |
 |------|-------|---------|
@@ -987,7 +988,7 @@ python3 tools/decode_signals.py --red /mnt/throng-runs/signal_corpus_red.jsonl -
 | `RedVQ:` / `red_codes_active` | Predator VQ loss + unique tokens / 64 |
 | `Actions (red):` | Red movement distribution (pincer signature) |
 
-### Config blocks (`config_phase7.yaml`)
+### Config blocks (`config.yaml`)
 
 ```yaml
 carry_fwd_coef: 0.05          # P11.0 — all branches with carry dynamics
@@ -1131,7 +1132,7 @@ phase12_coevolution:           # feature/phase13-thermodynamics (inherited from 
 | **Wire cut** | `monologue_enabled` → blue `signals=0` in `sim_step` |
 | **Graduation** | `recon_mse < 0.02` × 10 updates → banner → `dialogue_signal_mode=hard` + blue PPO |
 | **Broadcast** | `codebook[token_ids]` (no STE on wire) |
-| **Config** | `config_phase7.yaml` → `phase14_vqel` |
+| **Config** | `config.yaml` → `phase14_vqel` |
 
 #### Phase 14.1b — SHIPPED (`192d686` + `45bfbe7`)
 
@@ -1250,7 +1251,8 @@ Reason: Phase 18 was logged as complete before architectural approval, overwriti
 
 | Path | Status |
 |------|--------|
-| `main.py`, `agents/network_torch.py` | PyTorch era — reference only |
+| `agents/network_torch.py` | PyTorch era — **kept** only for `compute_obs_dim_torch`/`compute_fwd_env_dim` helpers used by `tools/` |
+| `main.py` + `launch_*`/`resume_*`/`withdrawal_*` + `config_phase{4,5}.yaml`/`config_large.yaml` | PyTorch trainer — **deleted Jun 2026**, recoverable from git history |
 | `config.yaml`, Kaggle cells in archive | Pre-JAX |
 | [`docs/PHASE14_CONTINGENCIES.md`](docs/PHASE14_CONTINGENCIES.md) | **[NEW]** Phase 14.4/15 JAX implementations (SimVQ, DCVQ, VQ-VIB) |
 | [`docs/THRONG_ARCHIVE.md`](docs/THRONG_ARCHIVE.md) | Full timeline + horcrux + SYSTEM UPDATE |
@@ -1362,7 +1364,7 @@ If our true goal is to force the emergence of AGI-level intelligence purely thro
   - **Ecological Shock & Per-Group Clip:** Before reconnecting the VQ loss, we discovered `dead_code_reset` spikes were causing massive `trunk_norm` gradient explosions (Ecological Shock), which suffocated the actor head via the global clip. A Per-Group gradient clip was implemented in `rl_jax.py` to isolate the actor head. Verification passed.
   - **VQ Reconnection:** Live `outs[7]` gradient was reconnected in `rl_jax.py` with a mandatory 0.5x coefficient warmup for 20 updates in `main_jax.py`.
   - **NB_GAIN Collapse:** The metric was confirmed to be a severed "ghost metric" (initialized to 1.0, never updated during rollout) — the causal ATE test methodology remains completely valid.
-  - **The Red VQ Index Bug (Phase 18.5, FIXED `c17e131`):** The reconnection indexed `outs[7]` unconditionally. Blue's `AgentNetworkJax` returns `(... token_ids, alarm_out[6], loss_vq[7], z_e[8], ...)`; red's `PredatorNetworkJax` returns `(... token_ids, loss_vq[6], z_e[7], ...)` (no alarm head). So red PPO minimized `vq_coef · Σz_e` (raw 40-D wire), not a commitment loss — explaining `RedVQ≈-24225` and `red_codes_active=2/64`. The `2559414` `.sum(axis=-1)` patch only stopped the crash. **Fix:** `vq_loss_idx` threaded per-team in `rl_jax.py` (`ppo_update` sets `7` for blue, `6` for red; `_minibatch_step` carries it as a jit-static arg). Added `n_actions: 12` to `config_phase7.yaml` (direct-YAML loads no longer default to 8), an H2 regression test (`tests/test_vq_loss_index.py`, validated on CPU), and an H3 dashboard `[ALERT]` gate for negative/collapsed blue VQ.
+  - **The Red VQ Index Bug (Phase 18.5, FIXED `c17e131`):** The reconnection indexed `outs[7]` unconditionally. Blue's `AgentNetworkJax` returns `(... token_ids, alarm_out[6], loss_vq[7], z_e[8], ...)`; red's `PredatorNetworkJax` returns `(... token_ids, loss_vq[6], z_e[7], ...)` (no alarm head). So red PPO minimized `vq_coef · Σz_e` (raw 40-D wire), not a commitment loss — explaining `RedVQ≈-24225` and `red_codes_active=2/64`. The `2559414` `.sum(axis=-1)` patch only stopped the crash. **Fix:** `vq_loss_idx` threaded per-team in `rl_jax.py` (`ppo_update` sets `7` for blue, `6` for red; `_minibatch_step` carries it as a jit-static arg). Added `n_actions: 12` to `config.yaml` (direct-YAML loads no longer default to 8), an H2 regression test (`tests/test_vq_loss_index.py`, validated on CPU), and an H3 dashboard `[ALERT]` gate for negative/collapsed blue VQ.
   - **Red VQ Decoupling (Phase 18.6, LIVE):** Post-18.5, blue VQ verified healthy (`loss≈0.003–0.007`, `codes 45|39|43/64`). But red's correctly-read DCVQ loss was pathological (`1.5e11`, `codes 1/64`, trunk grad clip-saturated at 2.0 — VQ dominating red PPO). Red's VQ loss was historically a static no-op gradient; reconnecting it violated directive #8 (red forged by catch reward only). **Decision:** `red_vq_loss_coef: 0.0` — red VQ is decoupled from the gradient. Red is now **pure ecological pressure** (policy/value + proprio/SRL aux still train; comms channel mute). Matches the chronic pincer failure (`p≈0.46`) and halves bug surface. Dashboard line relabeled `RedVQ(decoupled)`; H3 alert scoped to blue only. Reversible via `red_vq_loss_coef>0` + one-time cold restart.
 
 *Last updated: 2026-06-22 — Phase 18.6 LIVE. Blue VQ healthy post-18.5 fix; red VQ decoupled (`red_vq_loss_coef:0.0`) → red is now pure ecological pressure. Science focus shifts fully to the blue 3-slot compositional channel + the Receiver-Necessity ATE ecology.*

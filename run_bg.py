@@ -5,7 +5,10 @@
   nohup python -u run_bg.py > /mnt/throng-runs/train.log 2>&1 &
   tail -f /mnt/throng-runs/train.log
 
-Does NOT wipe checkpoints. Does NOT touch reward structure or VQ beta (config_phase7.yaml).
+Config: config.yaml (the single active config). Resume restores weights only;
+population/grid/curriculum start fresh. Does NOT wipe checkpoints, reward
+structure, or VQ beta. See docs/ARCHITECTURE.md for the network/wire map and
+docs/STRATEGIC_ROADMAP.md for the phase plan.
 """
 
 import sys
@@ -15,11 +18,13 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from scripts.modal_train import build_cfg, run_simulation  # noqa: E402
 
+N_STEPS = 3_000_000
+
 if __name__ == "__main__":
     print(
-        "run_bg.py: Phase 18.6 — Combinatorial Tool Use & Multi-Slot Syntax; "
-        "12 actions, 12 env channels, CtD bootstrap; blue VQ reconnected (idx 7); "
-        "red VQ decoupled (red = pure ecological pressure); n_steps=3_000_000",
+        "run_bg.py — THRONG | blue: 3-slot discrete VQ (12/8/12, 64-code) on a "
+        "32-D effective wire, 12 actions, GWT-masked comms | red: pure ecological "
+        f"pressure (VQ decoupled) | hot-resume from checkpoint | n_steps={N_STEPS:_}",
         flush=True,
     )
-    run_simulation(build_cfg(), seed=42, n_steps=3_000_000)
+    run_simulation(build_cfg(), seed=42, n_steps=N_STEPS)

@@ -42,7 +42,7 @@ original_build_obs = _obs_mod.build_observations_jax
 def patched_build_obs(*args, **kwargs):
     obs = original_build_obs(*args, **kwargs)
     N = obs.shape[0]
-    with open(ROOT / "config_phase7.yaml") as f:
+    with open(ROOT / "config.yaml") as f:
         cfg = yaml.safe_load(f)
     env_channels = int(cfg.get("env_channels", 10))
     if env_channels == 9 and obs.shape[1] >= (598 + 250):
@@ -73,7 +73,7 @@ def get_red_dists(b_pos, b_alive, r_pos, r_alive, gs):
 
 
 def run_lag_analysis(checkpoint_dir: str, steps: int = 500):
-    with open(ROOT / "config_phase7.yaml") as f:
+    with open(ROOT / "config.yaml") as f:
         config = yaml.safe_load(f)
     config = _normalize_config(config)
     config["ppo_rollout_steps"] = 1

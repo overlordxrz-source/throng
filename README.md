@@ -22,9 +22,9 @@ tail -f -n 60 /mnt/throng-runs/train.log
 ```
 
 **Framework:** JAX + Flax (`lax.scan` rollout, CPU-offload PPO on B200)
-**Active config:** `config_phase7.yaml`
+**Active config:** `config.yaml`
 **Active branch:** `feature/phase18-crafting` (not `master` for live train)
-**Working files:** `jax_sim/` (PyTorch in `agents/`, `main.py` is legacy).
+**Working files:** `jax_sim/`. (The legacy PyTorch trainer was retired Jun 2026; `agents/network_torch.py` is kept only for obs-dim helpers used by `tools/`.) See `docs/ARCHITECTURE.md` for the code-grounded map.
 
 For the full research log, theory, philosophy, and per-phase post-mortems see
 [THRONG.md](THRONG.md) (agent onboarding). Phase 12 co-evolution:
@@ -105,7 +105,7 @@ shutil.rmtree("runs/jax_run/checkpoints", ignore_errors=True)
 import yaml
 from jax_sim.main_jax import run_simulation
 
-with open("config_phase7.yaml") as f:
+with open("config.yaml") as f:
     cfg = yaml.safe_load(f)
 
 # T4-friendly overrides (do NOT use these on an A100 / H100; scale back up)
@@ -129,17 +129,12 @@ pip install jax[cuda12] flax optax orbax-checkpoint pyyaml wandb
 python -c "
 import yaml
 from jax_sim.main_jax import run_simulation
-cfg = yaml.safe_load(open('config_phase7.yaml'))
+cfg = yaml.safe_load(open('config.yaml'))
 run_simulation(cfg, seed=42, n_steps=1_000_000)
 "
 ```
 
-**Legacy PyTorch (frozen, not maintained):**
-
-```bash
-pip install -r requirements.txt
-python main.py --config config_phase7.yaml --headless --fresh
-```
+**Legacy PyTorch trainer:** retired Jun 2026. `main.py` and the `launch_*`/`resume_*` scripts live in git history only; all current work is JAX via `run_bg.py`.
 
 ---
 
@@ -256,23 +251,27 @@ PPO update introduced a numerical event, should one occur.
 
 ```
 throng/
-├── config_phase7.yaml         # Active hyperparameters
+├── config.yaml                # Active hyperparameters (the single config)
+├── run_bg.py                  # ★ Launch entrypoint: python -u run_bg.py
 ├── jax_sim/                   # ★ Active code
-│   ├── main_jax.py            # Outer loop, PPO orchestration, telemetry,
-│   │                          #   brain-vote, curriculum, checkpointing
-│   ├── network_jax.py         # AgentNetworkJax — Flax transformer + heads
+│   ├── main_jax.py            # Outer loop, PPO orchestration, ecology, telemetry, checkpointing
+│   ├── network_jax.py         # AgentNetworkJax (blue) + PredatorNetworkJax (red) + VQ
+│   ├── imagination_jax.py     # K-step mental rollout for the epistemic gate
 │   ├── rl_jax.py              # PPO + GAE + minibatch updates
-│   ├── grid_jax.py            # GridState + obs builder + world generation
-│   ├── population_jax.py      # PopState + reproduction + mind-meld
-│   ├── debug_metrics.py       # Sanity panel
+│   ├── grid_jax.py            # GridState + catches + resources + barrier physics
+│   ├── population_jax.py      # PopState + inventory + reproduction
 │   ├── observations_jax.py    # Observation builder (env channels, neighbor signals)
-│   └── obs_layout.py          # Observation dimension constants
-├── agents/, environment/, communication/, utils/   # Legacy PyTorch
-├── main.py                    # Legacy CLI
+│   └── obs_layout.py          # Observation / wire dimension constants
+├── communication/             # Corpus writers (shared)
+├── agents/                    # Legacy PyTorch — only network_torch.py obs-dim helpers used
 ├── tools/
-│   ├── decode_signals.py      # Offline corpus analysis (blue/red)
-│   └── causal_intervention.py # Frozen counterfactual causal test (950k)
-├── THRONG.md                  # Full research log + theory + roadmap
+│   ├── decode_signals.py      # Offline corpus decode (MI, LRT, PosDis, topsim, NPMI)
+│   └── causal_intervention.py # Live ATE instrument (frozen-ckpt token swap)
+├── tests/                     # Regression tests (VQ index + VQ gradient flow)
+├── docs/
+│   ├── ARCHITECTURE.md        # ★ Code-grounded architecture reference
+│   └── STRATEGIC_ROADMAP.md   # ★ v2 plan → emergent intelligence / AGI / neuromorphic
+├── THRONG.md                  # Full research log + theory + ops manual
 └── README.md                  # You are here
 ```
 
@@ -280,7 +279,7 @@ throng/
 
 ## Configuration Cheatsheet
 
-All knobs live in `config_phase7.yaml`. The ones you actually touch:
+All knobs live in `config.yaml`. The ones you actually touch:
 
 | Knob | What it controls | Default |
 |---|---|---|

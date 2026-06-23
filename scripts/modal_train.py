@@ -30,7 +30,7 @@ from jax_sim.train_entry import run_simulation  # noqa: E402
 
 
 def build_cfg() -> dict:
-    with open(REPO / "config_phase7.yaml") as f:
+    with open(REPO / "config.yaml") as f:
         cfg = yaml.safe_load(f)
     cfg["checkpoint_dir"] = "/mnt/throng-runs/checkpoints"
     # P10.5 Hard-Ceiling

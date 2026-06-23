@@ -229,6 +229,10 @@ def make_sim_step(
     _imagination_gamma = float(
         _p9.get("imagination_gamma", config.get("ppo_gamma", 0.999))
     )
+    # Default 5 = legacy behaviour (imagine Stay + N/S/E/W only). Set to n_actions
+    # (12) to let the epistemic gate deliberate over Strike/Push/Guard and the
+    # Phase-18 tool actions too. Reversible knob; off by default.
+    _imagine_n_actions = int(_p9.get("imagination_n_actions", 5))
     _p14 = config.get("phase14_vqel") or {}
     _vqel_monologue = bool(_p14.get("monologue_enabled", False))
     _dialogue_signal_mode = str(_p14.get("dialogue_signal_mode", "ste")).lower()
@@ -241,7 +245,14 @@ def make_sim_step(
     if _img_gate_enabled:
         from jax_sim.imagination_jax import make_imagination_fn
         _imagine_fn = make_imagination_fn(
-            model, K=_imagination_k, gamma=_imagination_gamma
+            model, K=_imagination_k, gamma=_imagination_gamma,
+            n_imagine_actions=_imagine_n_actions,
+        )
+        print(
+            f"[JAX] Epistemic gate: K={_imagination_k} gamma={_imagination_gamma} "
+            f"imagine_actions={_imagine_n_actions}/{int(getattr(model, 'n_actions', 12))} "
+            f"({'full action space' if _imagine_n_actions >= int(getattr(model, 'n_actions', 12)) else 'legacy: Stay+moves only'})",
+            flush=True,
         )
     from jax_sim import observations_jax as _obs
 
@@ -2508,7 +2519,7 @@ def _run_simulation_impl(
 if __name__ == "__main__":
     import sys
 
-    config_path = sys.argv[1] if len(sys.argv) > 1 else "config_phase7.yaml"
+    config_path = sys.argv[1] if len(sys.argv) > 1 else "config.yaml"
     try:
         with open(config_path) as f:
             cfg = yaml.safe_load(f)
