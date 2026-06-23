@@ -374,6 +374,7 @@ class SignalCorpusWriter:
         can_see_recipe:    Optional[np.ndarray] = None,
         current_recipe_id: Optional[int] = None,
         inventory:         Optional[np.ndarray] = None,
+        steps_since_dropout: Optional[np.ndarray] = None,
     ) -> None:
         """Write sampled records; no-op if called more often than every_n_steps.
 
@@ -411,6 +412,8 @@ class SignalCorpusWriter:
                 rec["current_recipe_id"] = int(current_recipe_id)
             if inventory is not None:
                 rec["inventory"] = int(inventory[i])
+            if steps_since_dropout is not None:
+                rec["steps_since_dropout"] = int(steps_since_dropout[i])
             if adj_bg is not None:
                 rec["adj_bg"] = bool(adj_bg[i])
             if adj_barrier is not None:
@@ -465,7 +468,6 @@ class SignalCorpusWriter:
         nb_hunter_dist_lag1: Optional[np.ndarray] = None,
         nb_hunter_token_lag1: Optional[np.ndarray] = None,
         carry_fwd:         Optional[np.ndarray] = None,
-        steps_since_dropout: Optional[np.ndarray] = None,
     ) -> None:
         """Write sampled red predator records (Phase 12.1 + 15). Separate file from blue corpus.
 
@@ -519,8 +521,6 @@ class SignalCorpusWriter:
             # Phase 15 — carry_fwd / steps_since_dropout are (n_alive,) slices, not full pop
             if carry_fwd is not None:
                 rec["carry_fwd"] = [round(float(v), 4) for v in carry_fwd[i].astype(np.float16)]
-            if steps_since_dropout is not None:
-                rec["steps_since_dropout"] = int(steps_since_dropout[i])
                 
             lines.append(json.dumps(rec))
         self._fh.write("\n".join(lines) + "\n")

@@ -2315,7 +2315,7 @@ def _run_simulation_impl(
         r_act_all = np.array(rollout_data["red"]["actions"])
         r_energy_all = np.array(rollout_data["red"]["energy"])
         r_carry_fwd_all = np.array(rollout_data["red"]["carries"])
-        r_steps_since_dropout_all = np.array(rollout_data["red"]["steps_since_dropout"])
+        b_steps_since_dropout_all = np.array(rollout_data["blue"]["steps_since_dropout"])
 
         # loc_env is the 4th block in b_obs (env_channels channels)
         env_channels = int(config.get("env_channels", 10))
@@ -2451,6 +2451,7 @@ def _run_simulation_impl(
                     can_see_recipe=can_see_recipe,
                     current_recipe_id=recipe_id,
                     inventory=inventory,
+                    steps_since_dropout=b_steps_since_dropout_all[t, alive_idx],
                 )
                 if is_scout.any():
                     pos_b_alive_f = b_pos[alive_idx].astype(np.float32)
