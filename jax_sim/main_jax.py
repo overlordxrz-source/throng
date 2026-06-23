@@ -258,6 +258,20 @@ def make_sim_step(
         )
     from jax_sim import observations_jax as _obs
 
+    def apply_medal_adr_carry_reset(pop: PopState, carries: jnp.ndarray, prob: float):
+        valid_ages = jnp.where(pop.alive, pop.ages, -1)
+        n_alive = jnp.sum(pop.alive)
+        n_reset = jnp.ceil(prob * n_alive).astype(jnp.int32)
+        
+        sorted_idx = jnp.argsort(-valid_ages)
+        ranks = jnp.argsort(sorted_idx)
+        reset_mask = pop.alive & (ranks < n_reset)
+        
+        new_carries = jnp.where(reset_mask[:, None], 0.0, carries)
+        new_steps = jnp.where(reset_mask, 0, pop.steps_since_dropout)
+        
+        return pop.replace(steps_since_dropout=new_steps), new_carries, jnp.sum(reset_mask)
+
     @jax.jit
     def sim_step(carry, scan_input):
         """
@@ -687,40 +701,9 @@ def make_sim_step(
         b_pop = kill_agents(b_pop, b_starved)
         r_pop = kill_agents(r_pop, r_starved)
 
-        # ── Phase 15.0: MEDAL-ADR (Expert Dropout) ──────────────
-        medal_dropouts = jnp.zeros((), dtype=jnp.float32)
-        if _medal_adr_enabled and _medal_adr_prob > 0.0:
-            medal_rng = jax.random.split(key_misc, 4)[3]
-            # Experts are the first half of the population
-            is_expert = jnp.arange(b_pop.max_pop) < (b_pop.max_pop // 2)
-            drop_mask = jax.random.uniform(medal_rng, (b_pop.max_pop,)) < _medal_adr_prob
-            actual_drop = drop_mask & is_expert & b_pop.alive
-            b_pop = kill_agents(b_pop, actual_drop)
-            medal_dropouts = actual_drop.astype(jnp.float32).sum()
-            
-            # -- Option B: Local Causal Reset --
-            b_pos_local = b_pop.positions
-            dx = jnp.abs(b_pos_local[:, 0:1] - b_pos_local[None, :, 0])
-            dy = jnp.abs(b_pos_local[:, 1:2] - b_pos_local[None, :, 1])
-            dx = jnp.minimum(dx, config.get("grid_size", 128) - dx)
-            dy = jnp.minimum(dy, config.get("grid_size", 128) - dy)
-            dist_matrix = jnp.maximum(dx, dy)
-
-            # Mask out non-dying agents (set distance to infinity)
-            valid_dist = jnp.where(actual_drop[None, :], dist_matrix, 9999.0)
-
-            # Find the closest dying expert for each agent
-            min_dist_to_dying_expert = jnp.min(valid_dist, axis=1)
-
-            # A local expert died if the closest dying expert is within the hunt range
-            _hunt_range = config.get("alarm_scout_range", 8.0)
-            _hunt_range = config.get("hunt_scout_range", _hunt_range)
-            local_expert_died = min_dist_to_dying_expert <= _hunt_range
-
-            # Update the tracker for alive novices
-            new_steps = jnp.where(b_pop.alive & ~is_expert, b_pop.steps_since_dropout + 1, 0)
-            new_steps = jnp.where(local_expert_died & b_pop.alive & ~is_expert, 1, new_steps)
-            b_pop = b_pop.replace(steps_since_dropout=new_steps)
+        # ── Update dropout tracker ──────────────
+        new_steps = jnp.where(b_pop.alive, b_pop.steps_since_dropout + 1, 0)
+        b_pop = b_pop.replace(steps_since_dropout=new_steps)
 
         # ── Rewards (all from config) ───────────────────────────
         b_rew = jnp.where(b_pop.alive, _reward_blue_alive, 0.0)
@@ -806,7 +789,6 @@ def make_sim_step(
             "craft_success": craft_success.astype(jnp.float32),
             "futile_craft": futile_craft.astype(jnp.float32),
             "current_recipe": grid.current_recipe,
-            "medal_dropouts": medal_dropouts,
             "steps_since_dropout": b_pop.steps_since_dropout,
         }
         r_rollout = {
@@ -1457,6 +1439,12 @@ def _run_simulation_impl(
     print(f"[JAX] Phase 18 Wire budget: 40D (8D cont + 12/8/12 discrete slots). Codebooks initialized.")
     print(f"[JAX] Phase 16.6 GWT Router mask active: Zero out age(0), mat(1), energy(2), layers(3)")
     
+    _medal_prob = float(config.get("medal_adr_prob", 0.0))
+    if config.get("medal_adr_enabled", False) and _medal_prob > 0.0:
+        print(f"[JAX] MEDAL-ADR soft carry-reset: prob={_medal_prob}, target=oldest agents by age")
+    else:
+        print("[JAX] MEDAL-ADR disabled or prob=0 — soft reset inactive")
+    
     r_opt_state = r_optimizer.init(r_params)
 
     # ── Carries ─────────────────────────────────────────────
@@ -1568,6 +1556,20 @@ def _run_simulation_impl(
                 )
             grid, b_pop, r_pop, b_carries, r_carries, b_params, r_params = final_carry
 
+        # final_carry unpack order: (b_pop, b_carries, r_pop, r_carries, ...)
+        # b_carries shape: (max_pop, carry_dim)
+        # Soft reset targets b_carries only — do not pass full carry tuple
+        _md = 0.0
+        _medal_prob = float(config.get("medal_adr_prob", 0.0))
+        if config.get("medal_adr_enabled", False) and _medal_prob > 0.0:
+            if use_pmap:
+                def _pmap_wrapper(p, c):
+                    return apply_medal_adr_carry_reset(p, c, _medal_prob)
+                b_pop, b_carries, reset_counts = jax.pmap(_pmap_wrapper)(b_pop, b_carries)
+                _md = float(np.sum(reset_counts))
+            else:
+                b_pop, b_carries, reset_count = apply_medal_adr_carry_reset(b_pop, b_carries, _medal_prob)
+                _md = float(reset_count)
         # ── Free GPU: full (T×N) rollout must not sit on device during PPO backward
         rollout_data = _rollout_to_cpu(rollout_data)
         jax.clear_caches()
@@ -2149,8 +2151,7 @@ def _run_simulation_impl(
                 barrier_sum_val = float(np.asarray(rollout_data["blue"]["barrier_sum"]).mean())
             print(f"  VQ: loss={vq_loss_val:.4f} | codes_active={vq_codes_str} | clusters={active_clusters_str} | NB_GAIN↔surv: {sp_r:.3f}")
             medal_str = ""
-            if "medal_dropouts" in rollout_data.get("blue", {}):
-                _md = np.asarray(rollout_data["blue"]["medal_dropouts"]).sum()
+            if config.get("medal_adr_enabled", False) and float(config.get("medal_adr_prob", 0.0)) > 0.0:
                 medal_str = f" | expert_dropouts={int(_md)}"
             print(
                 f"  Ecology: blue_caught={blue_caught_rollout} this rollout | "

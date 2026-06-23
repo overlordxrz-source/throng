@@ -1387,6 +1387,11 @@ If our true goal is to force the emergence of AGI-level intelligence purely thro
 - **Mechanics:** Agents can plant resources that take thousands of steps to mature.
 - **Semantics:** Forces the development of concepts for "Future Time", "Delayed Gratification", "Ownership", and "Defense".
 
----
+*Last updated: 2026-06-23 — Phase 18.7 LIVE. Receiver-Necessity Ecology active and corpus schema validated (can_see_recipe, inventory, current_recipe_id logging properly). MEDAL-ADR expert dropout is currently causing a population death spiral (5.6 deaths per step) due to index-based targeting, but an approved plan to migrate to a soft-carry reset is pending execution. ATE offline test pipeline is greenlit once 20k records accumulate.*
 
-*Last updated: 2026-06-22 — Phase 18.5. Fixed the red VQ-loss index bug (team-aware `vq_loss_idx`) and added `n_actions:12` YAML safeguard. Operator must pull + restart to apply (live cluster is on the band-aid `2559414`).*
+### Cam Reboot Sync (Jun 23, 2026)
+**Phase:** 18.7 (Receiver-Necessity Ecology)
+**Active Branch:** `feature/phase18-crafting`
+**Dimensionality:** 12 Actions, 3 VQ Slots (12/8/12, vocab 64). `obs_dim` = 2731 (`own_state`=22, `env_channels`=15).
+**Telemetry:** `can_see_recipe` confirmed at ~24% (curriculum decay from 50%). `expert_dropouts` reading ~2869 per 512-step rollout (bug: executing full agent deaths on array index < 100, causing a death spiral via `apply_auto_reproduce`).
+**Current Status:** Training is live but MEDAL-ADR mechanism is fatally flawed. A surgery plan to replace it with a post-update soft-carry reset (age-based targeting, memory wipe only) has been drafted and is pending execution. ATE accumulation gate is closed until MEDAL-ADR is fixed.

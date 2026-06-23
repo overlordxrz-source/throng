@@ -46,3 +46,12 @@ Any Python cell generated to launch training (`run_bg.py`) on Modal MUST adhere 
 2. **Bulletproof `cwd`:** Never use `cd` in the `subprocess.Popen` bash string. Always use the `cwd="/root/throng"` argument in the Python call.
 3. **Regex `pgrep`:** When verifying the process wipe, use `pgrep -af '[p]ython -u'` (the brackets prevent `pgrep` from matching its own command string).
 4. **Detachment:** You must pass `start_new_session=True` to `subprocess.Popen` to prevent Jupyter `SIGINT`s from killing the run when the user stops a `tail -f` log cell.
+
+## 8. JAX Lifecycle Targeting Constraints
+Never target agents for lifecycle events (death, reset, reward) based on raw array indices (e.g., `jnp.arange(max_pop) < max_pop // 2`). The population array is dynamically repopulated by `apply_auto_reproduce`, which randomly assigns newly spawned novices into empty array slots. Index-based targeting creates stationary "death zones" that kill novices instead of the intended targets. **Always target based on semantic state metrics** (e.g., `ages`, `energy`, `steps_since_dropout`).
+
+## 9. Receiver Resets vs. Agent Deaths
+Never apply full death events (`kill_agents`) as a communication penalty or compositionality scaffold. Full deaths destroy the Lotka-Volterra ecology, wipe survival skills, and trigger population-scale reproduction churn. **Receiver resets must always be implemented as a soft temporal carry-reset** (zeroing the RNN hidden state `carry`) while keeping the agent alive in place. Furthermore, these resets should be applied **once per PPO update** to a fixed subset of the population, not probabilistically per environment step, to allow temporal memory to accumulate.
+
+## 10. Confabulated Citation Warning
+Never reference "P.A. Lopez / AI Rights" as a source. This is a known LLM hallucination and is not a real publication. Rely only on verified literature (e.g., the 2025 JAIR survey, Butlin-Bengio TiCS).
