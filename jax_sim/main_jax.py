@@ -356,6 +356,11 @@ def make_sim_step(
         )
 
         # ── Sample actions (Phase 11.3 epistemic gate on blues) ──
+        # Logit-mask dummy actions Push (6) and Guard (7) to prevent them from being sampled
+        if b_action_logits.shape[-1] > 7:
+            b_action_logits = b_action_logits.at[:, 6].set(-1e9)
+            b_action_logits = b_action_logits.at[:, 7].set(-1e9)
+
         key_act_b, key_act_r = jax.random.split(key_act)
         b_action_keys = jax.random.split(key_act_b, b_pop.max_pop)
         r_action_keys = jax.random.split(key_act_r, r_pop.max_pop)
@@ -1436,6 +1441,7 @@ def _run_simulation_impl(
         print("[JAX] Phase14 dialogue_signal_mode=hard (discrete z_q broadcast on blue wire)")
         
     print(f"[JAX] Phase 18 action_space=12 (added PICK_UP=9, CRAFT=10, USE_TOOL=11)")
+    print(f"[JAX] Phase 18.x Logit-mask active: Push(6) and Guard(7) set to -1e9 before sampling (no-op amputation)")
     print(f"[JAX] Phase 18 Continuous-to-Discrete (CtD) bootstrap: 100k-step decay ramp active.")
     print(f"[JAX] Phase 18 Wire budget: 40D (8D cont + 12/8/12 discrete slots). Codebooks initialized.")
     print(f"[JAX] Phase 16.6 GWT Router mask active: Zero out age(0), mat(1), energy(2), layers(3)")
@@ -2151,7 +2157,7 @@ def _run_simulation_impl(
             barrier_sum_val = 0
             if "barrier_sum" in rollout_data["blue"]:
                 barrier_sum_val = float(np.asarray(rollout_data["blue"]["barrier_sum"]).mean())
-            print(f"  VQ: loss={vq_loss_val:.4f} | codes_active={vq_codes_str} | clusters={active_clusters_str} | NB_GAIN↔surv: {sp_r:.3f}")
+            print(f"  VQ: loss={vq_loss_val:.2e} | codes_active={vq_codes_str} | clusters={active_clusters_str} | NB_GAIN↔surv: {sp_r:.3f}")
             medal_str = ""
             if _medal_adr_enabled and _medal_adr_prob > 0.0:
                 medal_str = f" | expert_dropouts={int(_md)}"
