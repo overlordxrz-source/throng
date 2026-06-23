@@ -1439,9 +1439,8 @@ def _run_simulation_impl(
     print(f"[JAX] Phase 18 Wire budget: 40D (8D cont + 12/8/12 discrete slots). Codebooks initialized.")
     print(f"[JAX] Phase 16.6 GWT Router mask active: Zero out age(0), mat(1), energy(2), layers(3)")
     
-    _medal_prob = float(config.get("medal_adr_prob", 0.0))
-    if config.get("medal_adr_enabled", False) and _medal_prob > 0.0:
-        print(f"[JAX] MEDAL-ADR soft carry-reset: prob={_medal_prob}, target=oldest agents by age")
+    if _medal_adr_enabled and _medal_adr_prob > 0.0:
+        print(f"[JAX] MEDAL-ADR soft carry-reset: prob={_medal_adr_prob}, target=oldest agents by age")
     else:
         print("[JAX] MEDAL-ADR disabled or prob=0 — soft reset inactive")
     
@@ -1560,15 +1559,14 @@ def _run_simulation_impl(
         # b_carries shape: (max_pop, carry_dim)
         # Soft reset targets b_carries only — do not pass full carry tuple
         _md = 0.0
-        _medal_prob = float(config.get("medal_adr_prob", 0.0))
-        if config.get("medal_adr_enabled", False) and _medal_prob > 0.0:
+        if _medal_adr_enabled and _medal_adr_prob > 0.0:
             if use_pmap:
                 def _pmap_wrapper(p, c):
-                    return apply_medal_adr_carry_reset(p, c, _medal_prob)
+                    return apply_medal_adr_carry_reset(p, c, _medal_adr_prob)
                 b_pop, b_carries, reset_counts = jax.pmap(_pmap_wrapper)(b_pop, b_carries)
                 _md = float(np.sum(reset_counts))
             else:
-                b_pop, b_carries, reset_count = apply_medal_adr_carry_reset(b_pop, b_carries, _medal_prob)
+                b_pop, b_carries, reset_count = apply_medal_adr_carry_reset(b_pop, b_carries, _medal_adr_prob)
                 _md = float(reset_count)
         # ── Free GPU: full (T×N) rollout must not sit on device during PPO backward
         rollout_data = _rollout_to_cpu(rollout_data)
@@ -2151,7 +2149,7 @@ def _run_simulation_impl(
                 barrier_sum_val = float(np.asarray(rollout_data["blue"]["barrier_sum"]).mean())
             print(f"  VQ: loss={vq_loss_val:.4f} | codes_active={vq_codes_str} | clusters={active_clusters_str} | NB_GAIN↔surv: {sp_r:.3f}")
             medal_str = ""
-            if config.get("medal_adr_enabled", False) and float(config.get("medal_adr_prob", 0.0)) > 0.0:
+            if _medal_adr_enabled and _medal_adr_prob > 0.0:
                 medal_str = f" | expert_dropouts={int(_md)}"
             print(
                 f"  Ecology: blue_caught={blue_caught_rollout} this rollout | "
