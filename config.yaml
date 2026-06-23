@@ -280,7 +280,7 @@ phase16_combinatorial_syntax:
 
 # Phase 16.5 — Environmental Enrichment & Metabolic Routing
 phase16_5_enrichment:
-  barrier_build_cost: 0.06
+  barrier_build_cost: 0.10
   feral_threshold: 0.20
   barrier_decay_rate: 0.05
   ignition_discount: 0.1
