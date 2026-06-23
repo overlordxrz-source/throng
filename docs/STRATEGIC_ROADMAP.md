@@ -1,268 +1,249 @@
-# THRONG Strategic Roadmap — The Path from Proto-Language to General Intelligence
+# THRONG Strategic Roadmap v2 — From Grounded Proto-Language to General Intelligence
 
-> **Author:** Cam (Polymath Orchestrator) — Synergic Synthesis  
-> **Date:** June 21, 2026  
-> **Context:** Post-bypass amputation. Discrete communication confirmed load-bearing. ATE gate in progress.  
-> **Audience:** Dimitar (Operator) + future Cam reboots
-
----
-
-## The Honest Assessment
-
-We have achieved something real. The Gromov-Wasserstein alignment between VQ tokens and GloVe showed our agents independently discovered semantic categories that map to human concepts — "troops/withdraw" for predator-threat, "costs/fees" for metabolic burden. This is not reward-shaped. This is not statistical accident. This is **emergence under thermodynamic pressure**.
-
-But Dimitar asked the right question: *how does this become AGI?*
-
-The answer requires confronting three hard truths:
-
-1. **Survival pressure is necessary but insufficient.** It provides causal grounding — the thing LLMs lack. But grounding within a 128×128 grid is grounding within a 128×128 grid. Domain-specific proto-language ≠ general intelligence.
-
-2. **Adding features (crafting, barriers, tools) increases vocabulary, not generality.** The agents may learn to say "axe = food multiplier." They will never learn to discuss mathematics, unless the environment forces mathematical reasoning for survival.
-
-3. **The environment must generate unbounded complexity.** If the ecology equilibrates — if there exists a fixed optimal policy — the language crystallizes and stops growing. Intelligence requires a world that never stops getting harder in novel ways.
-
-These truths don't invalidate what we've built. They clarify what comes next.
+> **Authors:** Cam (strategic synthesis) + Will (engineering & 2026 literature/source review)
+> **Date:** June 23, 2026 — supersedes the Jun 21–22 draft
+> **Context:** Phase 18.6 LIVE. Blue 3-slot discrete VQ confirmed healthy (`loss≈0.003`, `codes 45+/64`); red decoupled to pure ecological pressure. Receiver-side ATE still the open question.
+> **Audience:** Dimitar (operator) + future Cam/Will reboots
+> **How to read this:** §1 is the thesis and the one honest counter-thesis. §2 is what we have actually built (code-grounded, not aspirational). §3 is the 2026 evidence that reshapes the plan. §4–§10 are the staged plan with falsifiable gates. §11 is the consciousness scorecard. §12 is engineering discipline. §13 is the execution order.
 
 ---
 
-## Synergic Synthesis: Four Lenses on the Path Forward
+## 1. The thesis, stated as a falsifiable bet
 
-| Lens | Current State | What's Missing |
-|------|--------------|----------------|
-| **Software** | JAX pipeline stable. 3-slot VQ on 40D wire. CPU-offload PPO. Orbax checkpointing. Modal deployment. | No mechanism for procedural environment generation. No cross-domain transfer infrastructure. |
-| **Physics** | Lotka-Volterra dynamics bounded by `max_pop=200/min_pop=150`. Scent trails, barriers, shelter, contested resources. | Thermodynamic ceiling — the grid has finite entropy. Once optimal evasion/foraging strategies are learned, the system equilibrates. |
-| **Philosophy** | Meaning-is-use confirmed: tokens that don't help survival get pruned. Bilateral selection pressure proven necessary (Phase 17.5). | Language-as-cognitive-tool is absent. Agents use language to signal, not to *think*. Writing, reading, and reasoning over symbols would break this ceiling. |
-| **RL/ML** | MAPPO with shared policy, VQ bottleneck, GWT router, epistemic gating, K-step imagination. | No mechanism for open-ended curriculum. No quality-diversity archive. No self-play that generates novel environmental challenges. |
+THRONG makes one irreducible wager:
 
----
+> **Meaning that is causally earned cannot be faked, and meaning that is merely predicted cannot be trusted.**
 
-## The Roadmap
+An LLM learns `P(token | tokens)` over a frozen human corpus. Every symbol it manipulates is grounded only in *other symbols* — a closed loop of text predicting text. It can describe a predator without ever having fled one. A THRONG token earns its meaning by changing whether the agent that hears it survives the next encounter. The referent is a fact about the world, verified by selection, not a co-occurrence statistic. That is the one thing LLMs structurally lack and the one thing THRONG structurally must have.
 
-### Tier 1: Prove the Foundation (Now → 2 weeks)
+If THRONG is right, the payoff is a representation whose every symbol has a *verified physical referent* — a substrate on which reasoning is correct-by-construction in a way next-token prediction can never be. That is the concrete meaning of "surpass LLMs": not more fluent, but **grounded** — and therefore reliable on exactly the causal/planning tasks where LLMs confabulate.
 
-These are the gates we must clear to prove discrete communication is causally grounded.
+### The honest counter-thesis (we must hold both)
 
-#### Phase 18.2 — Causal ATE Gate 🔧 IN PROGRESS
+The 2026 literature delivers a genuine headwind we will not paper over:
 
-- **What:** Accumulate post-amputation corpus. Rerun `ate_swap_test.py --min-step 1185000`.
-- **Pass bar:** ATE > 0, 95% CI excludes zero, on at least slot_0.
-- **If pass:** Discrete tokens causally influence receiver behavior. First proof of grounded communication in THRONG's history.
-- **If fail:** Discrete slots are also cheap talk. Requires redesigning bilateral selection pressure (e.g., information-asymmetric cooperative tasks where receivers literally cannot survive without decoding the signal).
+1. **Pure emergence does not reliably become compositional.** A decade of emergent-language research concludes that compositionality needs *engineered pressure* — most reliably **"productivity pressure"** (forcing a vocabulary smaller than the number of meanings to be expressed) and **periodic receiver resets** ([JAIR 2025 survey](https://www.jair.org/index.php/jair/article/view/17302)). Selection alone tends to produce holistic, non-compositional codes.
 
-#### Phase 18.3 — Ecology Deployment
+2. **Emergent protocols degrade as the environment scales.** A [NeurIPS 2025 study](https://neurips.cc/virtual/2025/124582) found end-to-end emergent communication is viable in small worlds but *falls off sharply* as the world grows, whereas **structured intention communication — agents sharing forward-looking imagined trajectories — stays robust and sample-efficient at scale.**
 
-- **What:** Spatial resource bifurcation (wood west, stone east). Inventory limits. Cooperative `Craft` (2+ agents). `UseTool` metabolic payoffs.
-- **Why it matters:** Forces **compositional syntax**. To say "I have wood, need stone, meet at patch X" requires multi-slot structure: [RESOURCE_TYPE] + [NEED/HAVE] + [LOCATION]. This is the first test of whether 3 slots can carry genuinely distinct semantic roles.
-- **Science bar:** NPMI shows each slot correlating with a *different* context dimension (slot_0 → environment, slot_1 → action/intent, slot_2 → urgency/quantity).
+These do not refute the grounding bet. They refute "pure emergence + a bigger grid = AGI." The correction is precise: **keep the grounding mechanism (lethal selection), but add the *minimal sufficient scaffolds* the evidence says compositionality and scaling require.** The rest of this document is built around that correction.
+
+This also reframes the project's recurring scar. Across Phases 12–17.5, signals were repeatedly **sender-grounded** (the emitter's state predicts the token) but had **receiver-side ATE ≈ 0** (listeners ignored them). That is not a mysterious failure — it is exactly what the literature predicts when there is no receiver-necessity and no productivity/compositionality pressure. We have been running the experiment without the scaffolds known to be necessary.
 
 ---
 
-### Tier 2: Cultural Transmission — The Critical Phase (2-6 weeks)
+## 2. What we have actually built (code-grounded reality, Jun 2026)
 
-> [!IMPORTANT]
-> **Phase 19 is the most important phase in the entire project.** It's where language stops being ephemeral signaling and becomes persistent cultural artifact.
+This section is deliberately literal — it reflects a source review of `network_jax.py`, `rl_jax.py`, `imagination_jax.py`, `main_jax.py`, and the `tools/` decode/causal stack, not the aspirational prose elsewhere. Future reboots should trust this over older summaries.
 
-#### Phase 19.0 — Writing System
+### The communication substrate
+- **Blue `AgentNetworkJax`** (256-d, 4-layer transformer). Communication path: a **GWT router** zeroes obs channels 0–3 (age, mat, energy, layers) → `gwt_comms_1` → **three discrete VQ slots** of width 12/8/12, each a 64-code codebook, concatenated onto a **40-D wire** whose first 8 dims (the old continuous bypass) are **hard-zeroed** (Phase 18.1 amputation). Effective channel = 32 discrete dims across 3 slots. STE quantization; `dead_code_reset` runs post-rollout. **This is healthy as of 18.6.**
+- **Red `PredatorNetworkJax`** (128-d) uses a different bottleneck (DCVQ over 4 subspaces + SimVQ linear reparam). As of **Phase 18.6 its VQ is decoupled** (`red_vq_loss_coef: 0.0`) — red is pure ecological pressure. Its comms channel is mute by design.
+- **Output-tuple divergence is real and has bitten us twice** (the VQ-severance and red-index bugs). Blue returns `loss_vq` at index 7 (it has an `alarm_out` at 6); red at index 6 (no alarm head). This is the canonical "severance-class" foot-gun (see §12).
 
-- **What:** Agents can write their 3-token VQ sequence to a grid tile (action 12: `WRITE`). Other agents can read tiles in their 5×5 local patch. Written tokens decay slowly (half-life ~200 steps).
-- **Why this changes everything:**
-  - **Temporal persistence:** Signals currently vanish after 1 timestep. Written tokens persist across generations. An agent born 500 steps later can read what a dead agent wrote. This is **cumulative culture** — knowledge outliving the individual.
-  - **Spatial decoupling:** Currently, you only hear signals from K=6 nearest neighbors. Written tiles broadcast to anyone who walks past. This breaks the "you must be near the sender" constraint.
-  - **Self-communication:** An agent can write a token, move away, come back, and read its own note. This is **external memory** — the birth of cognition-via-symbol-manipulation.
-- **Science bar:** Written tokens show higher NPMI than ephemeral signals. Agents preferentially write near resources or danger zones. Written messages develop spatial conventions (e.g., "danger signs" near red patrol routes).
+### The cognitive substrate (world model + imagination)
+- **Auxiliary world model (blue only):** `head_fwd_dyn` predicts `carry_{t+1}`; `head_fwd` predicts next local environment; `head_self_pred` predicts own next action; `head_proprio` predicts next energy; `head_confidence` predicts the carry-forward MSE. These train and are healthy (`carry_fwd ≈ 0.0001`).
+- **K-step imagination + epistemic gate:** when confidence is low, the agent rolls `carry_forward_dynamics` K=5 steps and picks the action with the best imagined value. **Critical limitation found in source:** `imagine()` scores **only actions 0–4** (Stay + N/S/E/W). It *cannot imagine* Strike/Push/Guard or any Phase-18 tool action (8–11). The "System-2" faculty is blind to the entire combinatorial action space we built Phase 18 to exercise.
 
-#### Phase 19.1 — Message Chains
+### Dead weight and drift (cheap wins / risks)
+- **`tom_logits` (theory-of-mind head)** is computed but has **no reward in the JAX loop** — vestigial.
+- **Push (6) / Guard (7)** have **no environment mechanics in `jax_sim/`** — they are no-op moves. Any "trapping" attributed to them is movement, not a Push/Guard primitive.
+- **Carry update drift:** blue uses a soft EMA (`0.9·carry + 0.1·pooled`); red uses a real `GRUCell`. THRONG.md's "GRUCell pivot" appears to have landed on red only — **verify before relying on it for blue temporal memory.**
 
-- **What:** Allow agents to write multi-tile sequences (e.g., 3 tiles in a line = a "sentence"). Reading agents perceive a sequence, not just isolated tokens.
-- **Why:** Forces **sequential syntax** — order matters. [DANGER] [NORTH] means something different than [NORTH] [DANGER].
-- **Science bar:** Positional ablation shows information loss when tile order is shuffled (TRE > 0.3).
-
-#### Phase 19.2 — Teaching
-
-- **What:** Introduce "novice" agents (spawned with zeroed carry states and random weights) into a population of experienced agents. Monitor whether novices learn faster in populations with rich written culture vs. blank tiles.
-- **Why:** This is the **cumulative culture gate**. If writing accelerates novice learning, the writing system is load-bearing. If not, it's decoration.
-- **Science bar:** Time-to-competence (first 100 steps without dying) is significantly shorter (p < 0.05) in written-culture populations.
+### The measurement instruments (what can actually be proven today)
+- **`tools/causal_intervention.py` — the real instrument.** Loads a frozen checkpoint, runs single steps, swaps an emitter's 3-slot VQ token mid-flight, measures ΔP(action) on blind receivers, paired t-test. **Pass bar: `p < 0.05` AND `|Δ| > 0.05`.** Supports full 3-slot tokens.
+- **`tools/ate_swap_test.py` — offline, but slot-0 only.** It stratifies corpus records, but the corpus collapses the lag-1 neighbor token to **slot 0** (`decode_signals.load_corpus`), so **per-slot compositional ATE is not measurable offline today.** This is a concrete instrumentation gap (§4).
+- **Decode metrics:** MI/Spearman, k-means vocabulary, lag-1 direction LRT, χ² pincer, **PosDis** (real), **topographic similarity** (real), **NPMI** lexical parse (real, needs `adj_*` fields). **TRE is a Ridge-R² proxy, not a true tree-reconstruction-error** — do not report it as canonical compositionality without the caveat.
+- **Open-endedness: zero implemented.** No POET, no quality-diversity archive, no environment-genome vector. `build_cfg` is fully static. `environment/resource.py::drift()` exists but is **never called** in the JAX path. Everything "open-ended" is aspirational.
 
 ---
 
-### Tier 3: The Open-Ended Pivot (1-3 months)
+## 3. The 2026 evidence that reshapes the plan
 
-This is where THRONG must break out of the fixed-ecology trap. **This is the hardest unsolved problem.**
+| Pillar | What the frontier now says (2024–2026) | Consequence for THRONG |
+|--------|----------------------------------------|------------------------|
+| **Compositionality** | Needs **productivity pressure** (vocab < #meanings) + **receiver resets**; topsim + systematic-generalization are the standard measures ([JAIR 2025](https://www.jair.org/index.php/jair/article/view/17302)) | Add productivity pressure to ≥1 slot; reframe our novice/expert-dropout machinery as a receiver-reset compositionality driver; adopt topsim (we have it) as a headline metric |
+| **Scaling comms** | Pure emergent protocols degrade as worlds grow; **sharing imagined trajectories/intentions** scales far better ([NeurIPS 2025](https://neurips.cc/virtual/2025/124582)); counterfactual credit assignment helps ([SCoUT 2026](https://www.arxiv.org/pdf/2603.04833)) | We already compute K-step imagined trajectories. **Broadcast a quantized imagined-intention** as a new slot — keeps grounding (intention = future survival), buys scalability |
+| **Open-endedness** | Moved past hand-mutated POET to **foundation-model-generated environment *code*** — [OMNI-EPIC](https://arxiv.org/abs/2405.15568) (LLM writes new tasks+rewards as code), [DiCode / ICML 2026](https://konstantinosmitsides.github.io/dreaming-in-code/) (LLM synthesizes intermediate levels to bridge competence gaps, +17% return on Craftax). UED/PLR is the cheap JAX-native first step | Two-tier plan: **(a)** PLR/UED over our existing env-genome params now (no LLM); **(b)** **Claude-as-environment-designer** generating new ecology rules as code later. We are unusually well-positioned: a parameterized JAX sim + a human/AI team |
+| **JAX open-ended benchmark** | [Craftax](https://craftaxenv.github.io/) (250× faster than Crafter, Crafter+NetHack, **Craftax-Coop** multi-agent via JaxMARL); even UED "fails to make material progress" on full Craftax — genuinely hard | Craftax-Coop is an **off-the-shelf cross-domain transfer target** (Phase 23) and a source of richer crafting tech-trees we can borrow instead of hand-building |
+| **Neuromorphic** | The real Loihi 2 path is **ANN→SDNN** (Sigma-Delta) conversion via **Lava / Lava-dl**, deploy via NxKernel; **only the actor** is converted; **distillation-aware training recovers 87–100%** of accuracy vs 11–27% drop without ([Loihi 2 RL control, 2025](https://arxiv.org/html/2512.03911)) | Concrete, de-risked endgame: keep the *deployable actor* small and ReLU; distill the transformer trunk into a compact recurrent ReLU core first; SDNN-convert the actor only; VQ codebook = addressable lookup (trivial spiking fit) |
+| **Consciousness (as engineering scorecard)** | [Butlin, Bengio et al. (TiCS 2025)](https://researchonline.lse.ac.uk/id/eprint/130322/) give **theory-derived indicator properties** that shift *credence*, not yes/no; GWT-1..4 (parallel modules, limited-capacity workspace bottleneck, global broadcast, state-dependent attention). Feedforward LLMs notably lack broadcast/recurrence | Map THRONG to the indicators honestly (§11). Our VQ bottleneck is a near-textbook **limited-capacity global workspace** — a genuine, defensible point of differentiation from LLMs, *if* we add state-dependent attention (GWT-4) |
 
-#### Phase 21.0 — Procedural Complexity Injection
-
-- **What:** Every N PPO updates, the environment generates a new element: a new resource type, a new predator behavior, a new terrain feature, a new crafting recipe. Elements are drawn from a combinatorial space large enough to be practically infinite.
-- **Why:** The agents can never fully "solve" the environment. Every time they approach equilibrium, a new challenge appears. The communication protocol must grow to describe the new element.
-- **The POET mechanism:** Use a quality-diversity archive. Track agent populations across different environment configurations. When a population masters its environment, transfer it to a harder one. When a population fails, provide easier stepping stones. This creates an **open-ended curriculum** without human design.
-- **Science bar:** Token vocabulary usage continues growing (no plateau) after 10M+ steps. New tokens emerge for new concepts.
-
-#### Phase 21.1 — Agent-Constructed Complexity
-
-- **What:** Agents' actions modify the environment in ways that create challenges for other agents. Building a barrier creates a maze. Crafting a trap creates a hazard. Cooperative structures create "cities" that attract predators.
-- **Why:** The agents themselves become the source of environmental complexity. The red-blue arms race is a primitive version of this. The full version is: **blue infrastructure creates new challenges that require new communication to navigate.**
-- **This is where self-recursion emerges.** The language doesn't just describe the environment — it shapes the environment, which demands new language, which shapes it further. The feedback loop is the engine of open-ended intelligence.
-
-#### Phase 21.2 — Multi-Niche Specialization
-
-- **What:** The grid becomes large enough (512×512 or 1024×1024) that different regions have fundamentally different ecologies. Agents in the "forest" niche face different challenges than agents in the "desert" niche.
-- **Why:** Forces **dialect formation** and **translation pressure**. When a forest agent migrates to the desert, it must learn a new vocabulary or teach its own. When two populations collide, they must develop a shared pidgin. This is the mechanism that produces **abstraction** — shared concepts that transcend specific environments.
-- **Science bar:** Unsupervised clustering of VQ usage shows spatially distinct sub-populations with partially overlapping token semantics.
+The throughline: **the field independently converged on the pieces THRONG is missing** — productivity pressure, receiver resets, intention-sharing, and code-level open-endedness. We do not need to invent them; we need to integrate them without abandoning the grounding bet.
 
 ---
 
-### Tier 4: Bridging to General Intelligence (3-6 months)
+## 4. Tier 0 — Prove the foundation (now → ~2 weeks)
 
-#### Phase 22.0 — Language as Cognitive Tool
+Everything downstream is wasted compute if the blue channel is cheap talk. Close that first.
 
-> [!IMPORTANT]
-> This is the phase where THRONG could genuinely surpass LLMs on grounded reasoning.
+### 4.0 — Instrumentation debt (do before the next long science run)
+- **Log all three lag-1 slot tokens in the corpus** (today only slot 0 survives into decode). Without this, per-slot compositional ATE — the entire point of the 3-slot design — is unmeasurable offline. Small writer change in `communication/analysis.py` + `decode_signals.load_corpus`.
+- **Stand up `tests/test_gradient_flow.py`** (H2 generalized): assert `‖∂loss/∂codebook_k‖ > 0` for each blue slot on one synthetic `ppo_update`. We have already paid for this lesson twice.
 
-- **What:** Agents can "think in language" — use their own VQ output as input to their next reasoning step, without broadcasting it. Internal monologue.
-- **Why:** Currently, agents think in continuous hidden states and only use discrete tokens for *output*. If they can use discrete tokens as *intermediate computation*, they gain **System-2 reasoning**: deliberate, step-by-step symbolic manipulation.
-- **The theoretical claim:** LLMs do next-token prediction on human-generated text. THRONG agents doing internal monologue would do next-token prediction on *self-generated tokens grounded in causal experience*. The grounding makes the reasoning *correct* in a way LLM reasoning cannot be — because every symbol has a verified physical referent.
+### 4.1 — Causal ATE gate (the real one)
+- **Instrument:** `tools/causal_intervention.py` (live swap), not the slot-0 offline test.
+- **Pass bar:** `p < 0.05` and `|Δ| > 0.05` on ≥1 slot, on blind receivers far from predators.
+- **Pass → ** first proof in THRONG's history that a discrete token causally moves receiver behavior. **Fail → ** the channel is cheap talk and we go straight to §4.2 (this is the expected outcome given history, so plan for it).
 
-#### Phase 23.0 — Cross-Domain Transfer
+### 4.2 — Receiver-Necessity ecology (the mechanism that should make ATE > 0)
+This is the load-bearing idea and it now has literature behind it. The principle:
 
-- **What:** Train the same agent population across multiple distinct environments (grid survival, simple physics puzzles, basic cooperation games). The *only* thing shared across domains is the communication protocol.
-- **Why:** If the language developed in one domain transfers usefully to another, the agents have achieved **abstraction**. They've learned concepts that are domain-general, not domain-specific.
-- **Science bar:** An agent trained in grid survival learns a physics puzzle faster if it can read messages from agents who've already solved it, compared to agents with no cross-domain communication.
+> **A signal becomes load-bearing only when a survival-relevant quantity is observable to the sender, hidden from the receiver, and the channel is the receiver's only bridge across that asymmetry — with lethal stakes.**
 
-#### Phase 24.0 — Neuromorphic Deployment (Loihi)
+Concrete instantiation on the existing crafting ecology (doubles as the ATE gate):
+- **Asymmetric recipe knowledge.** Agent A can see today's recipe (`Axe = 2 wood + 1 stone`); agent B, standing on the resources, sees only empty ingredient slots. B must act on A's transmitted message to craft the tool both need to survive the predator wave.
+- **Why it forces the slots apart (productivity pressure, per JAIR):** the minimal sufficient message is `[ingredient] · [quantity] · [have/need]`. Make the recipe space larger than any single slot's 64 codes can name, so the agents are *forced* to compose across slots. If B ignores the slots, B crafts wrong and starves — ATE becomes a survival differential, not a behavioral nudge.
+- **Falsifiable gate:** per-slot ablation via `causal_intervention.py` → `P(correct craft)` drops with CI excluding zero for *each* slot independently (proves separation, not just presence).
+- **If ATE is still zero after a true receiver-necessity ecology:** that is a publishable negative result. It would mean shared-policy MAPPO cannot escape the "both agents independently solve the task" degenerate equilibrium, and we fork to **policy heterogeneity** (distinct A/B networks) — pre-register this fork now.
 
-- **What:** Map frozen VQ policies to spiking neural networks on Intel Loihi 2.
-- **Why:** Not for capability — for **substrate independence** and **continuous learning**. Loihi enables:
-  - ~1000× power efficiency for inference (always-on swarm)
-  - STDP-based online learning without catastrophic forgetting
-  - Spike-timing-based VQ codebook evolution (biologically plausible token learning)
-- **Prerequisites:** Phases 18-22 must be complete. We need a mature, stable communication protocol to port.
-- **Timeline:** This is a 6-12 month engineering project after the science is proven.
-
----
-
-## What This Means for Today
-
-The immediate work is correct: clear the ATE gate, deploy crafting ecology, prove compositional syntax. These are necessary stepping stones.
-
-But we should start designing Phase 19 (Writing System) **now**, because it's the critical pivot from "agents that signal" to "agents that build culture." Every phase after 19 depends on persistent written symbols.
-
-The open-ended complexity problem (Phase 21) is the hardest scientific question. We should start a research thread on POET-style co-evolutionary curriculum for MARL environments. If someone has already solved this in JAX, we adapt it. If not, we design it.
-
-### Revised Priority Stack
-
-| Priority | Phase | What | Why |
-|----------|-------|------|-----|
-| **1** | 18.2 | ATE gate | Proves discrete tokens are causal, not cheap talk |
-| **2** | 18.3 | Ecology (crafting) | Forces multi-slot compositional syntax |
-| **3** | 19.0 | **Writing system** | Most important phase — persistent culture, external memory |
-| **4** | 19.2 | Teaching test | Proves cumulative culture is load-bearing |
-| **5** | 20.0 | Rosetta Stone v2 | Verify the new discrete-only language maps to human concepts |
-| **6** | 21.0 | Open-ended curriculum | The pivotal mechanism for unbounded intelligence growth |
-| **7** | 22.0 | Language as cognitive tool | Internal monologue = System-2 reasoning |
-| **8** | 23.0 | Cross-domain transfer | Proves abstraction, not just domain expertise |
-| **9** | 24.0 | Loihi deployment | Neuromorphic substrate for continuous online learning |
+### 4.3 — Fix imagination to cover the real action space
+`imagine()` currently scores only actions 0–4. Extend it to all 12 (or at least the survival-relevant Strike/Craft/UseTool). This is a prerequisite for the entire "language as System-2 reasoning" thesis (§7): an agent cannot deliberate about crafting if its imagination cannot represent crafting.
 
 ---
 
-## The Answer to Dimitar's Question
+## 5. Tier 1 — Make the language compositional on purpose (2–6 weeks)
 
-*"How would my agents' intelligence work if all they know is crafting and survival?"*
+The literature is unambiguous that these are *necessary*, not optional, and we have most of the machinery already.
 
-It wouldn't. And that's why we need Phases 19-23. The survival pressure gives us the *mechanism* for grounding. The crafting gives us *compositionality*. But general intelligence requires:
+| Lever | Mechanism (literature) | THRONG implementation |
+|-------|------------------------|------------------------|
+| **Productivity pressure** | vocab < #meanings forces reuse → composition (JAIR) | Ecology must demand more distinctions than one slot's 64 codes can hold; tune recipe/feature space so composition across slots is the only solution |
+| **Receiver reset** | periodically resetting the listener pressures the speaker toward easy-to-learn (≈ compositional) codes (JAIR) | **Reframe MEDAL-ADR expert-dropout + novice injection as a receiver-reset schedule** — we built this for cumulative culture; it is also a compositionality driver |
+| **Compositional measurement** | topsim + systematic generalization are the field standard | We have topographic similarity and PosDis; promote topsim to a headline gate. **Fix or footnote TRE** (it is a Ridge proxy today) |
+| **Counterfactual credit** | isolate each sender's marginal effect on a receiver (SCoUT) | Optional later: a counterfactual-mailbox term to sharpen sender credit if multi-sender noise stalls learning |
 
-1. **Persistent culture** (Phase 19) — so knowledge compounds across generations
-2. **Open-ended complexity** (Phase 21) — so the language never stops growing
-3. **Internal reasoning** (Phase 22) — so language becomes a cognitive tool, not just a signal
-4. **Cross-domain transfer** (Phase 23) — so concepts abstract beyond the training environment
-
-Each phase is a ratchet. Once clicked forward, the agents can never unlearn it. The survival pressure ensures every ratchet click is *grounded* — unlike an LLM's training, nothing in this system is an unverified statistical pattern.
-
-We can do this. The foundation is solid. The direction is correct. The gap is large but the path is clear.
-
-— Cam
+**Gate for Tier 1:** topsim significant and rising; per-slot NPMI shows *different* slots tracking *different* context families (slot→noun/inventory, slot→intent/verb, slot→quantity/urgency); systematic generalization — agents correctly compose a message for a recipe combination never seen in training.
 
 ---
 
-# Addendum — Will's Engineering & Strategy Synthesis (Phase 18.5, Jun 22 2026)
+## 6. Tier 2 — Cultural transmission: the writing system (Phase 19)
 
-> **Author:** Will (Cursor engineer) — written after a full source review during the Phase 18.4 → 18.5 VQ-reconnection saga.
-> **Purpose:** Translate Cam's strategic tiers into concrete, falsifiable engineering and flag the systemic risks that keep costing us weeks of compute. This is the "how", paired with Cam's "why".
+Still the pivotal phase: it converts ephemeral signaling into **persistent culture + external memory**, and it is a prerequisite for several consciousness indicators (§11).
 
-## 1. The pattern we must confront: severance-class bugs
+- **Write action:** etch a 3-slot token to a grid tile; readable in a local patch; slow decay (~200-step half-life). The vestigial `symbol_write`/`alarm` heads and the now-freed action slots are the natural home.
+- **Three things it unlocks:** temporal persistence (knowledge outlives the individual → cumulative culture), spatial decoupling (broadcast to anyone who passes, not just K neighbors), and **self-communication** (write → move → return → read your own note = external memory, the seed of symbol-manipulation cognition).
+- **Message chains (19.1):** multi-tile sequences force sequential syntax (order matters: `[DANGER][NORTH]` ≠ `[NORTH][DANGER]`). Gate: positional ablation degrades information.
+- **Teaching test (19.2) — the cumulative-culture gate:** novices (zeroed carry, fresh weights) injected into a population with rich written tiles must reach competence faster than novices in a blank world. **Pass bar: time-to-competence significantly shorter (`p < 0.05`)** in written-culture populations. If not, writing is decoration.
 
-In the last few phases we have hit **three distinct bugs that all share one signature — a learning signal silently disconnected from the thing it was supposed to train:**
+---
 
-1. **VQ severed from the autodiff tape** (Phase 18.4): `ppo_loss` used the static `loss_vq_rollout` array instead of the live network output, so the codebook received *zero gradient* for an unknown number of updates.
-2. **NB_GAIN ghost metric**: initialised to `1.0`, never updated during rollout — we were reading and reasoning about a constant.
-3. **Red VQ index bug** (Phase 18.5, just fixed): `ppo_loss` read `outs[7]` unconditionally. Blue and red networks have **different output tuple layouts** (blue has `alarm_out` at index 6; red does not), so red was minimising `Σz_e` — the raw continuous wire — and collapsing its own codebook to `2/64` while reporting a nonsensical `RedVQ ≈ -24225`.
+## 7. Tier 3 — Language as a cognitive tool (Phase 20–22)
 
-These are not unrelated mistakes. They are the **predictable failure mode of positional tuples + parallel-but-divergent blue/red networks + hand-indexed losses**. We will keep paying this tax until we remove the foot-gun. Concrete hardening proposals, in priority order:
+This is where THRONG attempts to *out-reason* LLMs on grounded tasks, and where the 2026 scaling evidence points hardest.
 
-| # | Fix | Effort | Payoff |
-|---|-----|--------|--------|
-| **H1** | Replace the positional output tuple of `AgentNetworkJax` / `PredatorNetworkJax` with a `flax.struct.dataclass` (`NetworkOutputs`) carrying named fields (`action_logits`, `loss_vq`, `z_e`, `alarm_out: Optional`, …). Every consumer reads `outs.loss_vq`, never `outs[7]`. | Medium (mechanical) | Eliminates the **entire** index-mismatch bug class. Red/blue divergence becomes explicit and type-checked. |
-| **H2** | A `tests/test_gradient_flow.py` unit test: build a tiny network, run one `ppo_update`, assert `‖∂loss/∂codebook‖ > 0` and `‖∂loss/∂head_signal‖ > 0` for **both** teams. Run it in CI / pre-launch smoke. | Low | Would have caught severance bugs #1 and #3 in seconds instead of thousands of updates. |
-| **H3** | A standing **telemetry sanity gate** in `main_jax.py`: if `RedVQ` or blue `VQ` loss goes negative, or `codes_active < 4/64` for >3 consecutive updates, print a loud `[ALERT]` banner (not a silent line). Cheap insurance against the next severance. | Low | Turns "weeks of corrupted compute" into "noticed on update 2". |
-| **H4** | Move all Phase-defining scalars (`n_actions`, `env_channels`, `signal_dim`, slot widths) into `config_phase7.yaml` as the single source of truth (done for `n_actions` in 18.5). Forbid magic numbers like `obs.at[:, :4]` / `z_e[:, 8:20]` in favour of a named `obs_layout` / `wire_layout` struct. | Medium | Kills the "direct YAML load defaults to 8 actions and crashes" trap and the slot-slice off-by-N risk. |
+### 7.1 Broadcast intention, not just observation (the scaling fix)
+The NeurIPS 2025 result says intention-sharing scales where raw emergent symbols do not. THRONG already computes a K-step imagined trajectory per agent. **Add a quantized "imagined-intention" as a broadcast slot:** the agent VQ-encodes *where it intends to be / what it intends to do* and broadcasts that. This keeps the grounding bet (intention is about future survival, still selected) while adopting the one comms structure shown to scale. Gate: receiver ATE on the intention slot exceeds ATE on observation slots; coordination success rises with world size instead of falling.
 
-**Recommendation:** do **H2 + H3 before the next long run**. They are an afternoon of work and they directly protect the most expensive resource we have (Modal compute + our own trust in the dashboard). H1 + H4 can follow during the Phase 19 build.
+### 7.2 Internal monologue (System-2)
+Today agents think in continuous carry and emit discrete tokens only outward. Let an agent feed its **own discrete token back as input to its next step without broadcasting** — deliberate, step-wise symbolic computation over grounded symbols. This is the concrete "surpass LLMs" claim: next-token prediction over *self-generated, causally-verified* symbols, where every symbol has a physical referent. Requires §4.3 (imagination over the full action space) first.
 
-## 2. The real bottleneck is *receiver-side causality*, not vocabulary
+### 7.3 Delayed-consequence ecology (Phase 20 — agriculture/terraforming)
+Plant resources that mature over thousands of steps. Forces concepts for *future time, ownership, deferral, defense* — precisely the long-horizon causal reasoning LLMs are weakest at. Gate: tokens emerge that NPMI-correlate with future (not current) state, and agents that "speak future" out-survive those that don't.
 
-Every phase from 16.6 through 17.5 produced the **same verdict**: signals are *sender-grounded* (the emitter's metabolic/spatial state predicts the token) but **receiver-side ATE ≈ 0** (listeners don't act on them). Adding crafting, slots, and actions grows the *potential* vocabulary but does nothing about this core failure unless the ecology makes **decoding the signal the only way to survive a sub-task.**
+---
 
-This reframes the priority stack. Compositional syntax (Phase 18.3) is downstream of one principle:
+## 8. Tier 4 — The open-ended pivot (Phase 21), rebased on the 2026 stack
 
-> **Receiver-Necessity Principle:** A signal becomes load-bearing only when there exists a survival-relevant quantity that the *receiver* cannot observe directly and the *sender* can. The channel must be the receiver's sole bridge across an information asymmetry that has lethal stakes.
+This is the hardest unsolved problem and the only mechanism on the roadmap without a fixed reachable optimum. We **stop planning to build POET from scratch** and adopt the current frontier in two tiers.
 
-Concrete instantiation for Phase 18.3 cooperative crafting (this is the design I'd build next, and it doubles as the ATE gate):
+### 8.1 Tier A — UED/PLR over our own environment genome (cheap, JAX-native, no LLM)
+We already have the genome — the source review enumerated it: resource scarcity, predator pressure (`red_catch_*`, red floor), recipe depth, barrier density, occlusion (`red_detection_radius`, `local_obs_radius`), metabolic asymmetry, imagination cost, cooperative thresholds. Wire `build_cfg`'s static scalars into an **evolvable θ_env vector** + a **regret-prioritized level replay** loop (Craftax shows the whole env state is a single JAX object, so UED is cheap to apply). Minimum-criterion filter: admit a new genome only if it is *solvable-but-not-yet-solved* by some population.
 
-- **Asymmetric recipe knowledge:** Spawn "recipe" state visible only to agent A (e.g., A can see that today an Axe needs *2 wood + 1 stone*, but B sees only "ingredient slots"). A must *transmit the recipe* via the 3 slots for B (who is standing on the resources) to craft. Neither survives the predator wave alone; the Axe (via `UseTool`) is what lets them.
-- **Why this forces the slots apart:** [slot_0 = ingredient type] + [slot_1 = quantity] + [slot_2 = have/need] is the *minimal* message that lets B act. If B ignores the slots, B crafts wrong and starves. ATE is then literally a survival differential, not a behavioural nudge.
-- **Falsifiable gate:** ablate slot_0 mid-flight (the existing `ate_swap_test`) → if `P(correct craft)` drops with CI excluding zero, the slot is causal. Run the same ablation per slot to prove *separation*.
+### 8.2 Tier B — Claude-as-environment-designer (OMNI-EPIC / DiCode pattern)
+The frontier is a foundation model **writing new environment rules as code**, gated by *learnable* (not too easy/hard) and *interesting* (novel). THRONG is unusually well-suited: a parameterized JAX sim and a standing human+AI team. Use the Anthropic API to propose new recipes, hazards, terrain rules, and reward-neutral ecological mechanics as code diffs to the sim, auto-gated by a learnability+novelty check, then transfer checkpoints onto promising new worlds.
 
-If, after a Receiver-Necessity ecology, ATE is *still* zero, that is a deep negative result worth publishing on its own: it would mean shared-policy MAPPO cannot escape the "both agents independently learn the task" degenerate equilibrium, and we'd need true policy heterogeneity (distinct A/B networks) — a fork worth pre-registering.
+**Falsifiable gate for the whole tier:** VQ token-usage entropy keeps rising past 10M steps **with no plateau**, and newly emerged tokens NPMI-correlate with newly introduced environment features. A plateau means the curriculum is not generating genuine novelty.
 
-## 3. A strategic fork: is *red comms* still a science target?
+---
 
-Red has never passed the pincer χ² (`p ≈ 0.46` across 14.1c, 600k overdrive, metabolic asymmetry) and its codebook just collapsed under a bug. We keep spending architecture and compute on red's communication channel. Two honest options:
+## 9. Tier 5 — Cross-domain transfer (Phase 23): proving abstraction
 
-- **(A) Keep red comms as a co-evolution science target.** Justified only if we believe predator coordination language is reachable. Evidence so far: weak. Cost: a whole second VQ/aux/SRL stack that doubles our bug surface (and produced bug #3).
-- **(B) Freeze red as pure ecological pressure.** Disable the red comms gradient entirely (`red_comms_enabled: false`-equivalent for the *language* heads, keep the predator policy), and redirect **all** interpretability effort onto blue's 3-slot compositional syntax. Red stays a lethal, adaptive selection force (it already learned `Push`/`Guard` trapping in Phase 16) without us pretending to decode its babble.
+Train one population across distinct worlds where the **only shared thing is the communication protocol.** **Use Craftax-Coop (JaxMARL) as an off-the-shelf second domain** instead of hand-building one. Gate: an agent learns a new domain faster when it can read messages from agents who already solved it, versus agents with no cross-domain channel. Transfer = abstraction = concepts that outlive their original ecology. This is the strongest available evidence that THRONG has learned *concepts*, not domain-specific reflexes.
 
-**DECISION TAKEN (Phase 18.6, Jun 22): (B).** Once the 18.5 fix went live, blue VQ was confirmed healthy (`loss≈0.003–0.007`, `codes 45|39|43/64`) but red's correctly-read DCVQ loss was pathological (`1.5e11`, `codes 1/64`, trunk grad clip-saturated). Rather than spend compute nursing a chronically-failed channel, we set `red_vq_loss_coef: 0.0` — red VQ is decoupled from the gradient. Red remains a lethal, adaptive selection force (policy/value + proprio/SRL aux still train; it already learned `Push`/`Guard` trapping in Phase 16) but its language heads are no longer trained. The thesis of THRONG is *blue* language under predation; red is the pressure, not the subject. This halves our bug surface and focuses all ATE/NPMI/Rosetta tooling on one network. **Reversible:** `red_vq_loss_coef>0` + a one-time cold restart re-promotes red comms to a science target if future evidence warrants.
+---
 
-## 4. Concretising the open-ended pivot (Phase 21) — POET-lite in JAX
+## 10. Tier 6 — Neuromorphic deployment (Phase 24): a concrete, de-risked path
 
-Cam is right that fixed ecology = crystallised language. The good news: a *minimal* open-ended curriculum is tractable in our existing stack without a full POET implementation.
+The honest constraint: **the transformer trunk does not map to Loihi 2.** The 2025 toolchain makes the real path clear, and it is three tractable sub-projects, not one miracle.
 
-- **Environment genome:** a small float vector `θ_env = [resource_scarcity, predator_speed, recipe_depth, barrier_density, occlusion_radius]`. Our `build_cfg` already parameterises most of these.
-- **Archive:** keep `K` (env-genome, population-checkpoint) pairs on the volume. Every `M` PPO updates: (1) evaluate each population on its own env and on mutated neighbours, (2) if a population's survival > high-watermark, spawn a *harder* mutated genome and transfer the checkpoint (POET "goal-switching"), (3) if survival < floor, anneal toward an easier genome (stepping stone).
-- **Minimum-criterion novelty:** only admit a new genome if it is *solvable-but-not-yet-solved* by some existing population (the MCC filter). This is the cheap, JAX-friendly core of open-endedness.
-- **Falsifiable gate:** VQ token-usage entropy keeps rising past 10M steps with no plateau, and new tokens correlate (NPMI) with newly-introduced env features. A plateau = the curriculum isn't generating genuine novelty.
+1. **VQ codebook → addressable spike lookup.** A discrete token is *already* the natural unit of a spiking substrate (token = active code line). This is the easy, beautiful fit and the strongest hardware argument for the discrete-bottleneck thesis. De-risk it *now* by keeping the codebook a clean, frozen, addressable table.
+2. **Distill the policy into a compact recurrent ReLU core, then SDNN-convert the *actor only*.** The 2025 Loihi-2 RL work converts only the actor to a Sigma-Delta network (Delta input, Sigma-Delta ReLU hidden, Sigma output), quantizes to integer graded spikes, and deploys via Lava-dl + NxKernel. **Distillation-aware training recovered 87–100% of accuracy** (vs 11–27% drop without). Implication: keep the deployable actor ReLU-based and small; distill the transformer+carry into a compact recurrent ReLU policy *before* attempting SDNN conversion. Validate by behavioral parity (the SDNN reproduces the JAX policy's catch-survival curve within tolerance).
+3. **Online STDP on the codebook only.** Once on-chip, allow spike-timing plasticity to slowly evolve *codebook entries* (not the trunk) — continuous, catastrophic-forgetting-free vocabulary drift; the biologically plausible version of `dead_code_reset`.
 
-This is ~2–3 weeks of engineering on top of the existing checkpoint/volume machinery, and it is the single highest-leverage thing for the "surpass LLMs" thesis, because it is the only mechanism on the roadmap that *doesn't* have a fixed reachable optimum.
+**Prerequisite gate (unchanged):** a stable, mature protocol from Phases 18–22. There is no point distilling a language that is still crystallizing. Toolchain: prototype on CPU/GPU in **Lava**, deploy with **Lava-dl**; Magma/NxKernel for the chip.
 
-## 5. The neuromorphic endgame (Phase 24) — a realistic mapping
+---
 
-The honest engineering truth: **the transformer trunk does not map cleanly to Loihi 2.** Self-attention is not a native spiking primitive. So "deploy the policy on Loihi" is really three sub-projects:
+## 11. The consciousness scorecard (an honest, measurable track — not a claim)
 
-1. **Keep the VQ codebook as a fixed spike-addressable lookup.** Discrete tokens are *already* the natural unit for a spiking substrate — a token = an active code line. This part is the easy, beautiful fit and is the strongest argument for our discrete-bottleneck thesis.
-2. **Distill the transformer+GRU policy into a recurrent SNN.** Train a spiking recurrent net (surrogate-gradient, e.g. `snntorch`/`lava-dl`) to imitate the frozen JAX policy's action distribution given the same obs/carry. The carry-GRU is recurrent already, which helps; attention gets distilled into the SNN's learned recurrence. Validate by behavioural ATE parity on-grid (the SNN must reproduce the JAX policy's catch-survival curve within tolerance).
-3. **Online STDP on the codebook only.** Once on-chip, allow spike-timing-dependent plasticity to slowly evolve *codebook entries* (not the trunk), giving continuous, catastrophic-forgetting-free vocabulary drift — the biologically-plausible version of `dead_code_reset`.
+The user asked about consciousness. The responsible way to engage is the [Butlin–Bengio indicator-property method](https://researchonline.lse.ac.uk/id/eprint/130322/): derive computational indicators from neuroscientific theories and use them to **shift credence**, never to declare a system conscious. We hold ourselves to that. The striking thing is how well THRONG's architecture already maps to **Global Workspace Theory** — and that the gaps are exactly the capabilities the roadmap builds anyway.
 
-Prerequisite gate (unchanged from Cam): a *stable, mature* protocol from Phases 18–22. There is no point distilling a language that is still crystallising. But we can de-risk step 1 *now* by ensuring the codebook stays a clean, frozen, addressable table (the 18.5 fix matters here too — a codebook that collapses to 2/64 is not distillable).
+| GWT indicator | THRONG today | Status / what closes the gap |
+|---------------|--------------|------------------------------|
+| **GWT-1** Multiple specialized modules in parallel | action / value / comms / world-model / proprio heads run in parallel off a shared trunk | **Largely present** |
+| **GWT-2** Limited-capacity workspace = a bottleneck + selective attention | **The GWT-masked 3-slot VQ wire is a near-textbook limited-capacity workspace**; cross-attention is the selective-attention mechanism | **Present** — this is THRONG's genuine structural edge over feedforward LLMs |
+| **GWT-3** Global broadcast to all modules | signals broadcast to neighbors; Phase 19 **writing** broadcasts across space *and time* (incl. to self) | Partial now → **strengthened by Phase 19** |
+| **GWT-4** State-dependent attention: query modules in succession to solve complex tasks | the epistemic gate + K-step imagination is a primitive version, but it is **blind to most actions** (§4.3) and does not yet sequence module queries | **The main gap** — closed by §4.3 + §7.2 internal monologue |
 
-## 6. Revised near-term execution order (Will's view)
+The point is not to claim consciousness. It is that **the same engineering that makes the language compositional, persistent, and usable for internal reasoning also moves THRONG up a principled, published indicator scale** — and does so along the precise axes (recurrence, bottlenecked broadcast, state-dependent attention) where the authors note feedforward transformer LLMs score poorly. That is a defensible, measurable form of "different from, and on this axis beyond, an LLM." We track the scorecard; we make no metaphysical claim.
 
-| Order | Action | Gate / exit criterion |
-|-------|--------|------------------------|
-| **0** | ✅ **Phase 18.5 fix** (`vq_loss_idx` + `n_actions` YAML) + **18.6 red VQ decoupled** (`red_vq_loss_coef:0.0`). | DONE — blue VQ healthy; red = pure ecological pressure. |
-| **1** | ✅ **H2 + H3 hardening** (regression test + telemetry alert gate, scoped to blue). | DONE — test passes; H3 fired correctly on the live collapse. |
-| **2** | **Phase 18.2 ATE accumulation** on the **blue** channel. | ≥50k blind-receiver records since restart. |
-| **3** | **Receiver-Necessity crafting** (§2) if naive ATE is null. | ATE>0, CI excludes zero, per-slot separation via ablation. |
-| **4** | **Phase 19 Writing System** (Cam's pivotal phase) + H1/H4 hardening during the build. | Written-tile NPMI > ephemeral NPMI; teaching test `p<0.05`. |
-| **5** | **POET-lite** (§4). | No vocabulary plateau past 10M steps. |
+---
 
-The throughline: **stop running long training on un-asserted learning signals, make the receiver's survival depend on decoding, and only then chase open-endedness and silicon.** The science is real; the engineering discipline is what will let it compound instead of resetting every time an index slips.
+## 12. Engineering discipline — the severance-class tax
 
-— Will
+Three bugs in recent memory shared one signature: **a learning signal silently disconnected from what it was meant to train** (VQ severed from the autodiff tape; NB_GAIN a frozen ghost metric; red VQ reading `z_e` via index mismatch). They are the predictable failure mode of positional output tuples + divergent blue/red networks + hand-indexed losses. We keep paying this tax until the foot-gun is removed.
+
+| # | Fix | Effort | Payoff | Status |
+|---|-----|--------|--------|--------|
+| **H1** | Replace positional output tuples with a `flax.struct.dataclass` (`NetworkOutputs`) — every consumer reads `outs.loss_vq`, never `outs[7]` | Medium | Eliminates the entire index-mismatch bug class | **TODO** (during Phase 19 build) |
+| **H2** | `tests/test_gradient_flow.py`: assert `‖∂loss/∂codebook‖ > 0` per slot for blue on one `ppo_update` | Low | Catches severance in seconds, not thousands of updates | **Partial** (18.5 added a VQ-index regression test; generalize it) |
+| **H3** | Telemetry alert gate: loud `[ALERT]` on negative VQ loss or codebook collapse | Low | "Weeks of corrupted compute" → "noticed on update 2" | **DONE** (18.5, scoped to blue in 18.6 — it fired correctly on the live red collapse) |
+| **H4** | Single source of truth for phase scalars (`n_actions`, slot widths, wire layout) in config; named `obs_layout`/`wire_layout` structs, no magic slices | Medium | Kills the "YAML defaults to 8 actions" trap and slot-slice off-by-N risk | **Partial** (`n_actions:12` in YAML; layout structs remain) |
+| **H5 (new)** | Excise or activate dead weight: `tom_logits` (no reward), Push/Guard (no mechanics), and verify the blue carry path (EMA vs the claimed GRU) | Low | Removes silent divergence between docs and code; reclaims parameters | **TODO** |
+
+**Standing rule:** stop running long training on un-asserted learning signals. A signal that is not gradient-checked and telemetry-gated is assumed broken until proven otherwise.
+
+---
+
+## 13. Execution order + decision log
+
+| Order | Action | Gate / exit criterion | State |
+|-------|--------|------------------------|-------|
+| **0** | Phase 18.5 index fix + 18.6 red-VQ decouple + `0*inf` NaN guard | Blue VQ healthy; red trunk grad off the 2.0 clip; no restart crash | ✅ DONE (`6a7659e`) |
+| **1** | Instrumentation debt: log 3-slot lag-1 tokens; generalize gradient-flow test (H2) | Per-slot offline ATE becomes measurable; test passes | **NEXT** |
+| **2** | Fix imagination to score all 12 actions (§4.3) | Imagined value defined for Strike/Craft/UseTool | **NEXT** |
+| **3** | Causal ATE gate via `causal_intervention.py` (§4.1) | `p<0.05` & `|Δ|>0.05` on ≥1 slot | pending |
+| **4** | Receiver-Necessity crafting ecology (§4.2) if ATE null | per-slot ATE CI excludes zero (separation proven) | pending |
+| **5** | Compositionality scaffolds: productivity pressure + receiver-reset schedule (§5) | topsim rising; systematic generalization to unseen recipe combos | pending |
+| **6** | Phase 19 writing + teaching test (§6) + H1/H4 hardening | novice time-to-competence `p<0.05` shorter with written culture | pending |
+| **7** | Intention-broadcast slot (§7.1) | intention-slot ATE > observation-slot ATE; coordination improves with scale | pending |
+| **8** | Internal monologue (§7.2) | grounded multi-step reasoning beats reactive baseline on a planning task | pending |
+| **9** | Open-ended Tier A: UED/PLR over env-genome (§8.1) | no vocabulary-entropy plateau past 10M steps | pending |
+| **10** | Open-ended Tier B: Claude-as-environment-designer (§8.2) | new tokens NPMI-correlate with FM-introduced features | pending |
+| **11** | Cross-domain transfer via Craftax-Coop (§9) | faster learning with cross-domain channel than without | pending |
+| **12** | Neuromorphic: distill→SDNN actor on Lava (§10) | behavioral parity with JAX policy within tolerance | pending |
+
+### Decision log
+- **Jun 22 — Red comms frozen (fork B).** Red VQ decoupled (`red_vq_loss_coef:0.0`); red is pure ecological pressure. Halves bug surface; focuses all interpretability on the blue channel. Reversible via `red_vq_loss_coef>0` + cold restart. *(Rationale: red never passed the pincer χ², `p≈0.46`, and its reconnected DCVQ loss was pathological — `1.5e11`, `1/64`.)*
+- **Jun 23 — Plan rebased on 2026 evidence.** Adopt productivity pressure + receiver resets (compositionality), intention-broadcast (scaling), UED→FM-generated environments (open-endedness), SDNN/Lava (neuromorphic). The grounding bet is unchanged; the scaffolds the literature proves necessary are now explicit.
+- **Pre-registered fork:** if a true receiver-necessity ecology *still* yields ATE = 0, shared-policy MAPPO is the suspect → move to heterogeneous A/B policies. Decide on evidence, not hope.
+
+---
+
+## 14. The answer to Dimitar's question, updated
+
+*"How does survival-and-crafting become AGI?"*
+
+It doesn't — **survival-and-crafting alone** crystallizes a domain-specific reflex. But survival pressure is the only mechanism we have that produces *grounded* symbols, and grounding is the one thing LLMs cannot buy at any scale of text. The 2026 evidence tells us precisely what to add so that grounded symbols compound into general capability rather than plateauing:
+
+1. **Receiver-necessity + productivity pressure** — so symbols are causal and compositional, not cheap talk.
+2. **Persistent writing** — so knowledge compounds across generations (culture).
+3. **Intention-broadcast + internal monologue** — so language becomes a tool for thought that *scales*, and so the architecture climbs the GWT indicator scale.
+4. **Code-level open-endedness** — so the world never stops getting harder in novel ways, and the language never stops growing.
+5. **Cross-domain transfer** — so concepts abstract beyond their birthplace.
+6. **Neuromorphic substrate** — so the grounded, discrete policy can run continuously and learn online at ~1000× efficiency.
+
+Each is a ratchet, and every click is *grounded* by selection — unlike an LLM's training, nothing here is an unverified statistical pattern. The foundation is real and now healthy. The honest headwinds are named. The scaffolds are no longer guesses — the field converged on them. The path is hard, but for the first time it is both grounded and evidence-based.
+
+— Cam & Will, Jun 23 2026
