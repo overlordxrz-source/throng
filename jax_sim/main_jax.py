@@ -191,6 +191,8 @@ def make_sim_step(
     _reward_red_starve = float(config.get("reward_red_starve_per_step", -0.01))
     _red_catch_radius = int(config.get("red_catch_radius", 1))
     _red_catch_prob = float(config.get("red_catch_prob", 1.0))
+    _reward_craft_success = float(config.get("reward_craft_success", 3.0))
+    _reward_futile_craft = float(config.get("reward_futile_craft", -0.20))
 
     # Phase 16 parameters
     p16 = config.get("phase16_combinatorial_syntax", {})
@@ -440,30 +442,42 @@ def make_sim_step(
 
         # 2. PICK_UP (Action 9) -> Capacity=1 enforcement
         is_pickup = (b_actions == 9) & b_pop.alive
-        currently_empty = (b_pop.inventory_wood == 0) & (b_pop.inventory_stone == 0)
+        currently_empty = (b_pop.inventory_wood == 0) & (b_pop.inventory_stone == 0) & (b_pop.inventory_flint == 0) & (b_pop.inventory_clay == 0) & (b_pop.inventory_vine == 0)
         
         on_wood = grid.wood_grid[b_pop.positions[:, 0], b_pop.positions[:, 1]] > 0
         on_stone = grid.stone_grid[b_pop.positions[:, 0], b_pop.positions[:, 1]] > 0
+        on_flint = grid.flint_grid[b_pop.positions[:, 0], b_pop.positions[:, 1]] > 0
+        on_clay = grid.clay_grid[b_pop.positions[:, 0], b_pop.positions[:, 1]] > 0
+        on_vine = grid.vine_grid[b_pop.positions[:, 0], b_pop.positions[:, 1]] > 0
         
         pickup_wood = is_pickup & on_wood & currently_empty
         pickup_stone = is_pickup & on_stone & currently_empty & ~pickup_wood
+        pickup_flint = is_pickup & on_flint & currently_empty & ~pickup_wood & ~pickup_stone
+        pickup_clay = is_pickup & on_clay & currently_empty & ~pickup_wood & ~pickup_stone & ~pickup_flint
+        pickup_vine = is_pickup & on_vine & currently_empty & ~pickup_wood & ~pickup_stone & ~pickup_flint & ~pickup_clay
         
         new_inv_wood = b_pop.inventory_wood + pickup_wood.astype(jnp.int32)
         new_inv_stone = b_pop.inventory_stone + pickup_stone.astype(jnp.int32)
+        new_inv_flint = b_pop.inventory_flint + pickup_flint.astype(jnp.int32)
+        new_inv_clay = b_pop.inventory_clay + pickup_clay.astype(jnp.int32)
+        new_inv_vine = b_pop.inventory_vine + pickup_vine.astype(jnp.int32)
         
         new_wood_grid = grid.wood_grid.at[b_pop.positions[:, 0], b_pop.positions[:, 1]].add(-pickup_wood.astype(jnp.float32))
         new_stone_grid = grid.stone_grid.at[b_pop.positions[:, 0], b_pop.positions[:, 1]].add(-pickup_stone.astype(jnp.float32))
+        new_flint_grid = grid.flint_grid.at[b_pop.positions[:, 0], b_pop.positions[:, 1]].add(-pickup_flint.astype(jnp.float32))
+        new_clay_grid = grid.clay_grid.at[b_pop.positions[:, 0], b_pop.positions[:, 1]].add(-pickup_clay.astype(jnp.float32))
+        new_vine_grid = grid.vine_grid.at[b_pop.positions[:, 0], b_pop.positions[:, 1]].add(-pickup_vine.astype(jnp.float32))
+        
         grid = grid.replace(
             wood_grid=jnp.maximum(new_wood_grid, 0.0),
-            stone_grid=jnp.maximum(new_stone_grid, 0.0)
+            stone_grid=jnp.maximum(new_stone_grid, 0.0),
+            flint_grid=jnp.maximum(new_flint_grid, 0.0),
+            clay_grid=jnp.maximum(new_clay_grid, 0.0),
+            vine_grid=jnp.maximum(new_vine_grid, 0.0)
         )
         
         # 3. CRAFT (Action 10) -> shared reward
         is_craft = (b_actions == 10) & b_pop.alive
-        has_wood = new_inv_wood > 0
-        has_stone = new_inv_stone > 0
-        craft_wood_ready = is_craft & has_wood
-        craft_stone_ready = is_craft & has_stone
         
         # Adjacency check
         dx = jnp.abs(b_pop.positions[:, 0:1] - b_pop.positions[None, :, 0])
@@ -473,18 +487,51 @@ def make_sim_step(
         dist = jnp.maximum(dx, dy)
         adjacent = dist <= 1
         
-        wood_to_stone = craft_wood_ready[:, None] & craft_stone_ready[None, :] & adjacent
-        success_wood = wood_to_stone.any(axis=1)
-        success_stone = wood_to_stone.any(axis=0)
+        craft_group = adjacent & is_craft[:, None] & is_craft[None, :]
         
-        new_inv_wood = new_inv_wood - success_wood.astype(jnp.int32)
-        new_inv_stone = new_inv_stone - success_stone.astype(jnp.int32)
-        new_inv_axe = b_pop.inventory_axe | success_wood | success_stone
+        group_wood = jnp.sum(new_inv_wood[None, :] * craft_group, axis=1)
+        group_stone = jnp.sum(new_inv_stone[None, :] * craft_group, axis=1)
+        group_flint = jnp.sum(new_inv_flint[None, :] * craft_group, axis=1)
+        group_clay = jnp.sum(new_inv_clay[None, :] * craft_group, axis=1)
+        group_vine = jnp.sum(new_inv_vine[None, :] * craft_group, axis=1)
+        
+        req_wood = grid.current_recipe[0]
+        req_stone = grid.current_recipe[1]
+        req_flint = grid.current_recipe[2]
+        req_clay = grid.current_recipe[3]
+        req_vine = grid.current_recipe[4]
+        
+        recipe_satisfied = (
+            (group_wood >= req_wood) &
+            (group_stone >= req_stone) &
+            (group_flint >= req_flint) &
+            (group_clay >= req_clay) &
+            (group_vine >= req_vine)
+        )
+        
+        craft_success = is_craft & recipe_satisfied
+        
+        consume_wood = craft_success & (new_inv_wood > 0)
+        consume_stone = craft_success & (new_inv_stone > 0)
+        consume_flint = craft_success & (new_inv_flint > 0)
+        consume_clay = craft_success & (new_inv_clay > 0)
+        consume_vine = craft_success & (new_inv_vine > 0)
+        
+        new_inv_wood = new_inv_wood - consume_wood.astype(jnp.int32)
+        new_inv_stone = new_inv_stone - consume_stone.astype(jnp.int32)
+        new_inv_flint = new_inv_flint - consume_flint.astype(jnp.int32)
+        new_inv_clay = new_inv_clay - consume_clay.astype(jnp.int32)
+        new_inv_vine = new_inv_vine - consume_vine.astype(jnp.int32)
+        
+        new_inv_axe = b_pop.inventory_axe | craft_success
         
         b_pop = b_pop.replace(
             energy=jnp.clip(b_pop.energy + b_energy_gain, 0.0, 1.0),
             inventory_wood=new_inv_wood,
             inventory_stone=new_inv_stone,
+            inventory_flint=new_inv_flint,
+            inventory_clay=new_inv_clay,
+            inventory_vine=new_inv_vine,
             inventory_axe=new_inv_axe
         )
 
@@ -575,6 +622,35 @@ def make_sim_step(
         r_starved_hunt = r_pop.alive & (r_pop.steps_since_catch >= _red_starvation_steps)
         r_pop = kill_agents(r_pop, r_starved_hunt)
 
+        # ── Phase 18.7 Recipe Rotation & Visibility ────────────────────────
+        k_rec1, k_rec2, k_vis = jax.random.split(jax.random.split(key_misc)[2], 3)
+        new_recipe_timer = grid.recipe_timer[0] - 1
+        
+        def update_recipe(_):
+            items = jax.random.randint(k_rec1, (4,), 0, 5)
+            mask = jax.random.bernoulli(k_rec2, 0.5)
+            items = items.at[3].set(jnp.where(mask, items[3], 5))
+            counts = jnp.bincount(items, length=6)[:5]
+            
+            progress = jnp.clip(step_idx / 1500000.0, 0.0, 1.0)
+            vis_prob = 0.5 - 0.3 * progress
+            new_vis = jax.random.bernoulli(k_vis, vis_prob, (b_pop.max_pop,))
+            
+            return counts.astype(jnp.int32), jnp.array([1000], dtype=jnp.int32), new_vis
+            
+        def keep_recipe(_):
+            return grid.current_recipe, jnp.array([new_recipe_timer], dtype=jnp.int32), b_pop.can_see_recipe
+            
+        new_recipe, recipe_timer, new_can_see = jax.lax.cond(
+            new_recipe_timer <= 0,
+            update_recipe,
+            keep_recipe,
+            operand=None
+        )
+        
+        grid = grid.replace(current_recipe=new_recipe, recipe_timer=recipe_timer)
+        b_pop = b_pop.replace(can_see_recipe=new_can_see)
+
         # ── Puzzle logic ────────────────────────────────────────
         p_act, p_cool = decay_puzzle_timeout(grid.puzzle_active, grid.puzzle_cooldown)
         p_rew, p_solved, p_act, p_cool = check_puzzle_solved(
@@ -661,10 +737,10 @@ def make_sim_step(
         b_rew = b_rew - _alarm_penalty_coef * alarm_fired
 
         # ── Phase 18 Futile Action Penalty ──────────────────────
-        craft_success = success_wood | success_stone
         futile_craft = (b_actions == 10) & b_pop.alive & ~craft_success
         futile_use = (b_actions == 11) & b_pop.alive & (b_pop.inventory_axe == 0)
-        b_rew = b_rew - 0.20 * (futile_craft | futile_use).astype(jnp.float32)
+        b_rew = b_rew + _reward_futile_craft * (futile_craft | futile_use).astype(jnp.float32)
+        b_rew = b_rew + _reward_craft_success * craft_success.astype(jnp.float32)
 
         r_rew = _rew_small_blue * r_caught_small
         r_rew = r_rew + (_rew_big_green_coop + _rew_coord) * r_caught_big_coop

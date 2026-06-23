@@ -39,8 +39,8 @@ symbol_dim: 16
 
 neighbor_k: 6
 local_obs_radius: 2              # 5×5 patch
-env_channels: 12                 # Phase 18.3: 10 base + wood, stone
-own_state_dim: 13                # Phase 18.3: 10 base + inv_wood, inv_stone, inv_axe
+env_channels: 15                 # Phase 18.7: 10 base + wood, stone, flint, clay, vine
+own_state_dim: 22                # Phase 18.7: 13 + flint, clay, vine, recipe[5], can_see_recipe
 n_actions: 12                    # Phase 18: N,S,E,W,Stay,Strike,Push,Guard,Build,PickUp,Craft,UseTool
                                  # (build_cfg overrides identically; defined here so direct-YAML loads
                                  #  — README quickstart, decode/test tools — don't default to 8 and crash
@@ -139,6 +139,8 @@ alarm_metabolic_cost: 0.006
 starvation_threshold: 0.1
 reward_starvation: -0.5
 reward_resource: 0.1
+reward_craft_success: 3.0
+reward_futile_craft: -0.20
 resource_decay: 0.05                 # how much resource depletes per consumption step
 
 # ── MAPPO ──────────────────────────────────────────────────────────────────────
