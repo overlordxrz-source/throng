@@ -803,6 +803,8 @@ def make_sim_step(
             "imagination_metabolic_cost": cog_cost,
             "ignition": ignition,
             "barrier_sum": jnp.sum(grid.barrier_hp_map),
+            "craft_success": craft_success.astype(jnp.float32),
+            "futile_craft": futile_craft.astype(jnp.float32),
         }
         r_rollout = {
             "obs": r_obs, "actions": r_actions, "log_probs": r_log_probs_taken,
@@ -2154,6 +2156,13 @@ def _run_simulation_impl(
                 f"red_floor={red_curriculum_stages[red_curriculum_idx]} "
                 f"sustain={red_sustain_count}/{red_sustain_needed} | brain={n_layers}L{medal_str} | barrier_sum={barrier_sum_val:.1f}"
             )
+            _n_craft_success = 0
+            _n_futile_craft = 0
+            if "craft_success" in rollout_data["blue"]:
+                _n_craft_success = int(np.asarray(rollout_data["blue"]["craft_success"]).sum())
+            if "futile_craft" in rollout_data["blue"]:
+                _n_futile_craft = int(np.asarray(rollout_data["blue"]["futile_craft"]).sum())
+            print(f"  Crafting: success={_n_craft_success} | futile={_n_futile_craft} | rate={_n_craft_success / max(1, _n_craft_success + _n_futile_craft):.1%}")
             if bool((_p9 or {}).get("imagination_gating_enabled", False)):
                 im_agree_val = float("nan")
                 conf_gate_val = float("nan")
