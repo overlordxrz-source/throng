@@ -2545,7 +2545,6 @@ def _run_simulation_impl(
                     nb_hunter_dist_lag1=nb_hunter_dist_lag1,
                     nb_hunter_token_lag1=nb_hunter_token_lag1,
                     carry_fwd=r_carry_fwd_all[t, alive_idx_r],
-                    steps_since_dropout=r_steps_since_dropout_all[t, alive_idx_r],
                 )
                 if is_hunter.any():
                     pos_r_alive_f = r_pos[alive_idx_r].astype(np.float32)
