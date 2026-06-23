@@ -79,6 +79,16 @@ def make_imagination_fn(
             return (values * discounts).sum(axis=0)
 
         scores = jax.vmap(score_action)(jnp.arange(_n_imag))
+
+        # Phase 18.x: Logit-mask dummy actions Push (6) and Guard (7) in imagination
+        # This prevents the Epistemic Gate from overriding reactive actions with no-ops
+        scores = jax.lax.cond(
+            _n_imag > 7,
+            lambda _: scores.at[6:8, :].set(-1e9),
+            lambda _: scores,
+            operand=None
+        )
+
         imagined = jnp.argmax(scores, axis=0)
 
         greedy_scores = jnp.take_along_axis(scores, greedy[None, :], axis=0).squeeze(0)

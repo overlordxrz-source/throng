@@ -1393,5 +1393,10 @@ If our true goal is to force the emergence of AGI-level intelligence purely thro
 **Phase:** 18.7 (Receiver-Necessity Ecology)
 **Active Branch:** `feature/phase18-crafting`
 **Dimensionality:** 12 Actions, 3 VQ Slots (12/8/12, vocab 64). `obs_dim` = 2731 (`own_state`=22, `env_channels`=15).
-**Telemetry:** `can_see_recipe` confirmed at ~24% (curriculum decay from 50%). `expert_dropouts` reading ~2869 per 512-step rollout (bug: executing full agent deaths on array index < 100, causing a death spiral via `apply_auto_reproduce`).
-**Current Status:** Training is live but MEDAL-ADR mechanism is fatally flawed. A surgery plan to replace it with a post-update soft-carry reset (age-based targeting, memory wipe only) has been drafted and is pending execution. ATE accumulation gate is closed until MEDAL-ADR is fixed.
+**Telemetry:** `can_see_recipe` confirmed at ~24%. MEDAL-ADR soft carry-reset is actively wiping 10% of agent hidden states (e.g. `expert_dropouts=16`). `codes_active` recovered to healthy `23|35|32` after soft-reset fix.
+**Current Status:** MEDAL-ADR soft carry-reset migration is successfully completed. Push (6) and Guard (7) dummy actions have been logit-masked to prevent 49% stationary-action pollution.
+**ATE Gate Criteria (DO NOT OPEN UNTIL ALL THREE HOLD):** 
+1. `expert_dropouts` is 15-22
+2. `blue_caught` is oscillating (not sustained at <=5)
+3. `codes_active` >= 40/64 **per slot independently**. 
+When gate opens, use `--min-step 1286144` (post-first-clean-rollout).

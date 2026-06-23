@@ -105,8 +105,17 @@ def ppo_loss(
     action_logits = outs[0]      # (M, 8)
     values_pred = outs[3]        # (M,)
 
+    # Phase 18.x: Logit-mask dummy actions Push (6) and Guard (7) for log-prob / entropy matching
+    # (Must match the mask applied in rollout to prevent old_log_probs mismatch)
+    action_logits_masked = jax.lax.cond(
+        action_logits.shape[-1] > 7,
+        lambda _: action_logits.at[..., 6:8].set(-1e9),
+        lambda _: action_logits,
+        operand=None
+    )
+
     # Action log probs
-    action_log_probs = jax.nn.log_softmax(action_logits, axis=-1)
+    action_log_probs = jax.nn.log_softmax(action_logits_masked, axis=-1)
     log_probs_taken = jnp.take_along_axis(
         action_log_probs, actions[..., None], axis=-1
     ).squeeze(-1)
@@ -149,10 +158,10 @@ def ppo_loss(
         vf_loss = vf_loss * vf_weight
 
     # Entropy bonus
-    action_probs = jax.nn.softmax(action_logits, axis=-1)
+    action_probs = jax.nn.softmax(action_logits_masked, axis=-1)
     spatial_entropy = -jnp.sum(action_probs * jnp.log(action_probs + 1e-10), axis=-1)
     
-    # L2 penalty on logits to prevent vanishing entropy gradients when deterministic
+    # L2 penalty on UNMASKED logits (prevents masking from exploding the penalty and causing NaN gradients)
     logit_penalty = 0.01 * jnp.mean(jnp.square(action_logits), axis=-1)
 
     # Mask dead agents
