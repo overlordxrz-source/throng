@@ -10,6 +10,7 @@ If the user indicates that Cam has lost context or has hallucinated an outdated 
 When modifying the architecture to expand the output dimensions of existing neural network heads (e.g., increasing actions from 8 to 12):
 - **NEVER** allow the layer to reinitialize due to shape mismatch. This causes catastrophic amnesia of the agents' survival policies.
 - **ALWAYS** ensure `jax_sim/network_jax.py:graft_missing_param_subtrees` gracefully zero-pads the expansion. Kernels must be padded on `axis=1` (outputs), and biases on `axis=0`.
+- **Action amputation must always use logit-masking (`-1e9`), never array dimension reduction.** Reducing `n_actions` after a checkpoint has been saved causes shape mismatches that cause catastrophic parameter amnesia. At 1M+ training steps, this is irreversible. The mask must be applied consistently per Rule 11 below.
 
 ## 3. Multi-Slot Array Handling
 With the transition to the Phase 18 multi-slot communication architecture, agent tokens are 2D arrays `(N, slots)`.
@@ -55,3 +56,17 @@ Never apply full death events (`kill_agents`) as a communication penalty or comp
 
 ## 10. Confabulated Citation Warning
 Never reference "P.A. Lopez / AI Rights" as a source. This is a known LLM hallucination and is not a real publication. Rely only on verified literature (e.g., the 2025 JAIR survey, Butlin-Bengio TiCS).
+
+## 11. PPO Logit-Mask Invariant
+When applying a logit mask (e.g., `-1e9`) to suppress any actions at rollout time, the **identical mask MUST be applied in ALL three of the following locations** or a NaN cascade will result:
+1. **Rollout sampling** (`main_jax.py` — before categorical sampling)
+2. **Epistemic Gate imagination** (`imagination_jax.py` — before the K-step imagined argmax scores)
+3. **PPO backward pass** (`rl_jax.py` — before `jax.nn.log_softmax` for `new_log_probs`)
+
+The invariant is: `old_log_probs` and `new_log_probs` must be drawn from identically-structured distributions for every `(agent, timestep)` in the buffer. Violating this produces `ratio = exp(new - old) = exp(finite - (-1e9)) = exp(1e9) = inf`, which `jnp.clip` cannot recover from, destroying all gradients.
+
+Additionally:
+- The **entropy bonus** must be computed on **masked** logits (not raw network output), to avoid inflating the entropy target with near-zero probability mass from dead actions.
+- The **L2 logit penalty** must be computed on **unmasked** logits, to prevent `square(-1e9) = 1e18` from injecting an astronomically large value into the gradient.
+
+The NaN signature for a masking invariant violation: `grad_norms total=nan trunk=nan actor=nan` on the first PPO update after a masked rollout.
