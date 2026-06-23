@@ -100,26 +100,34 @@ def load_corpus(path: str, min_step: int = 0) -> dict:
     else:
         nb_dist_lag1 = None
 
-    vq_tokens = np.array(
-        [r.get("vq_token", -1) for r in records], dtype=np.int32
-    )
-    def _normalize_token(v):
-        if v is None:
+    def _slot_token(value, slot_idx):
+        if value is None:
             return -1
-        if isinstance(v, list):
-            if len(v) == 0 or v[0] < 0:
+        if isinstance(value, list):
+            if len(value) <= slot_idx:
                 return -1
-            return v[0]
-        return int(v) if v >= 0 else -1
+            v = value[slot_idx]
+            return int(v) if v is not None and v >= 0 else -1
+        if slot_idx == 0:
+            return int(value) if value >= 0 else -1
+        return -1
+
+    vq_tokens_all = np.array(
+        [[_slot_token(r.get("vq_token"), i) for i in range(3)] for r in records],
+        dtype=np.int32
+    )
+    vq_tokens = vq_tokens_all[:, 0]  # default backwards-compatible slot_0 extraction
 
     nb_tok_lag1_raw = [r.get("nb_scout_token_lag1", None) for r in records]
     has_tok_lag1 = any(v is not None for v in nb_tok_lag1_raw)
     if has_tok_lag1:
-        nb_tok_lag1 = np.array(
-            [_normalize_token(v) for v in nb_tok_lag1_raw],
+        nb_tok_lag1_all = np.array(
+            [[_slot_token(v, i) for i in range(3)] for v in nb_tok_lag1_raw],
             dtype=np.int32,
         )
+        nb_tok_lag1 = nb_tok_lag1_all[:, 0]
     else:
+        nb_tok_lag1_all = None
         nb_tok_lag1 = None
 
     adj_bg      = np.array([r.get("adj_bg", False) for r in records], dtype=bool)
@@ -135,7 +143,9 @@ def load_corpus(path: str, min_step: int = 0) -> dict:
         "nb_lag1":      nb_lag1,
         "nb_dist_lag1": nb_dist_lag1,
         "vq_tokens":    vq_tokens,
+        "vq_tokens_all": vq_tokens_all,
         "nb_tok_lag1":  nb_tok_lag1,
+        "nb_tok_lag1_all": nb_tok_lag1_all,
         "adj_bg":       adj_bg,
         "adj_barrier":  adj_barrier,
         "adj_red":      adj_red,
@@ -1796,8 +1806,8 @@ def npmi_lexical_parse(data: dict) -> None:
     print(f"  PHASE 17: NPMI LEXICAL PARSER")
     print(f"{'='*70}")
     
-    vq_tokens = data.get("vq_tokens")
-    if vq_tokens is None or not (vq_tokens >= 0).any():
+    vq_tokens_all = data.get("vq_tokens_all")
+    if vq_tokens_all is None or not (vq_tokens_all >= 0).any():
         print("  ❌ No VQ tokens found in corpus. Cannot run lexical parse.")
         return
 
@@ -1811,129 +1821,139 @@ def npmi_lexical_parse(data: dict) -> None:
         print("  → Run the simulation longer with the new Phase 17 SignalCorpusWriter to accumulate data.")
         return
         
-    valid_mask = (vq_tokens >= 0)
-    tokens = vq_tokens[valid_mask]
-    n_samples = len(tokens)
-    
-    if n_samples < 1000:
-        print(f"  ⚠ Only {n_samples} valid token samples. Need more data for stable NPMI.")
-        
-    unique_tokens = np.unique(tokens)
-    
-    # Context features
-    actions = data["actions"][valid_mask]
-    ctx = data["ctx"]
-    resource = (ctx["resource"][valid_mask] > 0.5)
-    adj_bg_v = adj_bg[valid_mask]
-    adj_barrier_v = adj_barrier[valid_mask]
-    adj_red_v = adj_red[valid_mask]
-    
-    # Noun axes (Boolean entities)
-    noun_features = [adj_bg_v, adj_barrier_v, adj_red_v, resource]
-    
-    # Verb axes (Action execution)
-    verb_features = [(actions == a) for a in range(9) if a != 4] # Ignore STAY (4)
-    
-    # Adverb axes (Spatial geometry)
-    red_bear = ctx["red_bear"][valid_mask]
-    red_dist = ctx["red_dist"][valid_mask]
-    
-    bear_N = (red_bear >= 315) | (red_bear < 45)
-    bear_E = (red_bear >= 45) & (red_bear < 135)
-    bear_S = (red_bear >= 135) & (red_bear < 225)
-    bear_W = (red_bear >= 225) & (red_bear < 315)
-    
-    dist_close = red_dist <= 2.0
-    dist_mid = (red_dist > 2.0) & (red_dist <= 5.0)
-    dist_far = red_dist > 5.0
-    
-    adverb_bearings = [bear_N, bear_E, bear_S, bear_W]
-    adverb_dists = [dist_close, dist_mid, dist_far]
+    # Check if multi-slot
+    n_slots = vq_tokens_all.shape[1] if vq_tokens_all.ndim > 1 else 1
+    if vq_tokens_all.ndim == 1:
+        vq_tokens_all = vq_tokens_all[:, None]
 
-    # Precompute scores
-    scores_noun = []
-    scores_verb = []
-    scores_adverb = []
-    
-    for t in unique_tokens:
-        tok_mask = (tokens == t)
-        if tok_mask.sum() < 5:
-            scores_noun.append(0.0)
-            scores_verb.append(0.0)
-            scores_adverb.append(0.0)
+    for slot_idx in range(n_slots):
+        print(f"\n  --- SLOT {slot_idx} NPMI ---")
+        vq_tokens = vq_tokens_all[:, slot_idx]
+        
+        valid_mask = (vq_tokens >= 0)
+        tokens = vq_tokens[valid_mask]
+        n_samples = len(tokens)
+        
+        if n_samples < 1000:
+            print(f"  ⚠ Only {n_samples} valid token samples. Need more data for stable NPMI.")
             continue
             
-        # Noun NPMI (Max across entities)
-        n_score = max([compute_npmi(tok_mask, f) for f in noun_features])
+        unique_tokens = np.unique(tokens)
         
-        # Verb NPMI (Max across actions)
-        v_score = max([compute_npmi(tok_mask, f) for f in verb_features])
+        # Context features
+        actions = data["actions"][valid_mask]
+        ctx = data["ctx"]
+        resource = (ctx["resource"][valid_mask] > 0.5)
+        adj_bg_v = adj_bg[valid_mask]
+        adj_barrier_v = adj_barrier[valid_mask]
+        adj_red_v = adj_red[valid_mask]
+    
+        # Noun axes (Boolean entities)
+        noun_features = [adj_bg_v, adj_barrier_v, adj_red_v, resource]
         
-        # Adverb NPMI (Sum of max bearing + max distance)
-        adv_b_score = max([compute_npmi(tok_mask, f) for f in adverb_bearings])
-        adv_d_score = max([compute_npmi(tok_mask, f) for f in adverb_dists])
-        adv_score = adv_b_score + adv_d_score
+        # Verb axes (Action execution)
+        verb_features = [(actions == a) for a in range(9) if a != 4] # Ignore STAY (4)
         
-        scores_noun.append(n_score)
-        scores_verb.append(v_score)
-        scores_adverb.append(adv_score)
+        # Adverb axes (Spatial geometry)
+        red_bear = ctx["red_bear"][valid_mask]
+        red_dist = ctx["red_dist"][valid_mask]
         
-    scores_noun = np.array(scores_noun)
-    scores_verb = np.array(scores_verb)
-    scores_adverb = np.array(scores_adverb)
-    
-    # Per-axis normalization
-    med_n, std_n = np.median(scores_noun), np.std(scores_noun)
-    med_v, std_v = np.median(scores_verb), np.std(scores_verb)
-    med_a, std_a = np.median(scores_adverb), np.std(scores_adverb)
-    
-    thresh_n = med_n + 1.0 * std_n
-    thresh_v = med_v + 1.0 * std_v
-    thresh_a = med_a + 1.0 * std_a
-    
-    counts = {"noun": 0, "verb": 0, "adverb": 0, "composite": 0, "unclassified": 0}
-    
-    for i, t in enumerate(unique_tokens):
-        if scores_noun[i] == 0.0 and scores_verb[i] == 0.0 and scores_adverb[i] == 0.0:
-            continue # Skipped token
+        bear_N = (red_bear >= 315) | (red_bear < 45)
+        bear_E = (red_bear >= 45) & (red_bear < 135)
+        bear_S = (red_bear >= 135) & (red_bear < 225)
+        bear_W = (red_bear >= 225) & (red_bear < 315)
+        
+        dist_close = red_dist <= 2.0
+        dist_mid = (red_dist > 2.0) & (red_dist <= 5.0)
+        dist_far = red_dist > 5.0
+        
+        adverb_bearings = [bear_N, bear_E, bear_S, bear_W]
+        adverb_dists = [dist_close, dist_mid, dist_far]
+
+        # Precompute scores
+        scores_noun = []
+        scores_verb = []
+        scores_adverb = []
+        
+        for t in unique_tokens:
+            tok_mask = (tokens == t)
+            if tok_mask.sum() < 5:
+                scores_noun.append(0.0)
+                scores_verb.append(0.0)
+                scores_adverb.append(0.0)
+                continue
+                
+            # Noun NPMI (Max across entities)
+            n_score = max([compute_npmi(tok_mask, f) for f in noun_features])
             
-        is_n = scores_noun[i] > thresh_n
-        is_v = scores_verb[i] > thresh_v
-        is_a = scores_adverb[i] > thresh_a
+            # Verb NPMI (Max across actions)
+            v_score = max([compute_npmi(tok_mask, f) for f in verb_features])
+            
+            # Adverb NPMI (Sum of max bearing + max distance)
+            adv_b_score = max([compute_npmi(tok_mask, f) for f in adverb_bearings])
+            adv_d_score = max([compute_npmi(tok_mask, f) for f in adverb_dists])
+            adv_score = adv_b_score + adv_d_score
+            
+            scores_noun.append(n_score)
+            scores_verb.append(v_score)
+            scores_adverb.append(adv_score)
+            
+        scores_noun = np.array(scores_noun)
+        scores_verb = np.array(scores_verb)
+        scores_adverb = np.array(scores_adverb)
         
-        axes_cleared = sum([is_n, is_v, is_a])
+        # Per-axis normalization
+        med_n, std_n = np.median(scores_noun), np.std(scores_noun)
+        med_v, std_v = np.median(scores_verb), np.std(scores_verb)
+        med_a, std_a = np.median(scores_adverb), np.std(scores_adverb)
         
-        if axes_cleared >= 2:
-            counts["composite"] += 1
-        elif is_n:
-            counts["noun"] += 1
-        elif is_v:
-            counts["verb"] += 1
-        elif is_a:
-            counts["adverb"] += 1
+        thresh_n = med_n + 1.0 * std_n
+        thresh_v = med_v + 1.0 * std_v
+        thresh_a = med_a + 1.0 * std_a
+        
+        counts = {"noun": 0, "verb": 0, "adverb": 0, "composite": 0, "unclassified": 0}
+        
+        for i, t in enumerate(unique_tokens):
+            if scores_noun[i] == 0.0 and scores_verb[i] == 0.0 and scores_adverb[i] == 0.0:
+                continue # Skipped token
+                
+            is_n = scores_noun[i] > thresh_n
+            is_v = scores_verb[i] > thresh_v
+            is_a = scores_adverb[i] > thresh_a
+            
+            axes_cleared = sum([is_n, is_v, is_a])
+            
+            if axes_cleared >= 2:
+                counts["composite"] += 1
+            elif is_n:
+                counts["noun"] += 1
+            elif is_v:
+                counts["verb"] += 1
+            elif is_a:
+                counts["adverb"] += 1
+            else:
+                counts["unclassified"] += 1
+                
+        total = sum(counts.values())
+        if total == 0:
+            print("  ❌ No tokens had enough samples to classify.")
+            return
+            
+        print(f"  V_noun threshold   : > {thresh_n:.4f} (med={med_n:.4f}, std={std_n:.4f})")
+        print(f"  V_verb threshold   : > {thresh_v:.4f} (med={med_v:.4f}, std={std_v:.4f})")
+        print(f"  V_adverb threshold : > {thresh_a:.4f} (med={med_a:.4f}, std={std_a:.4f})")
+        print(f"{'-'*70}")
+        print(f"  Vocabulary Size : {total} active tokens")
+        print(f"  Nouns           : {counts['noun']} ({(counts['noun']/total)*100:.1f}%)")
+        print(f"  Verbs           : {counts['verb']} ({(counts['verb']/total)*100:.1f}%)")
+        print(f"  Adverbs         : {counts['adverb']} ({(counts['adverb']/total)*100:.1f}%)")
+        print(f"  Unclassified    : {counts['unclassified']} ({(counts['unclassified']/total)*100:.1f}%)")
+        print(f"  COMPOSITE       : {counts['composite']} ({(counts['composite']/total)*100:.1f}%)")
+        print(f"{'-'*70}")
+        if counts['composite'] > 0:
+            print(f"  ✅ SYNTACTIC GRAMMAR DETECTED. {counts['composite']} tokens span multiple orthogonal semantic axes.")
         else:
-            counts["unclassified"] += 1
-            
-    total = sum(counts.values())
-    if total == 0:
-        print("  ❌ No tokens had enough samples to classify.")
-        return
-        
-    print(f"  V_noun threshold   : > {thresh_n:.4f} (med={med_n:.4f}, std={std_n:.4f})")
-    print(f"  V_verb threshold   : > {thresh_v:.4f} (med={med_v:.4f}, std={std_v:.4f})")
-    print(f"  V_adverb threshold : > {thresh_a:.4f} (med={med_a:.4f}, std={std_a:.4f})")
-    print(f"{'-'*70}")
-    print(f"  Vocabulary Size : {total} active tokens")
-    print(f"  Nouns           : {counts['noun']} ({(counts['noun']/total)*100:.1f}%)")
-    print(f"  Verbs           : {counts['verb']} ({(counts['verb']/total)*100:.1f}%)")
-    print(f"  Adverbs         : {counts['adverb']} ({(counts['adverb']/total)*100:.1f}%)")
-    print(f"  Unclassified    : {counts['unclassified']} ({(counts['unclassified']/total)*100:.1f}%)")
-    print(f"  COMPOSITE       : {counts['composite']} ({(counts['composite']/total)*100:.1f}%)")
-    print(f"{'-'*70}")
-    if counts['composite'] > 0:
-        print(f"  ✅ SYNTACTIC GRAMMAR DETECTED. {counts['composite']} tokens span multiple orthogonal semantic axes.")
-    else:
-        print(f"  ❌ No combinatorial grammar detected. Tokens are still single-axis (holophrastic).")
+            print(f"  ❌ No combinatorial grammar detected. Tokens are still single-axis (holophrastic).")
 
 
 def withdrawal_comparison(baseline_path: str, withdrawal_path: str) -> None:

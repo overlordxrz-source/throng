@@ -55,13 +55,17 @@ from jax_sim.network_jax import AgentNetworkJax, init_agent_params, make_model_a
 from jax_sim.population_jax import init_population
 from flax.core.frozen_dict import unfreeze, freeze
 
-ACTION_NAMES = {0: "N", 1: "S", 2: "E", 3: "W", 4: "STAY", 5: "STRK", 6: "PUSH", 7: "GRD", 8: "BUILD"}
+ACTION_NAMES = {0: "N", 1: "S", 2: "E", 3: "W", 4: "STAY", 5: "STRK", 6: "PUSH", 7: "GRD", 8: "BUILD", 9: "PU", 10: "CRF", 11: "USE"}
 
 def run_causal_intervention(checkpoint_dir: str, token_a: str, token_b: str, context: str, num_samples: int, receiver_dist_min: int = 10, alarm_test: bool = False):
     
     def parse_token(t_str):
         if t_str == "-1": return None
-        return [int(x) for x in t_str.split(",")]
+        parts = t_str.split(",")
+        lst = [int(x) if x != "" else -1 for x in parts]
+        while len(lst) < 3:
+            lst.append(-1)
+        return lst
         
     t_a_list = parse_token(token_a)
     t_b_list = parse_token(token_b)
@@ -140,15 +144,13 @@ def run_causal_intervention(checkpoint_dir: str, token_a: str, token_b: str, con
     b_params = freeze(b_params)
     r_params = freeze(r_params)
     if not alarm_test and t_a_list is not None and t_b_list is not None:
-        cb0 = b_params["codebook_0"]["embedding"]
-        cb1 = b_params["codebook_1"]["embedding"]
-        cb2 = b_params["codebook_2"]["embedding"]
-        # Concatenate slots with the 8 dead continuous dimensions (zeros) at the front
-        token_a_emb = jnp.concatenate([jnp.zeros(8), cb0[t_a_list[0]], cb1[t_a_list[1]], cb2[t_a_list[2]]])
-        token_b_emb = jnp.concatenate([jnp.zeros(8), cb0[t_b_list[0]], cb1[t_b_list[1]], cb2[t_b_list[2]]])
+        codebooks = [
+            b_params["codebook_0"]["embedding"],
+            b_params["codebook_1"]["embedding"],
+            b_params["codebook_2"]["embedding"]
+        ]
     else:
-        token_a_emb = None
-        token_b_emb = None
+        codebooks = None
 
     # Initialize environment
     rng = jax.random.PRNGKey(42)
@@ -257,8 +259,17 @@ def run_causal_intervention(checkpoint_dir: str, token_a: str, token_b: str, con
                         agents_here = pos_map.get((ny, nx), [])
                         for eid in agents_here:
                             if eid != receiver_id:
-                                dist = np.linalg.norm(prev_signals[eid] - np.asarray(token_a_emb))
-                                if dist < 1e-4:
+                                sig = prev_signals[eid]
+                                match = True
+                                for slot_idx in range(3):
+                                    if t_a_list[slot_idx] != -1:
+                                        expected_emb = np.asarray(codebooks[slot_idx][t_a_list[slot_idx]])
+                                        actual_emb = sig[8 + slot_idx*8 : 16 + slot_idx*8]
+                                        dist = np.linalg.norm(actual_emb - expected_emb)
+                                        if dist > 1e-4:
+                                            match = False
+                                            break
+                                if match:
                                     emitter_id = eid
                                     break
                         if emitter_id != -1:
@@ -311,8 +322,12 @@ def run_causal_intervention(checkpoint_dir: str, token_a: str, token_b: str, con
                 
                 # --- INTERVENTION ---
                 if not alarm_test:
+                    new_sig = b_pop.signals[emitter_id]
+                    for slot_idx in range(3):
+                        if t_b_list[slot_idx] != -1:
+                            new_sig = new_sig.at[8 + slot_idx*8 : 16 + slot_idx*8].set(codebooks[slot_idx][t_b_list[slot_idx]])
                     b_pop_intervened = b_pop.replace(
-                        signals=b_pop.signals.at[emitter_id].set(token_b_emb)
+                        signals=b_pop.signals.at[emitter_id].set(new_sig)
                     )
                 else:
                     new_alarm = jnp.array([0.0, 1.0], dtype=jnp.float32)
