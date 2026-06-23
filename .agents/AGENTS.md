@@ -70,3 +70,13 @@ Additionally:
 - The **L2 logit penalty** must be computed on **unmasked** logits, to prevent `square(-1e9) = 1e18` from injecting an astronomically large value into the gradient.
 
 The NaN signature for a masking invariant violation: `grad_norms total=nan trunk=nan actor=nan` on the first PPO update after a masked rollout.
+
+**When to apply a logit mask:** Only mask actions that are confirmed mechanically dead (confirmed no-ops) by direct source code inspection in `jax_sim/grid_jax.py` or `jax_sim/main_jax.py`. The warrant for masking Push (6) and Guard (7) was a specific code finding that these actions had zero mechanical effect in the simulation engine. Actions with oscillating frequency due to ecological conditions (e.g., high Strike% during a zero-predation window) are NOT candidates for masking — their frequency self-regulates under selection pressure when ecology normalises. Never recommend masking based on action frequency alone.
+
+## 12. Ecological Parameter Changes Require Cam Sign-Off
+Config parameters that affect the ecological energy landscape (e.g., `build_energy_cost`, `reward_red_catch`, `red_energy_decay`, `resource_regen_rate`) must NOT be changed based on Will's unilateral assessment of telemetry alone. Will's role is to:
+1. Present the precise data (metric name, values over N consecutive updates, prescribed threshold)
+2. State clearly whether each condition of the prescribed threshold is currently met
+3. Wait for Cam's synthesis before touching config
+
+Do NOT declare a threshold "crossed" or recommend "we should act now" — these are Cam's calls. Ecology is often self-correcting; premature intervention wastes parameter budget and disrupts active selection dynamics. The correct framing is: "Here is the data. Here is what you prescribed. Is the trigger met?"
