@@ -199,8 +199,15 @@ def ppo_loss(
         loss_vq_mean = (_loss_vq * mask).sum() / denom
     else:
         loss_vq_mean = jnp.mean(_loss_vq)
-        
-    total_loss = total_loss + vq_coef * loss_vq_mean
+
+    # Phase 18.6 safety: red runs with vq_coef=0.0 and a large (decoupled) DCVQ loss
+    # (≈1e6–1e11). A bare `0.0 * inf = NaN` would silently poison the gradient → NaN
+    # params → a possible device-side fault on the next forward. nan_to_num makes the
+    # *contribution* robust without altering the reported metric below; it is a strict
+    # no-op for blue's small finite loss.
+    total_loss = total_loss + vq_coef * jnp.nan_to_num(
+        loss_vq_mean, nan=0.0, posinf=0.0, neginf=0.0
+    )
 
     metrics = {
         "ppo_pg_loss":  loss_pg,
