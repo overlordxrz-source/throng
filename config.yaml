@@ -220,7 +220,7 @@ phase9_canvas:
   confidence_multiplier: 1.0   # batch-relative gate: imagine if conf < mean(conf|alive)*mult
   imagination_k: 5
   imagination_gamma: 0.999
-  imagination_n_actions: 5     # how many actions the K-step mental rollout scores.
+  imagination_n_actions: 12     # how many actions the K-step mental rollout scores.
                                # 5 = legacy (Stay + N/S/E/W only). Set to 12 to let the
                                # gate deliberate over Strike/Push/Guard + tool actions.
                                # Behavioural change — A/B against a fresh run before adopting.
