@@ -265,7 +265,8 @@ exit_on_graduation: false
 
 # Phase 15.0 — Cumulative Culture (MEDAL-ADR Expert Dropout)
 phase15_cumulative_culture:
-  medal_adr_prob: 0.002      # Probability of expert dropout per step (approx 64% over 512 steps)
+  medal_adr_enabled: true
+  medal_adr_prob: 0.10       # Phase 18.7 receiver-reset test
 
 # Phase 16.0 — Open-Ended Combinatorial Complexity
 phase16_combinatorial_syntax:
@@ -276,7 +277,6 @@ phase16_combinatorial_syntax:
   r_coord: 1.5
   coop_threshold_step: 100000
   num_actions: 8
-  medal_adr_enabled: true
 
 # Phase 16.5 — Environmental Enrichment & Metabolic Routing
 phase16_5_enrichment:

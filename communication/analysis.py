@@ -371,6 +371,9 @@ class SignalCorpusWriter:
         adj_bg:            Optional[np.ndarray] = None,
         adj_barrier:       Optional[np.ndarray] = None,
         adj_red:           Optional[np.ndarray] = None,
+        can_see_recipe:    Optional[np.ndarray] = None,
+        current_recipe_id: Optional[int] = None,
+        inventory:         Optional[np.ndarray] = None,
     ) -> None:
         """Write sampled records; no-op if called more often than every_n_steps.
 
@@ -398,10 +401,16 @@ class SignalCorpusWriter:
                 "scout":     bool(is_scout[i]),
                 "red_dist":  round(float(nearest_red_dist[i]), 3),
                 "red_bear":  round(float(nearest_red_bear[i]), 2),
-                "resource":  round(float(local_resource[i]), 4),
-                "energy":    round(float(own_energy[i]), 4),
-                "neighbors": round(float(neighbor_count[i]), 4),
+                "resource":  round(float(local_resource[i]), 3),
+                "energy":    round(float(own_energy[i]), 3),
+                "neighbors": int(neighbor_count[i]),
             }
+            if can_see_recipe is not None:
+                rec["can_see_recipe"] = bool(can_see_recipe[i])
+            if current_recipe_id is not None:
+                rec["current_recipe_id"] = int(current_recipe_id)
+            if inventory is not None:
+                rec["inventory"] = int(inventory[i])
             if adj_bg is not None:
                 rec["adj_bg"] = bool(adj_bg[i])
             if adj_barrier is not None:

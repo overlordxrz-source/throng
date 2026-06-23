@@ -26,13 +26,23 @@ The signal corpus (`signal_corpus.jsonl`) uses these field names. Do NOT guess a
 - `action` (int 0–11) — executed action index
 
 ## 5. Modal Account Migration
-When switching Modal accounts:
-- **Always reauth first:** Run `modal token new` (or `.modal-cli/bin/modal token new`) and wait for browser approval BEFORE any volume operations.
-- **Upload script:** Use `./scripts/migrate_modal.sh upload ~/throng_backup` — it handles volume creation + upload.
-- **Log location:** When training is launched from a Modal Notebook (Jupyter), logs go to cell output, NOT to `/mnt/throng-runs/train.log` on the volume. Use `modal volume get` to fetch volume files, or ask the user to paste cell output.
+When switching between Modal accounts, you must follow this exact 4-step sequence to avoid data loss or permission errors:
+1. **Auth to Old Account:** Run `.modal-cli/bin/modal token new` and authenticate in the browser to the account that currently holds the volume.
+2. **Download Data:** Run `./scripts/migrate_modal.sh download ~/throng_backup` to pull all checkpoints and corpora locally. Wait for this to fully complete.
+3. **Auth to New Account:** Run `.modal-cli/bin/modal token new` AGAIN and authenticate in the browser to the target destination account.
+4. **Upload Data:** Run `./scripts/migrate_modal.sh upload ~/throng_backup` to create the new volume and push the local data up.
+
+**Log location:** When training is launched from a Modal Notebook (Jupyter), logs go to cell output, NOT to `/mnt/throng-runs/train.log` on the volume. Use `modal volume get` to fetch volume files, or ask the user to paste cell output.
 
 ## 6. Strategic Roadmap Awareness
 When onboarding or making high-level architectural decisions, you **MUST** consult `docs/STRATEGIC_ROADMAP.md`. 
 - Do not mistake "adding features" (like crafting) for progress towards AGI. Features exist only to increase the **environmental complexity ceiling** and force **compositional syntax**.
 - The true path to AGI lies in: 1) Persistent Culture (Phase 19 writing system), 2) Open-Ended Complexity (Phase 21 procedural environments), 3) Internal Reasoning (Phase 22 language as a cognitive tool), and 4) Cross-Domain Transfer (Phase 23).
 - Always contextualize the current phase within this broader strategic trajectory.
+
+## 7. Modal Launch Cell Constraints
+Any Python cell generated to launch training (`run_bg.py`) on Modal MUST adhere to these exact constraints:
+1. **Fresh Container Bootstrap:** Always include `git clone https://github.com/overlordxrz-source/throng.git /root/throng || true` and `pip install -r requirements.txt` before fetching or running.
+2. **Bulletproof `cwd`:** Never use `cd` in the `subprocess.Popen` bash string. Always use the `cwd="/root/throng"` argument in the Python call.
+3. **Regex `pgrep`:** When verifying the process wipe, use `pgrep -af '[p]ython -u'` (the brackets prevent `pgrep` from matching its own command string).
+4. **Detachment:** You must pass `start_new_session=True` to `subprocess.Popen` to prevent Jupyter `SIGINT`s from killing the run when the user stops a `tail -f` log cell.

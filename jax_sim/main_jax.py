@@ -692,16 +692,16 @@ def make_sim_step(
         if _medal_adr_enabled and _medal_adr_prob > 0.0:
             medal_rng = jax.random.split(key_misc, 4)[3]
             # Experts are the first half of the population
-            is_expert = jnp.arange(r_pop.max_pop) < (r_pop.max_pop // 2)
-            drop_mask = jax.random.uniform(medal_rng, (r_pop.max_pop,)) < _medal_adr_prob
-            actual_drop = drop_mask & is_expert & r_pop.alive
-            r_pop = kill_agents(r_pop, actual_drop)
+            is_expert = jnp.arange(b_pop.max_pop) < (b_pop.max_pop // 2)
+            drop_mask = jax.random.uniform(medal_rng, (b_pop.max_pop,)) < _medal_adr_prob
+            actual_drop = drop_mask & is_expert & b_pop.alive
+            b_pop = kill_agents(b_pop, actual_drop)
             medal_dropouts = actual_drop.astype(jnp.float32).sum()
             
             # -- Option B: Local Causal Reset --
-            r_pos = r_pop.positions
-            dx = jnp.abs(r_pos[:, 0:1] - r_pos[None, :, 0])
-            dy = jnp.abs(r_pos[:, 1:2] - r_pos[None, :, 1])
+            b_pos_local = b_pop.positions
+            dx = jnp.abs(b_pos_local[:, 0:1] - b_pos_local[None, :, 0])
+            dy = jnp.abs(b_pos_local[:, 1:2] - b_pos_local[None, :, 1])
             dx = jnp.minimum(dx, config.get("grid_size", 128) - dx)
             dy = jnp.minimum(dy, config.get("grid_size", 128) - dy)
             dist_matrix = jnp.maximum(dx, dy)
@@ -718,9 +718,9 @@ def make_sim_step(
             local_expert_died = min_dist_to_dying_expert <= _hunt_range
 
             # Update the tracker for alive novices
-            new_steps = jnp.where(r_pop.alive & ~is_expert, r_pop.steps_since_dropout + 1, 0)
-            new_steps = jnp.where(local_expert_died & r_pop.alive & ~is_expert, 1, new_steps)
-            r_pop = r_pop.replace(steps_since_dropout=new_steps)
+            new_steps = jnp.where(b_pop.alive & ~is_expert, b_pop.steps_since_dropout + 1, 0)
+            new_steps = jnp.where(local_expert_died & b_pop.alive & ~is_expert, 1, new_steps)
+            b_pop = b_pop.replace(steps_since_dropout=new_steps)
 
         # ── Rewards (all from config) ───────────────────────────
         b_rew = jnp.where(b_pop.alive, _reward_blue_alive, 0.0)
@@ -805,6 +805,9 @@ def make_sim_step(
             "barrier_sum": jnp.sum(grid.barrier_hp_map),
             "craft_success": craft_success.astype(jnp.float32),
             "futile_craft": futile_craft.astype(jnp.float32),
+            "current_recipe": grid.current_recipe,
+            "medal_dropouts": medal_dropouts,
+            "steps_since_dropout": b_pop.steps_since_dropout,
         }
         r_rollout = {
             "obs": r_obs, "actions": r_actions, "log_probs": r_log_probs_taken,
@@ -817,8 +820,6 @@ def make_sim_step(
             "signals": r_pop.signals,
             "energy": r_pop.energy,
             "alive": r_pop.alive,
-            "medal_dropouts": medal_dropouts,
-            "steps_since_dropout": r_pop.steps_since_dropout,
         }
 
         new_carry = (grid, b_pop, r_pop, b_new_c, r_new_c, b_params, r_params)
@@ -2148,8 +2149,8 @@ def _run_simulation_impl(
                 barrier_sum_val = float(np.asarray(rollout_data["blue"]["barrier_sum"]).mean())
             print(f"  VQ: loss={vq_loss_val:.4f} | codes_active={vq_codes_str} | clusters={active_clusters_str} | NB_GAIN↔surv: {sp_r:.3f}")
             medal_str = ""
-            if "medal_dropouts" in rollout_data.get("red", {}):
-                _md = np.asarray(rollout_data["red"]["medal_dropouts"]).sum()
+            if "medal_dropouts" in rollout_data.get("blue", {}):
+                _md = np.asarray(rollout_data["blue"]["medal_dropouts"]).sum()
                 medal_str = f" | expert_dropouts={int(_md)}"
             print(
                 f"  Ecology: blue_caught={blue_caught_rollout} this rollout | "
@@ -2411,6 +2412,22 @@ def _run_simulation_impl(
                 adj_bg = np.sum(b_obs_all[t, alive_idx][:, idx_adj_bg], axis=-1) > 0.5
                 adj_barrier = np.sum(b_obs_all[t, alive_idx][:, idx_adj_barrier], axis=-1) > 0.5
 
+                can_see_recipe = b_obs_all[t, alive_idx][:, 12] > 0.5
+                inv_wood = b_obs_all[t, alive_idx][:, 6] > 0.5
+                inv_stone = b_obs_all[t, alive_idx][:, 7] > 0.5
+                inv_flint = b_obs_all[t, alive_idx][:, 9] > 0.5
+                inv_clay = b_obs_all[t, alive_idx][:, 10] > 0.5
+                inv_vine = b_obs_all[t, alive_idx][:, 11] > 0.5
+                
+                inventory = np.where(inv_wood, 0,
+                            np.where(inv_stone, 1,
+                            np.where(inv_flint, 2,
+                            np.where(inv_clay, 3,
+                            np.where(inv_vine, 4, -1)))))
+                
+                cur_rec = np.array(rollout_data["blue"]["current_recipe"][t])
+                recipe_id = int(cur_rec[0] + cur_rec[1]*10 + cur_rec[2]*100 + cur_rec[3]*1000 + cur_rec[4]*10000)
+
                 corpus_writer.maybe_record(
                     step=global_step,
                     alive_idx=alive_idx,
@@ -2431,6 +2448,9 @@ def _run_simulation_impl(
                     adj_bg=adj_bg,
                     adj_barrier=adj_barrier,
                     adj_red=adj_red,
+                    can_see_recipe=can_see_recipe,
+                    current_recipe_id=recipe_id,
+                    inventory=inventory,
                 )
                 if is_scout.any():
                     pos_b_alive_f = b_pos[alive_idx].astype(np.float32)
