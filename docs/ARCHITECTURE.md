@@ -152,10 +152,10 @@ Per slot: distances to a stop-grad codebook → hard argmin token + straight-thr
 | Tool | Type | Metric | Pass bar |
 |------|------|--------|----------|
 | `tools/causal_intervention.py` | **Live** token swap on frozen ckpt | ΔP(action) on blind receivers, paired t-test | `p<0.05` AND `|Δ|>0.05`. Supports full 3-slot tokens. **This is the real ATE instrument.** |
-| `tools/ate_swap_test.py` | Offline stratified | Δ flee-rate alert vs safe | 95% CI excludes 0. **Slot-0 only** — corpus collapses the lag-1 token to slot 0, so per-slot offline ATE is *not* measurable today. |
+| `tools/ate_swap_test.py` | Offline stratified | Δ flee-rate alert vs safe, **per slot** | 95% CI excludes 0. Tests all 3 slots independently (Jun 2026 fix, validated on synthetic data) — compositional separation = different slots passing on different contexts. |
 | `tools/decode_signals.py` | Offline | MI/Spearman, lag-1 LRT, χ² pincer, **PosDis** (real), **topographic similarity** (real), **NPMI** (real, needs `adj_*` fields) | per-test `p<0.05`. **TRE here is a Ridge-R² proxy**, not true tree-reconstruction error — caveat any report. |
 
-**Corpus (`communication/analysis.py`):** blue `signal_corpus.jsonl` + red `signal_corpus_red.jsonl`, sampled `corpus_sample_frac` of alive agents every `corpus_every_n_steps`, fsync'd each PPO update. The blue writer *can* log a 3-slot `vq_token` list, but `decode_signals.load_corpus` collapses the lag-1 neighbor token to slot 0 — fixing this is the prerequisite for per-slot compositional ATE.
+**Corpus (`communication/analysis.py`):** blue `signal_corpus.jsonl` + red `signal_corpus_red.jsonl`, sampled `corpus_sample_frac` of alive agents every `corpus_every_n_steps`, fsync'd each PPO update. The blue writer logs a 3-slot `vq_token` list and a 3-slot `nb_scout_token_lag1` list. `ate_swap_test.py` now reads these per-slot (so per-slot offline ATE works). **Remaining gap:** `decode_signals.load_corpus` still collapses the lag-1 token to slot 0, so per-slot *NPMI/χ²* in `decode_signals.py` needs the same per-slot treatment.
 
 ---
 

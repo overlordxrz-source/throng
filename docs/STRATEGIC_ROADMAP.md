@@ -52,7 +52,7 @@ This section is deliberately literal — it reflects a source review of `network
 
 ### The measurement instruments (what can actually be proven today)
 - **`tools/causal_intervention.py` — the real instrument.** Loads a frozen checkpoint, runs single steps, swaps an emitter's 3-slot VQ token mid-flight, measures ΔP(action) on blind receivers, paired t-test. **Pass bar: `p < 0.05` AND `|Δ| > 0.05`.** Supports full 3-slot tokens.
-- **`tools/ate_swap_test.py` — offline, but slot-0 only.** It stratifies corpus records, but the corpus collapses the lag-1 neighbor token to **slot 0** (`decode_signals.load_corpus`), so **per-slot compositional ATE is not measurable offline today.** This is a concrete instrumentation gap (§4).
+- **`tools/ate_swap_test.py` — offline stratified, now per-slot.** It stratifies corpus records and (Jun 2026 fix, validated on synthetic data) tests all 3 slots independently, so **per-slot compositional ATE is measurable offline** as the corpus accumulates. The remaining gap is per-slot NPMI/χ² in `decode_signals.py` (its `load_corpus` still collapses to slot 0).
 - **Decode metrics:** MI/Spearman, k-means vocabulary, lag-1 direction LRT, χ² pincer, **PosDis** (real), **topographic similarity** (real), **NPMI** lexical parse (real, needs `adj_*` fields). **TRE is a Ridge-R² proxy, not a true tree-reconstruction-error** — do not report it as canonical compositionality without the caveat.
 - **Open-endedness: zero implemented.** No POET, no quality-diversity archive, no environment-genome vector. `build_cfg` is fully static. `environment/resource.py::drift()` exists but is **never called** in the JAX path. Everything "open-ended" is aspirational.
 
@@ -77,9 +77,9 @@ The throughline: **the field independently converged on the pieces THRONG is mis
 
 Everything downstream is wasted compute if the blue channel is cheap talk. Close that first.
 
-### 4.0 — Instrumentation debt (do before the next long science run)
-- **Log all three lag-1 slot tokens in the corpus** (today only slot 0 survives into decode). Without this, per-slot compositional ATE — the entire point of the 3-slot design — is unmeasurable offline. Small writer change in `communication/analysis.py` + `decode_signals.load_corpus`.
-- **Stand up `tests/test_gradient_flow.py`** (H2 generalized): assert `‖∂loss/∂codebook_k‖ > 0` for each blue slot on one synthetic `ppo_update`. We have already paid for this lesson twice.
+### 4.0 — Instrumentation debt
+- ✅ **Per-slot offline ATE** — `ate_swap_test.py` reads the corpus's 3-slot lag-1 tokens and tests each slot independently (validated on synthetic data). Remaining: port the same per-slot treatment to `decode_signals.load_corpus` so per-slot NPMI/χ² works too.
+- ✅ **VQ gradient-flow test** (`tests/test_vq_gradient_flow.py`, H2): asserts encoder←commitment, codebook←VQ-loss, wire←STE, and codebook-frozen-on-broadcast. Validated on CPU. (Generalize to a full `ppo_update` codebook-gradient check later.)
 
 ### 4.1 — Causal ATE gate (the real one)
 - **Instrument:** `tools/causal_intervention.py` (live swap), not the slot-0 offline test.
@@ -211,7 +211,7 @@ Three bugs in recent memory shared one signature: **a learning signal silently d
 | Order | Action | Gate / exit criterion | State |
 |-------|--------|------------------------|-------|
 | **0** | Phase 18.5 index fix + 18.6 red-VQ decouple + `0*inf` NaN guard | Blue VQ healthy; red trunk grad off the 2.0 clip; no restart crash | ✅ DONE (`6a7659e`) |
-| **1** | Instrumentation debt: log 3-slot lag-1 tokens; generalize gradient-flow test (H2) | Per-slot offline ATE becomes measurable; test passes | **NEXT** |
+| **1** | ✅ Instrumentation: per-slot offline ATE (`ate_swap_test.py`) + VQ gradient-flow test (H2) | DONE — per-slot ATE validated; gradient test passes. Remaining: per-slot NPMI in `decode_signals.py` | done |
 | **2** | Fix imagination to score all 12 actions (§4.3) | Imagined value defined for Strike/Craft/UseTool | **NEXT** |
 | **3** | Causal ATE gate via `causal_intervention.py` (§4.1) | `p<0.05` & `|Δ|>0.05` on ≥1 slot | pending |
 | **4** | Receiver-Necessity crafting ecology (§4.2) if ATE null | per-slot ATE CI excludes zero (separation proven) | pending |

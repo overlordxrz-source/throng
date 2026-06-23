@@ -51,6 +51,26 @@ ACTION_NAMES = {
 FLEE_ACTIONS = {0, 1, 2, 3}  # N, S, E, W
 
 
+def _slot_token(value, slot_idx):
+    """Resolve one slot's token from a corpus token field, backward-compatibly.
+
+    The Phase-18 corpus logs `vq_token` and `nb_scout_token_lag1` as 3-element
+    lists (one per VQ slot). Older corpora logged a single scalar (slot-0 only).
+    Returns an int token id, or None if absent/invalid for this slot.
+    """
+    if value is None:
+        return None
+    if isinstance(value, list):
+        if len(value) <= slot_idx:
+            return None
+        v = value[slot_idx]
+        return int(v) if v is not None and v >= 0 else None
+    # Scalar (legacy corpus): only meaningful for slot 0.
+    if slot_idx == 0:
+        return int(value) if value >= 0 else None
+    return None
+
+
 def load_corpus(path, min_step=0):
     """Load corpus records, filtering by minimum step."""
     records = []
@@ -82,10 +102,9 @@ def classify_tokens_by_emitter_context(records, slot_idx=0):
     for r in records:
         if not r.get("scout", False):
             continue
-        toks = r.get("vq_token", [])
-        if not toks or len(toks) <= slot_idx:
+        tok = _slot_token(r.get("vq_token"), slot_idx)
+        if tok is None:
             continue
-        tok = toks[slot_idx]
         rd = r.get("red_dist", 999)
         token_dists[tok].append(rd)
 
@@ -122,14 +141,13 @@ def get_receiver_records(records, slot_idx=0):
         # Blind agents only (not scouts — they can see danger directly)
         if r.get("scout", False):
             continue
-        # Must have a valid lag-1 scout token
-        lag1_tok = r.get("nb_scout_token_lag1")
-        if isinstance(lag1_tok, list):
-            if len(lag1_tok) <= slot_idx or lag1_tok[slot_idx] < 0:
-                continue
-            r["nb_scout_token_lag1"] = lag1_tok[slot_idx]
-        elif lag1_tok is None or (isinstance(lag1_tok, (int, float)) and lag1_tok < 0):
+        # Must have a valid lag-1 scout token in THIS slot. We stash the resolved
+        # token in `slot_token` rather than overwriting the source field, so the
+        # same records can be re-scanned for a different slot without corruption.
+        tok = _slot_token(r.get("nb_scout_token_lag1"), slot_idx)
+        if tok is None:
             continue
+        r["slot_token"] = tok
         receivers.append(r)
     return receivers
 
@@ -142,8 +160,8 @@ def stratified_ate(receivers, alert_set, safe_set, n_strata=10):
     This is the core causal test. If ATE ≈ 0, tokens don't cause behavior change.
     """
     # Split receivers into treatment (heard alert) vs control (heard safe)
-    treated = [r for r in receivers if r.get("nb_scout_token_lag1", -1) in alert_set]
-    control = [r for r in receivers if r.get("nb_scout_token_lag1", -1) in safe_set]
+    treated = [r for r in receivers if r.get("slot_token", -1) in alert_set]
+    control = [r for r in receivers if r.get("slot_token", -1) in safe_set]
 
     if len(treated) < 30 or len(control) < 30:
         print(f"[WARN] Insufficient sample: treated={len(treated)}, control={len(control)}")
@@ -215,8 +233,8 @@ def stratified_ate(receivers, alert_set, safe_set, n_strata=10):
 
 def unstratified_ate(receivers, alert_set, safe_set):
     """Simple (naive) ATE without stratification, for comparison."""
-    treated = [r for r in receivers if r.get("nb_scout_token_lag1", -1) in alert_set]
-    control = [r for r in receivers if r.get("nb_scout_token_lag1", -1) in safe_set]
+    treated = [r for r in receivers if r.get("slot_token", -1) in alert_set]
+    control = [r for r in receivers if r.get("slot_token", -1) in safe_set]
 
     if len(treated) < 10 or len(control) < 10:
         return None
@@ -231,8 +249,8 @@ def action_distribution_shift(receivers, alert_set, safe_set):
     Full action distribution comparison between alert vs safe token receivers.
     Shows which specific actions shift, not just flee/not-flee.
     """
-    treated = [r for r in receivers if r.get("nb_scout_token_lag1", -1) in alert_set]
-    control = [r for r in receivers if r.get("nb_scout_token_lag1", -1) in safe_set]
+    treated = [r for r in receivers if r.get("slot_token", -1) in alert_set]
+    control = [r for r in receivers if r.get("slot_token", -1) in safe_set]
 
     if len(treated) < 10 or len(control) < 10:
         return
@@ -252,21 +270,25 @@ def action_distribution_shift(receivers, alert_set, safe_set):
 
 
 def per_slot_ate(records, min_step):
-    """Run the full ATE pipeline for each of the 3 discrete slots."""
-    receivers = get_receiver_records(records, slot_idx=0)
-    print(f"\nTotal blind receivers with lag-1 scout token: {len(receivers)}")
+    """Run the full ATE pipeline for each of the 3 discrete slots.
 
-    if len(receivers) < 100:
-        print("[ERROR] Not enough receiver records for ATE analysis.")
-        print("        Need at least 100, got", len(receivers))
-        print("        Let training accumulate more corpus data.")
-        return
-
+    Per-slot is now first-class: receivers are extracted with the slot's own
+    lag-1 token (the corpus logs all 3 slots), so slots 1 and 2 are tested for
+    causal separation rather than skipped. This is the compositional-syntax gate
+    — each slot should carry a *distinct*, independently-causal signal.
+    """
     for slot_idx in range(3):
         slot_name = ["Noun (Env)", "Verb (Action)", "Modifier (Urgency)"][slot_idx]
         print(f"\n{'=' * 70}")
         print(f"  SLOT {slot_idx}: {slot_name}")
         print(f"{'=' * 70}")
+
+        receivers = get_receiver_records(records, slot_idx=slot_idx)
+        print(f"  Blind receivers with a slot-{slot_idx} lag-1 token: {len(receivers)}")
+        if len(receivers) < 100:
+            print(f"  [SKIP] Need ≥100 receivers for slot {slot_idx} (got {len(receivers)}). "
+                  f"Let the corpus accumulate, or this is a legacy slot-0-only corpus.")
+            continue
 
         alert_set, safe_set, token_stats = classify_tokens_by_emitter_context(
             records, slot_idx=slot_idx
@@ -292,15 +314,7 @@ def per_slot_ate(records, min_step):
             cls = "ALERT" if tok in alert_set else ("SAFE" if tok in safe_set else "—")
             print(f"  {tok:6d}  {st['n']:6d}  {st['mean_red_dist']:14.1f}  {cls:>8s}")
 
-        # Naive ATE
-        # For slot_idx > 0 we still use nb_scout_token_lag1 which is slot_0 only
-        # in the current corpus format. Flag this limitation.
-        if slot_idx > 0:
-            print(f"\n  [NOTE] Current corpus only records slot_0 in nb_scout_token_lag1.")
-            print(f"         Slot {slot_idx} ATE requires multi-slot lag-1 corpus fields.")
-            print(f"         Skipping receiver-side ATE for slot {slot_idx}.")
-            continue
-
+        # Naive ATE (each slot now resolved independently via slot_token).
         naive = unstratified_ate(receivers, alert_set, safe_set)
         if naive is not None:
             print(f"\n  Naive ATE (no stratification): Δ_flee = {naive:+.4f}")
@@ -374,9 +388,11 @@ def main():
     print(f"  ATE TEST COMPLETE")
     print(f"{'=' * 70}")
     print(f"  Interpret:")
-    print(f"  • ATE > 0 with CI excluding 0 → CAUSAL GROUNDING PROVEN")
-    print(f"  • ATE ≈ 0 or CI includes 0   → Token is cheap talk / confounded")
-    print(f"  • Gate requirement: At least slot_0 must pass before ecology deployment")
+    print(f"  • ATE > 0 with CI excluding 0 → that slot's token is causally load-bearing")
+    print(f"  • ATE ≈ 0 or CI includes 0   → that slot is cheap talk / confounded")
+    print(f"  • Compositional separation: DIFFERENT slots passing on DIFFERENT contexts")
+    print(f"    is the Phase-18 syntax gate (e.g. slot_0→noun, slot_1→verb).")
+    print(f"  • All 3 slots are now tested independently (corpus logs per-slot tokens).")
     print(f"{'=' * 70}")
 
 
