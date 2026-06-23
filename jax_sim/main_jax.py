@@ -1438,6 +1438,9 @@ def _run_simulation_impl(
     print(f"[JAX] Phase 18 Continuous-to-Discrete (CtD) bootstrap: 100k-step decay ramp active.")
     print(f"[JAX] Phase 18 Wire budget: 40D (8D cont + 12/8/12 discrete slots). Codebooks initialized.")
     print(f"[JAX] Phase 16.6 GWT Router mask active: Zero out age(0), mat(1), energy(2), layers(3)")
+    _p15_run = config.get("phase15_cumulative_culture") or {}
+    _medal_adr_enabled = bool(_p15_run.get("medal_adr_enabled", False))
+    _medal_adr_prob = float(_p15_run.get("medal_adr_prob", 0.0))
     
     if _medal_adr_enabled and _medal_adr_prob > 0.0:
         print(f"[JAX] MEDAL-ADR soft carry-reset: prob={_medal_adr_prob}, target=oldest agents by age")
