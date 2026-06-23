@@ -69,6 +69,20 @@ from jax_sim.rl_jax import (
 )
 from jax_sim.obs_layout import make_obs_layout
 
+def apply_medal_adr_carry_reset(pop: PopState, carries: jnp.ndarray, prob: float):
+    valid_ages = jnp.where(pop.alive, pop.ages, -1)
+    n_alive = jnp.sum(pop.alive)
+    n_reset = jnp.ceil(prob * n_alive).astype(jnp.int32)
+    
+    sorted_idx = jnp.argsort(-valid_ages)
+    ranks = jnp.argsort(sorted_idx)
+    reset_mask = pop.alive & (ranks < n_reset)
+    
+    new_carries = jnp.where(reset_mask[:, None], 0.0, carries)
+    new_steps = jnp.where(reset_mask, 0, pop.steps_since_dropout)
+    
+    return pop.replace(steps_since_dropout=new_steps), new_carries, jnp.sum(reset_mask)
+
 from jax_sim.observations_jax import (
     RED_NEIGHBOR_SIGNAL_API_VERSION,
     RED_SENSE_API_VERSION,
@@ -258,19 +272,6 @@ def make_sim_step(
         )
     from jax_sim import observations_jax as _obs
 
-    def apply_medal_adr_carry_reset(pop: PopState, carries: jnp.ndarray, prob: float):
-        valid_ages = jnp.where(pop.alive, pop.ages, -1)
-        n_alive = jnp.sum(pop.alive)
-        n_reset = jnp.ceil(prob * n_alive).astype(jnp.int32)
-        
-        sorted_idx = jnp.argsort(-valid_ages)
-        ranks = jnp.argsort(sorted_idx)
-        reset_mask = pop.alive & (ranks < n_reset)
-        
-        new_carries = jnp.where(reset_mask[:, None], 0.0, carries)
-        new_steps = jnp.where(reset_mask, 0, pop.steps_since_dropout)
-        
-        return pop.replace(steps_since_dropout=new_steps), new_carries, jnp.sum(reset_mask)
 
     @jax.jit
     def sim_step(carry, scan_input):
