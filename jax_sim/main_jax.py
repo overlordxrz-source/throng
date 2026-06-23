@@ -993,8 +993,8 @@ def _run_simulation_impl(
         memory_slots=config.get("memory_slots", 0),
         neighbor_k=config["neighbor_k"],
         local_cells=(2 * config["local_obs_radius"] + 1)**2,
-        env_channels=int(config.get("env_channels", 10)),
-        own_state_dim=int(config.get("own_state_dim", 10)),
+        env_channels=int(config.get("env_channels", 15)),
+        own_state_dim=int(config.get("own_state_dim", 22)),
     )
     _loc_env_start = _layout.loc_env_start
     _loc_env_end = _layout.loc_env_end
@@ -1025,8 +1025,8 @@ def _run_simulation_impl(
         fwd_env_dim=_fwd_env_dim,
         cross_attn_enabled=_cross_attn,
         cross_attn_num_heads=_cross_heads,
-        env_channels=int(config.get("env_channels", 10)),
-        own_state_dim=int(config.get("own_state_dim", 10)),
+        env_channels=int(config.get("env_channels", 15)),
+        own_state_dim=int(config.get("own_state_dim", 22)),
         n_actions=int(config.get("n_actions", 8)),
         local_cells=(2 * config["local_obs_radius"] + 1)**2,
         neighbor_k=config["neighbor_k"],
@@ -1064,8 +1064,8 @@ def _run_simulation_impl(
             memory_slots=config.get("memory_slots", 0),
             cross_attn_enabled=_red_cross,
             cross_attn_num_heads=_cross_heads,
-            env_channels=int(config.get("env_channels", 10)),
-            own_state_dim=int(config.get("own_state_dim", 10)),
+            env_channels=int(config.get("env_channels", 15)),
+            own_state_dim=int(config.get("own_state_dim", 22)),
             n_actions=int(config.get("n_actions", 8)),
         )
         r_model_apply = make_model_apply(model_red)

@@ -48,7 +48,13 @@ class PopState:
         # Inventory (Phase 18)
         self.inventory_wood = jnp.zeros(max_pop, dtype=jnp.int32)
         self.inventory_stone = jnp.zeros(max_pop, dtype=jnp.int32)
+        self.inventory_flint = jnp.zeros(max_pop, dtype=jnp.int32)
+        self.inventory_clay = jnp.zeros(max_pop, dtype=jnp.int32)
+        self.inventory_vine = jnp.zeros(max_pop, dtype=jnp.int32)
         self.inventory_axe = jnp.zeros(max_pop, dtype=jnp.bool_)
+
+        # Phase 18.7 Receiver-Necessity
+        self.can_see_recipe = jnp.zeros(max_pop, dtype=jnp.bool_)
 
         # Episodic memory (optional)
         if memory_slots > 0:
@@ -74,7 +80,9 @@ class PopState:
             self.n_layers, self.carries, self.signals, self.nb_gain,
             self.offspring_count, self.steps_since_catch, self.steps_since_dropout,
             self.lineage_ids, self.next_lineage_id, self.is_big_green, self.alarms,
-            self.inventory_wood, self.inventory_stone, self.inventory_axe,
+            self.inventory_wood, self.inventory_stone, self.inventory_flint,
+            self.inventory_clay, self.inventory_vine, self.inventory_axe,
+            self.can_see_recipe,
         ]
         if self.memory_buffer is not None:
             children.append(self.memory_buffer)
@@ -93,9 +101,11 @@ class PopState:
          pop.n_layers, pop.carries, pop.signals, pop.nb_gain,
          pop.offspring_count, pop.steps_since_catch, pop.steps_since_dropout,
          pop.lineage_ids, pop.next_lineage_id, pop.is_big_green, pop.alarms,
-         pop.inventory_wood, pop.inventory_stone, pop.inventory_axe) = children[:19]
+         pop.inventory_wood, pop.inventory_stone, pop.inventory_flint,
+         pop.inventory_clay, pop.inventory_vine, pop.inventory_axe,
+         pop.can_see_recipe) = children[:23]
         if memory_slots > 0:
-            pop.memory_buffer = children[19]
+            pop.memory_buffer = children[23]
         else:
             pop.memory_buffer = None
         return pop
@@ -126,7 +136,11 @@ class PopState:
         pop.is_big_green = kwargs.get("is_big_green", self.is_big_green)
         pop.inventory_wood = kwargs.get("inventory_wood", self.inventory_wood)
         pop.inventory_stone = kwargs.get("inventory_stone", self.inventory_stone)
+        pop.inventory_flint = kwargs.get("inventory_flint", self.inventory_flint)
+        pop.inventory_clay = kwargs.get("inventory_clay", self.inventory_clay)
+        pop.inventory_vine = kwargs.get("inventory_vine", self.inventory_vine)
         pop.inventory_axe = kwargs.get("inventory_axe", self.inventory_axe)
+        pop.can_see_recipe = kwargs.get("can_see_recipe", self.can_see_recipe)
         return pop
 
 
@@ -163,6 +177,9 @@ def init_population(
     # 20% of the initial population are Big Greens
     is_bg = jax.random.uniform(keys[2], (max_pop,)) < 0.2
     is_bg = is_bg & alive
+    
+    can_see = jax.random.uniform(keys[2], (max_pop,)) < 0.5
+    can_see = can_see & alive
 
     # Update state
     pop = pop.replace(
@@ -171,6 +188,7 @@ def init_population(
         energy=jnp.where(alive, 1.0, 0.0),
         team=jnp.where(alive, jnp.int8(team_id), jnp.int8(0)),
         is_big_green=is_bg,
+        can_see_recipe=can_see,
     )
     return pop
 
@@ -291,6 +309,16 @@ def apply_auto_reproduce(
     parent_is_big_green = pop.is_big_green[assigned_parents]
     new_is_big_green = jnp.where(activate_mask, parent_is_big_green, pop.is_big_green)
     
+    parent_can_see = pop.can_see_recipe[assigned_parents]
+    new_can_see = jnp.where(activate_mask, parent_can_see, pop.can_see_recipe)
+    
+    new_inv_wood = jnp.where(activate_mask, 0, pop.inventory_wood)
+    new_inv_stone = jnp.where(activate_mask, 0, pop.inventory_stone)
+    new_inv_flint = jnp.where(activate_mask, 0, pop.inventory_flint)
+    new_inv_clay = jnp.where(activate_mask, 0, pop.inventory_clay)
+    new_inv_vine = jnp.where(activate_mask, 0, pop.inventory_vine)
+    new_inv_axe = jnp.where(activate_mask, False, pop.inventory_axe)
+    
     pop = pop.replace(
         alive=new_alive,
         positions=new_positions,
@@ -302,7 +330,14 @@ def apply_auto_reproduce(
         signals=new_signals,
         alarms=new_alarms,
         nb_gain=new_nb_gain,
-        is_big_green=new_is_big_green
+        is_big_green=new_is_big_green,
+        can_see_recipe=new_can_see,
+        inventory_wood=new_inv_wood,
+        inventory_stone=new_inv_stone,
+        inventory_flint=new_inv_flint,
+        inventory_clay=new_inv_clay,
+        inventory_vine=new_inv_vine,
+        inventory_axe=new_inv_axe,
     )
     
     if pop.memory_buffer is not None:

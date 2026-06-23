@@ -32,6 +32,14 @@ class GridState:
         # Phase 18 Crafting Materials
         self.wood_grid = jnp.zeros((size, size), dtype=jnp.float32)
         self.stone_grid = jnp.zeros((size, size), dtype=jnp.float32)
+        self.flint_grid = jnp.zeros((size, size), dtype=jnp.float32)
+        self.clay_grid = jnp.zeros((size, size), dtype=jnp.float32)
+        self.vine_grid = jnp.zeros((size, size), dtype=jnp.float32)
+        
+        # Phase 18.7 Receiver-Necessity Ecology
+        self.current_recipe = jnp.zeros((5,), dtype=jnp.int32) # [wood, stone, flint, clay, vine] counts
+        self.recipe_timer = jnp.zeros((1,), dtype=jnp.int32)
+        
         # Puzzle
         self.puzzle_grid   = jnp.zeros((size, size), dtype=jnp.float32)
         self.puzzle_nodes  = jnp.zeros((3, 6), dtype=jnp.int32) # [ay, ax, by, bx, ry, rx]
@@ -45,7 +53,8 @@ class GridState:
             self.cultural_fast, self.cultural_slow, self.barrier_hp_map,
             self.puzzle_grid,
             self.puzzle_nodes, self.puzzle_active, self.puzzle_cooldown,
-            self.wood_grid, self.stone_grid,
+            self.wood_grid, self.stone_grid, self.flint_grid, self.clay_grid, self.vine_grid,
+            self.current_recipe, self.recipe_timer,
         )
         aux = (self.size, self.symbol_dim)
         return children, aux
@@ -58,7 +67,8 @@ class GridState:
          gs.shelter_spots, gs.contested_res, gs.scent_trails,
          gs.cultural_fast, gs.cultural_slow, gs.barrier_hp_map, gs.puzzle_grid,
          gs.puzzle_nodes, gs.puzzle_active, gs.puzzle_cooldown,
-         gs.wood_grid, gs.stone_grid) = children
+         gs.wood_grid, gs.stone_grid, gs.flint_grid, gs.clay_grid, gs.vine_grid,
+         gs.current_recipe, gs.recipe_timer) = children
         return gs
 
     def replace(self, **kwargs):
@@ -79,6 +89,11 @@ class GridState:
         gs.puzzle_cooldown = kwargs.get("puzzle_cooldown", self.puzzle_cooldown)
         gs.wood_grid = kwargs.get("wood_grid", self.wood_grid)
         gs.stone_grid = kwargs.get("stone_grid", self.stone_grid)
+        gs.flint_grid = kwargs.get("flint_grid", self.flint_grid)
+        gs.clay_grid = kwargs.get("clay_grid", self.clay_grid)
+        gs.vine_grid = kwargs.get("vine_grid", self.vine_grid)
+        gs.current_recipe = kwargs.get("current_recipe", self.current_recipe)
+        gs.recipe_timer = kwargs.get("recipe_timer", self.recipe_timer)
         return gs
 
 jax.tree_util.register_pytree_node(

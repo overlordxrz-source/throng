@@ -1,0 +1,5 @@
+print("Wait, if obs expanded to 2656, then obs.shape[1] = 2656!")
+print("But the error is `TypeError: cannot reshape array of shape (200, 391) into shape (200, 25, 16)`.")
+print("If obs.shape[1] = 2656, and slice size is 391, then idx = 2265.")
+print("BUT 2265 is EXACTLY the value calculated when `layout.mem_start` is 1025!")
+print("Why would `layout.mem_start` be 1025 if `own_state_dim=22` and `env_channels=12`?")

@@ -117,6 +117,8 @@ class AgentNetworkTorch(nn.Module):
         gumbel_tau:     float = 0.5,
         memory_slots:   int  = 0,
         memory_slot_dim: int = 0,
+        env_channels:   int  = 15,
+        own_state_dim:  int  = 22,
     ) -> None:
         super().__init__()
         self.hidden_dim     = hidden_dim
@@ -142,10 +144,10 @@ class AgentNetworkTorch(nn.Module):
 
         # Embedding layers — one per observation segment
         # Phase 7: pres expanded to 7 (added shelter, contested, scent)
-        self.emb_own  = nn.Linear(6,          token_dim)
+        self.emb_own  = nn.Linear(own_state_dim,          token_dim)
         self.emb_nb   = nn.Linear(signal_dim,  token_dim)   # per neighbour
         self.emb_sym  = nn.Linear(symbol_dim,  token_dim)   # per symbol cell
-        self.emb_pres = nn.Linear(10,           token_dim)   # per cell: [blue, red, wall, resource, shelter, contested, scent, puzzle, blue_bg, barrier]
+        self.emb_pres = nn.Linear(env_channels,           token_dim)   # per cell: [blue, red, wall, resource, shelter, contested, scent, puzzle, blue_bg, barrier]
         self.emb_sig  = nn.Linear(signal_dim,  token_dim)
         self.emb_mem  = nn.Linear(hidden_dim,  token_dim)
         # Phase 7: episodic memory tokens

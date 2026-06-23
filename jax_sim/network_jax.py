@@ -1196,6 +1196,27 @@ def pad_gwt_comms_1(flat_params: dict, target_channels: int) -> None:
         
         kernel = jnp.concatenate([part1, loc_env_new, part3], axis=0)
         print(f"[JAX] Truncating gwt_comms_1 loc_env: 2647 -> 2597 (-50 loc_env)", flush=True)
+
+    # 6. Pad own_state 13->22 (Phase 18.7 crafting inventory + recipe)
+    if kernel.shape[0] == 2647 and target_channels >= 2656:
+        # own_state occupies indices 0..13; insert 9 zero rows after index 13
+        part1 = kernel[:13, :]
+        pad_own = jnp.zeros((9, hidden_dim), dtype=kernel.dtype)
+        kernel = jnp.concatenate([part1, pad_own, kernel[13:]], axis=0)
+        print(f"[JAX] Grafting padding to gwt_comms_1: 2647 -> 2656 (+9 own_state 13->22)", flush=True)
+
+    # 7. Pad loc_env 12->15 (Phase 18.7 flint, clay, vine channels)
+    if kernel.shape[0] == 2656 and target_channels >= 2731:
+        # loc_env starts at 22 (own_state) + 240 (nb_sigs) + 12 (nb_alarms) + 400 (loc_sym) = 674
+        loc_env_offset = 674
+        part1 = kernel[:loc_env_offset, :]
+        loc_env_old = kernel[loc_env_offset:loc_env_offset + 300, :].reshape(25, 12, hidden_dim)
+        pad_env = jnp.zeros((25, 3, hidden_dim), dtype=kernel.dtype)
+        loc_env_new = jnp.concatenate([loc_env_old, pad_env], axis=1).reshape(375, hidden_dim)
+        part3 = kernel[loc_env_offset + 300:, :]
+        
+        kernel = jnp.concatenate([part1, loc_env_new, part3], axis=0)
+        print(f"[JAX] Grafting padding to gwt_comms_1: 2656 -> 2731 (+75 loc_env 12->15)", flush=True)
         
     flat_params["gwt_comms_1"] = {
         "kernel": kernel,

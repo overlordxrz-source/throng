@@ -106,15 +106,28 @@ def build_observations_jax(
     inv_stone = pop.inventory_stone.astype(jnp.float32)
     inv_axe = pop.inventory_axe.astype(jnp.float32)
 
-    own_state_dim = int(config.get("own_state_dim", 13))
+    inv_flint = pop.inventory_flint.astype(jnp.float32)
+    inv_clay = pop.inventory_clay.astype(jnp.float32)
+    inv_vine = pop.inventory_vine.astype(jnp.float32)
+    can_see_recipe = pop.can_see_recipe.astype(jnp.float32)
+    masked_recipe = grid.current_recipe.astype(jnp.float32)[None, :] * can_see_recipe[:, None]
+
+    own_state_dim = int(config.get("own_state_dim", 22))
     if own_state_dim == 10:
         own_state = jnp.concatenate([
             jnp.stack([norm_age, mat_frac, energy, nl_norm, norm_x, norm_y], axis=1),
             intrinsic_entropy
         ], axis=1)
-    else:
+    elif own_state_dim == 13:
         own_state = jnp.concatenate([
             jnp.stack([norm_age, mat_frac, energy, nl_norm, norm_x, norm_y, inv_wood, inv_stone, inv_axe], axis=1),
+            intrinsic_entropy
+        ], axis=1)
+    else:
+        own_state = jnp.concatenate([
+            jnp.stack([norm_age, mat_frac, energy, nl_norm, norm_x, norm_y, 
+                       inv_wood, inv_stone, inv_axe, inv_flint, inv_clay, inv_vine, can_see_recipe], axis=1),
+            masked_recipe,
             intrinsic_entropy
         ], axis=1)
 
@@ -157,15 +170,22 @@ def build_observations_jax(
 
     loc_wood = get_local_patches(grid.wood_grid.astype(jnp.float32), pop.positions, r, gs)[..., None]
     loc_stone = get_local_patches(grid.stone_grid.astype(jnp.float32), pop.positions, r, gs)[..., None]
+    loc_flint = get_local_patches(grid.flint_grid.astype(jnp.float32), pop.positions, r, gs)[..., None]
+    loc_clay = get_local_patches(grid.clay_grid.astype(jnp.float32), pop.positions, r, gs)[..., None]
+    loc_vine = get_local_patches(grid.vine_grid.astype(jnp.float32), pop.positions, r, gs)[..., None]
 
-    env_channels = int(config.get("env_channels", 12))
+    env_channels = int(config.get("env_channels", 15))
     if env_channels == 10:
         loc_env = jnp.concatenate([
             loc_pres, loc_wall, loc_res, loc_shelter, loc_contested, loc_scent, loc_puzzle, loc_blue_bg, loc_barrier
         ], axis=-1)
-    else:
+    elif env_channels == 12:
         loc_env = jnp.concatenate([
             loc_pres, loc_wall, loc_res, loc_shelter, loc_contested, loc_scent, loc_puzzle, loc_blue_bg, loc_barrier, loc_wood, loc_stone
+        ], axis=-1)
+    else:
+        loc_env = jnp.concatenate([
+            loc_pres, loc_wall, loc_res, loc_shelter, loc_contested, loc_scent, loc_puzzle, loc_blue_bg, loc_barrier, loc_wood, loc_stone, loc_flint, loc_clay, loc_vine
         ], axis=-1)
 
     if key is not None:
