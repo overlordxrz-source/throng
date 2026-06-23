@@ -99,6 +99,7 @@ def run_causal_intervention(checkpoint_dir: str, token_a: str, token_b: str, con
         neighbor_k=int(config["neighbor_k"]),
         n_actions=int(config.get("n_actions", 8)),
         env_channels=int(config.get("env_channels", 10)),
+        own_state_dim=int(config.get("own_state_dim", 10)),
     )
     model_apply = make_model_apply(model)
 
@@ -124,6 +125,7 @@ def run_causal_intervention(checkpoint_dir: str, token_a: str, token_b: str, con
         cross_attn_num_heads=_cross_heads,
         n_actions=int(config.get("n_actions", 8)),
         env_channels=int(config.get("env_channels", 10)),
+        own_state_dim=int(config.get("own_state_dim", 10)),
     )
     r_model_apply = make_model_apply(model_red)
 
