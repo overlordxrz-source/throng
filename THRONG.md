@@ -1389,14 +1389,45 @@ If our true goal is to force the emergence of AGI-level intelligence purely thro
 
 *Last updated: 2026-06-23 — Phase 18.7 LIVE. Receiver-Necessity Ecology active and corpus schema validated (can_see_recipe, inventory, current_recipe_id logging properly). MEDAL-ADR expert dropout is currently causing a population death spiral (5.6 deaths per step) due to index-based targeting, but an approved plan to migrate to a soft-carry reset is pending execution. ATE offline test pipeline is greenlit once 20k records accumulate.*
 
-### Cam Reboot Sync (Jun 23, 2026)
-**Phase:** 18.7 (Receiver-Necessity Ecology)
-**Active Branch:** `feature/phase18-crafting`
-**Dimensionality:** 12 Actions, 3 VQ Slots (12/8/12, vocab 64). `obs_dim` = 2731 (`own_state`=22, `env_channels`=15).
-**Telemetry:** `can_see_recipe` confirmed at ~24%. MEDAL-ADR soft carry-reset is actively wiping 10% of agent hidden states (e.g. `expert_dropouts=16`). `codes_active` recovered to healthy `23|35|32` after soft-reset fix.
-**Current Status:** MEDAL-ADR soft carry-reset migration is successfully completed. Push (6) and Guard (7) dummy actions have been logit-masked to prevent 49% stationary-action pollution.
-**ATE Gate Criteria (DO NOT OPEN UNTIL ALL THREE HOLD):** 
-1. `expert_dropouts` is 15-22
-2. `blue_caught` is oscillating (not sustained at <=5)
-3. `codes_active` >= 40/64 **per slot independently**. 
-When gate opens, use `--min-step 1286144` (post-first-clean-rollout).
+### Cam Reboot Sync (Jun 23, 2026) — UPDATED ppo=2522
+**Phase:** 18.7 (Receiver-Necessity Ecology + Logit-Masked No-Op Amputation + MEDAL-ADR Soft Carry-Reset)
+**Active Branch:** `feature/phase18-crafting` | **Git HEAD:** `ecc5455`
+**Dimensionality:** 12 Actions (Push=6 / Guard=7 logit-masked to -1e9), 3 VQ Slots (12/8/12, vocab 64). `obs_dim` = 2731 (`own_state`=22, `env_channels`=15).
+
+**Latest PPO Update:** 2522 (env step ~1,291,264)
+
+**What is live and confirmed working:**
+- MEDAL-ADR soft carry-reset: age-based targeting, `ceil(0.10 × n_alive)` oldest agents, once per PPO update. `expert_dropouts=15–20` per update ✅
+- Logit-mask `-1e9` on actions 6 (Push) and 7 (Guard) in rollout, imagination, and PPO loss. `Push=0%, Guard=0%` confirmed ✅
+- Entropy bonus computed on masked logits (not raw network output) ✅
+- L2 logit penalty computed on **unmasked** logits (prevents `square(-1e9)` explosion) ✅
+- NaN fix confirmed: all `grad_norms` finite since ppo=2515 ✅
+
+**Critical Post-NaN Fix Incident — Barrier Fortress Oscillation:**
+After restart at ppo=2515, agents bulk-built barriers in one rollout (`barrier_sum: 648 → 8,481`). This:
+1. Zeroed out predation (`blue_caught=0`) for 5+ consecutive updates (Gates 2 closed)
+2. Triggered 105 dead code resets on the VQ codebooks (ecological shock mechanism)
+3. Caused codebook oscillation: `codes_active` peaked at `44|40|53` (Gate 3 opened briefly at ppo=2517), then collapsed back to `26|18|32` as dead code resets propagated
+4. Self-corrected: `barrier_sum` decayed from 8,481 → 668 → rebounded to 2,389 → 1,455 (oscillating and declining)
+- **No intervention was needed or applied.** The energy math (0.06/action Build cost) caused self-correction via starvation deaths.
+
+**Active Anomaly — Strike Action Inflation:**
+`Strk=` climbed from ~19% to 47% at ppo=2521 (fortress collapse survivors had high Strike logits from selection artifact). Declining: 47% → 26%. Monitor — if Strike stays above 20% when predation returns, it is consuming action budget at the expense of crafting and may need a futile-action penalty or logit mask like Push/Guard.
+
+**Gate Status at ppo=2522:**
+| Gate | Status | Value |
+|------|--------|-------|
+| Gate 1: expert_dropouts 15–22 | ✅ | 20 |
+| Gate 2: blue_caught oscillating | ❌ | 0 (5 consecutive updates) |
+| Gate 3: codes_active ≥ 40/slot | ❌ | 32\|34\|26 (oscillating, not stable) |
+
+**Root Cause of Gate 3 Instability:** Each barrier spike causes a large z_e distribution shift, triggering 50–105 dead code resets per update. The codebooks cannot stabilize while the ecology oscillates. Gates 2 and 3 are correlated — predation returning will stabilize the ecology and allow codebooks to consolidate.
+
+**ATE Gate Criteria (DO NOT OPEN UNTIL ALL THREE HOLD SIMULTANEOUSLY):**
+1. `expert_dropouts` is 15–22
+2. `blue_caught` is oscillating (not sustained ≤ 5)
+3. `codes_active` ≥ 40/64 **per slot independently** (not summed)
+When gate opens, use `--min-step 1286144` (first structurally clean rollout post-masking).
+
+**PPO Loss Invariant (CRITICAL — never violate):**
+`old_log_probs` and `new_log_probs` must be drawn from identically-structured distributions. Any logit mask applied at rollout MUST also be applied identically in the PPO backward pass and the Epistemic Gate imagination. Violating this causes `ratio = exp(finite − (−1e9)) = exp(1e9) = inf` → NaN cascade.
