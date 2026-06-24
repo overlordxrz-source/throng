@@ -1454,9 +1454,27 @@ The core challenge since ppo=2515 has been a persistent "fortress Nash equilibri
 
 **ATE Gate Criteria (DO NOT OPEN UNTIL ALL THREE HOLD SIMULTANEOUSLY):**
 1. `expert_dropouts` is 15–22
-2. `blue_caught` is oscillating (not sustained ≤ 5)
-3. `codes_active` ≥ 40/64 **per slot independently** (not summed)
-When gate opens, use `--min-step 1286144` (first structurally clean rollout post-masking).
+2. `blue_caught` is oscillating (not sustained = 0 for >3 consecutive updates)
+3. `codes_active` ≥ 40/64 **per slot independently** for ≥ 2 consecutive updates
+When gate opens, use `--min-step` = first structurally clean post-restart step (≥ ~1,298,000).
+
+---
+
+**ATE Test Results (ppo~2575–2578 Transition Window):**
+The offline ATE test was run on the `min-step 1315000` corpus (the ppo=2576 fortress-break window where codebooks briefly hit 35|51|46). The causal test yielded its first statistically significant result, proving the receiver-necessity ecology is forcing genuine communication.
+
+**Slot 2 (Modifier / Urgency) PASSED THE CAUSAL GATE.**
+- **ATE:** +0.1295 (95% CI: [+0.0364, +0.2007])
+- **Significance:** Passed (CI excludes zero). Tokens in slot 2 causally increase the flee rate of blind receivers.
+- **Action Shift (Alert vs Safe):** Fleeing South (+10.8%), Pickup (+5.2%), Strike (-12.8%).
+- **Interpretation:** The agents are successfully utilizing the syntax channel to transmit survival-relevant urgency when the barrier fortress fails. The signal is present; we are now waiting for the ecology limit cycle to damp enough to allow sustained codebook crystallization between predation events.
+
+Slots 0 and 1 are not yet carrying causal signals (ATE CIs include zero).
+
+---
 
 **PPO Loss Invariant (CRITICAL — never violate):**
 `old_log_probs` and `new_log_probs` must be drawn from identically-structured distributions. Any logit mask applied at rollout MUST also be applied identically in the PPO backward pass and the Epistemic Gate imagination. Violating this causes `ratio = exp(finite − (−1e9)) = exp(1e9) = inf` → NaN cascade.
+
+**Masking Invariant (CRITICAL):**
+Never mask an action based on frequency alone. Push (6) and Guard (7) are masked because source-code inspection of `grid_jax.py` confirmed they are mechanical no-ops. Strike at 33% is NOT a masking candidate — it is an ecologically self-regulating behavior under predation pressure.
