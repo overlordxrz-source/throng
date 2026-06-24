@@ -1373,55 +1373,84 @@ If our true goal is to force the emergence of AGI-level intelligence purely thro
   - **VQ Reconnection:** Live `outs[7]` gradient was reconnected in `rl_jax.py` with a mandatory 0.5x coefficient warmup for 20 updates in `main_jax.py`.
   - **NB_GAIN Collapse:** The metric was confirmed to be a severed "ghost metric" (initialized to 1.0, never updated during rollout) — the causal ATE test methodology remains completely valid.
   - **The Red VQ Index Bug (Phase 18.5, FIXED `c17e131`):** The reconnection indexed `outs[7]` unconditionally. Blue's `AgentNetworkJax` returns `(... token_ids, alarm_out[6], loss_vq[7], z_e[8], ...)`; red's `PredatorNetworkJax` returns `(... token_ids, loss_vq[6], z_e[7], ...)` (no alarm head). So red PPO minimized `vq_coef · Σz_e` (raw 40-D wire), not a commitment loss — explaining `RedVQ≈-24225` and `red_codes_active=2/64`. The `2559414` `.sum(axis=-1)` patch only stopped the crash. **Fix:** `vq_loss_idx` threaded per-team in `rl_jax.py` (`ppo_update` sets `7` for blue, `6` for red; `_minibatch_step` carries it as a jit-static arg). Added `n_actions: 12` to `config.yaml` (direct-YAML loads no longer default to 8), an H2 regression test (`tests/test_vq_loss_index.py`, validated on CPU), and an H3 dashboard `[ALERT]` gate for negative/collapsed blue VQ.
-  - **Red VQ Decoupling (Phase 18.6, LIVE):** Post-18.5, blue VQ verified healthy (`loss≈0.003–0.007`, `codes 45|39|43/64`). But red's correctly-read DCVQ loss was pathological (`1.5e11`, `codes 1/64`, trunk grad clip-saturated at 2.0 — VQ dominating red PPO). Red's VQ loss was historically a static no-op gradient; reconnecting it violated directive #8 (red forged by catch reward only). **Decision:** `red_vq_loss_coef: 0.0` — red VQ is decoupled from the gradient. Red is now **pure ecological pressure** (policy/value + proprio/SRL aux still train; comms channel mute). Matches the chronic pincer failure (`p≈0.46`) and halves bug surface. Dashboard line relabeled `RedVQ(decoupled)`; H3 alert scoped to blue only. Reversible via `red_vq_loss_coef>0` + one-time cold restart.
+  - **Red VQ Decoupling (Phase 18.6, LIVE):** Post-18.5, blue VQ verified healthy (`loss≈0.003–0.007`, `codes 45|39|43/64`). But red's correctly-read DCVQ loss was pathological (`1.5e11`, `codes 1/64`, trunk grad clip-saturated at 2.0 — VQ dominating red PPO). Red's VQ loss was historically a static no-op gradient; reconnecting it violated directive #8 (red forged by catch reward only). **Decision:** `red_vq_loss_coef: 0.0` — red VQ is decoupled from the gradient. Red is now **pure ecological pressure** (policy/value + proprio/SRL aux still train; comms channel mute). Matches the chronic pincer failure (`p≈0.46`) and halves bug surface. Dashboard line relabeled `RedVQ(decoupled)`; H3 alert scoped to blue only. Reversible via `red_vq_loss_coef>0` + one-time cold restart.*Last updated: 2026-06-24 — Phase 18.7 LIVE. Receiver-Necessity Ecology active. barrier_build_cost escalated to 0.15 (git `7fbf7d9`). Fortress broken at ppo=2576 (barrier_sum=1,194) but Lotka-Volterra limit cycle persists. Crafting record: 15 successes / 0.6% rate at ppo=2578. Modal migrated to `thirtytwogeese`.*
 
-*Last updated: 2026-06-22 — Phase 18.6 LIVE. Blue VQ healthy post-18.5 fix; red VQ decoupled (`red_vq_loss_coef:0.0`) → red is now pure ecological pressure. Science focus shifts fully to the blue 3-slot compositional channel + the Receiver-Necessity ATE ecology.*
-
-#### Phase 19 — Cultural Transmission (Writing)
-**Goal:** Allow agents to pre-train themselves across generations, escaping the capacity limit of oral communication.
-- **Mechanics:** A `Write` action allows agents to etch VQ tokens permanently into grid cells.
-- **Semantics:** Allows the passing down of puzzle solutions, crafting recipes, and multi-generational memory.
-
-#### Phase 20 — Agriculture & Terraforming
-**Goal:** Force the invention of causal reasoning and long-term planning (the primary weakness of LLMs).
-- **Mechanics:** Agents can plant resources that take thousands of steps to mature.
-- **Semantics:** Forces the development of concepts for "Future Time", "Delayed Gratification", "Ownership", and "Defense".
-
-*Last updated: 2026-06-23 — Phase 18.7 LIVE. Receiver-Necessity Ecology active and corpus schema validated (can_see_recipe, inventory, current_recipe_id logging properly). MEDAL-ADR expert dropout is currently causing a population death spiral (5.6 deaths per step) due to index-based targeting, but an approved plan to migrate to a soft-carry reset is pending execution. ATE offline test pipeline is greenlit once 20k records accumulate.*
-
-### Cam Reboot Sync (Jun 23, 2026) — UPDATED ppo=2522
+### Cam Reboot Sync (Jun 24, 2026) — UPDATED ppo=2578
 **Phase:** 18.7 (Receiver-Necessity Ecology + Logit-Masked No-Op Amputation + MEDAL-ADR Soft Carry-Reset)
-**Active Branch:** `feature/phase18-crafting` | **Git HEAD:** `ecc5455`
+**Active Branch:** `feature/phase18-crafting` | **Git HEAD:** `7fbf7d9`
+**Modal Workspace:** `thirtytwogeese` (migrated Jun 23 from `thirtyonegeese` — volume fully uploaded)
 **Dimensionality:** 12 Actions (Push=6 / Guard=7 logit-masked to -1e9), 3 VQ Slots (12/8/12, vocab 64). `obs_dim` = 2731 (`own_state`=22, `env_channels`=15).
 
-**Latest PPO Update:** 2522 (env step ~1,291,264)
+**Latest PPO Update:** 2578 (env step ~1,319,936)
+
+---
 
 **What is live and confirmed working:**
 - MEDAL-ADR soft carry-reset: age-based targeting, `ceil(0.10 × n_alive)` oldest agents, once per PPO update. `expert_dropouts=15–20` per update ✅
 - Logit-mask `-1e9` on actions 6 (Push) and 7 (Guard) in rollout, imagination, and PPO loss. `Push=0%, Guard=0%` confirmed ✅
-- Entropy bonus computed on masked logits (not raw network output) ✅
-- L2 logit penalty computed on **unmasked** logits (prevents `square(-1e9)` explosion) ✅
-- NaN fix confirmed: all `grad_norms` finite since ppo=2515 ✅
+- NaN fix confirmed: all `grad_norms` finite throughout entire ppo=2536–2578 window ✅
+- `fwd_env` world-model loss dropped from ~0.30 (fortress phase) to 0.049 (open-terrain phase) — confirming barriers were pathological for the world model ✅
+- **Crafting new record: `success=15 | rate=0.6%` at ppo=2578** — first double-digit craft count ✅
 
-**Critical Post-NaN Fix Incident — Barrier Fortress Oscillation:**
-After restart at ppo=2515, agents bulk-built barriers in one rollout (`barrier_sum: 648 → 8,481`). This:
-1. Zeroed out predation (`blue_caught=0`) for 5+ consecutive updates (Gates 2 closed)
-2. Triggered 105 dead code resets on the VQ codebooks (ecological shock mechanism)
-3. Caused codebook oscillation: `codes_active` peaked at `44|40|53` (Gate 3 opened briefly at ppo=2517), then collapsed back to `26|18|32` as dead code resets propagated
-4. Self-corrected: `barrier_sum` decayed from 8,481 → 668 → rebounded to 2,389 → 1,455 (oscillating and declining)
-- **No intervention was needed or applied.** The energy math (0.06/action Build cost) caused self-correction via starvation deaths.
+---
 
-**Active Anomaly — Strike Action Inflation:**
-`Strk=` climbed from ~19% to 47% at ppo=2521 (fortress collapse survivors had high Strike logits from selection artifact). Declining: 47% → 26%. Monitor — if Strike stays above 20% when predation returns, it is consuming action budget at the expense of crafting and may need a futile-action penalty or logit mask like Push/Guard.
+**The Barrier Fortress Saga — Full Timeline (COMPLETE):**
 
-**Gate Status at ppo=2522:**
+The core challenge since ppo=2515 has been a persistent "fortress Nash equilibrium" where agents discovered that bulk-building barriers eliminated predation pressure entirely, decoupling survival from communication. This required two config escalations to break:
+
+| ppo | Event | barrier_sum | Action |
+|-----|-------|-------------|--------|
+| 2515 | Kernel restart, fresh pop | 8,481 (spike) | Wait — self-corrected |
+| 2522 | Oscillating ~1,200–2,400 | — | Wait — self-correcting |
+| 2532 | Second fortress formation | ~2,638 | Hold per Cam |
+| 2536 | Kernel restart (log glitch) | 3,688 (spike) | Wait |
+| 2540 | Fortress peak | 5,962 | **Cam directive: act** |
+| 2541 | Cam sign-off received | 5,233 | **↑ build_cost: 0.06→0.10** (`ec1819f`) |
+| 2563 | 0.10 insufficient; fortress sustained | 3,428–4,957 | **Cam: escalate immediately** |
+| 2563 | Escalation commit | — | **↑ build_cost: 0.10→0.15** (`7fbf7d9`) |
+| 2576 | **Fortress broken** | **1,194** ✅ | Hold — monitor |
+| 2578 | Lotka-Volterra rebound | 3,632 | Monitor — amplitude damped |
+
+**Current config:** `barrier_build_cost: 0.15` (in `phase16_5_enrichment` block of `config.yaml`).
+
+**The Lotka-Volterra Limit Cycle:** The 0.15 cost broke the previous high-energy fortress equilibrium (peaks of 5,962–6,531) but has not eliminated the oscillation. The ecology now runs a damped cycle: walls drain → reds flood in → survivors rebuild → walls drain again. The rebound peak of 3,632 at ppo=2578 is ~40% lower than the pre-escalation peak. The amplitude is decreasing but the cycle persists.
+
+**What Cam must decide:** Is the current limit cycle (barrier_sum oscillating between ~1,000–3,600, never reaching the 5,000+ extremes) a sufficient ecological condition to open the ATE gate when codebooks are stable? Or does `barrier_decay_rate` need adjustment to prevent the rebound phase?
+
+---
+
+**Gate Status at ppo=2578:**
 | Gate | Status | Value |
 |------|--------|-------|
-| Gate 1: expert_dropouts 15–22 | ✅ | 20 |
-| Gate 2: blue_caught oscillating | ❌ | 0 (5 consecutive updates) |
-| Gate 3: codes_active ≥ 40/slot | ❌ | 32\|34\|26 (oscillating, not stable) |
+| Gate 1: expert_dropouts 15–22 | ✅ | 15 |
+| Gate 2: blue_caught oscillating | ✅ | 154 (nonzero this update) |
+| Gate 3: codes_active ≥ 40/slot | ❌ | 7\|11\|14 (collapsed — ecological shock) |
 
-**Root Cause of Gate 3 Instability:** Each barrier spike causes a large z_e distribution shift, triggering 50–105 dead code resets per update. The codebooks cannot stabilize while the ecology oscillates. Gates 2 and 3 are correlated — predation returning will stabilize the ecology and allow codebooks to consolidate.
+**Gate 3 root cause:** Each predation event (blue_caught=154, blue_caught=560 etc.) causes a mass population death → z_e distribution shift → dead code resets. The codebooks opened cleanly to `35|51|46` at ppo=2576 (when the fortress was broken and predation was zero), then immediately collapsed to `7|11|14` at ppo=2578 when 154 catches caused a mass-death ecological shock. Gates 2 and 3 are anti-correlated under the current limit cycle: predation kills agents (closes Gate 3) and zero-predation kills codebooks through fortress formation (closes Gate 2).
+
+**This is the core deadlock Cam needs to resolve strategically.**
+
+---
+
+**Key Recent Telemetry (chronological):**
+
+| ppo | barrier_sum | blue_caught | codes_active | Crafting | fwd_env |
+|-----|-------------|-------------|--------------|----------|---------|
+| 2536 | 3,688 | 243 | 13\|13\|16 | 6 | 0.21 |
+| 2540 | 5,962 | 0 | 44\|43\|47 | 0 | — |
+| 2541 | 5,233 | 0 | 25\|27\|39 | 0 | — |
+| 2563 | 3,428 | 0 | 16\|16\|19 | 0 | — |
+| 2575 | 1,712 | 0 | 29\|45\|23 | 0 | 0.059 |
+| 2576 | **1,194** | 0 | **35\|51\|46** | 0 | **0.049** |
+| 2578 | 3,632 | **154** | 7\|11\|14 | **15 (0.6%)** | 0.12 |
+
+**Signals of scientific interest at ppo=2578:**
+- `Alarm_Rate=0.014` — highest ever logged; genuine alarm broadcast under active predation
+- `Strk=33%` — agents fighting back during the catch event (was 13–16% at baseline)
+- `self_pred_acc=0.494` — highest ever; agents are most predictable during predation crisis
+- `Crafting: success=15, rate=0.6%` — first double-digit crafts; crafting is becoming ecologically reachable under genuine survival pressure (not fortress stasis)
+
+---
 
 **ATE Gate Criteria (DO NOT OPEN UNTIL ALL THREE HOLD SIMULTANEOUSLY):**
 1. `expert_dropouts` is 15–22
