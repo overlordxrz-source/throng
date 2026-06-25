@@ -44,7 +44,6 @@ def build_cfg() -> dict:
     cfg["distill_enabled"] = False
     cfg["repro_energy_thresh"] = 0.95
     cfg["repro_energy_cost"] = 0.80
-    cfg["red_catch_radius"] = 1
     cfg["red_catch_prob"] = 0.8
     cfg["red_detection_radius"] = 0
     cfg["resource_regen_rate"] = 0.0003

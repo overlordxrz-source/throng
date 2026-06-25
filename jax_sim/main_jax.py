@@ -2174,6 +2174,10 @@ def _run_simulation_impl(
                     print(f"  [TRANSITION_WINDOW DETECTED: ppo={ui+1}, barrier_drop={barrier_sum_delta:.1f}, caught={blue_caught_rollout}]")
                     pre_transition_step = max(0, (ui + 1 - 5) * T)
                     print(f"  [TRANSITION_CORPUS_START] Run: python tools/ate_swap_test.py --min-step {pre_transition_step}")
+            elif blue_caught_rollout > 30:
+                print(f"  [TRANSITION_WINDOW DETECTED: restart event, ppo={ui+1}, caught={blue_caught_rollout}]")
+                pre_transition_step = max(0, (ui + 1 - 5) * T)
+                print(f"  [TRANSITION_CORPUS_START] Run: python tools/ate_swap_test.py --min-step {pre_transition_step}")
             _prev_barrier_sum_val = barrier_sum_val
             _prev_blue_caught_val = blue_caught_rollout
             _n_craft_success = 0

@@ -33,6 +33,7 @@ The philosophical and mathematical foundations of THRONG have been consolidated 
 **Phase 18.7 Hot-Resume & Telemetry Validation:**
 - **Zero Amnesia:** Successfully hot-resumed from update 2493 with expanded `obs_dim=2731`. The `pad_gwt_comms_1` graft held perfectly.
 - **Codebook Recovery:** The fresh zero-padded dimension expansions caused an initial dead-code reset drop (`codes_active` ~18/64), but the codebooks immediately recovered to ~40/64 by update 2496 as the VQ bottleneck adapted to the expanded visual cortex.
+- **Imagination Gate Upgrade (Action §4.3):** The Epistemic Gate imagination module is now scoring the full `12/12` action space (previously 5/12 legacy actions). This allows the gate to deliberate over Strike, Push, Guard, and the new Phase 18 tools (PickUp, Craft, UseTool). Implemented via `imagination_n_actions: 12` in config (commit `775ec7d`).
 - **Crafting Live:** `Crafting: success=... | futile=... | rate=...%` is successfully printing. First rollout saw 5 successes (0.3%), proving the mechanic is geometrically reachable.
 - **Penalty Calibration:** The `UseTool` action spiked to 12% on initialization, but the `-0.20` penalty quickly and aggressively squashed it to ~1.6% by update 2496. The penalty gradient is working exactly as intended.
 - **NB_GAIN Deprecated:** Variance fully collapsed to `[1.]`. Correlation is `nan`. Officially ghosted and ready for H5 removal in Phase 19.
