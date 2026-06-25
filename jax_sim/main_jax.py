@@ -1533,6 +1533,8 @@ def _run_simulation_impl(
         flush=True,
     )
     _corpus_sig_dim = int(config["signal_dim"])
+    _prev_barrier_sum_val = None
+    _prev_blue_caught_val = None
     for ui in range(start_update, n_updates):
         update_key = update_keys[ui]
         step_keys = jax.random.split(update_key, T)
@@ -2166,6 +2168,14 @@ def _run_simulation_impl(
                 f"red_floor={red_curriculum_stages[red_curriculum_idx]} "
                 f"sustain={red_sustain_count}/{red_sustain_needed} | brain={n_layers}L{medal_str} | barrier_sum={barrier_sum_val:.1f}"
             )
+            if _prev_barrier_sum_val is not None and _prev_blue_caught_val is not None:
+                barrier_sum_delta = barrier_sum_val - _prev_barrier_sum_val
+                if barrier_sum_delta < -800 and _prev_blue_caught_val == 0 and blue_caught_rollout > 30:
+                    print(f"  [TRANSITION_WINDOW DETECTED: ppo={ui+1}, barrier_drop={barrier_sum_delta:.1f}, caught={blue_caught_rollout}]")
+                    pre_transition_step = max(0, (ui + 1 - 5) * T)
+                    print(f"  [TRANSITION_CORPUS_START] Run: python tools/ate_swap_test.py --min-step {pre_transition_step}")
+            _prev_barrier_sum_val = barrier_sum_val
+            _prev_blue_caught_val = blue_caught_rollout
             _n_craft_success = 0
             _n_futile_craft = 0
             if "craft_success" in rollout_data["blue"]:
