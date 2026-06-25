@@ -60,7 +60,7 @@ symbol_decay: 0.993
 
 red_starvation_steps: 400
 red_spawn_step: 2000
-red_catch_radius: 1          # P4: adjacent reds catch blues (Chebyshev ≤ 1)
+red_catch_radius: 2          # Phase 18.7 (Jun 25) Evasion Attractor fix: adjacent reds catch blues (Chebyshev ≤ 2)
 red_catch_prob: 0.8          # P10.4: 20% predator jitter on in-range catches
 
 # ── VQ signal bottleneck (P3) ─────────────────────────────────────────────────
