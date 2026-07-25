@@ -530,13 +530,17 @@ def make_sim_step(
         dy = jnp.minimum(dy, gs - dy)
         dist = jnp.maximum(dx, dy)
         adjacent = dist <= 1
-        if _rn_exclude_self:
-            # Phase 18.8: a lone agent must not form a craft group with itself.
-            # (Capacity-1 vs 3-4 unit recipes already blocks solo craft, but a
-            # future 1-unit recipe would slip through.)
-            adjacent = adjacent & ~jnp.eye(b_pop.positions.shape[0], dtype=jnp.bool_)
 
         craft_group = adjacent & is_craft[:, None] & is_craft[None, :]
+
+        # Phase 18.8: require a real partner. NOTE this must NOT be done by
+        # removing the diagonal from `adjacent` — `craft_group` is also what sums
+        # the group's inventory below, so dropping the diagonal would stop an
+        # agent's own material counting toward the recipe and silently demand one
+        # extra body per craft. Keep the group intact; gate on partnership
+        # separately.
+        _not_self = ~jnp.eye(b_pop.positions.shape[0], dtype=jnp.bool_)
+        has_craft_partner = jnp.any(craft_group & _not_self, axis=1)
         
         group_wood = jnp.sum(new_inv_wood[None, :] * craft_group, axis=1)
         group_stone = jnp.sum(new_inv_stone[None, :] * craft_group, axis=1)
@@ -559,6 +563,11 @@ def make_sim_step(
         )
         
         craft_success = is_craft & recipe_satisfied
+        if _rn_exclude_self:
+            # A lone agent must not craft with itself. Capacity-1 inventory vs
+            # 3-4 unit recipes already blocks this today; the guard matters if a
+            # 1-unit recipe is ever generated.
+            craft_success = craft_success & has_craft_partner
         
         consume_wood = craft_success & (new_inv_wood > 0)
         consume_stone = craft_success & (new_inv_stone > 0)

@@ -85,6 +85,119 @@ def test_slot_write_shapes_are_consistent():
         )
 
 
+# ── 1b. Observation layout agreement ───────────────────────────────────────
+
+def test_memory_slots_displaces_everything_after_it():
+    """The network derives obs slice offsets from its own `memory_slots`.
+
+    `causal_intervention.py` used to build the model with `memory_slots=0` while
+    `init_population` created a 20-slot episodic buffer, so the environment
+    emitted a 2731-D obs and the network sliced it as 1891-D. Shapes still lined
+    up at every Dense layer, so nothing raised — the cultural-grid tokens were
+    simply read out of the memory region and the last 840 dims were dropped.
+    """
+    from jax_sim.obs_layout import make_obs_layout
+
+    kw = dict(
+        signal_dim=40, symbol_dim=16, neighbor_k=6,
+        local_cells=25, env_channels=15, own_state_dim=22,
+    )
+    without = make_obs_layout(memory_slots=0, **kw)
+    with_mem = make_obs_layout(memory_slots=20, **kw)
+
+    assert with_mem.total_dim == 2731, "config obs_dim is 2731"
+    assert with_mem.total_dim - without.total_dim == 840
+
+    # The corruption is specifically that everything *after* the memory block
+    # shifts while everything before it stays put — which is why it is silent.
+    assert without.loc_env_start == with_mem.loc_env_start
+    assert without.loc_cult_fast_start != with_mem.loc_cult_fast_start
+    assert with_mem.loc_cult_fast_start - without.loc_cult_fast_start == 840
+
+
+def test_ate_tool_guards_obs_layout():
+    """The ATE instrument must fail loudly on a layout mismatch, not measure
+    through it."""
+    src = (REPO / "tools" / "causal_intervention.py").read_text()
+    assert "OBS LAYOUT MISMATCH" in src, "layout guard removed"
+
+    # Check the code, not the prose: strip comment lines before matching, or the
+    # explanatory comment above the model constructor trips this itself.
+    code = "\n".join(
+        ln for ln in src.splitlines() if not ln.lstrip().startswith("#")
+    )
+    assert "memory_slots=0" not in code, "hard-coded memory_slots=0 is back"
+    # Both networks must take it from config — blue and red.
+    assert code.count("memory_slots=_memory_slots") >= 2, (
+        "blue and red must both derive memory_slots from config"
+    )
+
+
+# ── 1c. Craft contribution semantics ───────────────────────────────────────
+
+def test_craft_contribution_and_free_riders():
+    """Replicates the `main_jax` craft block to pin the 18.8 semantics.
+
+    Scenario: four adjacent agents all press Craft against a 1 wood + 1 stone +
+    1 flint recipe. A0/A1/A2 each hold one required material; A3 holds nothing —
+    it is the free-rider whose existence made the 18.7 "receiver-necessity"
+    ecology payable without listening.
+    """
+    import numpy as np
+
+    gs = 128
+    pos = np.array([[10, 10], [10, 11], [11, 10], [11, 11]])
+    is_craft = np.array([True] * 4)
+    inv = {
+        "wood": np.array([1, 0, 0, 0]), "stone": np.array([0, 1, 0, 0]),
+        "flint": np.array([0, 0, 1, 0]), "clay": np.zeros(4, int),
+        "vine": np.array([0, 0, 0, 1]),  # A3 holds an OFF-RECIPE material
+    }
+    req = {"wood": 1, "stone": 1, "flint": 1, "clay": 0, "vine": 0}
+
+    dx = np.abs(pos[:, 0:1] - pos[None, :, 0])
+    dy = np.abs(pos[:, 1:2] - pos[None, :, 1])
+    dx, dy = np.minimum(dx, gs - dx), np.minimum(dy, gs - dy)
+    adjacent = np.maximum(dx, dy) <= 1
+
+    craft_group = adjacent & is_craft[:, None] & is_craft[None, :]
+    not_self = ~np.eye(4, dtype=bool)
+    has_partner = (craft_group & not_self).any(1)
+
+    grp = {k: (inv[k][None, :] * craft_group).sum(1) for k in inv}
+
+    # Critical: an agent's OWN material must count toward its group total.
+    # Removing the diagonal from `adjacent` to implement exclude_self would
+    # break this and silently demand one extra body per craft.
+    assert grp["wood"][0] == 1, "agent lost its own material from the group total"
+    assert has_partner.all()
+
+    success = is_craft & np.all([grp[k] >= req[k] for k in inv], axis=0)
+    assert success.all(), "recipe is satisfied by the group"
+
+    def paid(contrib_only, req_only):
+        cons = {
+            k: success & (inv[k] > 0) & ((req[k] > 0) if req_only else True)
+            for k in inv
+        }
+        contributed = np.any([cons[k] for k in inv], axis=0)
+        return (contributed if contrib_only else success), cons
+
+    # 18.7 behaviour: the empty-handed free-rider is paid in full.
+    p, _ = paid(contrib_only=False, req_only=False)
+    assert p.tolist() == [True] * 4
+
+    # 18.8 contributor_only_reward: A3 earns nothing.
+    p, _ = paid(contrib_only=True, req_only=True)
+    assert p.tolist() == [True, True, True, False]
+
+    # 18.8 consume_required_only: A3's off-recipe vine is not destroyed.
+    _, cons = paid(contrib_only=True, req_only=True)
+    assert not cons["vine"][3], "off-recipe material was consumed"
+    _, cons_legacy = paid(contrib_only=True, req_only=False)
+    assert cons_legacy["vine"][3], "18.7 did consume off-recipe materials"
+
+
 # ── 2. Phase 18.8 defaults ─────────────────────────────────────────────────
 
 def _p188():

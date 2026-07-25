@@ -29,31 +29,39 @@ orbax_sharding.NamedShardingMetadata.to_jax_sharding = mock_to_jax_sharding
 orbax_sharding.SingleDeviceShardingMetadata.to_jax_sharding = mock_to_jax_sharding
 
 import jax_sim.observations_jax as _obs_mod
-original_build_obs = _obs_mod.build_observations_jax
-def patched_build_obs(*args, **kwargs):
-    obs = original_build_obs(*args, **kwargs)
-    N = obs.shape[0]
-    # Check if the generated obs size matches what we expect from 10 channels (25*10=250 vs 25*9=225)
-    # The default builder on this branch creates 10 channels. If our config wants 9 channels, we patch it down.
-    import yaml
-    with open(ROOT / "config.yaml") as f:
-        cfg = yaml.safe_load(f)
-    env_channels = int(cfg.get("env_channels", 10))
-    if env_channels == 9 and obs.shape[1] >= (598 + 250):
-        part1 = obs[:, :598]
-        loc_env = obs[:, 598:598+250].reshape((N, 25, 10))
-        loc_env_9 = loc_env[:, :, :9].reshape((N, 225))
-        part3 = obs[:, 598+250:]
-        return jnp.concatenate([part1, loc_env_9, part3], axis=1)
-    return obs
-_obs_mod.build_observations_jax = patched_build_obs
 
-from agents.network_torch import compute_obs_dim_torch, compute_fwd_env_dim
+# Legacy shim: a Phase-16-era branch built 10 env channels while its config asked
+# for 9, so the obs was truncated here. `env_channels` has been 15 since 18.7 and
+# the builder honours it, so this is a no-op today — it is kept only so an old
+# 9-channel checkpoint can still be replayed. The config is read ONCE at import
+# rather than on every call: `sim_step` is executed eagerly by this tool (not
+# traced into a `lax.scan`), so the original per-step `yaml.safe_load` ran a file
+# read and a full YAML parse for every simulated step.
+with open(ROOT / "config.yaml") as _f:
+    _ENV_CHANNELS_AT_IMPORT = int(yaml.safe_load(_f).get("env_channels", 10))
+
+if _ENV_CHANNELS_AT_IMPORT == 9:
+    original_build_obs = _obs_mod.build_observations_jax
+
+    def patched_build_obs(*args, **kwargs):
+        obs = original_build_obs(*args, **kwargs)
+        N = obs.shape[0]
+        if obs.shape[1] >= (598 + 250):
+            part1 = obs[:, :598]
+            loc_env = obs[:, 598:598 + 250].reshape((N, 25, 10))
+            loc_env_9 = loc_env[:, :, :9].reshape((N, 225))
+            part3 = obs[:, 598 + 250:]
+            return jnp.concatenate([part1, loc_env_9, part3], axis=1)
+        return obs
+
+    _obs_mod.build_observations_jax = patched_build_obs
+
+from agents.network_torch import compute_fwd_env_dim
 from jax_sim.grid_jax import GridState
 from jax_sim.main_jax import _normalize_config, make_sim_step
 from jax_sim.network_jax import AgentNetworkJax, init_agent_params, make_model_apply
 from jax_sim.population_jax import init_population
-from jax_sim.obs_layout import SIGNAL_SLOTS
+from jax_sim.obs_layout import SIGNAL_SLOTS, make_obs_layout
 from flax.core.frozen_dict import unfreeze, freeze
 
 ACTION_NAMES = {0: "N", 1: "S", 2: "E", 3: "W", 4: "STAY", 5: "STRK", 6: "PUSH", 7: "GRD", 8: "BUILD", 9: "PU", 10: "CRF", 11: "USE"}
@@ -84,29 +92,62 @@ def run_causal_intervention(checkpoint_dir: str, token_a: str, token_b: str, con
 
     gs = int(config["grid_size"])
     neighbor_k = int(config["neighbor_k"])
+    # `_normalize_config` sets memory_slots from memory_buffer_size (20).
+    _memory_slots = int(config.get("memory_slots", 0))
+    _local_cells = (2 * int(config["local_obs_radius"]) + 1) ** 2
     max_pop = int(config["max_pop"])
     max_pop_red = int(config["max_pop_red"])
     hidden_d = int(config["hidden_dim"])
     n_layers = int(config["n_layers"])
     sig_d = int(config["signal_dim"])
-    obs_dim = compute_obs_dim_torch(config)
+    # obs_dim MUST come from the canonical layout, exactly as main_jax does
+    # (`obs_dim = _layout.total_dim`, ~L1085). It is not cosmetic: it is handed to
+    # `ensure_aux_head_params` -> `pad_gwt_comms_1`, which grafts the GWT router
+    # kernel to that many input channels. `compute_obs_dim_torch` omits the
+    # neighbour-alarm (K*2) and own-alarm (2) fields and returns 2717 against a
+    # true 2731-D observation, so grafting through it builds a router 14 channels
+    # too narrow.
+    _layout = make_obs_layout(
+        signal_dim=sig_d,
+        symbol_dim=int(config["symbol_dim"]),
+        memory_slots=_memory_slots,
+        neighbor_k=neighbor_k,
+        local_cells=_local_cells,
+        env_channels=int(config.get("env_channels", 15)),
+        own_state_dim=int(config.get("own_state_dim", 22)),
+    )
+    obs_dim = _layout.total_dim
     fwd_env_dim = compute_fwd_env_dim(config)
+    print(f"[Causal Intervention] obs_dim = {obs_dim}", flush=True)
 
+    # NOTE: `memory_slots` and `local_cells` MUST match the training-time model
+    # (main_jax.py ~L1027). The network derives its observation slice offsets from
+    # these via `_obs_layout()`. This tool used to hard-code `memory_slots=0`
+    # while `init_population` below created a 20-slot episodic buffer, so the obs
+    # carried an 840-D memory block the network did not know about: every slice
+    # from `mem_start` onward was displaced by 840 dims (the cultural-grid tokens
+    # were read out of the memory region, and the last 840 dims were dropped).
+    # Shapes still matched, so it never raised — it just fed the policy garbage.
     model = AgentNetworkJax(
         hidden_dim=hidden_d,
         n_heads=int(config["n_heads"]),
         n_layers=n_layers,
-        obs_dim=0,
+        obs_dim=obs_dim,
         signal_dim=sig_d,
         symbol_dim=int(config["symbol_dim"]),
         vocab_size=int(config["vocab_size"]),
-        memory_slots=0,
+        memory_slots=_memory_slots,
+        local_cells=_local_cells,
         fwd_env_dim=fwd_env_dim,
         cross_attn_enabled=config.get("phase9_canvas", {}).get("cross_attn_enabled", False),
+        cross_attn_num_heads=int(config.get("phase9_canvas", {}).get("cross_attn_num_heads", 4)),
         neighbor_k=int(config["neighbor_k"]),
         n_actions=int(config.get("n_actions", 8)),
-        env_channels=int(config.get("env_channels", 10)),
-        own_state_dim=int(config.get("own_state_dim", 10)),
+        # Defaults track config.yaml (Phase 18.7: 15 env channels, 22 own-state
+        # dims). The old 10/10 fallbacks silently rebuilt a Phase-16 obs layout
+        # if a key was missing.
+        env_channels=int(config.get("env_channels", 15)),
+        own_state_dim=int(config.get("own_state_dim", 22)),
     )
     model_apply = make_model_apply(model)
 
@@ -128,11 +169,18 @@ def run_causal_intervention(checkpoint_dir: str, token_a: str, token_b: str, con
         vocab_size=_red_vocab,
         vq_beta=float(config.get("vq_beta", 0.25)),
         vq_dead_code_reset=bool(config.get("vq_dead_code_reset", True)),
+        # SimVQ reparam constants are part of the red forward pass, so they must
+        # match training or the restored weights are applied through a different
+        # transform (main_jax.py ~L1126).
+        simvq_w_clip=float(_p14t.get("simvq_w_clip", 2.0)),
+        simvq_out_scale=float(_p14t.get("simvq_out_scale", 2.0)),
+        # Same obs-layout requirement as blue — see the note above.
+        memory_slots=_memory_slots,
         cross_attn_enabled=_red_cross,
         cross_attn_num_heads=_cross_heads,
         n_actions=int(config.get("n_actions", 8)),
-        env_channels=int(config.get("env_channels", 10)),
-        own_state_dim=int(config.get("own_state_dim", 10)),
+        env_channels=int(config.get("env_channels", 15)),
+        own_state_dim=int(config.get("own_state_dim", 22)),
     )
     r_model_apply = make_model_apply(model_red)
 
@@ -169,14 +217,35 @@ def run_causal_intervention(checkpoint_dir: str, token_a: str, token_b: str, con
 
     b_pop = init_population(
         max_pop, hidden_d, sig_d, gs, team_id=0,
-        key=keys[0], n_agents=max_pop, memory_slots=20,
+        key=keys[0], n_agents=max_pop, memory_slots=_memory_slots,
     )
     r_pop = init_population(
         max_pop_red, red_hidden_d, sig_d, gs, team_id=1,
-        key=keys[1], n_agents=max_pop_red, memory_slots=20,  # Ensure full red population is initialized for distances
+        key=keys[1], n_agents=max_pop_red, memory_slots=_memory_slots,  # full red pop for distances
     )
     b_carries = jnp.zeros((max_pop, hidden_d))
     r_carries = jnp.zeros((max_pop_red, red_hidden_d))
+
+    # Layout guard. The network derives every observation slice offset from its
+    # own `_obs_layout()`; the environment builds the obs from `config`. If the
+    # two disagree the shapes still line up at the Dense layers and nothing
+    # raises — the policy just reads the wrong fields. That is exactly the
+    # failure this tool shipped with (memory_slots=0 vs a 20-slot buffer, an
+    # 840-dim displacement of everything past `mem_start`). Fail loudly instead.
+    _layout_dim = _layout.total_dim
+    _zero_map = jnp.zeros((gs, gs), dtype=jnp.float32)
+    _probe_obs = _obs_mod.build_observations_jax(
+        b_pop, grid, _zero_map, _zero_map, config, 0,
+    )
+    if _probe_obs.shape[1] != _layout_dim:
+        sys.exit(
+            f"OBS LAYOUT MISMATCH: environment builds {_probe_obs.shape[1]}-D "
+            f"observations but the network slices for {_layout_dim}-D "
+            f"(memory_slots={_memory_slots}, env_channels={config.get('env_channels')}, "
+            f"own_state_dim={config.get('own_state_dim')}). Any ATE measured "
+            f"through this mismatch is meaningless. Fix the model construction."
+        )
+    print(f"[Causal Intervention] obs layout OK: {_layout_dim}-D", flush=True)
 
     sim_step = make_sim_step(config, model, model_apply, r_model_apply=r_model_apply)
     
