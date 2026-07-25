@@ -53,9 +53,15 @@ from jax_sim.grid_jax import GridState
 from jax_sim.main_jax import _normalize_config, make_sim_step
 from jax_sim.network_jax import AgentNetworkJax, init_agent_params, make_model_apply
 from jax_sim.population_jax import init_population
+from jax_sim.obs_layout import SIGNAL_SLOTS
 from flax.core.frozen_dict import unfreeze, freeze
 
 ACTION_NAMES = {0: "N", 1: "S", 2: "E", 3: "W", 4: "STAY", 5: "STRK", 6: "PUSH", 7: "GRD", 8: "BUILD", 9: "PU", 10: "CRF", 11: "USE"}
+
+# Wire layout is NOT a uniform stride: slots are 12/8/12 wide at offsets 8/20/28
+# (see jax_sim/obs_layout.py SIGNAL_SLOTS and network_jax.py codebook_{0,1,2}).
+# The previous 8*slot_idx arithmetic here read/wrote the wrong dims.
+SLOT_SLICES = [SIGNAL_SLOTS["slot_0"], SIGNAL_SLOTS["slot_1"], SIGNAL_SLOTS["slot_2"]]
 
 def run_causal_intervention(checkpoint_dir: str, token_a: str, token_b: str, context: str, num_samples: int, receiver_dist_min: int = 10, alarm_test: bool = False):
     
@@ -77,6 +83,7 @@ def run_causal_intervention(checkpoint_dir: str, token_a: str, token_b: str, con
     config["ppo_rollout_steps"] = 1  # Crucial for intercepting state
 
     gs = int(config["grid_size"])
+    neighbor_k = int(config["neighbor_k"])
     max_pop = int(config["max_pop"])
     max_pop_red = int(config["max_pop_red"])
     hidden_d = int(config["hidden_dim"])
@@ -204,11 +211,17 @@ def run_causal_intervention(checkpoint_dir: str, token_a: str, token_b: str, con
         r_positions = np.asarray(r_pop.positions)
         bg_mask = np.asarray(b_pop.is_big_green)
         
-        pos_map = {}
-        for i in range(max_pop):
-            if alive[i]:
-                py, px = positions[i]
-                pos_map.setdefault((py, px), []).append(i)
+        # Audibility gate. A receiver only ingests the signals of its K nearest
+        # alive neighbours (grid_jax.get_neighbour_signals). Intervening on an
+        # emitter outside that set cannot reach the receiver at all, so it
+        # contributes a structural zero and dilutes the ATE. Mirror the same
+        # Chebyshev-on-torus top_k here and search only the audible set.
+        _diff = np.abs(positions[:, None, :].astype(np.int64) - positions[None, :, :].astype(np.int64))
+        _diff = np.minimum(_diff, gs - _diff)
+        _pair_d = np.max(_diff, axis=-1).astype(np.float64)
+        _pair_d = _pair_d + np.eye(max_pop) * (gs * 10)
+        _pair_d = np.where(alive[None, :], _pair_d, gs * 100)
+        nb_idx = np.argsort(_pair_d, axis=1)[:, :neighbor_k]
 
         for receiver_id in range(max_pop):
             if not alive[receiver_id]:
@@ -253,48 +266,33 @@ def run_causal_intervention(checkpoint_dir: str, token_a: str, token_b: str, con
                 
             emitter_id = -1
             prev_signals = np.asarray(b_pop.signals)
-            
+
+            # Only agents inside the receiver's own neighbour window are audible.
+            audible = [int(j) for j in nb_idx[receiver_id] if alive[j] and int(j) != receiver_id]
+
             if not alarm_test:
-                for dy in range(-5, 6):
-                    for dx in range(-5, 6):
-                        ny, nx = (ry + dy) % gs, (rx + dx) % gs
-                        agents_here = pos_map.get((ny, nx), [])
-                        for eid in agents_here:
-                            if eid != receiver_id:
-                                sig = prev_signals[eid]
-                                match = True
-                                for slot_idx in range(3):
-                                    if t_a_list[slot_idx] != -1:
-                                        expected_emb = np.asarray(codebooks[slot_idx][t_a_list[slot_idx]])
-                                        actual_emb = sig[8 + slot_idx*8 : 16 + slot_idx*8]
-                                        dist = np.linalg.norm(actual_emb - expected_emb)
-                                        if dist > 1e-4:
-                                            match = False
-                                            break
-                                if match:
-                                    emitter_id = eid
-                                    break
-                        if emitter_id != -1:
-                            break
-                    if emitter_id != -1:
+                for eid in audible:
+                    sig = prev_signals[eid]
+                    match = True
+                    for slot_idx in range(3):
+                        if t_a_list[slot_idx] != -1:
+                            expected_emb = np.asarray(codebooks[slot_idx][t_a_list[slot_idx]])
+                            actual_emb = sig[SLOT_SLICES[slot_idx]]
+                            if np.linalg.norm(actual_emb - expected_emb) > 1e-4:
+                                match = False
+                                break
+                    if match:
+                        emitter_id = eid
                         break
             else:
                 prev_alarms = np.asarray(b_pop.alarms)
-                for dy in range(-5, 6):
-                    for dx in range(-5, 6):
-                        ny, nx = (ry + dy) % gs, (rx + dx) % gs
-                        agents_here = pos_map.get((ny, nx), [])
-                        for eid in agents_here:
-                            if eid != receiver_id:
-                                # Find an agent who was silent (alarm=0)
-                                if prev_alarms[eid][1] < 0.5:
-                                    emitter_id = eid
-                                    break
-                        if emitter_id != -1:
-                            break
-                    if emitter_id != -1:
+                for eid in audible:
+                    # Find an audible agent who was silent (alarm=0)
+                    if prev_alarms[eid][1] < 0.5:
+                        emitter_id = eid
                         break
-                        
+
+
             if emitter_id != -1:
                 # We found a valid event. Calculate baseline probabilities.
                 baseline_logits = action_logits[receiver_id]
@@ -327,7 +325,7 @@ def run_causal_intervention(checkpoint_dir: str, token_a: str, token_b: str, con
                     new_sig = b_pop.signals[emitter_id]
                     for slot_idx in range(3):
                         if t_b_list[slot_idx] != -1:
-                            new_sig = new_sig.at[8 + slot_idx*8 : 16 + slot_idx*8].set(codebooks[slot_idx][t_b_list[slot_idx]])
+                            new_sig = new_sig.at[SLOT_SLICES[slot_idx]].set(codebooks[slot_idx][t_b_list[slot_idx]])
                     b_pop_intervened = b_pop.replace(
                         signals=b_pop.signals.at[emitter_id].set(new_sig)
                     )
@@ -381,7 +379,7 @@ def run_causal_intervention(checkpoint_dir: str, token_a: str, token_b: str, con
     print("\n" + "="*50)
     print(f" CAUSAL INTERVENTION RESULTS: Context '{context}'")
     print("="*50)
-    print(f"Total Samples (N): {num_samples}")
+    print(f"Total Samples (N): {len(baseline_probs)} (requested {num_samples})")
     if alarm_test:
         print(f"Mean P(Action|Silent): {np.mean(baseline_probs):.4f}")
         print(f"Mean P(Action|Alarm):  {np.mean(intervened_probs):.4f}")
