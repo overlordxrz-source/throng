@@ -284,3 +284,32 @@ phase16_5_enrichment:
   feral_threshold: 0.20
   barrier_decay_rate: 0.05
   ignition_discount: 0.1
+
+# ── Phase 18.8 — Receiver-Necessity Ecology ─────────────────────────────────
+# Every value below reproduces Phase 18.7 behaviour. Flipping them is an
+# ECOLOGY change: read docs/PHASE18_8_RECEIVER_NECESSITY.md and get Cam
+# sign-off (Rule 12) before enabling. Recommended staging is in that doc —
+# do NOT turn all of these on at once against the 2763 checkpoint.
+phase18_8_receiver_necessity:
+  # Recipe-sighted agents cannot pick up materials, so a blind agent cannot
+  # learn which material to fetch except through the channel. This is the one
+  # that actually creates receiver necessity; the rest close side-leaks.
+  strict_asymmetry: false
+  # Pay the +3.0 craft bounty only to agents whose material was consumed.
+  # Kills the "loiter next to crafters and spam Craft" policy.
+  contributor_only_reward: false
+  # Only destroy materials the live recipe actually requires (18.7 destroyed
+  # everything the crafter held).
+  consume_required_only: false
+  # A lone agent must not form a craft group with itself.
+  exclude_self_from_craft_group: false
+  # Steps a recipe stays live. 1000 (18.7) spans ~2 PPO updates and is
+  # memorisable from reward alone. Below ppo_rollout_steps (512) the policy
+  # cannot carry "the current recipe" in its weights.
+  recipe_rotation_steps: 1000
+  # Fraction of the craft bounty paid to a recipe-sighted agent when a
+  # contributor succeeds within sender_credit_radius. Under strict_asymmetry a
+  # sighted agent can never craft, so without this PPO gives senders no
+  # gradient at all and the channel collapses to silence. 0.0 = off.
+  sender_credit_frac: 0.0
+  sender_credit_radius: 8

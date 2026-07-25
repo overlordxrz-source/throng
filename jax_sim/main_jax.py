@@ -208,6 +208,24 @@ def make_sim_step(
     _reward_craft_success = float(config.get("reward_craft_success", 3.0))
     _reward_futile_craft = float(config.get("reward_futile_craft", -0.20))
 
+    # ── Phase 18.8 Receiver-Necessity Ecology ────────────────────────────
+    # 18.7 made *cooperation* structural (capacity-1 inventory vs 3-4 unit
+    # recipes) but left the *message* optional. Two leaks: a recipe-blind agent
+    # could hold any material, loiter beside crafters and spam Craft (+3.0 on
+    # success beats -0.20 futile at a ~7% hit rate); and the global recipe was
+    # stable for 1000 steps, i.e. ~2 PPO updates, so it was recoverable from
+    # reward alone without anyone ever listening. These knobs close both.
+    # Every default reproduces 18.7 behaviour exactly — see
+    # docs/PHASE18_8_RECEIVER_NECESSITY.md before flipping any of them.
+    _p188 = config.get("phase18_8_receiver_necessity", {}) or {}
+    _rn_strict_asymmetry = bool(_p188.get("strict_asymmetry", False))
+    _rn_contributor_only = bool(_p188.get("contributor_only_reward", False))
+    _rn_consume_required_only = bool(_p188.get("consume_required_only", False))
+    _rn_exclude_self = bool(_p188.get("exclude_self_from_craft_group", False))
+    _rn_recipe_steps = int(_p188.get("recipe_rotation_steps", 1000))
+    _rn_sender_credit_frac = float(_p188.get("sender_credit_frac", 0.0))
+    _rn_sender_credit_radius = int(_p188.get("sender_credit_radius", 8))
+
     # Phase 16 parameters
     p16 = config.get("phase16_combinatorial_syntax", {})
     _rew_small_blue = float(p16.get("reward_small_blue", 3.0))
@@ -462,6 +480,12 @@ def make_sim_step(
 
         # 2. PICK_UP (Action 9) -> Capacity=1 enforcement
         is_pickup = (b_actions == 9) & b_pop.alive
+        if _rn_strict_asymmetry:
+            # Phase 18.8: recipe-sighted agents are pure senders — they may not
+            # hold materials at all. A blind agent therefore cannot discover
+            # which material to fetch except through the channel. This is
+            # information asymmetry by construction, not by incentive.
+            is_pickup = is_pickup & ~b_pop.can_see_recipe
         currently_empty = (b_pop.inventory_wood == 0) & (b_pop.inventory_stone == 0) & (b_pop.inventory_flint == 0) & (b_pop.inventory_clay == 0) & (b_pop.inventory_vine == 0)
         
         on_wood = grid.wood_grid[b_pop.positions[:, 0], b_pop.positions[:, 1]] > 0
@@ -506,7 +530,12 @@ def make_sim_step(
         dy = jnp.minimum(dy, gs - dy)
         dist = jnp.maximum(dx, dy)
         adjacent = dist <= 1
-        
+        if _rn_exclude_self:
+            # Phase 18.8: a lone agent must not form a craft group with itself.
+            # (Capacity-1 vs 3-4 unit recipes already blocks solo craft, but a
+            # future 1-unit recipe would slip through.)
+            adjacent = adjacent & ~jnp.eye(b_pop.positions.shape[0], dtype=jnp.bool_)
+
         craft_group = adjacent & is_craft[:, None] & is_craft[None, :]
         
         group_wood = jnp.sum(new_inv_wood[None, :] * craft_group, axis=1)
@@ -536,7 +565,25 @@ def make_sim_step(
         consume_flint = craft_success & (new_inv_flint > 0)
         consume_clay = craft_success & (new_inv_clay > 0)
         consume_vine = craft_success & (new_inv_vine > 0)
-        
+
+        if _rn_consume_required_only:
+            # Phase 18.8: 18.7 destroyed *every* material held by a successful
+            # crafter, including ones the recipe never asked for. That both
+            # wasted materials and made "hold anything" as good as "hold the
+            # right thing" for the purposes of contribution.
+            consume_wood = consume_wood & (req_wood > 0)
+            consume_stone = consume_stone & (req_stone > 0)
+            consume_flint = consume_flint & (req_flint > 0)
+            consume_clay = consume_clay & (req_clay > 0)
+            consume_vine = consume_vine & (req_vine > 0)
+
+        # An agent *contributed* iff the recipe actually consumed its material.
+        # Empty-handed loiterers in the craft group are excluded.
+        contributed = (
+            consume_wood | consume_stone | consume_flint | consume_clay | consume_vine
+        )
+
+
         new_inv_wood = new_inv_wood - consume_wood.astype(jnp.int32)
         new_inv_stone = new_inv_stone - consume_stone.astype(jnp.int32)
         new_inv_flint = new_inv_flint - consume_flint.astype(jnp.int32)
@@ -656,7 +703,13 @@ def make_sim_step(
             vis_prob = 0.5 - 0.3 * progress
             new_vis = jax.random.bernoulli(k_vis, vis_prob, (b_pop.max_pop,))
             
-            return counts.astype(jnp.int32), jnp.array([1000], dtype=jnp.int32), new_vis
+            # Phase 18.8: the rotation period is the single most load-bearing
+            # number in the receiver-necessity design. At 1000 steps the recipe
+            # spans ~2 PPO updates (rollout=512) and the policy can simply
+            # memorise it from reward. Shorten it below the rollout length and
+            # "which recipe is live right now" becomes unlearnable from weights
+            # — it has to be read from obs (sighted) or from the wire (blind).
+            return counts.astype(jnp.int32), jnp.array([_rn_recipe_steps], dtype=jnp.int32), new_vis
             
         def keep_recipe(_):
             return grid.current_recipe, jnp.array([new_recipe_timer], dtype=jnp.int32), b_pop.can_see_recipe
@@ -729,7 +782,27 @@ def make_sim_step(
         futile_craft = (b_actions == 10) & b_pop.alive & ~craft_success
         futile_use = (b_actions == 11) & b_pop.alive & (b_pop.inventory_axe == 0)
         b_rew = b_rew + _reward_futile_craft * (futile_craft | futile_use).astype(jnp.float32)
-        b_rew = b_rew + _reward_craft_success * craft_success.astype(jnp.float32)
+
+        # Phase 18.8: pay the craft bounty to contributors only, so that standing
+        # next to a successful group is worth nothing.
+        _craft_paid = contributed if _rn_contributor_only else craft_success
+        b_rew = b_rew + _reward_craft_success * _craft_paid.astype(jnp.float32)
+
+        if _rn_sender_credit_frac > 0.0:
+            # Under strict_asymmetry a recipe-sighted agent can never craft, so
+            # PPO gives it no gradient toward informative signalling and the
+            # ecology collapses to silence. This pays a sighted agent a fraction
+            # of the bounty when a contributor succeeds within earshot. It is
+            # outcome credit (paid only on a real craft), never a reward for the
+            # act of signalling — but it IS an ecological parameter, so it needs
+            # Cam sign-off under Rule 12. Default 0.0 = off.
+            _near_contrib = (dist <= _rn_sender_credit_radius) & contributed[None, :]
+            _heard_success = (
+                jnp.any(_near_contrib, axis=1) & b_pop.can_see_recipe & b_pop.alive
+            )
+            b_rew = b_rew + (_reward_craft_success * _rn_sender_credit_frac) * (
+                _heard_success.astype(jnp.float32)
+            )
 
         r_rew = _rew_small_blue * r_caught_small
         r_rew = r_rew + (_rew_big_green_coop + _rew_coord) * r_caught_big_coop
@@ -793,6 +866,7 @@ def make_sim_step(
             "ignition": ignition,
             "barrier_sum": jnp.sum(grid.barrier_hp_map),
             "craft_success": craft_success.astype(jnp.float32),
+            "craft_contributed": contributed.astype(jnp.float32),
             "futile_craft": futile_craft.astype(jnp.float32),
             "current_recipe": grid.current_recipe,
             "steps_since_dropout": b_pop.steps_since_dropout,
@@ -2186,7 +2260,18 @@ def _run_simulation_impl(
                 _n_craft_success = int(np.asarray(rollout_data["blue"]["craft_success"]).sum())
             if "futile_craft" in rollout_data["blue"]:
                 _n_futile_craft = int(np.asarray(rollout_data["blue"]["futile_craft"]).sum())
-            print(f"  Crafting: success={_n_craft_success} | futile={_n_futile_craft} | rate={_n_craft_success / max(1, _n_craft_success + _n_futile_craft):.1%}")
+            _n_contrib = 0
+            if "craft_contributed" in rollout_data["blue"]:
+                _n_contrib = int(np.asarray(rollout_data["blue"]["craft_contributed"]).sum())
+            # free-rider share: successful crafters whose material was not consumed.
+            # Under 18.8 contributor_only_reward these earn nothing; if this stays
+            # high the ecology is still paying for proximity, not for cooperation.
+            _free = max(0, _n_craft_success - _n_contrib)
+            print(
+                f"  Crafting: success={_n_craft_success} | contrib={_n_contrib} | "
+                f"free-rider={_free} ({_free / max(1, _n_craft_success):.0%}) | "
+                f"futile={_n_futile_craft} | rate={_n_craft_success / max(1, _n_craft_success + _n_futile_craft):.1%}"
+            )
             if bool((_p9 or {}).get("imagination_gating_enabled", False)):
                 im_agree_val = float("nan")
                 conf_gate_val = float("nan")
