@@ -54,8 +54,14 @@ def get_marl_distributions(corpus_path, vocab_size=64, min_step=992000):
                 if data.get('step', 0) < min_step:
                     continue
                 token = data.get('vq_token', None)
-                if token is not None and 0 <= token < vocab_size:
-                    token_counts[token] += 1
+                # Phase 18 made vq_token a 3-element list (slots 12/8/12). The
+                # old scalar comparison raised TypeError on every line, the bare
+                # `except` below swallowed it, and the run silently fell back to
+                # a uniform frequency prior. Read slot 0 explicitly.
+                if isinstance(token, (list, tuple)):
+                    token = token[0] if len(token) else None
+                if token is not None and 0 <= int(token) < vocab_size:
+                    token_counts[int(token)] += 1
             except Exception:
                 continue
                 
@@ -150,7 +156,18 @@ def main():
                   f"Iso: {metrics['loss_isometry']:.4f}")
 
     print("\n--- THE ROSETTA STONE ---")
-    mapped_anchors = model.apply(params, marl_tokens, mode="fwd") # [64, 50]
+    print(
+        "WARNING: this alignment is NOT validated. The MARL side of the GW\n"
+        "objective is np.eye(64), whose distance matrix is constant, so the\n"
+        "alien token geometry never enters the loss. Any token->word table\n"
+        "printed below is unfalsified until (a) real token co-occurrence\n"
+        "structure is fed in and (b) it beats a label-permutation null.\n"
+        "See THRONG.md 'Phase 17 retraction'.\n"
+    )
+    # BUG (fixed): this used `params` — the output of model.init — so the
+    # published Phase 17 table was produced by an untrained, randomly
+    # initialised network. Training updates `state`, not `params`.
+    mapped_anchors = model.apply(state.params, marl_tokens, mode="fwd") # [64, 50]
     for i in range(64):
         # Find nearest 5 words
         dists = jnp.linalg.norm(target_embs - mapped_anchors[i], axis=1)

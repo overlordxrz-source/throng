@@ -23,6 +23,39 @@ The philosophical and mathematical foundations of THRONG have been consolidated 
 
 **Blue SOTA (frozen on `master`):** **`465d8c6+`** — 9.4 cross-attn + 9.1 confidence + **11.3 epistemic gate**.
 
+> [!CAUTION]
+> **The interventional ATE instrument was broken (fixed Jul 2026, `feature/phase18-8-receiver-necessity`).**
+> `tools/causal_intervention.py` sliced the 40-D wire with a uniform 8-dim stride
+> at offsets 8/16/24. The real slots are **12/8/12 at offsets 8/20/28**
+> (`jax_sim/obs_layout.py` `SIGNAL_SLOTS`; `network_jax.py` `codebook_{0,1,2}`).
+> A slot-0 or slot-2 intervention wrote a 12-vector into an 8-wide slice and
+> **raised**; a slot-1 intervention had matching shapes but wrote to dims 16–23 —
+> the tail of slot 0 plus the head of slot 1 — and ran **silently wrong**. The
+> emitter-matching loop had the same defect.
+>
+> Second defect, same commit: the emitter search scanned an ±5-cell box, but a
+> receiver only ingests its **K=6 nearest** neighbours (`grid_jax.py:389`
+> `get_neighbour_signals`). Intervening on an emitter outside that set cannot
+> reach the receiver, so it contributes a structural zero — a mechanism that
+> manufactures ATE ≈ 0 out of a channel that may be working. The search is now
+> restricted to the receiver's actual neighbour window.
+>
+> **Scope of the retraction — read carefully, the two instruments are different:**
+>
+> | Instrument | Status |
+> |---|---|
+> | `tools/causal_intervention.py` (live counterfactual token swap) | **Every number it has produced on the 3-slot wire is void.** Re-run required. |
+> | `tools/ate_swap_test.py` (offline stratified difference-in-means) | **Not affected.** It resolves slots correctly via `_slot_token`. The Slot-2 results below (+0.1295, +0.0430) are real computations. |
+>
+> The offline results therefore stand as *observational* estimates, with their
+> standing caveat intact: alert/safe token sets are defined by the **emitter's**
+> `red_dist`, and stratifying on the **receiver's** `red_dist` cannot remove the
+> fact that an audible emitter's predator is usually the receiver's predator too.
+> That residual confound is precisely what the interventional instrument exists
+> to break — and that instrument has never actually run correctly. **Re-running
+> it against ckpt 2763 is the current gate.** See
+> [`docs/PHASE18_8_RECEIVER_NECESSITY.md`](docs/PHASE18_8_RECEIVER_NECESSITY.md) §4.
+
 **Headline (Phase 18.7 milestone, Jun 25): The Evasion Attractor & Catch Radius Fix!** The 0.15 barrier cost successfully broke the "hide behind walls" strategy (`barrier_sum` stabilized ~1000-1500). However, the expected predation spike did not occur. We hit 20 consecutive quiet-phase updates (`ppo=2589` to `ppo=2608`) with `blue_caught=0`. The agents discovered a stable **Evasion Attractor**: on an open grid with `catch_radius=1`, any blue agent can maintain ≥2 cell separation from predators using pure reactive movement policy. Because evasion is cheap and guarantees survival, the crafting survival channel carried no marginal value and codebooks starved (~100 resets/update). **Intervention:** `red_catch_radius` increased from 1 to 2. This geometrically breaks the pure-evasion guarantee (blues now require ≥3 cell separation), forcing clustering, barrier use, and survival-critical crafting back into the limit cycle to generate ATE measurement windows.
 
 **Headline (Phase 18.7 milestone, Jun 25): Slot 2 Passes Causal Gate!** The offline ATE instrument was run on the transition-window corpus (min-step 1315000, ppo=2576) where the barrier fortress had just broken. **Slot 2 (Modifier / Urgency) passed the causal gate** with ATE = +0.1295 (95% CI: [+0.0364, +0.2007]). This proves the receiver-necessity ecology is working: discrete VQ tokens are causally moving receiver behavior beyond what spatial proximity predicts. Action shifts for Slot 2 alert tokens: S (+10.8%), PU (+5.2%), STRK (-12.8%). Interpretation: agents are successfully transmitting survival-relevant urgency ("danger is real and near") and receivers are responding with flight rather than aggression.
@@ -81,17 +114,51 @@ The philosophical and mathematical foundations of THRONG have been consolidated 
 **Cam's Measured Read on the Proto-Lexicon:**
 - **The Continuous Smuggling Hypothesis**: The categorical LRT on scout signals (k=4 clusters) showed no alignment with cardinal direction ($\chi^2 p = 0.315$). However, the continuous `LAG-1 DIRECTION LRT` on the 32d signal vector yielded highly significant causal steering ($p < 0.005$ on 12 dimensions!). The agents are not communicating via the discrete codebook index; they are doing linear algebra on the continuous `z_q` embeddings, effectively pointing to predators in continuous space.
 
-> [!NOTE]
-> **Phase 17 Results (The Rosetta Stone):** We successfully translated the alien vocabulary without paired data! Using Gromov-Wasserstein topological alignment, the geometric shape of the alien transition matrix mapped cleanly onto the Stanford GloVe 50d English embeddings.
-> **Key Extractions:**
-> - Token 57 ("troops", "soldiers", "withdraw") -> Flee/Predator
-> - Token 54 ("costs", "cost", "fees") -> Metabolic Energy Tax
-> - Token 48 ("mean", "higher", "zero") -> Spatial Coordinates
-> - Token 29 ("lost", "2", "5") -> Casualties/Energy Loss
-> The symbol grounding problem is practically solved for this isolated ecology.
+> [!CAUTION]
+> **Phase 17 (The Rosetta Stone) — RETRACTED (Jul 2026).** The token→English table
+> below is **not a result**. Three independent defects, all verifiable by reading
+> `scripts/train_rosetta.py`:
+>
+> 1. **The published table came from an untrained network.** Line 153 called
+>    `model.apply(params, ...)` where `params` is the output of `model.init` on
+>    line 100 and is never reassigned — training updates `state`, and
+>    `state.params` was discarded. The mapping was a random projection of a
+>    one-hot into GloVe space plus a nearest-neighbour lookup.
+> 2. **The alien geometry was never in the objective.** `batch_marl` is rows of
+>    `np.eye(64)`, so `C_marl` is a constant off-diagonal √2 matrix. There is no
+>    transition matrix, no co-occurrence structure and no codebook embedding on
+>    the MARL side of the Gromov-Wasserstein loss. The claim that "the geometric
+>    shape of the alien transition matrix mapped onto GloVe" describes something
+>    the code does not compute.
+> 3. **No permutation null.** Even with 1 and 2 fixed, GW always returns *a*
+>    coupling; at n=64 against a maximally non-isomorphic space a low cost is
+>    expected by chance. Any future attempt must beat a label-permutation null
+>    (shuffle codebook↔word labels ≥1,000×) before it is reportable.
+>
+> Both code bugs are fixed on `feature/phase18-8-receiver-necessity`; the script
+> now prints a warning banner and uses `state.params`. **The retraction stands
+> regardless** — defect 2 is a design flaw, not a bug, and it has never been
+> addressed. Nothing may be built on the token→word mappings.
+>
+> <details><summary>Retracted content (kept for the record)</summary>
+>
+> Token 57 ("troops", "soldiers", "withdraw") → Flee/Predator; Token 54
+> ("costs", "cost", "fees") → Metabolic Energy Tax; Token 48 ("mean", "higher",
+> "zero") → Spatial Coordinates; Token 29 ("lost", "2", "5") → Casualties/Energy
+> Loss. "The symbol grounding problem is practically solved for this isolated
+> ecology."
+> </details>
+>
+> This note sat roughly one file-section away from `ATE = 0.0000`. Those two
+> claims were never compatible: if receivers do not causally respond to tokens,
+> the tokens carry no semantics for a GW alignment to recover.
 
-> [!NOTE]
-> **Phase 19 Preparations:** The Hive-Mind Interface. We will now build a bridge mapping a lightweight LLM directly to the MARL agents' frozen continuous token embeddings to allow real-time human injection of semantic tokens into the simulation.
+> [!WARNING]
+> **Phase 19 (Hive-Mind Interface) — BLOCKED.** It was scheduled to bridge an LLM
+> onto "the MARL agents' frozen continuous token embeddings", i.e. onto the
+> semantics established by the retracted Phase 17 result. There are currently no
+> established semantics to bridge to. Phase 19 is gated behind a non-zero,
+> adequately powered receiver CIC (see §0b and `docs/PHASE18_8_RECEIVER_NECESSITY.md`).
 | **Science bar (P15.5)** | ✅ **CONFIRMED**: Episodic Memory ($p < 0.05$) & Cumulative Culture ($p < 0.001$) at Lag-10! |
 | **Decode gate (P16.0)** | `python3 tools/decode_signals.py --red --metrics posdis,tre` |
 | **Cold-restart toggle** | **False** (MUST be false for all future resumes; `True` only for the original 866304 codebook surgery) |
