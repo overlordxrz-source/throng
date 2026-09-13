@@ -104,8 +104,12 @@ def run_lag_analysis(checkpoint_dir: str, steps: int = 500):
     model_apply = make_model_apply(model)
 
     _p14t = config.get("phase14_transcendental", {})
+    # AUDIT_SEP2026.md: red_hidden_dim is a top-level config key, not a field
+    # under phase14_transcendental — this always missed and silently fell
+    # through to the hardcoded 128, matching today's value by coincidence.
+    red_hidden_d = int(config.get("red_hidden_dim", hidden_d // 2))
     model_red = PredatorNetworkJax(
-        hidden_dim=int(_p14t.get("hidden_dim", 128)),
+        hidden_dim=red_hidden_d,
         neighbor_k=int(config["neighbor_k"]),
         local_obs_radius=int(config["local_obs_radius"]),
         n_heads=int(config["n_heads"]),
@@ -136,10 +140,10 @@ def run_lag_analysis(checkpoint_dir: str, steps: int = 500):
     grid = grid.replace(walls=jnp.zeros((gs, gs), dtype=jnp.bool_))
 
     b_pop = init_population(max_pop, hidden_d, sig_d, gs, 0, keys[0], max_pop, 20)
-    r_pop = init_population(max_pop_red, int(_p14t.get("hidden_dim", 128)),
+    r_pop = init_population(max_pop_red, red_hidden_d,
                             sig_d, gs, 1, keys[1], max_pop_red, 20)
     b_carries = jnp.zeros((max_pop, hidden_d))
-    r_carries = jnp.zeros((max_pop_red, int(_p14t.get("hidden_dim", 128))))
+    r_carries = jnp.zeros((max_pop_red, red_hidden_d))
 
     sim_step = make_sim_step(config, model, model_apply, r_model_apply=r_model_apply)
 
