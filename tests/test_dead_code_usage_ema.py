@@ -22,6 +22,27 @@ pins the exact bug a full end-to-end smoke test caught: `dead_streak` must
 be float-typed, not int, because it lives inside the same params pytree
 that PPO's `jax.grad` differentiates end to end — an integer leaf anywhere
 in that tree makes JAX refuse to differentiate the WHOLE tree.
+
+`dead_streak` placement (Cam's question, docs/WILL_RESTART_SEP2026.md):
+does the optimizer apply updates to it, and can the reset's write race the
+optimizer step? Answered and pinned below
+(test_optimizer_never_perturbs_usage_state_but_still_trains_embedding):
+- No perturbation: neither field is read by any loss function, so
+  jax.grad produces an EXACT zero gradient for them; Adam's update rule
+  with m_hat=0, v_hat=0 is `lr * 0 / (0 + eps) = 0` exactly, not
+  approximately — verified bit-for-bit equal before/after a real PPO
+  update (5 real minibatches) that DOES change `embedding` in the same
+  call, proving the params tree is genuinely being optimized while these
+  two fields are not.
+- No race: `dead_code_reset_codebook_params` is not concurrent with
+  anything. main_jax.py calls it as a plain sequential Python statement
+  strictly AFTER `ppo_update` (and `auxiliary_update`) has already
+  returned and been reassigned to `b_params` — there is no threading,
+  async, or jit-parallel region spanning the optimizer step and the reset
+  call, so "race" does not apply; the ordering is enforced by ordinary
+  Python data dependency (each call takes the previous call's returned
+  params as its own input). No move to a separate persisted state tree
+  is needed.
 """
 
 import jax
@@ -30,8 +51,11 @@ import jax.numpy as jnp
 from jax_sim.network_jax import (
     dead_code_reset_codebook_params,
     ensure_vq_usage_state,
+    init_agent_params,
+    AgentNetworkJax,
     VQ_CODEBOOK_KEYS,
 )
+from jax_sim.rl_jax import ppo_update, create_optimizer
 
 VOCAB = 16
 DIM = 8
@@ -197,6 +221,65 @@ def test_thin_pool_cannot_be_bypassed_by_accumulating_many_updates():
     assert float(params["codebook_0"]["dead_streak"][0]) == 0.0
 
 
+def test_optimizer_never_perturbs_usage_state_but_still_trains_embedding():
+    """`dead_streak` placement, answered and pinned (Cam's question). Runs a
+    REAL PPO update (5 real minibatches, real Adam optimizer, real VQ loss)
+    against a real AgentNetworkJax and proves — not reasons about —
+    usage_ema/dead_streak come out bit-for-bit identical, while embedding
+    (trained by the same loss, in the same call, on the same params tree)
+    does not. This is the empirical half of the answer; the "no race"
+    half is that dead_code_reset_codebook_params is never called concurrently
+    with anything — main_jax.py calls it as an ordinary sequential Python
+    statement strictly after ppo_update has already returned and been
+    reassigned, so there is no concurrent write for it to race."""
+    hidden, n_actions = 256, 12
+    model = AgentNetworkJax(hidden_dim=hidden, n_actions=n_actions)
+    rng = jax.random.PRNGKey(0)
+    obs_dim = model.own_state_dim + model.obs_dim
+    carries = jnp.zeros((2, hidden))
+    obs = jnp.zeros((2, obs_dim))
+    params = init_agent_params(model, rng, carries, obs, n_layers=2)
+
+    before = {
+        k: (params[k]["usage_ema"], params[k]["dead_streak"], params[k]["embedding"])
+        for k in ("codebook_0", "codebook_1", "codebook_2")
+    }
+
+    T, N = 8, 20
+    apply_fn = lambda p, c, o, nl, **kw: model.apply({"params": p}, c, o, nl, **kw)
+    opt = create_optimizer(lr=1e-2)
+    opt_state = opt.init(params)
+    k1, k2, k3, k4, k5 = jax.random.split(jax.random.PRNGKey(1), 5)
+    batch = {
+        "obs": jax.random.normal(k1, (T, N, obs_dim)) * 0.1,
+        "actions": jax.random.randint(k2, (T, N), 0, n_actions),
+        "log_probs": jnp.zeros((T, N)),
+        "rewards": jax.random.normal(k3, (T, N)),
+        "dones": jnp.zeros((T, N)),
+        "values": jnp.zeros((T, N)),
+        "carries": jax.random.normal(k4, (T, N, hidden)) * 0.1,
+        "alive": jnp.ones((T, N)),
+    }
+    new_params, _new_opt_state, _metrics = ppo_update(
+        params, opt_state, opt, apply_fn, batch, n_layers=2, key=k5,
+        minibatch_size=32, team="blue", vq_coef=0.1,
+    )
+
+    for k in ("codebook_0", "codebook_1", "codebook_2"):
+        before_ema, before_streak, before_embedding = before[k]
+        assert bool(jnp.array_equal(before_ema, new_params[k]["usage_ema"])), (
+            f"{k}: usage_ema was perturbed by the optimizer — it must be an exact no-op"
+        )
+        assert bool(jnp.array_equal(before_streak, new_params[k]["dead_streak"])), (
+            f"{k}: dead_streak was perturbed by the optimizer — it must be an exact no-op"
+        )
+        assert not bool(jnp.array_equal(before_embedding, new_params[k]["embedding"])), (
+            f"{k}: embedding did not change — the VQ loss isn't actually training "
+            f"through this params tree in this test, so the no-perturbation result above "
+            f"would be vacuous"
+        )
+
+
 if __name__ == "__main__":
     tests = [
         test_ensure_vq_usage_state_initializes_fresh_fields,
@@ -207,6 +290,7 @@ if __name__ == "__main__":
         test_single_zero_usage_window_alone_does_not_reset,
         test_thin_alive_pool_skips_the_entire_update,
         test_thin_pool_cannot_be_bypassed_by_accumulating_many_updates,
+        test_optimizer_never_perturbs_usage_state_but_still_trains_embedding,
     ]
     for t in tests:
         t()
