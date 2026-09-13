@@ -58,6 +58,20 @@ from flax.core.frozen_dict import unfreeze, freeze
 
 ACTION_NAMES = {0: "N", 1: "S", 2: "E", 3: "W", 4: "STAY", 5: "STRK", 6: "PUSH", 7: "GRD", 8: "BUILD", 9: "PU", 10: "CRF", 11: "USE"}
 
+# Pre-registered pass bar (docs/STRATEGIC_ROADMAP.md): p < 0.05 AND
+# |Delta| > 0.05. Set in advance of any run; do not fit it to the data.
+ATE_P_VALUE_BAR = 0.05
+ATE_DELTA_BAR = 0.05
+
+
+def ate_passes_bar(p_val: float, mean_delta: float) -> bool:
+    """Two-sided pre-registered significance test. Must be two-sided: a
+    directional `mean_delta > ATE_DELTA_BAR` check is a DIFFERENT hypothesis
+    (suppression only) and structurally cannot detect an intervention that
+    INCREASES the target action's probability — it would report a null on a
+    real, large, significant effect running the other direction."""
+    return p_val < ATE_P_VALUE_BAR and abs(mean_delta) > ATE_DELTA_BAR
+
 # Wire layout is NOT a uniform stride: slots are 12/8/12 wide at offsets 8/20/28
 # (see jax_sim/obs_layout.py SIGNAL_SLOTS and network_jax.py codebook_{0,1,2}).
 # The previous 8*slot_idx arithmetic here read/wrote the wrong dims.
@@ -380,6 +394,8 @@ def run_causal_intervention(checkpoint_dir: str, token_a: str, token_b: str, con
         mean_delta = np.mean(baseline_probs - intervened_probs) 
         t_stat, p_val = stats.ttest_rel(baseline_probs, intervened_probs)
     
+    pass_bar = ate_passes_bar(p_val, mean_delta)
+
     print("\n" + "="*50)
     print(f" CAUSAL INTERVENTION RESULTS: Context '{context}'")
     print("="*50)
@@ -389,23 +405,25 @@ def run_causal_intervention(checkpoint_dir: str, token_a: str, token_b: str, con
         print(f"Mean P(Action|Alarm):  {np.mean(intervened_probs):.4f}")
         print(f"Mean Delta (ATE):      {mean_delta:.4f}")
         print(f"Paired t-test:         t={t_stat:.2f}, p={p_val:.2e}")
-        if p_val < 0.05 and mean_delta > 0.05:
+        if pass_bar:
+            direction = "increases" if mean_delta > 0 else "decreases"
             print("\n[CONCLUSION] SIGNIFICANT CAUSAL DIVERGENCE DETECTED.")
-            print(f"Injecting the alarm conclusively drives '{context}' behavior.")
+            print(f"Injecting the alarm conclusively {direction} '{context}' behavior.")
         else:
             print("\n[CONCLUSION] NULL HYPOTHESIS.")
-            print("The alarm intervention did not produce a statistically significant increase.")
+            print("The alarm intervention did not produce a statistically significant change.")
     else:
         print(f"Mean P(Action|TokenA): {np.mean(baseline_probs):.4f}")
         print(f"Mean P(Action|TokenB): {np.mean(intervened_probs):.4f}")
         print(f"Mean Delta (ATE):      {mean_delta:.4f}")
         print(f"Paired t-test:         t={t_stat:.2f}, p={p_val:.2e}")
-        if p_val < 0.05 and mean_delta > 0.05:
+        if pass_bar:
+            direction = "suppresses" if mean_delta > 0 else "amplifies"
             print("\n[CONCLUSION] SIGNIFICANT CAUSAL DIVERGENCE DETECTED.")
-            print(f"Token {token_a} conclusively drives '{context}' behavior compared to Token {token_b}.")
+            print(f"Token {token_a} conclusively {direction} '{context}' behavior compared to Token {token_b}.")
         else:
             print("\n[CONCLUSION] NULL HYPOTHESIS.")
-            print("The VQ token swap did not produce a statistically significant suppression.")
+            print("The VQ token swap did not produce a statistically significant change.")
 
 
 if __name__ == "__main__":
