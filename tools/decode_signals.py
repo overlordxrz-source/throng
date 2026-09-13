@@ -1784,6 +1784,14 @@ def _quick_withdrawal_metrics(corpus_path: str, seed: int = 42) -> dict:
 
 # ── Phase 17 NPMI Lexical Parser ──────────────────────────────────────────────
 
+# Pre-registered decode gate (THRONG.md, Phase 18 decode gate: "NPMI(slot_0,
+# inventory_item) > 0.3", "NPMI(slot_1, action_intent) > 0.3"). Fixed in
+# advance of seeing the data — see the "NPMI threshold" ruling in
+# docs/WILL_RESTART_SEP2026.md for why this replaced a per-slot adaptive
+# threshold that could mathematically exceed NPMI's own maximum of 1.0.
+NPMI_DECODE_GATE = 0.3
+
+
 def compute_npmi(x: np.ndarray, y: np.ndarray, eps: float = 1e-8) -> float:
     """Compute Normalized Pointwise Mutual Information between two boolean arrays.
     NPMI = ln(p(x,y) / (p(x)*p(y))) / -ln(p(x,y))
@@ -1901,28 +1909,34 @@ def npmi_lexical_parse(data: dict) -> None:
         scores_noun = np.array(scores_noun)
         scores_verb = np.array(scores_verb)
         scores_adverb = np.array(scores_adverb)
-        
-        # Per-axis normalization
-        med_n, std_n = np.median(scores_noun), np.std(scores_noun)
-        med_v, std_v = np.median(scores_verb), np.std(scores_verb)
-        med_a, std_a = np.median(scores_adverb), np.std(scores_adverb)
-        
-        thresh_n = med_n + 1.0 * std_n
-        thresh_v = med_v + 1.0 * std_v
-        thresh_a = med_a + 1.0 * std_a
-        
+
+        # Cam's ruling (docs/WILL_RESTART_SEP2026.md, "NPMI threshold"): a
+        # per-slot adaptive threshold (median + 1*std over as few as 2-3
+        # active tokens) can mathematically EXCEED the max possible NPMI of
+        # 1.0 whenever a slot's vocabulary is small and bimodal (some tokens
+        # near-perfectly grounded, others not at all) — proven directly by
+        # `--synthetic`, which failed to recover its own planted ground truth
+        # under the adaptive threshold. That bimodal-small-vocabulary regime
+        # is exactly what a SUCCESSFULLY grounded, collapsed codebook looks
+        # like: the classifier was blindest precisely when the science
+        # succeeds. Use the fixed, PRE-REGISTERED bar from THRONG.md's Phase
+        # 18 decode gate instead of one fitted to the observed distribution
+        # post hoc — an adaptive threshold chosen after seeing the data is
+        # p-hacking with extra steps.
+        thresh_n = thresh_v = thresh_a = NPMI_DECODE_GATE
+
         counts = {"noun": 0, "verb": 0, "adverb": 0, "composite": 0, "unclassified": 0}
-        
+
         for i, t in enumerate(unique_tokens):
             if scores_noun[i] == 0.0 and scores_verb[i] == 0.0 and scores_adverb[i] == 0.0:
                 continue # Skipped token
-                
+
             is_n = scores_noun[i] > thresh_n
             is_v = scores_verb[i] > thresh_v
             is_a = scores_adverb[i] > thresh_a
-            
+
             axes_cleared = sum([is_n, is_v, is_a])
-            
+
             if axes_cleared >= 2:
                 counts["composite"] += 1
             elif is_n:
@@ -1933,15 +1947,31 @@ def npmi_lexical_parse(data: dict) -> None:
                 counts["adverb"] += 1
             else:
                 counts["unclassified"] += 1
-                
+
         total = sum(counts.values())
         if total == 0:
             print("  ❌ No tokens had enough samples to classify.")
             return
-            
-        print(f"  V_noun threshold   : > {thresh_n:.4f} (med={med_n:.4f}, std={std_n:.4f})")
-        print(f"  V_verb threshold   : > {thresh_v:.4f} (med={med_v:.4f}, std={std_v:.4f})")
-        print(f"  V_adverb threshold : > {thresh_a:.4f} (med={med_a:.4f}, std={std_a:.4f})")
+
+        print(f"  Decode gate (pre-registered, THRONG.md Phase 18): NPMI(slot, feature) > {NPMI_DECODE_GATE}")
+        print(f"  (Note: the adverb axis sums two per-feature NPMI maxima — bearing + distance —")
+        print(f"   so its natural range is [0, 2]; the same {NPMI_DECODE_GATE} bar applies to that sum.)")
+        print(f"{'-'*70}")
+        # The labels below are a lossy summary of these numbers, not the
+        # result themselves — report the full per-token distribution so the
+        # classification can be checked against the actual scores it came from.
+        print(f"  {'Token':>6s}  {'N':>6s}  {'noun':>7s}  {'verb':>7s}  {'adverb':>7s}  {'class':>12s}")
+        print(f"  {'-'*60}")
+        for i, t in enumerate(unique_tokens):
+            tok_n = int((tokens == t).sum())
+            if tok_n < 5:
+                continue
+            is_n, is_v, is_a = scores_noun[i] > thresh_n, scores_verb[i] > thresh_v, scores_adverb[i] > thresh_a
+            axes_cleared = sum([is_n, is_v, is_a])
+            label = ("composite" if axes_cleared >= 2 else
+                     "noun" if is_n else "verb" if is_v else "adverb" if is_a else "unclassified")
+            print(f"  {t:6d}  {tok_n:6d}  {scores_noun[i]:7.4f}  {scores_verb[i]:7.4f}  "
+                  f"{scores_adverb[i]:7.4f}  {label:>12s}")
         print(f"{'-'*70}")
         print(f"  Vocabulary Size : {total} active tokens")
         print(f"  Nouns           : {counts['noun']} ({(counts['noun']/total)*100:.1f}%)")
@@ -2047,6 +2077,62 @@ def withdrawal_comparison(baseline_path: str, withdrawal_path: str) -> None:
 
 
 # ── Main ───────────────────────────────────────────────────────────────────────
+def run_synthetic_validation():
+    print(f"\n{'='*70}")
+    print("  SYNTHETIC CORPUS VALIDATION")
+    print(f"{'='*70}")
+    print("Generating 10,000 synthetic records with known rules...")
+    N = 10000
+    rng = np.random.default_rng(42)
+    
+    red_bear = rng.uniform(0, 360, N)
+    red_dist = rng.uniform(0, 10, N)
+    resource = rng.uniform(0, 1, N)
+    adj_bg = rng.choice([True, False], N)
+    adj_barrier = rng.choice([True, False], N)
+    adj_red = rng.choice([True, False], N)
+    
+    actions = rng.integers(0, 8, N)
+    scouts = np.ones(N, dtype=bool)
+    
+    vq_tokens_all = np.zeros((N, 3), dtype=np.int32)
+    # Rule 1 (Slot 0, Noun): adj_red -> token 1, resource > 0.5 -> token 2, else 0
+    vq_tokens_all[:, 0] = np.where(adj_red, 1, np.where(resource > 0.5, 2, 0))
+    # Rule 2 (Slot 1, Verb): action==0 -> token 3, action==1 -> token 4, else 0
+    vq_tokens_all[:, 1] = np.where(actions == 0, 3, np.where(actions == 1, 4, 0))
+    # Rule 3 (Slot 2, Adverb): red_dist > 5.0 -> token 5, else 0
+    vq_tokens_all[:, 2] = np.where(red_dist > 5.0, 5, 0)
+    
+    data = {
+        "ctx": {"red_bear": red_bear, "red_dist": red_dist, "resource": resource},
+        "actions": actions,
+        "scouts": scouts,
+        "adj_bg": adj_bg,
+        "adj_barrier": adj_barrier,
+        "adj_red": adj_red,
+        "vq_tokens": vq_tokens_all[:, 0],
+        "vq_tokens_all": vq_tokens_all,
+        "nb_tok_lag1": None,
+        "nb_tok_lag1_all": None,
+        "nb_dist_lag1": None,
+    }
+    
+    print("\nRunning NPMI on synthetic corpus. Expected:")
+    print("Slot 0 -> Noun high (token 1, 2)")
+    print("Slot 1 -> Verb high (token 3, 4)")
+    print("Slot 2 -> Adverb high (token 5)")
+    
+    npmi_lexical_parse(data)
+    
+    print("\nRunning Direction Test (chi-square) on synthetic corpus...")
+    # Just mock nb_tok_lag1_all with random values to avoid crashing if it's evaluated
+    nb_t = rng.integers(0, 5, (N, 3))
+    for slot_idx in range(3):
+        print(f"\n  --- SLOT {slot_idx} CHI-SQUARE ---")
+        vq_token_direction_test(
+            actions, scouts, data["ctx"], vq_tokens_all[:, slot_idx],
+            nb_t[:, slot_idx], red_dist, min_token_n=10, min_elig=10,
+        )
 
 def main() -> None:
     ap = argparse.ArgumentParser(description="Decode Throng signal corpus")
@@ -2076,7 +2162,13 @@ def main() -> None:
                     help="Phase 17: Run NPMI Lexical Parser (Noun, Verb, Adverb)")
     ap.add_argument("--slice-cols", type=int, default=None,
                     help="Phase 18: Isolate the first N columns of the signal vector (e.g. 8 for the continuous bypass)")
+    ap.add_argument("--synthetic", action="store_true",
+                    help="Run synthetic corpus validation step to verify NPMI and χ² calculations.")
     args = ap.parse_args()
+
+    if args.synthetic:
+        run_synthetic_validation()
+        return
 
     if args.red:
         corpus_path = args.corpus or RED_CORPUS_DEFAULT
@@ -2242,10 +2334,24 @@ def main() -> None:
         topographic_similarity(signals, actions, scouts, ctx, nb_lag1, sig_dim)
         categorical_vocabulary_tests(signals, scouts, ctx, sig_dim)
         lag1_direction_lrt(actions, scouts, nb_lag1, nb_dist_lag1, sig_dim)
-        vq_token_direction_test(
-            actions, scouts, ctx, data["vq_tokens"], data.get("nb_tok_lag1"),
-            nb_dist_lag1, min_token_n=25, min_elig=50,
-        )
+        
+        vq_tokens_all = data.get("vq_tokens_all")
+        nb_tok_lag1_all = data.get("nb_tok_lag1_all")
+        if vq_tokens_all is not None:
+            n_slots = vq_tokens_all.shape[1] if vq_tokens_all.ndim > 1 else 1
+            if vq_tokens_all.ndim == 1:
+                vq_tokens_all = vq_tokens_all[:, None]
+            if nb_tok_lag1_all is not None and nb_tok_lag1_all.ndim == 1:
+                nb_tok_lag1_all = nb_tok_lag1_all[:, None]
+            for slot_idx in range(n_slots):
+                print(f"\n{'='*70}")
+                print(f"  SLOT {slot_idx} CHI-SQUARE (DIRECTION)")
+                print(f"{'='*70}")
+                nb_t = nb_tok_lag1_all[:, slot_idx] if nb_tok_lag1_all is not None else None
+                vq_token_direction_test(
+                    actions, scouts, ctx, vq_tokens_all[:, slot_idx], nb_t,
+                    nb_dist_lag1, min_token_n=25, min_elig=50,
+                )
     else:
         print(f"\n{'─'*70}")
         print(f"  LAG-1 COMMUNICATION TEST")
