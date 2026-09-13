@@ -576,3 +576,81 @@ roadmap promises written as achievements, and **no claim that is not currently t
 — `cross_attn_enabled` is false, blue carry is an EMA, the confidence gate is being repaired.
 Prose over bullet soup. One diagram maximum, and only if it shows the actual signal path. Assume
 the reader is a researcher deciding whether this is serious work.
+
+---
+
+# TASK 5 — LAUNCH ORDER (Cam, Sep 13, 2026)
+
+State: `master` = `6d07e7c`, clean-clone verified. Resume source: ckpt **2763** from
+`~/throng_restart_staging/checkpoints` (never `~/throng_backup`, now enforced in code).
+Gates are pre-registered and must not be renegotiated mid-run.
+
+## 5.1 — Upload (Will, from the laptop)
+
+`modal profile activate agionetwo`, confirm with `modal profile list`, then
+`./scripts/migrate_modal.sh upload ~/throng_restart_staging`. Checkpoints only — the corpora
+stay local as replication evidence and the run writes a fresh one. Verify with
+`modal volume ls throng-runs /checkpoints` and report what is actually on the volume; a
+successful-looking upload command is not evidence the files are there.
+
+## 5.2 — The one-time flag register (do this before launch, not after)
+
+`reset_confidence_head_on_resume: true` is a **one-shot**. If it is still true on the next
+resume it wipes the confidence head again and it will never train — we would spend the whole
+run re-fossilising the thing we just fixed.
+
+Write down, in the run log and in this file, the exact trigger for flipping it back: **after
+the first post-restart checkpoint save succeeds, set it to `false`, commit, push.** Treat it as
+a task with a deadline, not a thing to remember. Confirm `reset_red_vq_on_resume: false` at the
+same time.
+
+## 5.3 — Launch and the banner check (M runs; Will prepares the cells)
+
+Expected startup, determined empirically against 2763 — not guessed:
+
+- six `[JAX] Injected randomly initialized codebook_{0,1,2}/{usage_ema,dead_streak} into b_params`
+- one `[JAX] DELIBERATE RESET (not a graft): head_confidence_1/2 reinitialized...`
+- `[JAX] Restored params from step 2763. Population starts fresh.`
+- the §4 startup checklist lines (`red_sense_api=v2`, corpus path, curriculum)
+
+**Anything else that prints is the diff worth stopping for.** A banner we did not predict means
+the box is not running what we think it is. Stop and report rather than pressing on.
+
+Single `run_bg.py` process — `pkill -f run_bg.py` then confirm the process count before launch.
+
+## 5.4 — Capture the corpus start step
+
+As soon as the first rollout writes, record the **first structurally clean post-restart step**
+and put it in this file. Every decode from here on depends on that number, and reconstructing
+it later from logs is how `--min-step` mistakes happen.
+
+## 5.5 — Gate A (first ~20 updates): stop conditions, not observations
+
+Stop the run and report if any of these holds: any non-finite `grad_norm`; `codes_active` does
+not recover from the graft dip within ~5 updates; **dead-code resets still firing every update
+at production scale**. That last one is the direct test of the Task 4 mechanism — it ran 100–157
+per update before the fix. If the fix did not take, we stop rather than tune around it.
+
+## 5.6 — Gate B (~50–100 updates): the prediction
+
+`blue_caught` oscillating (not sustained zero >3 updates) **and** `codes_active ≥ 40/64` per
+slot independently, sustained ≥2 consecutive updates, **simultaneously**. First co-opening since
+ppo 2515.
+
+`barrier_sum` should be structurally zero with Build masked. If it is not, the mask is
+incomplete — check all three sites before anything else.
+
+If the gates still refuse to co-open, the dead-code diagnosis was wrong. Say that plainly.
+Do not adjust `barrier_decay_rate`, `red_catch_*`, or any ecological parameter to make a gate
+open — Rule 12, and doing so would destroy the only clean test we have.
+
+## 5.7 — Reporting
+
+Report at Gate A, at Gate B, and immediately on any stop condition. **Lead with what changes my
+mind**, then the supporting detail — the PPO minibatch discovery arrived as an aside in a task
+narration and it was the most important thing in that batch.
+
+Telemetry to include each time: `ppo`, `step`, `blue`/`red` counts, `blue_caught`,
+`codes_active` per slot, dead-code resets this update, `barrier_sum`, VQ loss, `grad_norm`
+finiteness, `Crafting: success/rate`, `expert_dropouts`, and the imagination/gate fractions now
+that the confidence head is real.
