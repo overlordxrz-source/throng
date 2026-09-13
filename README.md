@@ -1,367 +1,116 @@
-# THRONG — Emergent Communication & Cumulative Culture from Survival Pressure
+# THRONG
 
-THRONG is a multi-agent artificial-life simulation in which two populations of
-neural agents — **blue** (prey) and **red** (predator) — co-evolve in a rich
-2D world. Blues must learn, from scratch and with no human-supplied rewards,
-to **survive, signal, and pass knowledge on**. The goal is not "an agent that
-plays a game well." The goal is **emergence**: language, culture, and proto-
-cognition arising purely from selection pressure.
+Meaning that is causally earned cannot be faked. A large language model's
+symbols are grounded only in other symbols — text produced by humans who were
+themselves grounded, at one remove the model never touches. A THRONG token is
+grounded in whether the agent that hears it survives. That is the entire bet:
+build a world where communication has to pay rent in survival, and see whether
+anything recognizable as language, culture, or planning is selected for.
 
-**Current state (Jun 2026):** **Phase 18.6 (Red VQ decoupled — red = pure ecological pressure) LIVE.** The 8D continuous bypass is amputated; agents communicate exclusively through **3 discrete VQ slots (12/8/12 vocabularies)** on a 40-D wire across a **12-action** space (movement + Strike/Push/Guard + Build/PickUp/Craft/UseTool). Phase 18.3 ecology (wood-west / stone-east bifurcation, inventory, cooperative crafting) is deployed; a `-0.20` futile-action penalty curbs `Craft`/`UseTool` spam. Phase 18.4 reconnected the VQ commitment loss to the live PPO autodiff tape; **18.5** fixed a latent index bug (red's VQ loss was mis-read as the raw continuous wire `z_e`) by threading a team-aware `vq_loss_idx` in `rl_jax.py`. With the fix live, **blue VQ is confirmed healthy** (`loss≈0.005`, `codes 45|39|43/64`) but red's real DCVQ loss was pathological; **18.6** sets `red_vq_loss_coef: 0.0`, decoupling red's language heads from the gradient. Red is now a lethal **ecological pressure** (policy/value + aux still train, comms mute); all interpretability effort focuses on the **blue** channel. The Causal ATE Gate (Phase 18.2) resumes on blue.
-Currently training on branch `feature/phase18-crafting`. See `THRONG.md` §0b for the full scientific roadmap and status.
+## Mechanism
 
-**Phase 19 (Cultural Transmission & Writing) PREP** — see `docs/STRATEGIC_ROADMAP.md`: the pivotal phase, allowing agents to write multi-token sequences permanently to the grid (external memory + cumulative culture).
-**Modal:** **`twentyninegeese`** — volume **`throng-runs`**.
+THRONG is a multi-agent simulation on a toroidal grid. Two populations —
+**blue** (prey) and **red** (predator) — share one policy per team, trained
+with MAPPO. Blues are partially blind: they see a local patch and a handful of
+nearest neighbours, nothing more. Predation is lethal and unshaped — there is
+no reward for communicating, cooperating, or exploring, only for staying
+alive.
 
-**Full ops / decode / roadmap:** [THRONG.md](THRONG.md) §0b (read first).
+Blues speak through a single channel: three discrete VQ codebooks (an 8-bit,
+an 8-bit, and a 12-bit slot on the wire), broadcast to nearby agents every
+step. Nothing about the channel is free-form; a token is one of a small,
+fixed vocabulary, chosen by the same policy that chooses movement. The
+grounding pressure comes from **receiver necessity**: agents must craft using
+a shared, rotating recipe that only half the population can see. An informed
+agent has no reward for telling a blind one what to gather — but a blind
+agent that never receives usable information cannot craft, and a population
+that cannot craft loses whatever craft confers. If a token carries no
+information a receiver can act on, there is nothing selecting for it to
+persist.
 
-**Monitor (live):**
+```
+  blind agent -------- 5x5 local patch --------\
+                                                 \
+  informed agent -- 3-slot VQ signal (12/8/12) -- shared transformer -- action
+                                                 /
+  neighbours (k=6) ------- signals + culture ---/
+```
+
+Two slower channels run alongside the per-step signal: a fast-decaying
+"culture" grid (danger traces, ~10-step memory) and a slow one (~200-step
+landmarks), both written and read by the same agents. Whatever any blue
+learns is shared instantly across the whole team, because they share one set
+of weights — the "cultural transmission" channel is the gradient itself.
+
+## Current status
+
+The infrastructure is live: a 12-action space (movement, Strike, Push, Guard,
+Build, PickUp, Craft, UseTool — Push and Guard are logit-masked everywhere,
+they have no environment mechanics), the 3-slot discrete channel, and the
+receiver-necessity crafting ecology are all implemented and exercised
+end-to-end. `docs/AUDIT_SEP2026.md` and `docs/WILL_RESTART_SEP2026.md` record
+an adversarial pass over the codebase and the fixes that came out of it —
+worth reading before trusting any specific number in this repository, current
+or historical.
+
+Three things worth stating plainly rather than letting the code imply
+otherwise: cross-attention over neighbour signals (`cross_attn_enabled`) is
+off — blue currently integrates neighbour signals through a simpler
+per-neighbour path, not attention, and turning attention on is logged as the
+next planned experiment, not a shipped feature. Blue's recurrent state update
+is a fixed exponential moving average, not a learned gate (red predators do
+use a gated GRU cell; blue does not, yet). And the epistemic gate that
+decides whether an agent acts reactively or deliberates over a short mental
+rollout is being actively repaired — its confidence head was found to have
+been running untrained (and, worse, carrying stale weights forward from a
+now-obsolete architecture) for an unknown span of training.
+
+The one significant causal result on record — that tokens in one VQ slot
+causally raise a blind receiver's flee rate — was originally measured in a
+two-update transient window and was not, on its own, a settled result. An
+independent offline re-test against a later, stable ~100k-step span of the
+same recovered corpus (`tools/ate_swap_test.py`) found the same slot
+significant again, in the same direction, at a smaller effect size; the other
+two slots remain statistically indistinguishable from no effect in both
+measurements. That is corroborating, not conclusive — the definitive test is
+a live replication under a corrected codebook-reset mechanism, which has not
+yet run. Nothing downstream of that replication (cross-attention, channel
+cost, population scale, recurrent depth) is scheduled to run before it does.
+
+## Running it
 
 ```bash
-tail -f -n 60 /mnt/throng-runs/train.log
-```
-
-**Framework:** JAX + Flax (`lax.scan` rollout, CPU-offload PPO on B200)
-**Active config:** `config.yaml`
-**Active branch:** `feature/phase18-crafting` (not `master` for live train)
-**Working files:** `jax_sim/`. (The legacy PyTorch trainer was retired Jun 2026; `agents/network_torch.py` is kept only for obs-dim helpers used by `tools/`.) See `docs/ARCHITECTURE.md` for the code-grounded map.
-
-For the full research log, theory, philosophy, and per-phase post-mortems see
-[THRONG.md](THRONG.md) (agent onboarding). Phase 12 co-evolution:
-[docs/PHASE12_COEVOLUTION.md](docs/PHASE12_COEVOLUTION.md). Historical log:
-[docs/THRONG_ARCHIVE.md](docs/THRONG_ARCHIVE.md).
-
-### Decode (offline)
-
-```bash
-# Blue alarm / flee (214k reference: decode_p11_3_214k.log)
-python3 tools/decode_signals.py signal_corpus.jsonl --k 16 --min-step 149500
-
-# Phase 15 decode — after restart stabilizes + 50k clean steps (e.g. restart @ 763k → 813k)
-python3 tools/decode_signals.py --red /mnt/throng-runs/signal_corpus_red.jsonl \
-  --min-step 813000 --k 16 2>&1 | tee decode_p15_culture.log
-```
-
-**Pass bar (P15):** Novice episodic memory LRT — **`carry_fwd → blue_bear`** at lag-10, **p < 0.05**.
-
-**Modal (3-cell notebook — see THRONG.md §4):**
-
-```python
-# Cell 2 toggle:
-COLD_RESTART = True   # surgery once | False = normal resume
-```
-
-```bash
-# Startup must print (when COLD_RESTART=True):
-# [JAX] Red VQ cold-restart: gwt_comms_1 + head_signal + codebook + simvq_W reinitialized ...
-# When red_codes_active ≥ 16/64: re-run Cell 2 with COLD_RESTART=False before next restart
-```
-
----
-
-## What THRONG Is Trying to Do (The Path to Grounded AGI)
-
-Most "intelligent agent" projects work *top-down*: define a task, define a reward, build an architecture, get it to score well. THRONG works *bottom-up*: build a world hard enough that **survival itself selects for the things we care about** — communication, cooperation, planning, cumulative culture — and get out of the way.
-
-We believe this is a required, mathematically distinct path to achieving Artificial General Intelligence (AGI).
-
-- Current paradigm models (LLMs) are **mirrors** of human concepts. They perform ungrounded next-token prediction on text generated by humans. They do not experience time, physics, or survival.
-- THRONG agents are **seeds** that grow their own concepts from physical, thermodynamic survival outcomes. Their intelligence is entirely causally grounded.
-
-When Phase 19 (Multi-Token Sequences) succeeds, these agents will have developed a true proto-language mapping "Nouns" to objects and "Verbs" to actions to survive an open-ended multi-agent environment. 
-By Phase 21+, the goal is to build the Hive-Mind Interface: a two-way interactive bridge to converse with the swarm in real-time, allowing us to converse with a non-human AGI whose language maps directly to causal reality, rather than just statistical text patterns.
-
-We try to falsify this daily. Every claim ("agents are communicating", "they are forming a vocabulary", "they are planning") has a *number* we watch in the dashboard (e.g., Lag-10 $p < 0.05$ for Episodic Memory, or NPMI scores for Syntax). If the number doesn't move, the claim is wrong, and the design is incomplete.
-
-## Beyond LLMs: The Symbol Grounding Advantage
-
-THRONG is not an attempt to build a better conversational agent. It is a fundamentally different cognitive architecture designed to solve the **Symbol Grounding Problem**—the epistemological wall that static Large Language Models cannot cross.
-
-* **LLMs** are statistical compressors over human symbolic output. They learn correlations between tokens that were produced by humans describing grounded experience. The grounding is secondhand, inherited, and frozen at training time. This lack of causal constraint is the root of hallucination.
-* **THRONG Agents** are direct compressors over causal physical reality. When a THRONG VQ token encodes "predator approaching," that encoding was forged by thermodynamic necessity: agents that failed to assign semantic weight to that token died. 
-
-In THRONG, intelligence emerges from continuous adaptation, spatial multi-agent coordination, and lethal selection pressure, mapping directly to physical reality rather than human text. The end goal is the **Hive-Mind Interface** (Phase 19) and **Combinatorial Tool Use** (Phase 18): a conversable, decentralized intelligence whose language maps directly to causal reality, capable of continuous online learning without catastrophic forgetting.
-
----
-
-## Quick Start (Colab / Kaggle T4)
-
-```python
-# Cell 1 — setup
-!git clone https://github.com/overlordxrz-source/throng.git /content/throng 2>/dev/null || true
-%cd /content/throng
-!git reset --hard
-!git pull origin master
-!pip install -q jax[cuda12] flax optax pyyaml wandb orbax-checkpoint
-
-# Cell 2 — fresh run with aggressive overrides for free T4
-import sys, os, shutil
-sys.path.insert(0, "/content/throng")
-os.chdir("/content/throng")
-
-# Clear prior checkpoints if doing a fresh run after major code change
-shutil.rmtree("runs/jax_run/checkpoints", ignore_errors=True)
-
-import yaml
-from jax_sim.main_jax import run_simulation
-
-with open("config.yaml") as f:
-    cfg = yaml.safe_load(f)
-
-# T4-friendly overrides (do NOT use these on an A100 / H100; scale back up)
-cfg["population_size"]    = 100
-cfg["red_population_size"] = 75
-cfg["grid_size"]          = 64
-cfg["n_layers"]           = 2     # brain_vote may expand this up to brain_max_layers=6
-cfg["ppo_rollout_steps"]  = 128
-cfg["ppo_minibatch_size"] = 256
-cfg["memory_buffer_size"] = 5
-cfg["mind_meld_enabled"]  = False
-cfg["use_pmap"]           = False
-
-final_params, metrics = run_simulation(cfg, seed=42, n_steps=1_000_000)
-```
-
-**Local (Linux + CUDA 12):**
-
-```bash
-pip install jax[cuda12] flax optax orbax-checkpoint pyyaml wandb
+pip install jax[cuda12] flax optax orbax-checkpoint pyyaml
 python -c "
 import yaml
-from jax_sim.main_jax import run_simulation
+from jax_sim.train_entry import run_simulation
 cfg = yaml.safe_load(open('config.yaml'))
 run_simulation(cfg, seed=42, n_steps=1_000_000)
 "
 ```
 
-**Legacy PyTorch trainer:** retired Jun 2026. `main.py` and the `launch_*`/`resume_*` scripts live in git history only; all current work is JAX via `run_bg.py`.
+`config.yaml` is the single source of hyperparameters; nothing else should
+override it silently (this used to not be true — see the audit). For a
+low-memory smoke run, shrink `population_size`, `red_population_size`, and
+`grid_size` before launching, and make sure `ppo_minibatch_size` stays at or
+below the resulting rollout size — `ppo_update` now raises rather than
+silently skipping the gradient step if it doesn't.
 
----
+Offline analysis tools live in `tools/`: `decode_signals.py` for corpus-level
+NPMI/χ²/LRT decode, `ate_swap_test.py` for the offline stratified causal test
+against a recovered corpus (no GPU required), `causal_intervention.py` for a
+live frozen-checkpoint token-swap intervention (requires a GPU and a real
+checkpoint). Regression tests for the training step itself live in `tests/`
+and run on CPU in seconds — `test_severance_sweep.py` is the one to read
+first, since it measures every loss term's gradient rather than assuming it.
 
-## Architecture (At a Glance)
+## Where everything else lives
 
-### The World
-
-A toroidal grid (default 128×128, runnable at 64×64 for low-VRAM) with eight
-overlapping environmental channels — every cell carries:
-
-| Channel | What it is | Why it matters |
-|---|---|---|
-| Resources | Gaussian food patches that regenerate | Energy economy |
-| Walls | Procedural cave-like barriers | Navigation challenge |
-| Shelter spots | Safe zones that double red detection range | Strategic geography |
-| Contested nodes | High-value hotspots agents fight over | Competition gradient |
-| Scent trails | Fading traces left by reds | Indirect danger signal |
-| Symbols | Persistent "graffiti" agents write to the ground | Long-lived communication |
-| Cultural Fast (decay 0.90) | Recent danger / coordination traces | "Red was here" memory |
-| Cultural Slow (decay 0.995) | Long-term landmarks | "This valley is safe" memory |
-| Puzzle grid | Co-op lock-and-key mechanic | Cooperation pressure |
-
-### The Agent Brain
-
-Each agent is a **Flax transformer** (`jax_sim/network_jax.py`):
-
-- 2–6 attention layers (`n_layers`), expanded dynamically by **brain-vote**.
-- 128-dim tokens through multi-head self-attention.
-- 256-dim recurrent **carry** persisting across the agent's lifetime.
-- Ten output heads (action, signal_vq, alarm, symbol, culture-fast, culture-slow,
-  value, theory-of-mind, gain, build).
-- Observation dimension dynamically computed (e.g., **554** for standard Phase 17.5 configurations, or **1234** with expanded memory buffers) at `n_layers=2, neighbor_k=6, env_ch=10`.
-
-### Learning
-
-- **MAPPO** (Multi-Agent PPO) — one shared policy per team. All blues update
-  one network; all reds update another.
-- **GAE** advantage normalisation, value clipping, gradient clipping at norm 2.
-- **Survival-only reward**: +small for staying alive each step, large negative
-  on death. We deliberately do **not** reward communicating, cooperating, or
-  exploring.
-- **Red curriculum**: floor stages `[6, 15, 30, 75]`. Reds graduate when blues
-  sustain ≥ `curriculum_survival_threshold` (0.80 by default) for
-  `curriculum_sustain_updates` (5) consecutive PPO updates.
-- **Capacity-based brain vote**: `n_layers` grows when *signal entropy
-  plateaus* + *signal diversity plateaus* + *VF loss stays high* + *survival
-  is under pressure*. Translation: "agents have squeezed everything they can
-  out of their current brain — give them more." Not "agents are dying" (the
-  old trigger).
-
-### What Information Flows Between Agents
-
-Four channels, each with a different temporal and spatial scale:
-
-1. **Signals & Alarms** (per-step, 40-D wire = 3 discrete VQ slots [12/8/12] + a vestigial 8-D
-   continuous field, plus a 1-bit Alarm) — 6 nearest neighbours hear what each agent broadcasts.
-   The discrete alarm incurs a metabolic penalty. (The 8-D continuous field is zeroed — amputated in
-   Phase 18.1 after it was shown to be a Protean-scattering metabolic leak.)
-2. **Cultural Fast grid** (decay 0.90, ~10 step memory) — danger traces.
-3. **Cultural Slow grid** (decay 0.995, ~200 step memory) — stable landmarks.
-4. **Parameter sharing (MAPPO gradient)** — what one blue learns, every blue
-   learns. The "evolutionary memory" channel.
-
-(A fifth channel — **mind-meld** — is implemented but currently disabled for
-performance. It directly blends carries between adjacent old/young agents.)
-
----
-
-## What the Dashboard Means
-
-Every `T = ppo_rollout_steps` simulation steps you'll see a panel like:
-
-```
-======================================================================
-[step    5120] 2 steps/sec | blue=100 red=75 | ppo=40
-  Actions: N=15% S=30% E=15% W=27% Stay=14%
-  Energy:  mean=0.622 std=0.101 | Age: mean=62 max=345
-  Values:  mean=1.6022 | VF_loss=0.8093 | Clip=0.044
-  Reward:  mean=0.1037 | Entropy: 1.5030
-  Signals: 3135 unique | NB_GAIN↔surv: nan
-  Curriculum: red_floor=75 sustain=0/5 | brain=2L
-======================================================================
-```
-
-| Field | Meaning |
-|---|---|
-| `step` | Simulation steps since launch. |
-| `steps/sec` | Throughput. T4 free tier sustains ~2 steps/sec at N=100. |
-| `blue=… red=…` | Currently alive populations. |
-| `ppo=` | PPO update count. |
-| `Actions: …%` | Action distribution this rollout. Healthy = no single action above ~50%. |
-| `Energy` | Per-agent energy. Should stabilise around `repro_energy_thresh` once foraging is solved. |
-| `Age max=…` | Lifespan of the oldest agent — proxy for "real elders exist". |
-| `Values mean / VF_loss / Clip` | Critic stats. Loss should fall as predation pressure stabilises. Clip is PPO fraction clipped. |
-| `Reward` | Mean per-step reward — survival-only, so close to 0.10 ≈ 100% survival. |
-| `Entropy` | Action policy entropy. `ln(5)=1.609` is fully uniform. Below ~1.0 means a strong preference has formed. |
-| `Signals: N unique` | **Distinct broadcast vectors among alive agents** this rollout. Pre-May-28: stuck at 1 (channel was dead). Now: ~N_alive, which means broadcasts are non-trivial but **not yet compressed into a vocabulary**. |
-| `NB_GAIN↔surv` | Spearman correlation between "did I weight neighbour signals?" and "did I survive?". `nan` until there's enough death variance. **Positive = listening is selected for.** |
-| `Curriculum red_floor / sustain` | Current red population minimum, and how many consecutive PPO updates met the survival threshold. |
-| `brain=NL` | Current `n_layers` of the blue transformer. Grows via brain-vote up to `brain_max_layers`. |
-
-The `[DEBUG]` block that prints **before** the first `step 512` summary is a
-one-shot sanity panel that verifies (a) parameters initialised without NaN,
-(b) action logits and entropy are at sensible defaults, (c) the JIT-compiled
-rollout produced no NaNs, (d) PPO inputs (rewards / values / advantages /
-returns) have reasonable means and stds, (e) gradient norms are nonzero and
-below clip, and (f) PPO updates didn't blow anything up. After the first
-cycle, the same block prints once per minibatch so you can see exactly which
-PPO update introduced a numerical event, should one occur.
-
----
-
-## Project Layout
-
-```
-throng/
-├── config.yaml                # Active hyperparameters (the single config)
-├── run_bg.py                  # ★ Launch entrypoint: python -u run_bg.py
-├── jax_sim/                   # ★ Active code
-│   ├── main_jax.py            # Outer loop, PPO orchestration, ecology, telemetry, checkpointing
-│   ├── network_jax.py         # AgentNetworkJax (blue) + PredatorNetworkJax (red) + VQ
-│   ├── imagination_jax.py     # K-step mental rollout for the epistemic gate
-│   ├── rl_jax.py              # PPO + GAE + minibatch updates
-│   ├── grid_jax.py            # GridState + catches + resources + barrier physics
-│   ├── population_jax.py      # PopState + inventory + reproduction
-│   ├── observations_jax.py    # Observation builder (env channels, neighbor signals)
-│   └── obs_layout.py          # Observation / wire dimension constants
-├── communication/             # Corpus writers (shared)
-├── agents/                    # Legacy PyTorch — only network_torch.py obs-dim helpers used
-├── tools/
-│   ├── decode_signals.py      # Offline corpus decode (MI, LRT, PosDis, topsim, NPMI)
-│   └── causal_intervention.py # Live ATE instrument (frozen-ckpt token swap)
-├── tests/                     # Regression tests (VQ index + VQ gradient flow)
-├── docs/
-│   ├── ARCHITECTURE.md        # ★ Code-grounded architecture reference
-│   └── STRATEGIC_ROADMAP.md   # ★ v2 plan → emergent intelligence / AGI / neuromorphic
-├── THRONG.md                  # Full research log + theory + ops manual
-└── README.md                  # You are here
-```
-
----
-
-## Configuration Cheatsheet
-
-All knobs live in `config.yaml`. The ones you actually touch:
-
-| Knob | What it controls | Default |
-|---|---|---|
-| `population_size` | Blue agents (max alive) | 500 |
-| `red_population_size` | Red agents (max alive) | 75 |
-| `grid_size` | World edge length | 128 |
-| `n_layers` | Initial transformer depth | 2–4 |
-| `brain_max_layers` | Cap for brain-vote expansion | 6 |
-| `brain_token_dim` | Transformer hidden | 128 |
-| `signal_dim` | Wire width (8 cont + 12/8/12 slots) | 40 |
-| `n_actions` | Action-space size (Phase 18) | 12 |
-| `signal_vocab_size` | Discrete signal vocab | 64 |
-| `symbol_dim` | Symbol / cultural vector dim | 16 |
-| `neighbor_k` | Visible neighbours | 6 |
-| `local_obs_radius` | Half-width of local patch (2 → 5×5) | 2 |
-| `memory_buffer_size` | Episodic memory slots | 20 |
-| `culture_fast_decay` | 0.90 | recent-danger half-life ≈ 7 steps |
-| `culture_slow_decay` | 0.995 | landmark half-life ≈ 140 steps |
-| `ppo_rollout_steps` | Steps between PPO updates | 512 |
-| `ppo_minibatch_size` | PPO minibatch (touch this for OOM) | 2048 |
-| `repro_energy_thresh` / `_cost` | High-energy self-cloning rule | 0.80 / 0.40 |
-| `min_population` | Floor-enforced respawn | 200 |
-| `curriculum_survival_threshold` | Sustain blue surv to advance reds | 0.80 |
-| `curriculum_sustain_updates` | Consecutive updates required | 5 |
-| `brain_vote_interval` | Steps between capacity checks | 5000 |
-| `brain_vote_survival_threshold` | Survival level that gates a layer add | 0.55 |
-| `signal_gate_prob` | Fraction of self-obs randomly masked | 0.5 |
-| `resource_obs_noise` | Gaussian σ on resource readings | 0.2 |
-| `red_starvation_steps` | Steps without a catch before a red starves | 400 |
-
----
-
-## Roadmap
-
-**Authoritative roadmap:** [THRONG.md §11](THRONG.md#11-roadmap-whats-next).
-
-| Phase | Status |
-|-------|--------|
-| **12** | **COMPLETE** — dual brain, wiretap, spatial gate |
-| **13.0** | **VALIDATED** — tax ~0.0018/step; no imagination collapse |
-| **14.1–14.4** | ✅ **COMPLETE** — VQEL graduated → hard z_q; proprio wedge; GWT Router; DCVQ+SimVQ |
-| **15.0–15.5** | ✅ **COMPLETE** — MEDAL-ADR + GRUCell pivot. Episodic Memory ($p < 0.05$) and Cumulative Culture ($p < 0.001$) at Lag-10 confirmed. |
-| **16.0** | ✅ **COMPLETE** — Open-Ended Combinatorial Complexity. Big Green prey, 8-action space. Offline causal decode revealed 0.0 ATE on communication channel. |
-| **16.5–16.6** | ✅ **COMPLETE** — The Great Burn-Off (`codes_active=1/64`); Protean Scattering discovery (continuous channel was a cryptographic RNG, r≈0 to all environment correlates). |
-| **17.0–17.5** | ✅ **COMPLETE** — Rosetta Stone (GW alignment maps VQ tokens → GloVe concepts). Hardened Gumbel-Softmax bottleneck. Timescale-grammar alarm head: sender-side metabolic grounding validated, receiver-side ATE=0 (alarm vestigial). |
-| **18.0–18.1** | ✅ **COMPLETE** — Combinatorial Tool Use: 12-action space, 3-slot discrete VQ (12/8/12), 40-D wire; 8D continuous bypass amputated with zero catch spike. |
-| **18.3–18.6** | **LIVE** — Crafting ecology + futile-action penalty + Per-Group grad clip; VQ commitment loss reconnected to PPO (blue); team-aware `vq_loss_idx` fix (18.5); red VQ decoupled, red = pure ecological pressure (18.6). |
-| **18.2** | 🔧 **IN PROGRESS** — Causal ATE Gate. Pass bar: ATE>0, 95% CI excludes zero, on ≥1 slot. |
-| **19.0** | **PREP (pivotal)** — Cultural Transmission: `WRITE` action etches VQ sequences to grid tiles (persistent culture + external memory). |
-| **20.0+** | **PREP** — Agriculture/terraforming, open-ended procedural complexity (POET), language-as-cognitive-tool, cross-domain transfer, Loihi. See `docs/STRATEGIC_ROADMAP.md`. |
-
-## Research & Theory
-
-The sprawling philosophical foundations of THRONG, including the "Alien Semantics Problem" and our theories on the "Complexity Ceiling", have been migrated to the `research/` directory to keep this README ultra-lean.
-
-If you are a researcher building on THRONG, start here:
-- **[marl_complexity_2026.md](file:///Users/overlord/CascadeProjects/throng/research/marl_complexity_2026.md)**: Our theoretical basis for VQ-VIB, Feral Masking, and why true causality requires survival pressure.
-- **[rosetta_stone_math.md](file:///Users/overlord/CascadeProjects/throng/research/rosetta_stone_math.md)**: The mathematical blueprints for Phase 17's Unsupervised Semantic Translation using Gromov-Wasserstein alignment.
-
----
-
-## Running Tips
-
-- **OOM on P100 / T4?** Drop `ppo_minibatch_size` to 256, `n_layers` to 2,
-  `grid_size` to 64.
-- **First run takes 5–10 minutes to start producing steps** — XLA is
-  compiling the entire `lax.scan` rollout into one kernel. After that,
-  steps/sec is constant.
-- **Checkpoints resume populations from scratch** but restore params — this
-  is intentional. Long-run training is robust to interrupted populations
-  because MAPPO learns from the shared policy, not from individual lifelines.
-- **If `Signals: 1 unique` persists for more than 5k steps after a fresh
-  pull**, your build is from before commit `82a1c7f` and is still suffering
-  from the signal-propagation bug. `git pull && rm -rf runs/jax_run/checkpoints`.
-
----
-
-## License & Citation
-
-Research project, MIT-style permissive license (see repo root). If you build
-on THRONG, please cite the repository and the relevant phase in `THRONG.md`.
-
----
-
-*"Give them a rich enough world and a reason to talk, then get out of the way."*
+`THRONG.md` is the full research log, ops manual, and phase-by-phase history
+— read it before making an architectural decision. `docs/ARCHITECTURE.md` is
+the code-grounded reference for what the network and observation layout
+actually do, and is authoritative over prose anywhere else when the two
+disagree. `docs/STRATEGIC_ROADMAP.md` lays out the longer-term bet and the
+open counter-arguments to it. `docs/AUDIT_SEP2026.md` and
+`docs/WILL_RESTART_SEP2026.md` record the most recent adversarial review and
+the restart plan that followed it.
