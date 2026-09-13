@@ -67,14 +67,16 @@ now-obsolete architecture) for an unknown span of training.
 
 The one significant causal result on record — that tokens in one VQ slot
 causally raise a blind receiver's flee rate — was originally measured in a
-two-update transient window and was not, on its own, a settled result. An
+two-update window selected because it looked anomalous, which inflates
+effect size by construction; it was never a clean measurement. An
 independent offline re-test against a later, stable ~100k-step span of the
-same recovered corpus (`tools/ate_swap_test.py`) found the same slot
-significant again, in the same direction, at a smaller effect size; the other
-two slots remain statistically indistinguishable from no effect in both
-measurements. That is corroborating, not conclusive — the definitive test is
-a live replication under a corrected codebook-reset mechanism, which has not
-yet run. Nothing downstream of that replication (cross-attention, channel
+same recovered corpus (`tools/ate_swap_test.py`) is the trustworthy number:
+the effect **replicates and is real, but below the pre-registered
+significance bar** (`|Δ| > 0.05`) — smaller than the original figure implied.
+The other two slots remain statistically indistinguishable from no effect in
+both measurements. The channel is weaker than earlier numbers suggested. A
+live replication under a corrected codebook-reset mechanism has not yet run.
+Nothing downstream of that replication (cross-attention, channel
 cost, population scale, recurrent depth) is scheduled to run before it does.
 
 ## Running it
