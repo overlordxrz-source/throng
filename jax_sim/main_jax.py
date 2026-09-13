@@ -141,6 +141,21 @@ DEFAULT_CONFIG = {
 def _normalize_config(cfg: Dict) -> Dict:
     """Map PyTorch config names to JAX config names."""
     cfg = dict(cfg)
+    if "n_actions" not in cfg:
+        # AUDIT_SEP2026.md Finding 8's cousin: every model-construction call
+        # site used to read config.get("n_actions", 8) — a silent fallback to
+        # a pre-Phase-18 action-space size. test_checkpoint_compat.py caught
+        # this in the wild: with no config.json sidecar next to a real backup
+        # checkpoint, that default silently built an 8-action model against a
+        # checkpoint whose head_action kernel is (256, 12). A wrong n_actions
+        # doesn't just misbehave — it's a genuine checkpoint-shape footgun
+        # (Rule "action amputation = logit-mask only" exists for exactly this
+        # class of risk), so this must fail loudly rather than pick a guess.
+        raise KeyError(
+            "config is missing 'n_actions' — refusing to silently default to "
+            "a pre-Phase-18 action-space size. Set n_actions explicitly in "
+            "config.yaml (or whatever config source is being loaded)."
+        )
     cfg.setdefault("max_pop", cfg.get("population_size", 500))
     cfg.setdefault("max_pop_red", cfg.get("red_population_size", 75))
     cfg.setdefault("hidden_dim", cfg.get("agent_hidden_dim", 256))
@@ -1040,7 +1055,7 @@ def _run_simulation_impl(
         cross_attn_num_heads=_cross_heads,
         env_channels=int(config.get("env_channels", 15)),
         own_state_dim=int(config.get("own_state_dim", 22)),
-        n_actions=int(config.get("n_actions", 8)),
+        n_actions=int(config["n_actions"]),
         local_cells=(2 * config["local_obs_radius"] + 1)**2,
         neighbor_k=config["neighbor_k"],
     )
@@ -1079,7 +1094,7 @@ def _run_simulation_impl(
             cross_attn_num_heads=_cross_heads,
             env_channels=int(config.get("env_channels", 15)),
             own_state_dim=int(config.get("own_state_dim", 22)),
-            n_actions=int(config.get("n_actions", 8)),
+            n_actions=int(config["n_actions"]),
         )
         r_model_apply = make_model_apply(model_red)
 
@@ -1746,7 +1761,7 @@ def _run_simulation_impl(
                 self_pred_coef=_self_pred_coef, conf_coef=_conf_coef,
                 energy_np=_b_energy_np,
                 proprio_coef=_proprio_coef,
-                n_actions=int(config.get("n_actions", 8)),
+                n_actions=int(config["n_actions"]),
             )
             b_metrics["fwd_loss"] = b_fwd_loss
             b_metrics["carry_fwd_loss"] = b_carry_fwd_loss
@@ -1863,7 +1878,7 @@ def _run_simulation_impl(
                 self_pred_coef=_self_pred_coef, conf_coef=_conf_coef,
                 energy_np=_r_energy_np,
                 proprio_coef=_proprio_coef,
-                n_actions=int(config.get("n_actions", 8)),
+                n_actions=int(config["n_actions"]),
             )
             r_metrics["fwd_loss"] = r_fwd_loss
             r_metrics["carry_fwd_loss"] = r_carry_fwd_loss
@@ -2000,7 +2015,7 @@ def _run_simulation_impl(
             # Action distribution (N=stay, S, E, W, stay=0)
             alive_actions = b_act_all[b_alive_all]
             if len(alive_actions) > 0:
-                act_counts = np.bincount(alive_actions, minlength=config.get("n_actions", 8))
+                act_counts = np.bincount(alive_actions, minlength=config["n_actions"])
                 act_pct = act_counts / act_counts.sum() * 100
                 act_str = f"N={act_pct[1]:.0f}% S={act_pct[2]:.0f}% E={act_pct[3]:.0f}% W={act_pct[4]:.0f}% Stay={act_pct[0]:.0f}% Strk={act_pct[5]:.0f}% Push={act_pct[6]:.0f}% Grd={act_pct[7]:.0f}%"
                 if len(act_pct) > 8:
@@ -2018,7 +2033,7 @@ def _run_simulation_impl(
                 r_alive_all = np.array(rollout_data["red"]["alive"]).astype(bool)
                 r_alive_actions = r_act_all[r_alive_all]
                 if len(r_alive_actions) > 0:
-                    r_counts = np.bincount(r_alive_actions, minlength=config.get("n_actions", 8))
+                    r_counts = np.bincount(r_alive_actions, minlength=config["n_actions"])
                     r_pct = r_counts / r_counts.sum() * 100
                     red_act_str = (
                         f"N={r_pct[1]:.0f}% S={r_pct[2]:.0f}% E={r_pct[3]:.0f}% W={r_pct[4]:.0f}% Stay={r_pct[0]:.0f}% "
@@ -2115,7 +2130,7 @@ def _run_simulation_impl(
                 im_act_all = np.array(rollout_data["blue"]["imagined_action"])
                 im_alive_actions = im_act_all[b_alive_all]
                 if len(im_alive_actions) > 0:
-                    im_counts = np.bincount(im_alive_actions, minlength=config.get("n_actions", 8))
+                    im_counts = np.bincount(im_alive_actions, minlength=config["n_actions"])
                     im_pct = im_counts / im_counts.sum() * 100
                     im_act_str = f"N={im_pct[1]:.0f}% S={im_pct[2]:.0f}% E={im_pct[3]:.0f}% W={im_pct[4]:.0f}% Stay={im_pct[0]:.0f}% Strk={im_pct[5]:.0f}% Push={im_pct[6]:.0f}% Grd={im_pct[7]:.0f}%"
                     if len(im_pct) > 8:
@@ -2365,11 +2380,21 @@ def _run_simulation_impl(
         r_carry_fwd_all = np.array(rollout_data["red"]["carries"])
         b_steps_since_dropout_all = np.array(rollout_data["blue"]["steps_since_dropout"])
 
-        # loc_env is the 4th block in b_obs (env_channels channels)
-        env_channels = int(config.get("env_channels", 10))
-        idx_offset = 6 + (config["neighbor_k"] * config["signal_dim"]) + (25 * config["symbol_dim"])
+        # loc_env is the 4th block in b_obs (env_channels channels).
+        # AUDIT_SEP2026.md Finding 3: this used to hand-roll the offset as
+        # `6 + neighbor_k*signal_dim + 25*symbol_dim`, assuming a 6-dim
+        # own_state and no neighbor-alarm block — both stale since Phase 17
+        # (own_state_dim) and Phase 17.5 (nb_alarms). It was off by 28 columns
+        # against the current config, silently reading `contested`/`wood`/
+        # `stone` instead of `resource`/`blue_bg`/`barrier`. Use the same
+        # canonical `_loc_env_start` (from `make_obs_layout`, computed once at
+        # the top of this function from the live config) that every other
+        # obs-layout consumer in this file already uses, instead of a second,
+        # independently-drifting formula.
+        env_channels = int(config.get("env_channels", 15))
+        idx_offset = _loc_env_start
         idx_resource = idx_offset + (12 * env_channels) + 3  # 12th cell (center of 5x5), channel 3 = resource
-        
+
         # Phase 17 NPMI spatial correlates
         adj_cells = [7, 11, 12, 13, 17] # N, W, Center, E, S in 5x5 patch
         idx_adj_bg = [idx_offset + (c * env_channels) + 8 for c in adj_cells]
