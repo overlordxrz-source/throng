@@ -224,8 +224,21 @@ carry_fwd_coef: 0.05   # MSE on carry_{t+1}; target always stop_gradient
 phase9_canvas:
   cross_attn_enabled: false   # scaffold: set true to compile 9.4 path (new params)
   cross_attn_num_heads: 4
-  confidence_enabled: false   # 9.1 — enable after git pull post P9.4 run (grafts head_confidence_*)
+  confidence_enabled: true    # Sep 2026 restart (Cam's ruling, AUDIT_SEP2026.md Finding 2):
+                              # the epistemic gate has been consulting this head every rollout
+                              # step regardless of this flag — running it untrained was worse
+                              # than either training it or turning the gate off. See
+                              # reset_confidence_head_on_resume below: the checkpoint's existing
+                              # weights are a fossil and must not just resume training in place.
   confidence_coef: 0.05
+  reset_confidence_head_on_resume: true  # ONE-TIME at this restart only (Cam's ruling): ckpt
+                              # 2244/2763's head_confidence_1/2 is bit-identical across both —
+                              # trained once in the Phase 9.1 era, then carried frozen through
+                              # every graft since, predicting carry-forward error for a dead
+                              # 8-action architecture. Deliberately reinitialized fresh rather
+                              # than resumed. Set back to false after this restart's first save,
+                              # or every future resume will keep re-randomizing a head that is
+                              # by then actually training.
   # Phase 11.3 — epistemic imagination gating (feature/phase11-3-epistemic-gate)
   imagination_gating_enabled: true
   confidence_multiplier: 1.0   # batch-relative gate: imagine if conf < mean(conf|alive)*mult

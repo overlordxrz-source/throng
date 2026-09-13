@@ -53,6 +53,7 @@ from jax_sim.network_jax import (
     init_agent_params,
     init_predator_params,
     reset_predator_vq_on_resume,
+    reset_confidence_head_on_resume,
     make_model_apply,
     make_vqel_monologue_apply,
     params_apply_variables,
@@ -1313,6 +1314,11 @@ def _run_simulation_impl(
                     obs_dim=obs_dim, n_layers=n_layers,
                 )
             )
+            if bool(_p9.get("reset_confidence_head_on_resume", False)):
+                b_params = reset_confidence_head_on_resume(
+                    model, b_params, keys[3], hidden_d,
+                    obs_dim=obs_dim, n_layers=n_layers,
+                )
             if _red_comms:
                 r_params = sanitize_agent_params(
                     ensure_predator_params(

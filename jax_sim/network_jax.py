@@ -1425,6 +1425,48 @@ def pad_head_fwd_2(flat_params: dict, target_outputs: int = 250) -> None:
     print(f"[JAX] Grafting head_fwd_2: {kernel.shape[1]} -> {target_outputs}", flush=True)
 
 
+CONFIDENCE_HEAD_KEYS = ("head_confidence_1", "head_confidence_2")
+
+
+def reset_confidence_head_on_resume(
+    model: AgentNetworkJax,
+    params: Any,
+    rng: jax.Array,
+    hidden_dim: int,
+    obs_dim: int,
+    n_layers: int,
+) -> Any:
+    """Deliberate EXCEPTION to the grafting rule that never resets existing
+    parameters (AUDIT_SEP2026.md Finding 2 / Cam's ruling, Sep 2026): ckpt
+    2244/2763's head_confidence_1/2 is a fossil — bit-for-bit identical
+    between the two checkpoints, proving it was trained once (plausibly the
+    Phase 9.1 validation) then carried frozen through every graft since,
+    predicting carry-forward error for an architecture (n_actions=8) that no
+    longer exists. `confidence_enabled: true` alone is not enough: without
+    this, the "freshly trained" head would actually resume from those stale
+    weights and spend unknown training time un-learning them while the
+    epistemic gate (which reads this head every rollout step) keeps
+    consulting it. Explicit and loud on purpose so nobody mistakes this for
+    the usual "graft only if missing" behavior every other head follows.
+    """
+    flat = unfreeze(params)
+    if not all(k in flat for k in CONFIDENCE_HEAD_KEYS):
+        return params  # nothing to reset yet — ensure_aux_head_params will graft it fresh
+    carry = jnp.zeros((1, hidden_dim))
+    obs = jnp.zeros((1, obs_dim))
+    fresh_flat = unfreeze(model.init(rng, carry, obs, n_layers)["params"])
+    for k in CONFIDENCE_HEAD_KEYS:
+        flat[k] = fresh_flat[k]
+    print(
+        "[JAX] DELIBERATE RESET (not a graft): head_confidence_1/2 reinitialized from "
+        "scratch, discarding the checkpoint's fossil weights (AUDIT_SEP2026.md Finding 2 — "
+        "bit-identical across ckpt 2244/2763, trained once on a dead 8-action architecture, "
+        "never touched since). This is intentional; do not restore the checkpoint's values.",
+        flush=True,
+    )
+    return sanitize_agent_params(freeze(flat))
+
+
 def ensure_aux_head_params(
     model: AgentNetworkJax,
     params: Any,
