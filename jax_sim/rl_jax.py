@@ -361,6 +361,19 @@ def ppo_update(
     if minibatch_size <= 0:
         raise ValueError(f"ppo_minibatch_size must be positive, got {minibatch_size}")
     n_minibatches = M // minibatch_size
+    # Rule 13, instance 9 (docs/WILL_RESTART_SEP2026.md): with no floor here,
+    # M < minibatch_size silently produced n_minibatches=0 — the for loop
+    # below never executed, no gradient step was ever taken, and the caller
+    # still got a "Blue PPO done in 0.1s" success line and an empty metrics
+    # dict back. A success message is not evidence that work occurred: fail
+    # loudly instead of reporting a no-op as a completed PPO update.
+    if n_minibatches == 0:
+        raise ValueError(
+            f"ppo_update({team}): M={M} rollout samples < ppo_minibatch_size="
+            f"{minibatch_size} — zero minibatches would run and no gradient "
+            f"step would be taken. Reduce ppo_minibatch_size (or increase "
+            f"population_size / ppo_rollout_steps) so M >= minibatch_size."
+        )
 
     # Accumulate metrics as Python floats (not 500 JAX scalar dicts)
     metric_sums = {}
