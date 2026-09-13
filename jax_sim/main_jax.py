@@ -248,7 +248,7 @@ def make_sim_step(
     # Default 5 = legacy behaviour (imagine Stay + N/S/E/W only). Set to n_actions
     # (12) to let the epistemic gate deliberate over Strike/Push/Guard and the
     # Phase-18 tool actions too. Reversible knob; off by default.
-    _imagine_n_actions = int(_p9.get("imagination_n_actions", 5))
+    _imagine_n_actions = int(_p9.get("imagination_n_actions", 12))
     _p14 = config.get("phase14_vqel") or {}
     _vqel_monologue = bool(_p14.get("monologue_enabled", False))
     _dialogue_signal_mode = str(_p14.get("dialogue_signal_mode", "ste")).lower()
@@ -312,8 +312,28 @@ def make_sim_step(
         b_new_c, b_outs = model_apply(b_params_sg, b_carries, b_obs, _n_layers)
         r_new_c, r_outs = _r_apply(r_params_sg, r_carries, r_obs, _n_layers, rngs={'dropout': noise_key})
 
-        b_action_logits, b_signal_out, b_sym_w, b_vals, b_tom, b_token_ids, b_alarm_logits, b_loss_vq, b_z_e, b_cult_f, b_cult_s = b_outs
-        r_action_logits, r_signal_out, r_sym_w, r_vals, r_tom, r_token_ids, r_loss_vq, r_z_e, r_cult_f, r_cult_s = r_outs
+        b_action_logits = b_outs.action_logits
+        b_signal_out = b_outs.signal_out
+        b_sym_w = b_outs.symbol_write
+        b_vals = b_outs.values
+        b_tom = b_outs.tom_logits
+        b_token_ids = b_outs.token_ids
+        b_alarm_logits = b_outs.alarm_out
+        b_loss_vq = b_outs.loss_vq
+        b_z_e = b_outs.z_e
+        b_cult_f = b_outs.culture_fast
+        b_cult_s = b_outs.culture_slow
+
+        r_action_logits = r_outs.action_logits
+        r_signal_out = r_outs.signal_out
+        r_sym_w = r_outs.symbol_write
+        r_vals = r_outs.values
+        r_tom = r_outs.tom_logits
+        r_token_ids = r_outs.token_ids
+        r_loss_vq = r_outs.loss_vq
+        r_z_e = r_outs.z_e
+        r_cult_f = r_outs.culture_fast
+        r_cult_s = r_outs.culture_slow
 
         # Sample alarm action from logits
         b_alarm_keys = jax.random.split(alarm_key, b_pop.max_pop)
@@ -392,6 +412,7 @@ def make_sim_step(
             b_used_imagination = b_gate_imagine
         else:
             b_actions = b_actions_reactive
+            b_a_imagined = jnp.zeros((b_pop.max_pop,), dtype=jnp.int32)
             b_im_gain = jnp.zeros((b_pop.max_pop,), dtype=jnp.float32)
             b_imagination_agree = jnp.zeros((b_pop.max_pop,), dtype=jnp.float32)
             b_conf_gate_frac = jnp.zeros((b_pop.max_pop,), dtype=jnp.float32)
@@ -786,6 +807,7 @@ def make_sim_step(
             "energy": b_pop.energy,
             "alive": b_pop.alive,
             "blue_caught": caught_b.astype(jnp.float32),
+            "imagined_action": b_a_imagined,
             "imagination_gain": b_im_gain,
             "imagination_agree": b_imagination_agree,
             "conf_gate_imagine_frac": b_conf_gate_frac,
@@ -1407,7 +1429,7 @@ def _run_simulation_impl(
     test_carry = jnp.zeros((1, hidden_d))
     test_obs = jnp.zeros((1, obs_dim))
     _, test_outs = model_apply(b_params, test_carry, test_obs, n_layers)
-    test_logits = test_outs[0]  # action_logits
+    test_logits = test_outs.action_logits
     test_probs = jax.nn.softmax(test_logits, axis=-1)
     test_entropy = -jnp.sum(test_probs * jnp.log(test_probs + 1e-10), axis=-1)
     print(f"[DEBUG] Init action_logits mean={float(test_logits.mean()):.4f} std={float(test_logits.std()):.4f}")
@@ -2089,6 +2111,18 @@ def _run_simulation_impl(
             print(f"\n{'='*70}")
             print(f"[step {step_val:>7}] {steps_sec:.0f} steps/sec | blue={b_alive_now} red={r_alive_now} | ppo={ui+1}")
             print(f"  Actions (blue): {act_str}")
+            if "imagined_action" in rollout_data["blue"] and _img_gate_enabled:
+                im_act_all = np.array(rollout_data["blue"]["imagined_action"])
+                im_alive_actions = im_act_all[b_alive_all]
+                if len(im_alive_actions) > 0:
+                    im_counts = np.bincount(im_alive_actions, minlength=config.get("n_actions", 8))
+                    im_pct = im_counts / im_counts.sum() * 100
+                    im_act_str = f"N={im_pct[1]:.0f}% S={im_pct[2]:.0f}% E={im_pct[3]:.0f}% W={im_pct[4]:.0f}% Stay={im_pct[0]:.0f}% Strk={im_pct[5]:.0f}% Push={im_pct[6]:.0f}% Grd={im_pct[7]:.0f}%"
+                    if len(im_pct) > 8:
+                        im_act_str += f" Bld={im_pct[8]:.0f}%"
+                    if len(im_pct) > 11:
+                        im_act_str += f" PU={im_pct[9]:.0f}% Crf={im_pct[10]:.0f}% Use={im_pct[11]:.0f}%"
+                    print(f"  Actions (imag): {im_act_str}")
             if _red_comms:
                 red_vq_val = float(r_metrics.get("ppo_vq_loss", float("nan")))
                 red_ent_val = float(r_metrics.get("ppo_entropy", float("nan")))
@@ -2212,15 +2246,20 @@ def _run_simulation_impl(
                     return min(int(x) for x in codes_str.split("/")[0].split("|"))
                 except Exception:
                     return None
-            _vq_alerts = []
+            _alerts = []
             if np.isfinite(vq_loss_val) and vq_loss_val < 0.0:
-                _vq_alerts.append(
-                    f"blue VQ loss < 0 ({vq_loss_val:.2f}) — VQ likely wired to wrong network output"
-                )
+                _alerts.append(f"blue VQ loss < 0 ({vq_loss_val:.2f}) — VQ likely wired to wrong network output")
             _bc_min = _min_codes_active(vq_codes_str)
             if _bc_min is not None and _bc_min < 4:
-                _vq_alerts.append(f"blue codes_active collapsed ({vq_codes_str})")
-            for _a in _vq_alerts:
+                _alerts.append(f"blue codes_active collapsed ({vq_codes_str})")
+                
+            if any(np.isnan(x) for x in [vq_loss_val, vf_loss, ent_val, val_mean, rew_mean]):
+                _alerts.append("NaN detected in blue PPO metrics (check gradients/logit-masking invariant)")
+                
+            if b_alive_now < 5:
+                _alerts.append(f"blue population collapsed (N={b_alive_now})")
+
+            for _a in _alerts:
                 print(f"  [ALERT] {_a}", flush=True)
             print(f"{'='*70}\n")
 

@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import jax
 import jax.numpy as jnp
+import flax
 from flax import linen as nn
 from flax.core import freeze, unfreeze
 from flax.core.frozen_dict import FrozenDict
@@ -39,6 +40,25 @@ CHECKPOINT_GRAFT_TOP_KEYS = AUX_HEAD_KEYS + (
     "head_vqel_recon_1",
     "head_vqel_recon_2",
 )
+
+
+@flax.struct.dataclass
+class NetworkOutputs:
+    action_logits: jnp.ndarray
+    signal_out: jnp.ndarray
+    symbol_write: jnp.ndarray
+    values: jnp.ndarray
+    tom_logits: jnp.ndarray
+    token_ids: jnp.ndarray
+    alarm_out: jnp.ndarray | None
+    loss_vq: jnp.ndarray
+    z_e: jnp.ndarray
+    culture_fast: jnp.ndarray
+    culture_slow: jnp.ndarray
+
+    def __getitem__(self, idx):
+        raise TypeError("Use named attributes instead of tuple indexing for NetworkOutputs.")
+
 
 
 def vector_quantize_signals(
@@ -392,9 +412,18 @@ class AgentNetworkJax(nn.Module):
             _zq_seed = jnp.zeros_like(z_e)
             self.head_vqel_recon_2(nn.relu(self.head_vqel_recon_1(_zq_seed)))
 
-        return new_carries, (
-            action_logits, signal_out, symbol_write, values,
-            tom_logits, token_ids, alarm_out, loss_vq, z_e, culture_fast, culture_slow,
+        return new_carries, NetworkOutputs(
+            action_logits=action_logits,
+            signal_out=signal_out,
+            symbol_write=symbol_write,
+            values=values,
+            tom_logits=tom_logits,
+            token_ids=token_ids,
+            alarm_out=alarm_out,
+            loss_vq=loss_vq,
+            z_e=z_e,
+            culture_fast=culture_fast,
+            culture_slow=culture_slow,
         )
 
     def monologue_forward(
@@ -412,11 +441,11 @@ class AgentNetworkJax(nn.Module):
         obs_masked = obs_masked.at[:, layout.own_sig_start : layout.own_sig_end].set(0.0)
 
         _, outs = self(carries, obs_masked, n_layers)
-        token_ids = outs[5]
-        alarm_out = outs[6]
-        loss_vq = outs[7]
-        z_e = outs[8]
-        z_q = z_e + jax.lax.stop_gradient(outs[1] - z_e)
+        token_ids = outs.token_ids
+        alarm_out = outs.alarm_out
+        loss_vq = outs.loss_vq
+        z_e = outs.z_e
+        z_q = z_e + jax.lax.stop_gradient(outs.signal_out - z_e)
         spatial_ego_hat = self.head_vqel_recon_2(nn.relu(self.head_vqel_recon_1(z_q)))
         spatial_ego_target = self.extract_spatial_ego(obs)
         return z_q, token_ids, spatial_ego_hat, spatial_ego_target, loss_vq, z_e
@@ -785,17 +814,18 @@ class PredatorNetworkJax(nn.Module):
             self.head_proprio(h_policy)
             self.head_retention(h_policy)
 
-        return new_carries, (
-            action_logits,
-            signal_out,
-            symbol_write,
-            values,
-            tom_logits,
-            token_ids,
-            loss_vq,
-            z_e,
-            culture_fast,
-            culture_slow,
+        return new_carries, NetworkOutputs(
+            action_logits=action_logits,
+            signal_out=signal_out,
+            symbol_write=symbol_write,
+            values=values,
+            tom_logits=tom_logits,
+            token_ids=token_ids,
+            alarm_out=None,
+            loss_vq=loss_vq,
+            z_e=z_e,
+            culture_fast=culture_fast,
+            culture_slow=culture_slow,
         )
 
 
