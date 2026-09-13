@@ -1810,28 +1810,43 @@ def _run_simulation_impl(
                 _ze = _ze.reshape(-1, _ze.shape[-1])
                 
             _alive = jnp.asarray(b_batch["alive"]).reshape(-1).astype(bool)
-            
+
+            # Task 4: fraction of the rollout window that had a live agent —
+            # a thin pool (e.g. right after a predation spike) can't support
+            # a vocab_size-code usage estimate; the reset call skips its
+            # entire update rather than reading a noisy small-pool bincount.
+            _alive_pool_frac = float(jnp.mean(_alive.astype(jnp.float32)))
+            _dc_min_pool_frac = float(config.get("vq_dead_code_min_pool_frac", 0.25))
+            _dc_window = int(config.get("vq_dead_code_window", 5))
+            _dc_ema_decay = float(config.get("vq_dead_code_ema_decay", 0.8))
+
             _toks_alive = _toks[_alive]
             _ze_alive = _ze[_alive]
-            
+
             if _toks_alive.ndim > 1 and _toks_alive.shape[-1] == 3:
                 # Phase 18: 3 slots. z_e layout: 8D cont + 12D slot0 + 8D slot1 + 12D slot2
                 _dc_key_0, _dc_key_1, _dc_key_2 = jax.random.split(_dc_key, 3)
                 _vocab_size = int(config["vocab_size"])
-                b_params = dead_code_reset_codebook_params(
-                    b_params, _toks_alive[:, 0], _ze_alive[:, 8:20], _vocab_size, _dc_key_0, "codebook_0"
+                _dc_kwargs = dict(
+                    alive_pool_frac=_alive_pool_frac, min_pool_frac=_dc_min_pool_frac,
+                    dead_streak_window=_dc_window, ema_decay=_dc_ema_decay,
                 )
                 b_params = dead_code_reset_codebook_params(
-                    b_params, _toks_alive[:, 1], _ze_alive[:, 20:28], _vocab_size, _dc_key_1, "codebook_1"
+                    b_params, _toks_alive[:, 0], _ze_alive[:, 8:20], _vocab_size, _dc_key_0, "codebook_0", **_dc_kwargs
                 )
                 b_params = dead_code_reset_codebook_params(
-                    b_params, _toks_alive[:, 2], _ze_alive[:, 28:40], _vocab_size, _dc_key_2, "codebook_2"
+                    b_params, _toks_alive[:, 1], _ze_alive[:, 20:28], _vocab_size, _dc_key_1, "codebook_1", **_dc_kwargs
+                )
+                b_params = dead_code_reset_codebook_params(
+                    b_params, _toks_alive[:, 2], _ze_alive[:, 28:40], _vocab_size, _dc_key_2, "codebook_2", **_dc_kwargs
                 )
             else:
                 _toks_alive = _toks_alive.reshape(-1)
                 _ze_alive = _ze_alive.reshape(-1, int(config["signal_dim"]))
                 b_params = dead_code_reset_codebook_params(
-                    b_params, _toks_alive, _ze_alive, int(config["vocab_size"]), _dc_key, "codebook"
+                    b_params, _toks_alive, _ze_alive, int(config["vocab_size"]), _dc_key, "codebook",
+                    alive_pool_frac=_alive_pool_frac, min_pool_frac=_dc_min_pool_frac,
+                    dead_streak_window=_dc_window, ema_decay=_dc_ema_decay,
                 )
 
         if ui == start_update:
@@ -1958,6 +1973,10 @@ def _run_simulation_impl(
                 _r_vocab,
                 _dc_key,
                 codebook_key=_cb_key,
+                alive_pool_frac=float(jnp.mean(_alive.astype(jnp.float32))),
+                min_pool_frac=float(config.get("vq_dead_code_min_pool_frac", 0.25)),
+                dead_streak_window=int(config.get("vq_dead_code_window", 5)),
+                ema_decay=float(config.get("vq_dead_code_ema_decay", 0.8)),
             )
             if _red_comms:
                 r_params = ensure_predator_params(

@@ -107,36 +107,101 @@ def dead_code_reset_codebook_params(
     vocab_size: int,
     rng: jax.Array,
     codebook_key: str = "codebook",
+    alive_pool_frac: float = 1.0,
+    min_pool_frac: float = 0.25,
+    dead_streak_window: int = 5,
+    ema_decay: float = 0.8,
 ) -> Any:
     """
   Persist dead-code reset into the codebook embedding (runs after PPO on CPU/GPU).
 
+  AUDIT_SEP2026.md Task 4 (Gate 2 / Gate 3 deadlock fix). The original version
+  reset any code with zero usage in a SINGLE rollout window — usage is a
+  jnp.bincount over one window's alive agents, so when predation thins the
+  population, the surviving token pool shrinks, most codes read as
+  transiently dead, and the codebook gets scrambled precisely during the
+  event the project is trying to measure (codes_active went 35|51|46 ->
+  7|11|14 the instant blue_caught spiked at ppo=2578). The reset mechanism
+  was destroying the measurement instrument during the event it was meant to
+  observe.
+
+  Fix: death is now a per-code PERSISTENT usage_ema and dead_streak counter,
+  stored alongside `embedding` (see ensure_vq_usage_state) so they survive
+  checkpointing. A code is reset only when it has gone unused for
+  `dead_streak_window` CONSECUTIVE updates, and the entire update (not just
+  the reset) is skipped whenever `alive_pool_frac` (the fraction of the
+  rollout window that had a live agent present) is below `min_pool_frac` —
+  a thin pool can't support a `vocab_size`-code usage estimate, so a noisy
+  small-pool bincount must not corrupt the persistent state either.
+
   token_ids: (M,) int — tokens used in the rollout window (alive agents only).
   z_e: (M, signal_dim) matching encoder outputs for those rows.
-  codebook_key: ``codebook`` (blue) or ``red_codebook`` (Phase 12 predator).
+  codebook_key: ``codebook`` (blue legacy) / ``codebook_0``..``codebook_2``
+    (blue Phase 18 3-slot) / ``red_codebook`` (Phase 12 predator).
+  alive_pool_frac: fraction of (step, agent) cells alive during this rollout
+    window (0..1) — pass e.g. ``float(alive_mask.mean())`` from the caller.
     """
     if z_e.shape[0] == 0:
         return params
     flat = unfreeze(params)
     if codebook_key not in flat:
         return params
-    cb = flat[codebook_key]["embedding"]
-    usage = jnp.bincount(token_ids, length=vocab_size)
-    dead_mask = usage == 0
+    cb = flat[codebook_key]
+    embedding = cb["embedding"]
+    usage_ema = cb.get("usage_ema", jnp.zeros((vocab_size,), dtype=jnp.float32))
+    dead_streak = cb.get("dead_streak", jnp.zeros((vocab_size,), dtype=jnp.float32))
+
+    pool_ok = jnp.asarray(alive_pool_frac) >= min_pool_frac
+
+    usage = jnp.bincount(token_ids, length=vocab_size).astype(jnp.float32)
+    used_this_window = usage > 0
+
+    candidate_usage_ema = ema_decay * usage_ema + (1.0 - ema_decay) * usage
+    candidate_dead_streak = jnp.where(used_this_window, 0, dead_streak + 1)
+
+    # Leave the persistent state untouched on a too-thin window instead of
+    # letting an unreliable bincount corrupt it.
+    new_usage_ema = jnp.where(pool_ok, candidate_usage_ema, usage_ema)
+    new_dead_streak = jnp.where(pool_ok, candidate_dead_streak, dead_streak)
+
+    dead_mask = pool_ok & (new_dead_streak >= dead_streak_window)
     num_dead = jnp.sum(dead_mask)
-    
-    def _log_reset(nd, key):
-        if nd > 0:
-            print(f"[JAX] dead_code_reset ({key}): resetting {nd} dead codes", flush=True)
-            
-    jax.debug.callback(_log_reset, num_dead, codebook_key)
-    
+
+    def _log_reset(nd, key, ema_all, mask_all, pool_frac, pool_was_ok):
+        if not bool(pool_was_ok):
+            print(
+                f"[JAX] dead_code_reset ({key}): skipped this update — alive pool "
+                f"{float(pool_frac):.1%} below the {min_pool_frac:.0%} floor",
+                flush=True,
+            )
+        elif nd > 0:
+            reset_emas = ema_all[mask_all][:10]
+            print(
+                f"[JAX] dead_code_reset ({key}): resetting {int(nd)} codes unused for "
+                f"{dead_streak_window}+ consecutive updates "
+                f"(usage_ema at trigger: {reset_emas})",
+                flush=True,
+            )
+
+    jax.debug.callback(
+        _log_reset, num_dead, codebook_key, new_usage_ema, dead_mask,
+        jnp.asarray(alive_pool_frac), pool_ok,
+    )
+
     n_pool = z_e.shape[0]
     rand_idx = jax.random.randint(rng, (vocab_size,), 0, n_pool)
     replacement = jax.lax.stop_gradient(z_e[rand_idx])
+    new_embedding = jnp.where(dead_mask[:, None], replacement, embedding)
+    # A reset code gets a fresh dead_streak_window-update grace period rather
+    # than instantly re-triggering the reset on the very next update.
+    new_dead_streak = jnp.where(dead_mask, 0, new_dead_streak)
+    new_usage_ema = jnp.where(dead_mask, 0.0, new_usage_ema)
+
     flat[codebook_key] = {
-        **flat[codebook_key],
-        "embedding": jnp.where(dead_mask[:, None], replacement, cb),
+        **cb,
+        "embedding": new_embedding,
+        "usage_ema": new_usage_ema,
+        "dead_streak": new_dead_streak,
     }
     # Match container type — optax Adam state must stay aligned with params tree.
     return freeze(flat) if isinstance(params, FrozenDict) else flat
@@ -833,7 +898,11 @@ def init_predator_params(
     obs: jnp.ndarray,
     n_layers: int,
 ) -> Any:
-    return sanitize_agent_params(model.init(rng, carry, obs, n_layers)["params"])
+    params = sanitize_agent_params(model.init(rng, carry, obs, n_layers)["params"])
+    # Only matters when red falls back to a plain VQ codebook (not the
+    # dcvq/subspace_embeddings path); no-ops otherwise since VQ_CODEBOOK_KEYS
+    # won't be present.
+    return ensure_vq_usage_state(params, model.vocab_size)
 
 
 def ensure_predator_params(
@@ -918,6 +987,38 @@ def reset_predator_vq_on_resume(
     return sanitize_agent_params(freeze(flat))
 
 
+VQ_CODEBOOK_KEYS = ("codebook", "codebook_0", "codebook_1", "codebook_2")
+
+
+def ensure_vq_usage_state(params: Any, vocab_size: int) -> Any:
+    """
+    AUDIT_SEP2026.md Task 4: give each VQ codebook a persistent per-code
+    ``usage_ema`` (float32) and ``dead_streak`` (int32) counter, living
+    alongside ``embedding`` so they ride the existing checkpoint save/restore
+    path and ``graft_missing_param_subtrees`` (already used for every other
+    "new field added to an old checkpoint" case) without any special-casing —
+    it recurses into ``codebook_N``, which is present in both the old
+    checkpoint and the fresh template, and injects whichever of these two
+    sub-keys the old checkpoint is missing.
+
+    Neither field is read by any loss function, so ``jax.grad`` produces an
+    exact zero gradient for them and Adam applies a no-op update; they are
+    only ever written by ``dead_code_reset_codebook_params``, called after
+    the optimizer step, exactly like ``embedding`` itself already is.
+    """
+    flat = unfreeze(params) if isinstance(params, FrozenDict) else dict(params)
+    for key in VQ_CODEBOOK_KEYS:
+        if key not in flat:
+            continue
+        cb = dict(flat[key])
+        if "usage_ema" not in cb:
+            cb["usage_ema"] = jnp.zeros((vocab_size,), dtype=jnp.float32)
+        if "dead_streak" not in cb:
+            cb["dead_streak"] = jnp.zeros((vocab_size,), dtype=jnp.float32)
+        flat[key] = cb
+    return freeze(flat) if isinstance(params, FrozenDict) else flat
+
+
 def init_agent_params(
     model: AgentNetworkJax,
     rng: jax.Array,
@@ -930,7 +1031,8 @@ def init_agent_params(
 
     Auxiliary heads are touched inside ``__call__`` when ``is_initializing()``.
     """
-    return sanitize_agent_params(model.init(rng, carry, obs, n_layers)["params"])
+    params = sanitize_agent_params(model.init(rng, carry, obs, n_layers)["params"])
+    return ensure_vq_usage_state(params, model.vocab_size)
 
 
 def params_apply_variables(params: Any) -> dict:
