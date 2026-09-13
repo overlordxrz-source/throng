@@ -58,18 +58,26 @@ case "$MODE" in
     ls -la "$DIR"
     ;;
   upload)
-    for path in "$DIR/checkpoints" "$DIR/signal_corpus.jsonl" "$DIR/signal_corpus_red.jsonl"; do
-      if [[ ! -e "$path" ]]; then
-        echo "Missing required path: $path" >&2
-        exit 1
-      fi
-    done
+    # Only checkpoints are required. The corpus files are optional (Sep 2026
+    # restart: a fresh corpus is written by the new run, and the recovered
+    # historical corpus stays local as replication evidence — 5.5GB of it
+    # isn't needed on the new volume for training to resume).
+    if [[ ! -e "$DIR/checkpoints" ]]; then
+      echo "Missing required path: $DIR/checkpoints" >&2
+      exit 1
+    fi
     echo "=== Ensuring volume $VOLUME exists ==="
     "$MODAL" volume create "$VOLUME" || true
-    echo "=== Uploading $DIR → $VOLUME ==="
+    echo "=== Uploading $DIR/checkpoints → $VOLUME/checkpoints ==="
     "$MODAL" volume put -f "$VOLUME" "$DIR/checkpoints" /checkpoints
-    "$MODAL" volume put -f "$VOLUME" "$DIR/signal_corpus.jsonl" /
-    "$MODAL" volume put -f "$VOLUME" "$DIR/signal_corpus_red.jsonl" /
+    for corpus in signal_corpus.jsonl signal_corpus_red.jsonl; do
+      if [[ -e "$DIR/$corpus" ]]; then
+        echo "=== Uploading $DIR/$corpus → $VOLUME ==="
+        "$MODAL" volume put -f "$VOLUME" "$DIR/$corpus" /
+      else
+        echo "=== Skipping $corpus (not present in $DIR — optional) ==="
+      fi
+    done
     echo "=== Upload complete ==="
     "$MODAL" volume ls "$VOLUME" /
     ;;

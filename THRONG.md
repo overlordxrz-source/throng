@@ -31,7 +31,7 @@ The philosophical and mathematical foundations of THRONG have been consolidated 
 > An independent offline re-test (Sep 2026, `tools/ate_swap_test.py` against the recovered corpus, `~/throng_backup/signal_corpus.jsonl`, `--min-step 1315000`, a stable ~100k-step span, steps 1,315,000–1,415,676, 629,657 records) gives the trustworthy number: **Slot 2 ATE = +0.0274, 95% CI [+0.0080, +0.0480]** — statistically significant (CI excludes zero) and **below** the pre-registered pass bar of `|Δ| > 0.05` (`docs/STRATEGIC_ROADMAP.md`). Slots 0 and 1 remain null (CI includes zero for both: +0.0101 [-0.0255, +0.0407] and -0.0161 [-0.0420, +0.0123]). Read plainly: the effect is real and replicates, and the channel is weaker than the retracted numbers implied. Stratification uses only emitter/receiver `red_dist`, independent of the Finding 3 corpus-index bug. A live re-run against checkpoint 2763 (the actual replication gate, per the Sep 2026 restart plan) has not yet happened.
 
 > [!NOTE]
-> **Branch situation (Jul 2026):** Current local branch is `feature/infra-hardening` (HEAD: `7fbf7d9`). `feature/phase18-crafting` is ahead by 5 commits including `8e476e2` (catch_radius increased to 2 to break evasion attractor) and `5ede5be` (catch_radius override removed). The Modal migration is complete (data at `~/throng_backup`, latest checkpoint `2763`). Resume must use `feature/phase18-crafting`.
+> **Branch situation (Sep 2026, resolved):** `master` on GitHub was 239 commits behind (frozen at Phase 14.4) while all Sep 2026 audit/restart work — H1 completion, Findings 1-9 fixes, Tasks 2 and 4, the confidence-head reset, the checkpoint-backup guard — landed on `feature/infra-hardening`. That branch has been **merged into `master`**; `master` is now the current, tested state and the only branch a fresh clone or a `git reset --hard origin/master` should ever need. **Every `git reset --hard origin/master` / `git pull` snippet elsewhere in this file (there are several, scattered across older phase-specific sections) now pulls the correct code** — but this file accumulates operational snippets phase-by-phase and an OLDER one could reference a since-abandoned branch by name; if any command below names a branch other than `master`, stop and check with the team before running it. `feature/phase18-crafting` (5 commits ahead of its own base, including a `catch_radius` change) was **not** part of this merge and remains a separate, unreviewed consideration — do not resume from it without an explicit decision. The Modal migration is complete (data at `~/throng_backup`, latest checkpoint `2763`; a working copy lives at `~/throng_restart_staging/checkpoints` — never point a training run's `checkpoint_dir` at `~/throng_backup` itself, which is now also enforced in code).
 
 **Phase 18.7 Hot-Resume & Telemetry Validation:**
 - **Zero Amnesia:** Successfully hot-resumed from update 2493 with expanded `obs_dim=2731`. The `pad_gwt_comms_1` graft held perfectly.
@@ -657,7 +657,7 @@ Example swing: step 38912 → 2876 catches, age 51; step 39424 → 1812 catches,
 [JAX] blue PPO minibatch 1/200 ... — H2D + backward...
 ```
 
-**Do not see:** `GPU-resident backward` or `GPU-resident scan` — pull **`origin/master`** and restart process.
+**Do not see:** `GPU-resident backward` or `GPU-resident scan` — pull **`origin/master`**, confirm with `git log -1 --oneline` (must NOT be a Phase 14-or-earlier commit — see §0b Branch situation), and restart process.
 
 **Phase 11.0 success metric — ACHIEVED:**
 
@@ -774,6 +774,7 @@ ps aux | grep run_bg
 
 # 2. Sync code — must be d4cf614+
 cd /root/throng && git fetch origin && git reset --hard origin/master
+git log -1 --oneline   # sanity-check: should NOT be a Phase 14-or-earlier commit — see §0b Branch situation
 grep -n "H2D + backward" jax_sim/rl_jax.py   # must match
 
 # 3. Allocator + JAX env (add to nohup line or shell profile)
@@ -804,6 +805,7 @@ Notebooks often die with **`KeyboardInterrupt`** during silent JAX compile (cell
 ```bash
 cd /root/throng 2>/dev/null || git clone https://github.com/overlordxrz-source/throng.git /root/throng
 cd /root/throng && git fetch origin && git reset --hard origin/master
+git log -1 --oneline   # sanity-check: should NOT be a Phase 14-or-earlier commit — see §0b Branch situation
 
 export TF_GPU_ALLOCATOR=cuda_malloc_async
 export XLA_PYTHON_CLIENT_MEM_FRACTION=0.80
@@ -846,6 +848,7 @@ import subprocess, sys, os
 from pathlib import Path
 REPO = Path("/root/throng")
 # clone if missing, git reset --hard origin/master ...
+# then `git log -1 --oneline` — confirm NOT a Phase 14-or-earlier commit (see §0b Branch situation)
 os.environ["JAX_COMPILATION_CACHE_DIR"] = "/tmp/throng_jax_cache"
 ```
 
@@ -912,6 +915,7 @@ Resume training (**do not** wipe checkpoints):
 
 ```bash
 cd /root/throng && git pull   # or reset --hard origin/master
+git log -1 --oneline   # sanity-check: should NOT be a Phase 14-or-earlier commit — see §0b Branch situation
 nohup python -u run_bg.py > /mnt/throng-runs/train.log 2>&1 &
 tail -f /mnt/throng-runs/train.log
 ```
@@ -1096,11 +1100,11 @@ phase12_coevolution:           # feature/phase13-thermodynamics (inherited from 
 | `KeyboardInterrupt` mid-compile | **subprocess Popen** (Jupyter) or **nohup** (bash); wait 5–15+ min; don't use volume JAX cache |
 | B200 shows ~150GB VRAM used | Normal — `MEM_FRACTION=0.80` pre-allocation, not OOM |
 | Slow PPO on B200 despite fast scan | **Expected** — CPU offload → H2D (`8077a12`); ~6 steps/sec is healthy |
-| Log shows `GPU-resident backward` | **Stale code** — `git reset --hard origin/master`, kill old `run_bg`, restart |
+| Log shows `GPU-resident backward` | **Stale code** — `git reset --hard origin/master`, then `git log -1 --oneline` (must NOT be Phase 14-or-earlier — see §0b), kill old `run_bg`, restart |
 | OOM at **rollout** `lax.scan` after ckpt | **Fragmentation** — `TF_GPU_ALLOCATOR=cuda_malloc_async`, fresh process, resume from volume ckpt (see §5) |
 | Missing `carry_fwd` on dashboard | `git pull` → `3880337+`; resume merges `head_fwd_dyn` via `b2eb5f0` restore |
 | `/root/throng` missing | Clone repo (Cell 1 or bash) |
-| No `red_sense_api=v2` | `git reset --hard origin/master` + `train_entry` |
+| No `red_sense_api=v2` | `git reset --hard origin/master` + `train_entry`; then `git log -1 --oneline` sanity-check (§0b) |
 | OOM on PPO backward | `ppo_minibatch_size: 512`, `XLA_PYTHON_CLIENT_MEM_FRACTION=0.80` (try **0.75** if fragmented) |
 | Checkpoint shape error | Incompatible arch — wipe ckpts only if intentional fresh run |
 | Lag-1 / scouts 0% in decode | Old corpus — train after `5964a24`; scout uses **alarm range 8** |

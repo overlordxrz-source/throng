@@ -81,7 +81,15 @@ cost, population scale, recurrent depth) is scheduled to run before it does.
 
 ## Running it
 
+The default branch is **`master`**; it is the only branch a fresh clone or
+training box needs. Confirm you're on it (`git branch --show-current`) and
+that `git log -1 --oneline` doesn't look stale before trusting any run —
+this repository has previously had `master` sit hundreds of commits behind
+active development, which is exactly the kind of thing to check for rather
+than assume.
+
 ```bash
+git clone https://github.com/overlordxrz-source/throng.git && cd throng
 pip install jax[cuda12] flax optax orbax-checkpoint pyyaml
 python -c "
 import yaml
