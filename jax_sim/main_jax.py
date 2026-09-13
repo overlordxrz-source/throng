@@ -2178,7 +2178,7 @@ def _run_simulation_impl(
             print(f"\n{'='*70}")
             print(f"[step {step_val:>7}] {steps_sec:.0f} steps/sec | blue={b_alive_now} red={r_alive_now} | ppo={ui+1}")
             print(f"  Actions (blue): {act_str}")
-            if "imagined_action" in rollout_data["blue"] and _img_gate_enabled:
+            if "imagined_action" in rollout_data["blue"] and _img_gate:
                 im_act_all = np.array(rollout_data["blue"]["imagined_action"])
                 im_alive_actions = im_act_all[b_alive_all]
                 if len(im_alive_actions) > 0:
