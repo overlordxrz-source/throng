@@ -181,6 +181,34 @@ def _normalize_config(cfg: Dict) -> Dict:
     return cfg
 
 
+def assert_checkpoint_dir_is_not_protected_backup(resolved_ckpt_dir: str) -> None:
+    """
+    STRUCTURAL SAFEGUARD (Sep 2026 restart pre-flight, Cam's instruction):
+    called at the one and only place a WRITE-capable CheckpointManager gets
+    constructed for a run — refuse outright if `checkpoint_dir` resolves
+    anywhere under the local recovered-backup directory. That backup
+    (~/throng_backup) is irreplaceable physical evidence (it is the only
+    copy of the corpus behind the Slot 2 ATE); a training run pointed at it
+    by a stale/typo'd config would start writing new checkpoint steps into
+    it. "Remember not to do this" is exactly the failure mode Rule 13 exists
+    to eliminate — make it impossible instead.
+
+    `resolved_ckpt_dir` must already be an absolute, symlink-resolved path
+    (as produced by `Path(...).resolve()`), matching how the caller derives
+    `_protected_backup_root` below — a caller that skips resolution could
+    defeat this check with a relative path or a symlink.
+    """
+    protected_backup_root = str(Path(os.path.expanduser("~/throng_backup")).resolve())
+    if resolved_ckpt_dir == protected_backup_root or resolved_ckpt_dir.startswith(protected_backup_root + os.sep):
+        raise ValueError(
+            f"checkpoint_dir resolves to {resolved_ckpt_dir!r}, inside the protected "
+            f"recovered-backup directory ({protected_backup_root!r}). This directory is "
+            f"read-only source material, never a live training checkpoint_dir. Copy the "
+            f"checkpoint you need into a separate working directory and point "
+            f"checkpoint_dir there instead."
+        )
+
+
 # ── Rollout → CPU (free GPU before PPO backward) ───────────────────────────
 
 def _rollout_to_cpu(rollout_data: Dict) -> Dict:
@@ -949,6 +977,7 @@ def _run_simulation_impl(
     )
     # Orbax mkdir fails on symlinks (FileExistsError); use real volume path.
     ckpt_dir = str(Path(ckpt_dir).resolve())
+    assert_checkpoint_dir_is_not_protected_backup(ckpt_dir)
     Path(ckpt_dir).mkdir(parents=True, exist_ok=True)
     options = ocp.CheckpointManagerOptions(max_to_keep=2, create=True)
     ckpt_mngr = ocp.CheckpointManager(ckpt_dir, ocp.StandardCheckpointer(), options=options)
