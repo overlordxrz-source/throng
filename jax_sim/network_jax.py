@@ -263,7 +263,6 @@ class AgentNetworkJax(nn.Module):
         carries: jnp.ndarray,   # (N, hidden_dim)
         obs: jnp.ndarray,       # (N, obs_dim)
         n_layers: int,
-        nb_gain: Optional[jnp.ndarray] = None,
         detach_value: bool = False,
         deterministic: bool = False,
     ) -> Tuple[jnp.ndarray, Tuple]:
@@ -693,11 +692,9 @@ class PredatorNetworkJax(nn.Module):
         carries: jnp.ndarray,
         obs: jnp.ndarray,
         n_layers: int,
-        nb_gain: Optional[jnp.ndarray] = None,
         detach_value: bool = False,
         deterministic: bool = False,
     ) -> Tuple[jnp.ndarray, Tuple]:
-        del nb_gain
         N = obs.shape[0]
         sym_d = self.symbol_dim
         K = self.neighbor_k

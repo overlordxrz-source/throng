@@ -396,6 +396,19 @@ def make_sim_step(
             b_action_logits = b_action_logits.at[:, 6].set(-1e9)
             b_action_logits = b_action_logits.at[:, 7].set(-1e9)
 
+        # AUDIT_SEP2026.md Finding 5: Push/Guard are true no-ops for red too
+        # (grid_jax.py has no dispatch for either index), and rl_jax.py's PPO
+        # backward pass already masks both teams' logits at these indices
+        # (team-blind). Without this, red could sample Push/Guard here with
+        # unmasked probability, and old_log_probs would be computed from that
+        # unmasked distribution — a probability-ratio mismatch against the
+        # masked new_log_probs at the PPO step for any (agent, timestep) where
+        # it happened. Mask at rollout sampling too, matching blue and the
+        # backward pass.
+        if r_action_logits.shape[-1] > 7:
+            r_action_logits = r_action_logits.at[:, 6].set(-1e9)
+            r_action_logits = r_action_logits.at[:, 7].set(-1e9)
+
         key_act_b, key_act_r = jax.random.split(key_act)
         b_action_keys = jax.random.split(key_act_b, b_pop.max_pop)
         r_action_keys = jax.random.split(key_act_r, r_pop.max_pop)
@@ -2107,21 +2120,6 @@ def _run_simulation_impl(
             rew_alive = b_rew_all[b_alive_all]
             rew_mean = float(rew_alive.mean()) if len(rew_alive) > 0 else 0
             
-            # NB_GAIN correlation
-            sp_r = float('nan')
-            b_nb_gain_snap = b_pop_np.nb_gain
-            if alive_mask_final.sum() > 10:
-                try:
-                    from scipy.stats import spearmanr
-                    _nb_g = b_nb_gain_snap[alive_mask_final]
-                    _ages = b_pop_np.ages[alive_mask_final].astype(float)
-                    if _nb_g.std() > 1e-6:
-                        sp_r, _ = spearmanr(_nb_g, _ages)
-                    else:
-                        print(f"  [DEBUG] NB_GAIN variance collapsed! Unique raw values: {np.unique(_nb_g)[:10]}")
-                except Exception:
-                    pass
-            
             # Print concise dashboard
             print(f"\n{'='*70}")
             print(f"[step {step_val:>7}] {steps_sec:.0f} steps/sec | blue={b_alive_now} red={r_alive_now} | ppo={ui+1}")
@@ -2206,7 +2204,7 @@ def _run_simulation_impl(
             barrier_sum_val = 0
             if "barrier_sum" in rollout_data["blue"]:
                 barrier_sum_val = float(np.asarray(rollout_data["blue"]["barrier_sum"]).mean())
-            print(f"  VQ: loss={vq_loss_val:.2e} | codes_active={vq_codes_str} | clusters={active_clusters_str} | NB_GAIN↔surv: {sp_r:.3f}")
+            print(f"  VQ: loss={vq_loss_val:.2e} | codes_active={vq_codes_str} | clusters={active_clusters_str}")
             medal_str = ""
             if _medal_adr_enabled and _medal_adr_prob > 0.0:
                 medal_str = f" | expert_dropouts={int(_md)}"

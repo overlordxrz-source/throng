@@ -14,6 +14,8 @@ population_size: 200           # P10.5 Hard-Ceiling: cap blues (no 500-agent ent
 max_population: 200
 max_pop: 200
 min_population: 150              # P10.5 Goldilocks: 150–200 high-stress band
+red_population_size: 250         # P10.4 Safety Bubble: full red ecology pressure
+max_pop_red: 250
 min_red_population: 250          # P4b: max red pressure immediately on resume
 repro_energy_thresh: 0.95        # P10.2 Metabolic Squeeze: rare clones (was 0.80)
 repro_energy_cost: 0.80          # P10.2: cloning nearly starves parent (was 0.40)
@@ -137,7 +139,6 @@ puzzle_timeout: 100              # steps before puzzle resets
 energy_decay: 0.001
 alarm_metabolic_cost: 0.006
 starvation_threshold: 0.1
-reward_starvation: -0.5
 reward_resource: 0.1
 reward_craft_success: 3.0
 reward_futile_craft: -0.20
@@ -162,7 +163,6 @@ ppo_max_grad_norm: 2.0
 # Rewards
 reward_blue_alive: 0.05
 reward_blue_caught: -2.0      # P4: harsher death penalty for caught blues
-reward_blue_red_proximity: -0.01
 reward_red_catch: 3.0         # P4: stronger hunt incentive
 reward_red_starve_per_step: -0.02
 reward_move: 0.01

@@ -30,34 +30,25 @@ from jax_sim.train_entry import run_simulation  # noqa: E402
 
 
 def build_cfg() -> dict:
+    """Load config.yaml as-is; override only what's genuinely Modal-infra-specific.
+
+    This used to re-assert ~22 individual training/ecology hyperparameters on
+    top of the loaded config.yaml (population sizes, PPO settings, red ecology
+    params, n_actions, env_channels...). AUDIT_SEP2026.md flagged this as the
+    exact mechanism that produced the historical `env_channels=12` bug
+    (THRONG.md's Phase 18.7 headline): someone tunes a value in config.yaml,
+    runs via this script, and the tuned value is silently overwritten back to
+    whatever was hardcoded here. Verified line-by-line that all 22 previously
+    matched config.yaml except two that had silently drifted apart:
+    `red_population_size`/`max_pop_red` were hardcoded to 250 here but absent
+    from config.yaml entirely, so loading config.yaml alone would have fallen
+    back to `_normalize_config`'s default of 75 — a real ecology change, not a
+    redundant duplicate. Fixed by adding both to config.yaml directly instead
+    of perpetuating the shadow copy.
+    """
     with open(REPO / "config.yaml") as f:
         cfg = yaml.safe_load(f)
     cfg["checkpoint_dir"] = "/mnt/throng-runs/checkpoints"
-    # P10.5 Hard-Ceiling
-    cfg["population_size"] = cfg["max_population"] = cfg["max_pop"] = 200
-    cfg["min_population"] = 150
-    cfg["ppo_gamma"] = 0.999
-    # P10.4 Safety Bubble + ecology
-    cfg["red_population_size"] = cfg["max_pop_red"] = 250
-    cfg["min_red_population"] = 250
-    cfg["red_curriculum_stages"] = [250]
-    cfg["distill_enabled"] = False
-    cfg["repro_energy_thresh"] = 0.95
-    cfg["repro_energy_cost"] = 0.80
-    cfg["red_catch_radius"] = 1
-    cfg["red_catch_prob"] = 0.8
-    cfg["red_detection_radius"] = 0
-    cfg["resource_regen_rate"] = 0.0003
-    cfg["resource_n_patches"] = 10
-    cfg["resource_max"] = 0.5
-    cfg["resource_spawn_boost"] = 0.1
-    cfg["max_age"] = 1000
-    cfg["vq_dead_code_reset"] = True
-    cfg["ppo_rollout_steps"] = 512
-    cfg["ppo_minibatch_size"] = 512   # Phase 18: Reverted back to 512 to avoid A100 PPO backward OOM
-    # Phase 18 — Continuous-to-Discrete bootstrap
-    cfg["n_actions"] = 12       # N, S, E, W, Stay, Strike, Push, Guard, Bld, PickUp, Craft, UseTool
-    cfg["env_channels"] = 15    # blue, red, wall, res, shelter, contested, scent, puzzle, blue_bg, barrier, wood, stone, flint, clay, vine
     return cfg
 
 

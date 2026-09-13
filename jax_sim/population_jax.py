@@ -43,7 +43,6 @@ class PopState:
         self.carries = jnp.zeros((max_pop, hidden_dim), dtype=jnp.float32)
         self.signals = jnp.zeros((max_pop, signal_dim), dtype=jnp.float32)
         self.alarms = jnp.zeros((max_pop, 2), dtype=jnp.float32)
-        self.nb_gain = jnp.ones(max_pop, dtype=jnp.float32)
 
         # Inventory (Phase 18)
         self.inventory_wood = jnp.zeros(max_pop, dtype=jnp.int32)
@@ -77,7 +76,7 @@ class PopState:
     def tree_flatten(self):
         children = [
             self.positions, self.ages, self.alive, self.energy, self.team,
-            self.n_layers, self.carries, self.signals, self.nb_gain,
+            self.n_layers, self.carries, self.signals,
             self.offspring_count, self.steps_since_catch, self.steps_since_dropout,
             self.lineage_ids, self.next_lineage_id, self.is_big_green, self.alarms,
             self.inventory_wood, self.inventory_stone, self.inventory_flint,
@@ -98,14 +97,14 @@ class PopState:
         pop.signal_dim = signal_dim
         pop.memory_slots = memory_slots
         (pop.positions, pop.ages, pop.alive, pop.energy, pop.team,
-         pop.n_layers, pop.carries, pop.signals, pop.nb_gain,
+         pop.n_layers, pop.carries, pop.signals,
          pop.offspring_count, pop.steps_since_catch, pop.steps_since_dropout,
          pop.lineage_ids, pop.next_lineage_id, pop.is_big_green, pop.alarms,
          pop.inventory_wood, pop.inventory_stone, pop.inventory_flint,
          pop.inventory_clay, pop.inventory_vine, pop.inventory_axe,
-         pop.can_see_recipe) = children[:23]
+         pop.can_see_recipe) = children[:22]
         if memory_slots > 0:
-            pop.memory_buffer = children[23]
+            pop.memory_buffer = children[22]
         else:
             pop.memory_buffer = None
         return pop
@@ -126,7 +125,6 @@ class PopState:
         pop.carries = kwargs.get("carries", self.carries)
         pop.signals = kwargs.get("signals", self.signals)
         pop.alarms = kwargs.get("alarms", self.alarms)
-        pop.nb_gain = kwargs.get("nb_gain", self.nb_gain)
         pop.offspring_count = kwargs.get("offspring_count", self.offspring_count)
         pop.steps_since_catch = kwargs.get("steps_since_catch", self.steps_since_catch)
         pop.steps_since_dropout = kwargs.get("steps_since_dropout", self.steps_since_dropout)
@@ -302,9 +300,7 @@ def apply_auto_reproduce(
     
     parent_alarms = pop.alarms[assigned_parents]
     new_alarms = jnp.where(activate_mask[:, None], parent_alarms, pop.alarms)
-    
-    new_nb_gain = jnp.where(activate_mask, 1.0, pop.nb_gain)
-    
+
     # We maintain the type of the parent
     parent_is_big_green = pop.is_big_green[assigned_parents]
     new_is_big_green = jnp.where(activate_mask, parent_is_big_green, pop.is_big_green)
@@ -329,7 +325,6 @@ def apply_auto_reproduce(
         carries=new_carries,
         signals=new_signals,
         alarms=new_alarms,
-        nb_gain=new_nb_gain,
         is_big_green=new_is_big_green,
         can_see_recipe=new_can_see,
         inventory_wood=new_inv_wood,
