@@ -550,3 +550,95 @@ def check_puzzle_solved(
     new_cooldown = out_states[:, 1].astype(jnp.int32)
 
     return rewards, solved_any, new_active, new_cooldown
+
+
+# ── Crafting material spawn zones ────────────────────────────────────────────
+
+def material_zone_masks(grid_size: int) -> Dict[str, jnp.ndarray]:
+    """Spatial zones each crafting material can spawn in.
+
+    Banding (not uniform spawn) is the point, not an incidental choice: if every
+    material were everywhere, a blind agent picks up whatever it's standing on and
+    co-located groups assemble correct combinations by chance, which destroys the
+    message's value. Position determining availability is what makes recipe
+    knowledge an actionable spatial instruction.
+
+    wood/stone split west/east (x-axis); flint/clay/vine split north/mid/south
+    (y-axis) -- orthogonal to the wood/stone split, so every one of the resulting
+    6 cells holds at most 2 of the 5 materials (Cam, 2026-09-13).
+    """
+    x_coords = jnp.arange(grid_size)[None, :]
+    y_coords = jnp.arange(grid_size)[:, None]
+    return {
+        "wood": x_coords < (grid_size // 2),
+        "stone": x_coords >= (grid_size // 2),
+        "flint": y_coords < (grid_size // 3),
+        "clay": (y_coords >= (grid_size // 3)) & (y_coords < (2 * grid_size // 3)),
+        "vine": y_coords >= (2 * grid_size // 3),
+    }
+
+
+# ── Crafting resolution ──────────────────────────────────────────────────────
+
+def resolve_crafting(
+    positions: jnp.ndarray,   # (N, 2) int32
+    is_craft: jnp.ndarray,    # (N,) bool -- action == CRAFT and alive
+    inv_wood: jnp.ndarray,    # (N,) int32
+    inv_stone: jnp.ndarray,
+    inv_flint: jnp.ndarray,
+    inv_clay: jnp.ndarray,
+    inv_vine: jnp.ndarray,
+    recipe: jnp.ndarray,      # (5,) int32: [req_wood, req_stone, req_flint, req_clay, req_vine]
+    grid_size: int,
+) -> Dict[str, jnp.ndarray]:
+    """Resolve craft attempts and classify every failure by cause.
+
+    Only "wrong materials" is evidence about the communication channel -- "too
+    few crafters" and "nobody carrying anything" are logistics. The three
+    failure classes are mutually exclusive and, together with craft_success,
+    exhaustive over `is_craft` (Cam, 2026-09-13).
+    """
+    dx = jnp.abs(positions[:, 0:1] - positions[None, :, 0])
+    dy = jnp.abs(positions[:, 1:2] - positions[None, :, 1])
+    dx = jnp.minimum(dx, grid_size - dx)
+    dy = jnp.minimum(dy, grid_size - dy)
+    dist = jnp.maximum(dx, dy)
+    adjacent = dist <= 1
+
+    craft_group = adjacent & is_craft[:, None] & is_craft[None, :]
+
+    group_wood = jnp.sum(inv_wood[None, :] * craft_group, axis=1)
+    group_stone = jnp.sum(inv_stone[None, :] * craft_group, axis=1)
+    group_flint = jnp.sum(inv_flint[None, :] * craft_group, axis=1)
+    group_clay = jnp.sum(inv_clay[None, :] * craft_group, axis=1)
+    group_vine = jnp.sum(inv_vine[None, :] * craft_group, axis=1)
+
+    recipe_satisfied = (
+        (group_wood >= recipe[0]) &
+        (group_stone >= recipe[1]) &
+        (group_flint >= recipe[2]) &
+        (group_clay >= recipe[3]) &
+        (group_vine >= recipe[4])
+    )
+    craft_success = is_craft & recipe_satisfied
+
+    group_size = jnp.sum(craft_group.astype(jnp.int32), axis=1)  # includes self
+    total_req = recipe[0] + recipe[1] + recipe[2] + recipe[3] + recipe[4]
+    is_carrying = (
+        (inv_wood > 0) | (inv_stone > 0) | (inv_flint > 0) | (inv_clay > 0) | (inv_vine > 0)
+    )
+    group_carrying_count = jnp.sum(
+        craft_group.astype(jnp.int32) * is_carrying[None, :].astype(jnp.int32), axis=1
+    )
+
+    futile_attempt = is_craft & ~recipe_satisfied
+    futile_uncoordinated = futile_attempt & (group_size < total_req)
+    futile_empty = futile_attempt & (group_size >= total_req) & (group_carrying_count == 0)
+    futile_wrong_mats = futile_attempt & (group_size >= total_req) & (group_carrying_count > 0)
+
+    return {
+        "craft_success": craft_success,
+        "futile_uncoordinated": futile_uncoordinated,
+        "futile_wrong_mats": futile_wrong_mats,
+        "futile_empty": futile_empty,
+    }

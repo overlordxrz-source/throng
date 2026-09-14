@@ -35,7 +35,7 @@ from jax_sim.grid_jax import (
     write_to_grid, decay_grid, decay_barrier_grid, get_local_patches, get_neighbour_signals,
     generate_puzzle_nodes, update_puzzle_grid, decay_puzzle_timeout, check_puzzle_solved,
     generate_resource_patches, generate_shelter_spots, generate_contested_nodes,
-    update_scent_trails,
+    update_scent_trails, material_zone_masks, resolve_crafting,
 )
 from communication.analysis import SignalCorpusWriter
 from jax_sim.population_jax import (
@@ -566,38 +566,16 @@ def make_sim_step(
         # 3. CRAFT (Action 10) -> shared reward
         is_craft = (b_actions == 10) & b_pop.alive
         
-        # Adjacency check
-        dx = jnp.abs(b_pop.positions[:, 0:1] - b_pop.positions[None, :, 0])
-        dy = jnp.abs(b_pop.positions[:, 1:2] - b_pop.positions[None, :, 1])
-        dx = jnp.minimum(dx, gs - dx)
-        dy = jnp.minimum(dy, gs - dy)
-        dist = jnp.maximum(dx, dy)
-        adjacent = dist <= 1
-        
-        craft_group = adjacent & is_craft[:, None] & is_craft[None, :]
-        
-        group_wood = jnp.sum(new_inv_wood[None, :] * craft_group, axis=1)
-        group_stone = jnp.sum(new_inv_stone[None, :] * craft_group, axis=1)
-        group_flint = jnp.sum(new_inv_flint[None, :] * craft_group, axis=1)
-        group_clay = jnp.sum(new_inv_clay[None, :] * craft_group, axis=1)
-        group_vine = jnp.sum(new_inv_vine[None, :] * craft_group, axis=1)
-        
-        req_wood = grid.current_recipe[0]
-        req_stone = grid.current_recipe[1]
-        req_flint = grid.current_recipe[2]
-        req_clay = grid.current_recipe[3]
-        req_vine = grid.current_recipe[4]
-        
-        recipe_satisfied = (
-            (group_wood >= req_wood) &
-            (group_stone >= req_stone) &
-            (group_flint >= req_flint) &
-            (group_clay >= req_clay) &
-            (group_vine >= req_vine)
+        _craft_result = resolve_crafting(
+            b_pop.positions, is_craft,
+            new_inv_wood, new_inv_stone, new_inv_flint, new_inv_clay, new_inv_vine,
+            grid.current_recipe, gs,
         )
-        
-        craft_success = is_craft & recipe_satisfied
-        
+        craft_success = _craft_result["craft_success"]
+        futile_uncoordinated = _craft_result["futile_uncoordinated"]
+        futile_wrong_mats = _craft_result["futile_wrong_mats"]
+        futile_empty = _craft_result["futile_empty"]
+
         consume_wood = craft_success & (new_inv_wood > 0)
         consume_stone = craft_success & (new_inv_stone > 0)
         consume_flint = craft_success & (new_inv_flint > 0)
@@ -636,23 +614,30 @@ def make_sim_step(
         b_pop = b_pop.replace(energy=jnp.clip(b_pop.energy + contested_gain, 0.0, 1.0))
 
         # ── Resource & Material respawning ──────────────────────
-        res_key, wood_key, stone_key = jax.random.split(jax.random.split(key_misc)[0], 3)
+        res_key, wood_key, stone_key, flint_key, clay_key, vine_key = jax.random.split(
+            jax.random.split(key_misc)[0], 6
+        )
         regen_rate = float(config.get("resource_regen_rate", 0.005))
         spawn_mask = jax.random.bernoulli(res_key, regen_rate, (gs, gs))
         new_res = grid.resources + spawn_mask.astype(jnp.float32) * _resource_spawn_boost
-        
-        # Spatial material respawn
-        x_coords = jnp.arange(gs)[None, :]
-        west_mask = x_coords < (gs // 2)
-        east_mask = x_coords >= (gs // 2)
 
-        wood_spawn = jax.random.bernoulli(wood_key, regen_rate * 0.5, (gs, gs)) & west_mask
-        stone_spawn = jax.random.bernoulli(stone_key, regen_rate * 0.5, (gs, gs)) & east_mask
-        
+        # Spatial material respawn -- see material_zone_masks() for why banding
+        # (not uniform spawn) is the point, not an incidental choice.
+        _zones = material_zone_masks(gs)
+
+        wood_spawn = jax.random.bernoulli(wood_key, regen_rate * 0.5, (gs, gs)) & _zones["wood"]
+        stone_spawn = jax.random.bernoulli(stone_key, regen_rate * 0.5, (gs, gs)) & _zones["stone"]
+        flint_spawn = jax.random.bernoulli(flint_key, regen_rate * 0.5, (gs, gs)) & _zones["flint"]
+        clay_spawn = jax.random.bernoulli(clay_key, regen_rate * 0.5, (gs, gs)) & _zones["clay"]
+        vine_spawn = jax.random.bernoulli(vine_key, regen_rate * 0.5, (gs, gs)) & _zones["vine"]
+
         grid = grid.replace(
             resources=jnp.clip(new_res, 0.0, _resource_max),
             wood_grid=jnp.clip(grid.wood_grid + wood_spawn.astype(jnp.float32), 0.0, 1.0),
-            stone_grid=jnp.clip(grid.stone_grid + stone_spawn.astype(jnp.float32), 0.0, 1.0)
+            stone_grid=jnp.clip(grid.stone_grid + stone_spawn.astype(jnp.float32), 0.0, 1.0),
+            flint_grid=jnp.clip(grid.flint_grid + flint_spawn.astype(jnp.float32), 0.0, 1.0),
+            clay_grid=jnp.clip(grid.clay_grid + clay_spawn.astype(jnp.float32), 0.0, 1.0),
+            vine_grid=jnp.clip(grid.vine_grid + vine_spawn.astype(jnp.float32), 0.0, 1.0)
         )
 
         # ── Age ─────────────────────────────────────────────────
@@ -868,6 +853,9 @@ def make_sim_step(
             "barrier_sum": jnp.sum(grid.barrier_hp_map),
             "craft_success": craft_success.astype(jnp.float32),
             "futile_craft": futile_craft.astype(jnp.float32),
+            "futile_uncoordinated": futile_uncoordinated.astype(jnp.float32),
+            "futile_wrong_mats": futile_wrong_mats.astype(jnp.float32),
+            "futile_empty": futile_empty.astype(jnp.float32),
             "current_recipe": grid.current_recipe,
             "steps_since_dropout": b_pop.steps_since_dropout,
         }
@@ -2263,12 +2251,25 @@ def _run_simulation_impl(
                 f"sustain={red_sustain_count}/{red_sustain_needed} | brain={n_layers}L{medal_str} | barrier_sum={barrier_sum_val:.1f}"
             )
             _n_craft_success = 0
-            _n_futile_craft = 0
+            _n_futile_uncoordinated = 0
+            _n_futile_wrong_mats = 0
+            _n_futile_empty = 0
             if "craft_success" in rollout_data["blue"]:
                 _n_craft_success = int(np.asarray(rollout_data["blue"]["craft_success"]).sum())
-            if "futile_craft" in rollout_data["blue"]:
-                _n_futile_craft = int(np.asarray(rollout_data["blue"]["futile_craft"]).sum())
-            print(f"  Crafting: success={_n_craft_success} | futile={_n_futile_craft} | rate={_n_craft_success / max(1, _n_craft_success + _n_futile_craft):.1%}")
+            if "futile_uncoordinated" in rollout_data["blue"]:
+                _n_futile_uncoordinated = int(np.asarray(rollout_data["blue"]["futile_uncoordinated"]).sum())
+            if "futile_wrong_mats" in rollout_data["blue"]:
+                _n_futile_wrong_mats = int(np.asarray(rollout_data["blue"]["futile_wrong_mats"]).sum())
+            if "futile_empty" in rollout_data["blue"]:
+                _n_futile_empty = int(np.asarray(rollout_data["blue"]["futile_empty"]).sum())
+            _n_craft_total = (
+                _n_craft_success + _n_futile_uncoordinated + _n_futile_wrong_mats + _n_futile_empty
+            )
+            print(
+                f"  Crafting: success={_n_craft_success} | futile_uncoordinated={_n_futile_uncoordinated} | "
+                f"futile_wrong_mats={_n_futile_wrong_mats} | futile_empty={_n_futile_empty} | "
+                f"rate={_n_craft_success / max(1, _n_craft_total):.1%}"
+            )
             if bool((_p9 or {}).get("imagination_gating_enabled", False)):
                 im_agree_val = float("nan")
                 conf_gate_val = float("nan")
