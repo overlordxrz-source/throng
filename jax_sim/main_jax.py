@@ -1724,17 +1724,29 @@ def _run_simulation_impl(
     red_ramp_start_step = start_update * T
     red_ramp_catch_streak = 0
 
-    # Comms-freeze tripwires (Cam, 2026-09-14, Blocker 2 behavioral check):
-    # the freeze proves comms PARAMS don't move; it can't prove codes_active
-    # doesn't drift, because z_e comes out of the frozen head applied to a
-    # trunk that keeps training under the policy loss. C0 is captured once,
-    # on the first production update after THIS resume -- never hardcoded
-    # from the offline calibration ladder, which used a different batch and
-    # isn't comparable in absolute scale. Persisted across resumes so a
-    # crash mid-stage-0 doesn't reset the streak counters or re-capture C0.
-    comms_c0 = None  # (u0, u1, u2) at first production update after resume
-    comms_fast_streak = [0, 0, 0]   # consecutive updates below 0.5*C0, per slot
-    comms_slow_streak = [0, 0, 0]   # consecutive updates below 0.6*C0, per slot
+    # Comms-freeze tripwires (Cam, 2026-09-14, Blocker 2 behavioral check;
+    # thresholds revised 2026-09-14 -- see RESEARCH_PROTOCOL.md Part 2, Cam's
+    # own instance): the freeze proves comms PARAMS don't move; it can't
+    # prove codes_active doesn't drift, because z_e comes out of the frozen
+    # head applied to a trunk that keeps training under the policy loss.
+    #
+    # C0 = per-slot MEDIAN of codes_active over updates 3-7 after resume
+    # (updates 1-2 discarded outright; updates 3-7 are five samples, not
+    # one). A single-update sample is a zero-tolerance floor compared
+    # against one stochastic draw of the exact quantity being floored --
+    # codes_active over a rollout batch lands below any given sample about
+    # half the time, so a single-sample C0 produces a false halt in
+    # expectation within 2-3 updates. Tripwires do not arm until update 8.
+    # Never hardcoded from the offline calibration ladder, which used a
+    # different batch and isn't comparable in absolute scale. All of this
+    # persists across resumes so a crash mid-collection or mid-stage-0
+    # doesn't reset the streak counters or restart C0 collection.
+    comms_updates_since_resume = 0   # counts qualifying updates since THIS resume
+    comms_c0_samples = [[], [], []]  # per-slot codes_active samples from updates 3-7
+    comms_c0 = None                  # (u0, u1, u2) per-slot median, set once at update 7
+    comms_fast_streak = [0, 0, 0]    # consecutive updates below 0.5*C0, per slot
+    comms_drift_streak = [0, 0, 0]   # consecutive updates below 0.75*C0, per slot
+    comms_floor_streak = [0, 0, 0]   # consecutive updates below 0.85*C0, per slot (stage 0 only)
     comms_stage1_updates_elapsed = 0
     comms_stage1_uncoordinated_seen = False
 
@@ -1746,15 +1758,27 @@ def _run_simulation_impl(
             craft_ramp_stage_outer = int(_restored_training_state.get("craft_ramp_stage", craft_ramp_stage_outer))
             craft_ramp_start_step = int(_restored_training_state.get("craft_ramp_start_step", craft_ramp_start_step))
             craft_ramp_success_streak = int(_restored_training_state.get("craft_ramp_success_streak", craft_ramp_success_streak))
+            comms_updates_since_resume = int(_restored_training_state.get(
+                "comms_updates_since_resume", comms_updates_since_resume
+            ))
+            _tw_samples_restored = _restored_training_state.get("comms_c0_samples", None)
+            if _tw_samples_restored is not None:
+                _tw_samples_arr = np.asarray(_tw_samples_restored)  # (3, 5), -1 = not yet collected
+                comms_c0_samples = [
+                    [int(v) for v in row if int(v) >= 0] for row in _tw_samples_arr.tolist()
+                ]
             _tw_c0_restored = _restored_training_state.get("comms_tripwire_c0", None)
             if _tw_c0_restored is not None:
-                _tw_c0_vals = [int(x) for x in np.asarray(_tw_c0_restored).tolist()]
+                _tw_c0_vals = [float(x) for x in np.asarray(_tw_c0_restored).tolist()]
                 comms_c0 = None if any(x < 0 for x in _tw_c0_vals) else tuple(_tw_c0_vals)
             comms_fast_streak = [int(x) for x in np.asarray(
                 _restored_training_state.get("comms_fast_streak", comms_fast_streak)
             ).tolist()]
-            comms_slow_streak = [int(x) for x in np.asarray(
-                _restored_training_state.get("comms_slow_streak", comms_slow_streak)
+            comms_drift_streak = [int(x) for x in np.asarray(
+                _restored_training_state.get("comms_drift_streak", comms_drift_streak)
+            ).tolist()]
+            comms_floor_streak = [int(x) for x in np.asarray(
+                _restored_training_state.get("comms_floor_streak", comms_floor_streak)
             ).tolist()]
             comms_stage1_updates_elapsed = int(_restored_training_state.get(
                 "comms_stage1_updates_elapsed", comms_stage1_updates_elapsed
@@ -1800,10 +1824,12 @@ def _run_simulation_impl(
         )
         _c0_str = f"{comms_c0[0]}|{comms_c0[1]}|{comms_c0[2]}/64" if comms_c0 is not None else "not yet captured"
         print(
-            f"[TRIPWIRE] comms-freeze tripwires: C0={_c0_str} | "
+            f"[TRIPWIRE] comms-freeze tripwires: C0={_c0_str} "
+            f"(median of updates 3-7 after resume, updates 1-2 discarded, armed from update 8) | "
+            f"updates_since_resume={comms_updates_since_resume} | "
             f"fast_streak={comms_fast_streak} (halt >=3 below 0.5*C0) | "
-            f"slow_streak={comms_slow_streak} (halt >=5 below 0.6*C0) | "
-            f"stage0_floor=zero-tolerance below C0 | "
+            f"drift_streak={comms_drift_streak} (halt >=15 below 0.75*C0) | "
+            f"floor_streak={comms_floor_streak} (halt >=3 below 0.85*C0, stage 0 only) | "
             f"stage1_updates_elapsed={comms_stage1_updates_elapsed} "
             f"uncoordinated_seen={comms_stage1_uncoordinated_seen} (halt if still 0 after 10 updates in stage 1)",
             flush=True,
@@ -1867,13 +1893,24 @@ def _run_simulation_impl(
         if ui == 0:
             print(f"[DEBUG] Rollout data NaN: obs={has_nan_obs} vals={has_nan_vals} logp={has_nan_logp} rew={has_nan_rew}")
 
-        # ── Comms-freeze tripwires (Cam, 2026-09-14) ─────────────────────
+        # ── Comms-freeze tripwires (Cam, 2026-09-14; thresholds revised
+        # 2026-09-14, Cam's own registered correction -- see
+        # RESEARCH_PROTOCOL.md Part 2) ────────────────────────────────────
         # Computed every update, unconditionally -- not nested inside any
         # print-cadence gate, since "N consecutive updates" means consecutive
         # PPO updates. Evaluated against craft_ramp_stage_outer/active_outer
         # AS THEY STAND RIGHT NOW: the ratchet-advance decision runs later in
         # this same loop body, so at this point they still describe the
         # stage that produced the rollout just collected.
+        #
+        # C0 = per-slot MEDIAN of codes_active over updates 3-7 after resume,
+        # not a single sample: codes_active over a rollout batch is noisy
+        # enough that a lone sample lands below the next one about half the
+        # time, and update 1 is a distribution-shock sample (trained under
+        # the old ecology, resuming into the fixed one) -- anchoring a
+        # zero-tolerance floor to it would false-halt within 2-3 updates.
+        # Updates 1-2 are discarded outright; tripwires do not arm until
+        # update 8.
         if craft_ramp_active_outer:
             _tw_alive_mask = np.array(b_pop.alive).astype(bool)
             _tw_codes_now = None
@@ -1892,15 +1929,28 @@ def _run_simulation_impl(
             )
 
             if _tw_codes_now is not None:
-                if comms_c0 is None:
-                    comms_c0 = _tw_codes_now
+                comms_updates_since_resume += 1
+
+                if comms_c0 is None and 3 <= comms_updates_since_resume <= 7:
+                    for _i in range(3):
+                        comms_c0_samples[_i].append(_tw_codes_now[_i])
                     print(
-                        f"[TRIPWIRE] C0 captured at ppo={ui} (first production update "
-                        f"after resume): codes_active={comms_c0[0]}|{comms_c0[1]}|"
-                        f"{comms_c0[2]}/64",
+                        f"[TRIPWIRE] C0 sample {comms_updates_since_resume - 2}/5 at "
+                        f"ppo={ui} (update {comms_updates_since_resume} after resume): "
+                        f"codes_active={_tw_codes_now[0]}|{_tw_codes_now[1]}|{_tw_codes_now[2]}/64",
                         flush=True,
                     )
-                else:
+                    if comms_updates_since_resume == 7:
+                        comms_c0 = tuple(
+                            float(np.median(comms_c0_samples[_i])) for _i in range(3)
+                        )
+                        print(
+                            f"[TRIPWIRE] C0 captured (median of updates 3-7 after resume): "
+                            f"{comms_c0[0]:.1f}|{comms_c0[1]:.1f}|{comms_c0[2]:.1f}/64 -- "
+                            f"tripwires ARM at update 8",
+                            flush=True,
+                        )
+                elif comms_c0 is not None and comms_updates_since_resume >= 8:
                     _tw_halt_reasons = []
                     for _i in range(3):
                         _now = _tw_codes_now[_i]
@@ -1909,28 +1959,30 @@ def _run_simulation_impl(
                             comms_fast_streak[_i] += 1
                         else:
                             comms_fast_streak[_i] = 0
-                        if _now < 0.6 * _c0:
-                            comms_slow_streak[_i] += 1
+                        if _now < 0.75 * _c0:
+                            comms_drift_streak[_i] += 1
                         else:
-                            comms_slow_streak[_i] = 0
+                            comms_drift_streak[_i] = 0
+                        if craft_ramp_stage_outer == 0 and _now < 0.85 * _c0:
+                            comms_floor_streak[_i] += 1
+                        else:
+                            comms_floor_streak[_i] = 0
+
                         if comms_fast_streak[_i] >= 3:
                             _tw_halt_reasons.append(
                                 f"FAST: slot{_i} codes_active={_now} < 0.5*C0={0.5 * _c0:.1f} "
                                 f"for {comms_fast_streak[_i]} consecutive updates"
                             )
-                        if comms_slow_streak[_i] >= 5:
+                        if comms_drift_streak[_i] >= 15:
                             _tw_halt_reasons.append(
-                                f"SLOW: slot{_i} codes_active={_now} < 0.6*C0={0.6 * _c0:.1f} "
-                                f"for {comms_slow_streak[_i]} consecutive updates"
+                                f"DRIFT: slot{_i} codes_active={_now} < 0.75*C0={0.75 * _c0:.1f} "
+                                f"for {comms_drift_streak[_i]} consecutive updates"
                             )
-                        # Stage-0 floor: zero tolerance -- the freeze's whole
-                        # job is to guarantee no regression below the
-                        # at-resume value while comms params are held still.
-                        if craft_ramp_stage_outer == 0 and _now < _c0:
+                        if comms_floor_streak[_i] >= 3:
                             _tw_halt_reasons.append(
-                                f"STAGE-0 FLOOR: slot{_i} codes_active={_now} < C0={_c0} "
-                                f"-- the freeze is not holding codes_active at or above "
-                                f"its at-resume value"
+                                f"STAGE-0 FLOOR: slot{_i} codes_active={_now} < "
+                                f"0.85*C0={0.85 * _c0:.1f} for {comms_floor_streak[_i]} "
+                                f"consecutive updates"
                             )
 
                     if craft_ramp_stage_outer == 1:
@@ -1951,12 +2003,16 @@ def _run_simulation_impl(
                         for _r in _tw_halt_reasons:
                             print(f"[TRIPWIRE]   {_r}", flush=True)
                         print(
-                            f"[TRIPWIRE] C0={comms_c0[0]}|{comms_c0[1]}|{comms_c0[2]}/64 | "
+                            f"[TRIPWIRE] C0={comms_c0[0]:.1f}|{comms_c0[1]:.1f}|{comms_c0[2]:.1f}/64 | "
                             f"now={_tw_codes_now[0]}|{_tw_codes_now[1]}|{_tw_codes_now[2]}/64 | "
                             f"stage={craft_ramp_stage_outer} | ppo={ui}",
                             flush=True,
                         )
                         print("=" * 70, flush=True)
+                        _tw_c0_padded = np.full((3, 5), -1, dtype=np.int32)
+                        for _i in range(3):
+                            _row = comms_c0_samples[_i][:5]
+                            _tw_c0_padded[_i, :len(_row)] = _row
                         _tw_training_state = {
                             "craft_ramp_active": jnp.array(craft_ramp_active_outer, dtype=jnp.bool_),
                             "craft_ramp_stage": jnp.array(craft_ramp_stage_outer, dtype=jnp.int32),
@@ -1967,9 +2023,12 @@ def _run_simulation_impl(
                             "red_ramp_catch_streak": jnp.array(red_ramp_catch_streak, dtype=jnp.int32),
                             "red_curriculum_idx": jnp.array(red_curriculum_idx, dtype=jnp.int32),
                             "red_sustain_count": jnp.array(red_sustain_count, dtype=jnp.int32),
-                            "comms_tripwire_c0": jnp.array(comms_c0, dtype=jnp.int32),
+                            "comms_updates_since_resume": jnp.array(comms_updates_since_resume, dtype=jnp.int32),
+                            "comms_c0_samples": jnp.array(_tw_c0_padded, dtype=jnp.int32),
+                            "comms_tripwire_c0": jnp.array(comms_c0, dtype=jnp.float32),
                             "comms_fast_streak": jnp.array(comms_fast_streak, dtype=jnp.int32),
-                            "comms_slow_streak": jnp.array(comms_slow_streak, dtype=jnp.int32),
+                            "comms_drift_streak": jnp.array(comms_drift_streak, dtype=jnp.int32),
+                            "comms_floor_streak": jnp.array(comms_floor_streak, dtype=jnp.int32),
                             "comms_stage1_updates_elapsed": jnp.array(comms_stage1_updates_elapsed, dtype=jnp.int32),
                             "comms_stage1_uncoordinated_seen": jnp.array(comms_stage1_uncoordinated_seen, dtype=jnp.bool_),
                         }
@@ -3161,9 +3220,16 @@ def _run_simulation_impl(
                 "red_ramp_catch_streak": jnp.array(red_ramp_catch_streak, dtype=jnp.int32),
                 "red_curriculum_idx": jnp.array(red_curriculum_idx, dtype=jnp.int32),
                 "red_sustain_count": jnp.array(red_sustain_count, dtype=jnp.int32),
-                "comms_tripwire_c0": jnp.array(comms_c0 if comms_c0 is not None else (-1, -1, -1), dtype=jnp.int32),
+                "comms_updates_since_resume": jnp.array(comms_updates_since_resume, dtype=jnp.int32),
+                "comms_c0_samples": jnp.array(
+                    [(row + [-1, -1, -1, -1, -1])[:5] for row in comms_c0_samples], dtype=jnp.int32
+                ),
+                "comms_tripwire_c0": jnp.array(
+                    comms_c0 if comms_c0 is not None else (-1.0, -1.0, -1.0), dtype=jnp.float32
+                ),
                 "comms_fast_streak": jnp.array(comms_fast_streak, dtype=jnp.int32),
-                "comms_slow_streak": jnp.array(comms_slow_streak, dtype=jnp.int32),
+                "comms_drift_streak": jnp.array(comms_drift_streak, dtype=jnp.int32),
+                "comms_floor_streak": jnp.array(comms_floor_streak, dtype=jnp.int32),
                 "comms_stage1_updates_elapsed": jnp.array(comms_stage1_updates_elapsed, dtype=jnp.int32),
                 "comms_stage1_uncoordinated_seen": jnp.array(comms_stage1_uncoordinated_seen, dtype=jnp.bool_),
             }

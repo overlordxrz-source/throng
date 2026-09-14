@@ -79,6 +79,26 @@ more expensive, because it produces publishable-looking nulls.
   licensed by the ladder's internal structure, not by 2862's number being inconvenient. Any
   future instrument swap must meet that same standard, stated in writing, before it is
   accepted: name the independent contradiction, not the failed threshold.
+- **A threshold compared against a single stochastic sample of the quantity it gates is a
+  design error, identifiable without running anything.** It doesn't need a run to fail
+  before it's flagged — the error is visible from the shape of the comparison itself.
+  **Confirmed instance (2026-09-14, Cam's own — logged by the same standard as the bar-
+  moving entry above):** the first comms-freeze tripwire draft set `C0` (the stage-0
+  reference for `codes_active`) from a single production update — the first one after
+  resume — then applied a zero-tolerance floor against it. `codes_active` is a count over a
+  rollout batch; consecutive samples land below one another roughly half the time on noise
+  alone, so a zero-tolerance floor anchored to one sample has an expected time-to-false-halt
+  of 2-3 updates. Compounded by the specific resume point (2541, trained under the pre-fix
+  ecology, resuming into the fixed one): update 1 is a distribution-shock sample, the single
+  worst update in the run to anchor a floor to. Caught and fixed before any run — `C0`
+  replaced with the per-slot median of updates 3-7 after resume (updates 1-2 discarded
+  outright, tripwires arm at update 8), and the zero-tolerance floor replaced with a
+  noise-tolerant `<0.85*C0` for 3 consecutive updates. The `<0.6*C0`-for-5 "slow" trip was
+  also retired in the same pass — not because it was wrong, but because it was redundant
+  with the fast trip *and* blind to the actual decay mode finding 3 identified (a gradual
+  decline that crosses 0.75 and stays there for hundreds of updates without ever forming a
+  5-update streak below 0.6) — replaced with a `<0.75*C0`-for-15 drift trip verified against
+  the real 2541→2763 history (slot1: 35→12, 0.34x over ~220 updates) before being trusted.
 - **Source beats prose.** Where documentation and code disagree, the code wins and the
   disagreement is itself a finding to record.
 

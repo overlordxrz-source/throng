@@ -39,11 +39,17 @@ def test_training_state_survives_a_real_checkpoint_round_trip():
             "red_ramp_catch_streak": jnp.array(10, dtype=jnp.int32),
             "red_curriculum_idx": jnp.array(2, dtype=jnp.int32),
             "red_sustain_count": jnp.array(3, dtype=jnp.int32),
-            # Comms-freeze tripwire state (Cam, 2026-09-14) -- C0 captured
-            # mid-stage-0, one slot already partway into its fast streak.
-            "comms_tripwire_c0": jnp.array((27, 12, 22), dtype=jnp.int32),
+            # Comms-freeze tripwire state (thresholds revised 2026-09-14) --
+            # C0 already captured (median of updates 3-7) and mid-stage-0,
+            # one slot already partway into its drift streak.
+            "comms_updates_since_resume": jnp.array(12, dtype=jnp.int32),
+            "comms_c0_samples": jnp.array(
+                [[26, 27, 28, 27, 26], [12, 13, 11, 12, 12], [22, 21, 23, 22, 22]], dtype=jnp.int32
+            ),
+            "comms_tripwire_c0": jnp.array((27.0, 12.0, 22.0), dtype=jnp.float32),
             "comms_fast_streak": jnp.array((0, 2, 0), dtype=jnp.int32),
-            "comms_slow_streak": jnp.array((0, 3, 1), dtype=jnp.int32),
+            "comms_drift_streak": jnp.array((0, 6, 1), dtype=jnp.int32),
+            "comms_floor_streak": jnp.array((0, 1, 0), dtype=jnp.int32),
             "comms_stage1_updates_elapsed": jnp.array(0, dtype=jnp.int32),
             "comms_stage1_uncoordinated_seen": jnp.array(False, dtype=jnp.bool_),
         }
@@ -81,9 +87,14 @@ def test_training_state_survives_a_real_checkpoint_round_trip():
         assert int(rts["red_ramp_catch_streak"]) == 10
         assert int(rts["red_curriculum_idx"]) == 2
         assert int(rts["red_sustain_count"]) == 3
-        assert tuple(int(x) for x in rts["comms_tripwire_c0"]) == (27, 12, 22)
+        assert int(rts["comms_updates_since_resume"]) == 12
+        assert [list(int(v) for v in row) for row in rts["comms_c0_samples"]] == [
+            [26, 27, 28, 27, 26], [12, 13, 11, 12, 12], [22, 21, 23, 22, 22],
+        ]
+        assert tuple(float(x) for x in rts["comms_tripwire_c0"]) == (27.0, 12.0, 22.0)
         assert tuple(int(x) for x in rts["comms_fast_streak"]) == (0, 2, 0)
-        assert tuple(int(x) for x in rts["comms_slow_streak"]) == (0, 3, 1)
+        assert tuple(int(x) for x in rts["comms_drift_streak"]) == (0, 6, 1)
+        assert tuple(int(x) for x in rts["comms_floor_streak"]) == (0, 1, 0)
         assert int(rts["comms_stage1_updates_elapsed"]) == 0
         assert bool(rts["comms_stage1_uncoordinated_seen"]) is False
     finally:
