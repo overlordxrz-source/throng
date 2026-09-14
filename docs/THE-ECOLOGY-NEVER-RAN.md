@@ -52,6 +52,60 @@ in passing while extending it, rather than filing it away.
 
 ---
 
+## 2. Checkpoint-restore schema-mismatch fallback never actually restored anything
+
+**Introduced:** the `except ValueError` branch in `_run_simulation_impl`'s checkpoint-restore
+block (`jax_sim/main_jax.py`) has existed for multiple phases, handling the case where a
+checkpoint's param tree doesn't match the current architecture 1:1 (an old checkpoint missing
+a head added since, or carrying state fields the current `model.init()` no longer produces).
+Its innermost fallback, `ckpt_mngr.restore(step, items=target_dict)`, looked like a real
+recovery path: present in code, reached under a named condition, followed by
+`graft_missing_param_subtrees` to patch the result.
+
+**Fixed:** 2026-09-14, while resuming from checkpoint 2541 per the calibration ladder's
+codes_active rule. This is the first checkpoint in the project's history old enough (predates
+`head_signal` reactivation, `nb_cross_attn`, `red_codebook`; carries `codebook_N.usage_ema`/
+`dead_streak` fields the current `model.init()` doesn't produce) to actually need this
+fallback — every prior resume was architecturally close enough that the unconstrained restore
+one level up always succeeded and this path was never reached.
+
+**Duration:** present, unexercised, since whichever phase introduced the schema-evolution
+`except ValueError` branch (predates this session) through 2026-09-14 — an unknown but
+plausibly multi-month span in which any checkpoint old enough to need it would have crashed
+the run instead of resuming from it.
+
+**Effect:** `ckpt_mngr.restore(step, items=target_dict)` goes through `CheckpointManager`'s
+`"default"` item, which is bound to `StandardCheckpointHandler`. `StandardRestoreArgs`'s
+`strict=False` does not loosen a key-set mismatch (only shape/dtype mismatches on keys present
+on both sides — tested directly, raises the identical "do not match" error either way), and
+orbax's own error message ("pass `partial_restore=True`") names a flag `StandardRestore`
+doesn't expose at all; it only exists on the lower-level `PyTreeRestoreArgs`, which this
+`CheckpointManager`'s handler registration refuses outright ("does not match with any
+registered handler"). The fallback could never have succeeded for any checkpoint that actually
+needed it — it would always hit this same crash, one level deeper than the outer schema-
+mismatch handler it lived inside of, making the outer handler's recovery attempt itself only
+partially real: catches the mismatch, prints "merging new heads manually," then crashes on the
+next line for any checkpoint whose mismatch is a key-set difference rather than a pure
+shape/dtype one.
+
+**Fix:** bypass the Standard-bound `CheckpointManager` for this one restore and go straight to
+`ocp.PyTreeCheckpointer()` against the on-disk `"default"` item, which does honor
+`partial_restore`, with `restore_args` built via `ocp.checkpoint_utils.construct_restore_args`
+(needed on top of `partial_restore` alone — verified locally that `partial_restore` without
+explicit `restore_args` still raises `"Topology mismatch"` / `"sharding ... Got None"` against
+a checkpoint saved on a different device topology than the restoring process). Regression test:
+`tests/test_checkpoint_partial_restore_fallback.py`, a real Orbax round trip proving the strict
+path fails first (so the fallback is genuinely exercised) and the fallback correctly restores
+overlapping keys, drops checkpoint-only keys, and preserves target-only keys for
+`graft_missing_param_subtrees` to fill.
+
+**How it was found:** not by auditing the fallback in isolation — by resuming from a
+calibration-picked checkpoint old enough to actually need it, per `RESEARCH_PROTOCOL.md`'s
+"measure, don't assume" discipline applied to the resume point itself (2541, chosen by the
+codes_active ladder rule, not by habit).
+
+---
+
 *(Log format: mechanism, when it was introduced not-actually-working, when
 it was fixed, how long the gap was, what it plausibly cost, and how it was
 found. Append new confirmed instances below this line — suspicions belong in

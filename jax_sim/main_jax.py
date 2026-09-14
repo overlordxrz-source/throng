@@ -1359,7 +1359,46 @@ def _run_simulation_impl(
                 try:
                     raw_restored = ckpt_mngr.restore(_ckpt_latest)
                 except ValueError:
-                    raw_restored = ckpt_mngr.restore(_ckpt_latest, items=target_dict)
+                    # 2026-09-14: this fallback had never been exercised
+                    # successfully -- `ckpt_mngr.restore(step, items=target_dict)`
+                    # goes through CheckpointManager's "default" item, which is
+                    # bound to StandardCheckpointHandler; StandardRestoreArgs's
+                    # `strict=False` does NOT loosen a key-set mismatch (tested:
+                    # raises the identical "do not match" error), and orbax's
+                    # own error message ("pass partial_restore=True") names a
+                    # flag StandardRestore doesn't expose at all -- it only
+                    # exists on the lower-level PyTreeRestoreArgs, which this
+                    # CheckpointManager's handler registration refuses ("does
+                    # not match with any registered handler"). First checkpoint
+                    # old enough to need this path (2541, predates head_signal
+                    # reactivation / nb_cross_attn / red_codebook, and carries
+                    # codebook_N.usage_ema/dead_streak fields the current
+                    # model.init() doesn't produce) is what surfaced it -- every
+                    # prior resume in this project's history was close enough
+                    # in architecture to succeed on the unconstrained restore
+                    # above and never reach here. Fix: bypass the Standard-bound
+                    # CheckpointManager for this one restore and go straight to
+                    # a PyTreeCheckpointer against the on-disk "default" item,
+                    # which does honor partial_restore -- verified locally
+                    # against a real bidirectional mismatch (extra keys on both
+                    # sides) before landing here.
+                    # partial_restore alone still hits "Topology mismatch" /
+                    # "sharding ... Got None" when the checkpoint was saved on
+                    # a different device topology (GPU) than this restore call
+                    # runs on (CPU preflight) -- construct_restore_args derives
+                    # concrete restore_args from target_dict's own (already
+                    # correctly-placed) leaves, same fix diag_ze_variance.py
+                    # and test_checkpoint_compat.py already use for the plain
+                    # (non-partial) restore path.
+                    _pytree_ckptr = ocp.PyTreeCheckpointer()
+                    _raw_default_dir = os.path.join(str(ckpt_dir), str(_ckpt_latest), "default")
+                    _restore_args = ocp.checkpoint_utils.construct_restore_args(target_dict)
+                    raw_restored = _pytree_ckptr.restore(
+                        _raw_default_dir,
+                        args=ocp.args.PyTreeRestore(
+                            item=target_dict, restore_args=_restore_args, partial_restore=True,
+                        ),
+                    )
                 
                 source_dict = unfreeze(raw_restored)
                 if "training_state" in source_dict:
