@@ -521,8 +521,27 @@ failure class: *something reported success while doing nothing.* Nine instances 
 9. **`n_minibatches = M // minibatch_size` with no floor** — at M=160, mb=512 this is **zero
    minibatches**, so the PPO loop body never executes and the log still prints
    `Blue PPO done in 0.1s`. Smoke tests "validating" PPO validated nothing.
+10. **`flint_grid`/`clay_grid`/`vine_grid` zero-initialised in `GridState.__init__`
+    (grid_jax.py:33–37), consumed by crafting's `on_flint`/`on_clay`/`on_vine` checks
+    (main_jax.py:536–538), and never written anywhere** — declared, never spawned.
+    ~95.5% of generated recipes required at least one of these and were unsatisfiable from the
+    instant they were drawn, for their entire 1000-step lifetime, independent of coordination
+    speed. `Crafting: success=0` across 4,959 attempts read as an ecology/coordination problem;
+    it was a missing write site (2026-09-13, Cam's investigation).
+11. **`reward_red_catch` (config.yaml:175, "P4: stronger hunt incentive") loaded into
+    `_reward_red_catch` (main_jax.py:248) and never referenced again** — read, then dropped.
+    Red's actual reward was two dense, blue-position-independent per-step terms
+    (`reward_red_move`, `reward_red_starve_per_step`); the one dial someone had already tuned
+    specifically to increase hunt incentive did nothing, at any magnitude. Read `red_entropy=2.03`
+    against `ln(12)=2.48` as "policy never got a reason to point at blue," not as evasion or a
+    converged strategy (2026-09-13, Cam's investigation).
 
-Nine instances, one shape. Assume it is happening again.
+Eleven instances, three shapes: *severed* (a loss disconnected from the tape), *declared but
+never written* (a state grid with real consumers and no producer), and *read but never used* (a
+config value loaded into a local that nothing downstream references — distinct from an
+unread config key, which the H2 sweep already catches: this one *is* read, then silently
+dropped). All three are mechanically detectable and none require running the model. Assume it
+is happening again.
 
 **The checklist, applied before reporting any result:**
 
@@ -538,6 +557,20 @@ Nine instances, one shape. Assume it is happening again.
   the hardest kind to see. Derive offsets from `make_obs_layout`, never by hand.
 - **Build fixtures from production config.** Never zero-arg constructors, never hardcoded
   shapes. If a test cannot fail when the live layout changes, it is decoration.
+- **Every state grid has a write site.** A `GridState` field initialised to zeros and read by a
+  real consumer must have at least one `.replace(...)` call that writes it somewhere in the
+  simulation loop. `grep` the field name across the codebase; if the only hits are the
+  declaration and the read, it is dead ground truth, not a slow-filling resource.
+- **Every config-derived local is referenced downstream.** `x = float(config.get("key", d))` is
+  not evidence `x` does anything. Grep the local's name after its assignment line; a config key
+  that is read once and never appears again is the same defect as an unread key, just harder to
+  see because the read line looks like wiring.
+- **Every configured mechanism is confirmed by a measured effect in a live rollout**, not by
+  the presence of the config value or the code that reads it. A reward term, a mask, a gate —
+  none of them are "on" until a real rollout shows the behavior they're supposed to produce.
+  Before trusting any ecology mechanism again: crafting succeeds in a real rollout, not just
+  that materials exist on the grid; red's action distribution measurably shifts toward blue,
+  not just that the reward term is summed into `r_rew`.
 
 **Fix now (from instance 9):** make `ppo_update` raise a clear error when `n_minibatches == 0`
 rather than silently skipping, and clamp or report the minibatch size when `M < minibatch_size`.
@@ -662,3 +695,43 @@ Telemetry to include each time: `ppo`, `step`, `blue`/`red` counts, `blue_caught
 `codes_active` per slot, dead-code resets this update, `barrier_sum`, VQ loss, `grad_norm`
 finiteness, `Crafting: success/rate`, `expert_dropouts`, and the imagination/gate fractions now
 that the confidence head is real.
+
+## 5.8 — Run aborted at Gate A: no live selection pressure (Cam, Sep 13, 2026)
+
+Run `ap-ekkulESwkMHmOOihZb7NPs` cleared all four Gate A stop conditions (finite grad norms,
+`codes_active` recovering from the graft dip, dead-code resets settling to 18|15|4 rather than
+firing every update, `barrier_sum` staying at 0.0 with Build masked) but was stopped anyway:
+crafting had zero successes across 4,959 attempts and red's policy was statistically
+indistinguishable from a random walk (`red_entropy=2.03` vs. `ln(12)=2.48`, uniform-ish N/S/E/W).
+Neither of Gate B's two required conditions has a live mechanism behind it — a Gate B pass or
+fail under no pressure measures nothing about the codebook. See Rule 13 instances 10 and 11
+above for the root causes.
+
+**Fix 2, landed:** `reward_red_catch` (config.yaml:175, was dead — Rule 13 #11) wired into
+`r_rew` additively alongside the existing `phase16_combinatorial_syntax` terms, gated on
+`r_caught_any` (main_jax.py:801–810). Ratio against the dense `reward_red_move` term: raw
+3.0/0.04 = 75 steps of movement reward equals one catch; net of the `reward_red_starve_per_step`
+tax that applies every alive step regardless of movement, 3.0/(0.04−0.02) = 150 steps; weighted
+by the observed ~93% move fraction, ≈174 steps. Not changed pending a live-rollout read on
+whether it shapes hunting at all — per Cam: "may still be too weak... report the ratio; don't
+change it yet."
+
+**Fix 1, proposed, pending sign-off before implementation:** spawn flint/clay/vine, mirroring
+wood/stone's respawn rate exactly (`regen_rate * 0.5` bernoulli per cell per step) with a spatial
+layout where no single region contains everything a recipe needs — orthogonal banding against
+the existing wood(west)/stone(east) split: flint in the north third, clay in the middle third,
+vine in the south third (each full-width). Every one of the resulting 6 west/east × north/mid/
+south cells has at most 2 of the 5 materials, so any recipe needing 2+ materials from different
+bands forces travel between regions, not just co-location within one.
+
+**Verification required before any relaunch** (effect, not config): crafting success > 0 in a
+real rollout; red's action distribution measurably non-uniform with entropy below 2.03 and
+movement correlating with blue proximity. Small scale — not a resumption of the interrupted run.
+
+**Flagged, not actioned (second-order, once materials exist):**
+- Recipes can draw up to 4 units total while inventory capacity is 1 per agent — a 4-unit recipe
+  needs four agents co-located and simultaneously crafting, which may be unachievable even once
+  materials are real.
+- `vis_prob = 0.5 − 0.3×progress` was 21.7% and falling at the corpus-start step (progress=0.943)
+  — most of the population is blind to the recipe at this point in training, independent of
+  whether the recipe is satisfiable.

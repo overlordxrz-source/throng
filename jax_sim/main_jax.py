@@ -802,6 +802,12 @@ def make_sim_step(
         r_rew = r_rew + (_rew_big_green_coop + _rew_coord) * r_caught_big_coop
         r_rew = r_rew + _rew_big_green_solo_catch * r_caught_big_solo
         r_rew = r_rew + _rew_big_green_solo_pen * r_mauled
+        # reward_red_catch (config.yaml, "P4: stronger hunt incentive") was read into
+        # _reward_red_catch and never applied anywhere -- confirmed dead by exhaustive
+        # grep. Wired in additively alongside the phase16_combinatorial_syntax terms
+        # above, not replacing them, per Cam's ruling (Rule 12 doesn't gate making a
+        # configured-but-unwired mechanism actually run).
+        r_rew = r_rew + _reward_red_catch * r_caught_any.astype(jnp.float32)
         r_rew = r_rew + jnp.where(r_pop.alive, _reward_red_starve, 0.0)
         r_rew = r_rew + _reward_red_move * r_moved.astype(jnp.float32)
 
