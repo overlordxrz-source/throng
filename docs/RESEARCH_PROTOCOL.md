@@ -83,6 +83,17 @@ sparse-reward coordination trap, and the project has already solved it once: the
 gate made Big Green solo-catchable so agents learned the value of the noun before facing the
 cooperative friction that required the verb.
 
+**Overwritten versus bypassed.** A competence ramp that temporarily eases a mechanism will
+produce successes during the easy period — that is expected and is not evidence the fossil is
+fixed, since it was engineered to be possible. The test is what happens *after* the ratchet
+back to full difficulty: track **attempt rate**, not just success rate, in the window right
+after. A genuinely repaired policy keeps attempting the mechanism at roughly the same rate it
+did during the ramp, because it has learned the mechanism has positive expected value, even
+though success gets harder again. A policy that only exploited the temporary window —
+bypassed, not overwritten — shows attempt rate collapse back toward the pre-ramp fossil
+baseline within a few updates of the ratchet, with nothing else in the environment having
+changed. That collapse, or its absence, is the tell.
+
 ## Part 4 — Change discipline
 
 - **One experimental variable at a time.** Corrections to confirmed defects may be bundled;
