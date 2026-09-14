@@ -624,6 +624,14 @@ As soon as the first rollout writes, record the **first structurally clean post-
 and put it in this file. Every decode from here on depends on that number, and reconstructing
 it later from logs is how `--min-step` mistakes happen.
 
+**Captured, 2026-09-13, run `ap-ekkulESwkMHmOOihZb7NPs`:** `min-step = 1414656`. Measured
+directly from the fresh `signal_corpus.jsonl` on the `throng-runs` volume (the historical
+5.5GB corpus was deliberately not re-uploaded per §5.1 — this file is entirely this run's
+output), not derived from the printed banner alone: `min(step for all lines) == 1414656`,
+matching `2763 * ppo_rollout_steps(512) = 1414656` and the startup line `Training PPO updates
+2763 → 5858 (~env steps 1414656 → 3000000)`. Use `--min-step 1414656` for any decode or ATE
+tool run against this run's corpus from here on.
+
 ## 5.5 — Gate A (first ~20 updates): stop conditions, not observations
 
 Stop the run and report if any of these holds: any non-finite `grad_norm`; `codes_active` does
