@@ -42,6 +42,7 @@ from jax_sim.population_jax import (
     PopState, init_population, kill_agents, update_memory_buffer, apply_mind_meld,
     apply_auto_reproduce
 )
+from jax_sim.action_space import MASKED_ACTIONS, mask_disabled_actions, masked_actions_banner
 from jax_sim.network_jax import (
     AgentNetworkJax,
     AUX_HEAD_KEYS,
@@ -400,10 +401,6 @@ def make_sim_step(
         if ablate_slot1:
             b_sig_broadcast = b_sig_broadcast.at[:, SIGNAL_SLOTS['slot_1']].set(0.0)
 
-        # Reds cannot build barriers. Mask out action 8 to prevent PPO from exploring it.
-        if r_action_logits.shape[-1] > 8:
-            r_action_logits = r_action_logits.at[:, 8].set(-1e9)
-
         # ── Write VQ signals for neighbours ──
         if _vqel_monologue:
             b_sig_broadcast = jnp.zeros_like(b_signal_out)
@@ -420,23 +417,15 @@ def make_sim_step(
         )
 
         # ── Sample actions (Phase 11.3 epistemic gate on blues) ──
-        # Logit-mask dummy actions Push (6) and Guard (7) to prevent them from being sampled
-        if b_action_logits.shape[-1] > 7:
-            b_action_logits = b_action_logits.at[:, 6].set(-1e9)
-            b_action_logits = b_action_logits.at[:, 7].set(-1e9)
-
-        # AUDIT_SEP2026.md Finding 5: Push/Guard are true no-ops for red too
-        # (grid_jax.py has no dispatch for either index), and rl_jax.py's PPO
-        # backward pass already masks both teams' logits at these indices
-        # (team-blind). Without this, red could sample Push/Guard here with
-        # unmasked probability, and old_log_probs would be computed from that
-        # unmasked distribution — a probability-ratio mismatch against the
-        # masked new_log_probs at the PPO step for any (agent, timestep) where
-        # it happened. Mask at rollout sampling too, matching blue and the
-        # backward pass.
-        if r_action_logits.shape[-1] > 7:
-            r_action_logits = r_action_logits.at[:, 6].set(-1e9)
-            r_action_logits = r_action_logits.at[:, 7].set(-1e9)
+        # Logit-mask disabled actions (Push/Guard: no dispatch in grid_jax.py
+        # for either team; Build: disabled for both teams per the Sep 2026
+        # restart ruling) identically for both teams, matching imagination_jax.py
+        # and rl_jax.py's PPO backward pass exactly — a mismatch at any one of
+        # these three sites corrupts either PPO's log-prob ratio (rollout vs
+        # backward) or the epistemic gate's imagined-action choice. See
+        # jax_sim/action_space.py.
+        b_action_logits = mask_disabled_actions(b_action_logits, axis=-1)
+        r_action_logits = mask_disabled_actions(r_action_logits, axis=-1)
 
         key_act_b, key_act_r = jax.random.split(key_act)
         b_action_keys = jax.random.split(key_act_b, b_pop.max_pop)
@@ -1526,7 +1515,7 @@ def _run_simulation_impl(
         print("[JAX] Phase14 dialogue_signal_mode=hard (discrete z_q broadcast on blue wire)")
         
     print(f"[JAX] Phase 18 action_space=12 (added PICK_UP=9, CRAFT=10, USE_TOOL=11)")
-    print(f"[JAX] Phase 18.x Logit-mask active: Push(6) and Guard(7) set to -1e9 before sampling (no-op amputation)")
+    print(f"[JAX] Phase 18.x Logit-mask active: {masked_actions_banner()} set to -1e9 before sampling, both teams (no-op/disabled amputation)")
     print(f"[JAX] Phase 18 Continuous-to-Discrete (CtD) bootstrap: 100k-step decay ramp active.")
     print(f"[JAX] Phase 18 Wire budget: 40D (8D cont + 12/8/12 discrete slots). Codebooks initialized.")
     print(f"[JAX] Phase 16.6 GWT Router mask active: Zero out age(0), mat(1), energy(2), layers(3)")

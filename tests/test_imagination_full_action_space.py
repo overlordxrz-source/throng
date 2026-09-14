@@ -16,6 +16,7 @@ import yaml
 import jax
 import jax.numpy as jnp
 
+from jax_sim.action_space import MASKED_ACTIONS
 from jax_sim.main_jax import DEFAULT_CONFIG, _normalize_config
 from jax_sim.network_jax import AgentNetworkJax
 from jax_sim.imagination_jax import make_imagination_fn
@@ -72,12 +73,16 @@ def test_imagine_scores_tensor_has_one_value_per_action():
     assert int(jnp.max(imagined)) <= N_ACTIONS - 1, "imagined action index exceeds the action space"
     assert int(jnp.min(imagined)) >= 0
 
-    # Structural: Push(6)/Guard(7) must never be the imagined action — masked
-    # to -1e9 inside imagine() precisely because they're no-ops (Finding 5/E).
-    assert bool(jnp.all((imagined != 6) & (imagined != 7))), (
-        "imagine() selected Push or Guard — the -1e9 mask inside imagination_jax.py "
-        "is not doing its job"
-    )
+    # Structural: no MASKED_ACTIONS index may ever be the imagined action --
+    # masked to -1e9 inside imagine() (Push/Guard are no-ops, Build is
+    # disabled per the Sep 2026 restart ruling). This assertion originally
+    # only checked 6 and 7 and missed that Build(8) could still win the
+    # imagined argmax -- exactly the gap the Sep 2026 pre-flight caught.
+    for _masked in MASKED_ACTIONS:
+        assert bool(jnp.all(imagined != _masked)), (
+            f"imagine() selected action {_masked} — the -1e9 mask inside "
+            "imagination_jax.py is not doing its job"
+        )
 
 
 def test_imagine_argmax_lands_outside_legacy_five_actions():

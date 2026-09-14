@@ -18,6 +18,8 @@ import optax
 import functools
 from typing import Dict, Tuple, Any
 
+from jax_sim.action_space import MASKED_ACTIONS, mask_disabled_actions
+
 
 def compute_gae(
     rewards,   # (T, N) — numpy or JAX
@@ -104,11 +106,13 @@ def ppo_loss(
     action_logits = outs.action_logits      # (M, 8)
     values_pred = outs.values               # (M,)
 
-    # Phase 18.x: Logit-mask dummy actions Push (6) and Guard (7) for log-prob / entropy matching
-    # (Must match the mask applied in rollout to prevent old_log_probs mismatch)
+    # Logit-mask disabled actions (jax_sim/action_space.py), team-blind --
+    # must match the mask applied in rollout exactly (both teams, all three
+    # indices) or old_log_probs (rollout) and new_log_probs (here) are
+    # computed from different distributions over the same sampled action.
     action_logits_masked = jax.lax.cond(
-        action_logits.shape[-1] > 7,
-        lambda _: action_logits.at[..., 6:8].set(-1e9),
+        action_logits.shape[-1] > max(MASKED_ACTIONS),
+        lambda _: mask_disabled_actions(action_logits, axis=-1),
         lambda _: action_logits,
         operand=None
     )

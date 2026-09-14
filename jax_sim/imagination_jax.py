@@ -13,6 +13,7 @@ import jax
 import jax.numpy as jnp
 from jax import lax
 
+from jax_sim.action_space import MASKED_ACTIONS, mask_disabled_actions
 from jax_sim.network_jax import AgentNetworkJax, params_apply_variables
 
 
@@ -80,11 +81,13 @@ def make_imagination_fn(
 
         scores = jax.vmap(score_action)(jnp.arange(_n_imag))
 
-        # Phase 18.x: Logit-mask dummy actions Push (6) and Guard (7) in imagination
-        # This prevents the Epistemic Gate from overriding reactive actions with no-ops
+        # Logit-mask disabled actions in imagination, matching rollout and the
+        # PPO backward pass exactly (jax_sim/action_space.py) -- a mismatch
+        # here would let the Epistemic Gate override a reactive action with
+        # one rollout could never have sampled.
         scores = jax.lax.cond(
-            _n_imag > 7,
-            lambda _: scores.at[6:8, :].set(-1e9),
+            _n_imag > max(MASKED_ACTIONS),
+            lambda _: mask_disabled_actions(scores, axis=0),
             lambda _: scores,
             operand=None
         )
