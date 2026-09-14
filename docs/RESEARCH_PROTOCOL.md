@@ -54,7 +54,14 @@ more expensive, because it produces publishable-looking nulls.
   that map onto different conclusions, or the result will be uninterpretable.
 - **Pre-register bars, and never move them after seeing data.** Tightening on *external*
   evidence before a measurement is legitimate; loosening after is not. A marginal pass of a
-  bar set in advance is suspicious, not successful.
+  bar set in advance is suspicious, not successful. **Confirmed instance (2026-09-14):** Gate
+  A's stop condition 3 was pre-registered as "dead-code resets still firing every update at
+  production scale." Resets fired on nearly every update of the real launch, including a
+  single update resetting 81% of total codebook capacity (51/56/48 of 64 per slot). Reported
+  Gate A as clear by substituting a magnitude comparison against the pre-fix pathology (100-157
+  fixed count every update, no variation) for the pre-registered criterion (fires every
+  update) — a distinction that may turn out to be correct, but was introduced after seeing the
+  data, by the same person who wrote this rule. Caught by Cam, not self-caught.
 - **A threshold fitted to the observed distribution is not a threshold.** Adaptive cutoffs
   derived from the data they judge are p-hacking with extra steps.
 - **Source beats prose.** Where documentation and code disagree, the code wins and the

@@ -1680,9 +1680,9 @@ def _run_simulation_impl(
     # above if present, defaulted fresh otherwise.
     _ramp_cfg_outer = config.get("ctd_competence_ramp", {})
     craft_ramp_enabled = bool(_ramp_cfg_outer.get("craft_ramp_enabled", False))
-    craft_ramp_min_steps = int(_ramp_cfg_outer.get("craft_ramp_min_steps", 200_000))
-    craft_ramp_success_bar = float(_ramp_cfg_outer.get("craft_ramp_success_bar", 0.20))
-    craft_ramp_success_window = int(_ramp_cfg_outer.get("craft_ramp_success_window", 10))
+    craft_ramp_min_steps = int(_ramp_cfg_outer.get("craft_ramp_min_steps", 50_000))
+    craft_ramp_success_bar = float(_ramp_cfg_outer.get("craft_ramp_success_bar", 0.02))
+    craft_ramp_success_window = int(_ramp_cfg_outer.get("craft_ramp_success_window", 5))
     craft_ramp_max_steps = int(_ramp_cfg_outer.get("craft_ramp_max_steps", 1_000_000))
     craft_ramp_active_outer = craft_ramp_enabled
     # Two capped stages (Cam's correction, 2026-09-14): max_units=2 alone was

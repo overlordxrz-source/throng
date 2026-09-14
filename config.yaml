@@ -320,9 +320,19 @@ phase16_combinatorial_syntax:
 # ceiling below are reapplied fresh at each stage.
 ctd_competence_ramp:
   craft_ramp_enabled: true
-  craft_ramp_min_steps: 200000     # floor: an advance never fires before this many steps into the stage
-  craft_ramp_success_bar: 0.20     # success rate that must be sustained to advance on the bar
-  craft_ramp_success_window: 10    # consecutive PPO updates the bar must hold
+  # Exit criteria revised 2026-09-14 (Cam), after the real launch showed
+  # codes_active collapse to 1|3|3/64 (VQ loss=2.30e-09) under stage 0:
+  # the 20%-sustained-over-10-updates bar was written without knowing stage
+  # 0 (solo-satisfiable) removes all communication pressure --
+  # futile_uncoordinated=0 across all twenty updates meant coordination
+  # wasn't failing, it wasn't required, and the channel atrophied because
+  # nothing used it. Stage 0's actual purpose is a behavioural milestone
+  # (teach that Craft has value), which success=123 at 7.1% already showed
+  # was learned well inside the old bar. New bar is deliberately easier to
+  # clear, not harder: every update past competence is pure channel atrophy.
+  craft_ramp_min_steps: 50000      # floor: an advance never fires before this many steps into the stage
+  craft_ramp_success_bar: 0.02     # success rate that must be sustained to advance on the bar
+  craft_ramp_success_window: 5     # consecutive PPO updates the bar must hold
   craft_ramp_max_steps: 1000000    # hard ceiling per stage: forced advance + loud report if the bar is never met
   red_ramp_enabled: true
   red_ramp_beta: 2.5               # shaping coefficient (verified: full 1-cell close ~= reward_red_move)
