@@ -184,6 +184,17 @@ def run_causal_intervention(checkpoint_dir: str, token_a: str, token_b: str, con
     keys = jax.random.split(rng, 10)
     grid = GridState(gs, symbol_dim=int(config["symbol_dim"]))
     grid = grid.replace(walls=jnp.zeros((gs, gs), dtype=jnp.bool_))
+    # Gate C (Cam, 2026-09-14): this tool never reads the JSONL corpus (live
+    # rewind, not offline replication -- see --corpus above) and constructs
+    # GridState directly rather than through main_jax._run_simulation_impl's
+    # config-driven enable, so craft_ramp_active/red_ramp_active are False by
+    # construction (GridState.__init__'s default) regardless of config.yaml's
+    # ctd_competence_ramp.*_enabled. Asserted, not assumed.
+    assert not bool(grid.craft_ramp_active) and not bool(grid.red_ramp_active), (
+        "causal_intervention.py's live-rewind rollout must never run under a "
+        "CtD competence ramp -- Gate C would be measuring a scaffolded, not "
+        "full-difficulty, world"
+    )
 
     b_pop = init_population(
         max_pop, hidden_d, sig_d, gs, team_id=0,

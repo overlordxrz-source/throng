@@ -302,6 +302,28 @@ phase16_combinatorial_syntax:
   coop_threshold_step: 100000
   num_actions: 8
 
+# CtD competence ramp (2026-09-14, Cam's sign-off -- see RESEARCH_PROTOCOL.md
+# Part 3 and jax_sim/ctd_ramp.py). Modelled on the Phase 16 CtD gate directly
+# above: one easy regime, one ratchet to full difficulty, no interpolation.
+# Both fossils (blue's crafting-avoidance, red's hunting-avoidance) were
+# trained ~1.4M steps under a broken ecology; this gives each a period where
+# the mechanism it avoided is actually reachable before facing real friction.
+# This is a genuine ecological change (Rule 12) -- signed off explicitly, not
+# implemented by default judgment.
+ctd_competence_ramp:
+  craft_ramp_enabled: true
+  craft_ramp_max_units: 2          # recipes solo/pair-satisfiable during the ramp (vs. up to 4 full)
+  craft_ramp_min_steps: 200000     # floor: ratchet never fires before this many env steps
+  craft_ramp_success_bar: 0.20     # success rate that must be sustained to ratchet on the bar
+  craft_ramp_success_window: 10    # consecutive PPO updates the bar must hold
+  craft_ramp_max_steps: 1000000    # hard ceiling: forced ratchet + loud report if the bar is never met
+  red_ramp_enabled: true
+  red_ramp_beta: 2.5               # shaping coefficient (verified: full 1-cell close ~= reward_red_move)
+  red_ramp_min_steps: 200000
+  red_ramp_catch_bar: 1.0          # catches/update that must be sustained to ratchet on the bar
+  red_ramp_catch_window: 10
+  red_ramp_max_steps: 1000000
+
 # Phase 16.5 — Environmental Enrichment & Metabolic Routing
 phase16_5_enrichment:
   barrier_build_cost: 0.15

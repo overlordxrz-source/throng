@@ -72,16 +72,37 @@ def _slot_token(value, slot_idx):
 
 
 def load_corpus(path, min_step=0):
-    """Load corpus records, filtering by minimum step."""
+    """Load corpus records, filtering by minimum step.
+
+    Gate C exclusion (Cam, 2026-09-14): records written while a CtD
+    competence ramp (jax_sim/ctd_ramp.py) was active are dropped here, at
+    the read step -- not carried into the result as a flag. Gate C is
+    suspended, not merely caveated, while either ramp is active: no ATE
+    measured during a ramp goes into the record at all. A record with no
+    craft_ramp_active/red_ramp_active key predates the ramp mechanism and is
+    treated as unramped.
+    """
     records = []
+    n_excluded_ramp = 0
     with open(path) as fh:
         for line in fh:
             try:
                 r = json.loads(line)
-                if r["step"] >= min_step:
-                    records.append(r)
+                if r["step"] < min_step:
+                    continue
+                if r.get("craft_ramp_active", False) or r.get("red_ramp_active", False):
+                    n_excluded_ramp += 1
+                    continue
+                records.append(r)
             except Exception:
                 continue
+    if n_excluded_ramp:
+        print(
+            f"[GATE-C] Excluded {n_excluded_ramp} record(s) written while a CtD "
+            f"competence ramp was active (jax_sim/ctd_ramp.py) -- not included "
+            f"in any statistic below.",
+            file=sys.stderr,
+        )
     return records
 
 

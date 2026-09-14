@@ -39,7 +39,11 @@ class GridState:
         # Phase 18.7 Receiver-Necessity Ecology
         self.current_recipe = jnp.zeros((5,), dtype=jnp.int32) # [wood, stone, flint, clay, vine] counts
         self.recipe_timer = jnp.zeros((1,), dtype=jnp.int32)
-        
+
+        # CtD competence ramp (2026-09-14, Cam's sign-off) -- see jax_sim/ctd_ramp.py
+        self.craft_ramp_active = jnp.array(False, dtype=jnp.bool_)
+        self.red_ramp_active = jnp.array(False, dtype=jnp.bool_)
+
         # Puzzle
         self.puzzle_grid   = jnp.zeros((size, size), dtype=jnp.float32)
         self.puzzle_nodes  = jnp.zeros((3, 6), dtype=jnp.int32) # [ay, ax, by, bx, ry, rx]
@@ -55,6 +59,7 @@ class GridState:
             self.puzzle_nodes, self.puzzle_active, self.puzzle_cooldown,
             self.wood_grid, self.stone_grid, self.flint_grid, self.clay_grid, self.vine_grid,
             self.current_recipe, self.recipe_timer,
+            self.craft_ramp_active, self.red_ramp_active,
         )
         aux = (self.size, self.symbol_dim)
         return children, aux
@@ -68,7 +73,8 @@ class GridState:
          gs.cultural_fast, gs.cultural_slow, gs.barrier_hp_map, gs.puzzle_grid,
          gs.puzzle_nodes, gs.puzzle_active, gs.puzzle_cooldown,
          gs.wood_grid, gs.stone_grid, gs.flint_grid, gs.clay_grid, gs.vine_grid,
-         gs.current_recipe, gs.recipe_timer) = children
+         gs.current_recipe, gs.recipe_timer,
+         gs.craft_ramp_active, gs.red_ramp_active) = children
         return gs
 
     def replace(self, **kwargs):
@@ -94,6 +100,8 @@ class GridState:
         gs.vine_grid = kwargs.get("vine_grid", self.vine_grid)
         gs.current_recipe = kwargs.get("current_recipe", self.current_recipe)
         gs.recipe_timer = kwargs.get("recipe_timer", self.recipe_timer)
+        gs.craft_ramp_active = kwargs.get("craft_ramp_active", self.craft_ramp_active)
+        gs.red_ramp_active = kwargs.get("red_ramp_active", self.red_ramp_active)
         return gs
 
 jax.tree_util.register_pytree_node(

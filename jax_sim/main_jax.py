@@ -43,6 +43,7 @@ from jax_sim.population_jax import (
     apply_auto_reproduce
 )
 from jax_sim.action_space import MASKED_ACTIONS, mask_disabled_actions, masked_actions_banner
+from jax_sim.ctd_ramp import capped_recipe_counts, red_shaping_term
 from jax_sim.network_jax import (
     AgentNetworkJax,
     AUX_HEAD_KEYS,
@@ -252,6 +253,12 @@ def make_sim_step(
     _red_catch_prob = float(config.get("red_catch_prob", 1.0))
     _reward_craft_success = float(config.get("reward_craft_success", 3.0))
     _reward_futile_craft = float(config.get("reward_futile_craft", -0.20))
+
+    # CtD competence ramp (jax_sim/ctd_ramp.py) -- Cam's sign-off, 2026-09-14
+    _ramp_cfg = config.get("ctd_competence_ramp", {})
+    _craft_ramp_max_units = int(_ramp_cfg.get("craft_ramp_max_units", 2))
+    _red_ramp_beta = float(_ramp_cfg.get("red_ramp_beta", 2.5))
+    _ppo_gamma_for_shaping = float(config.get("ppo_gamma", 0.999))
 
     # Phase 16 parameters
     p16 = config.get("phase16_combinatorial_syntax", {})
@@ -474,9 +481,14 @@ def make_sim_step(
         r_pop = update_memory_buffer(r_pop, r_mean_nb_sig, r_actions, r_pop.alive)
 
         # ── Movement ────────────────────────────────────────────
+        # Captured for the CtD red shaping term (jax_sim/ctd_ramp.py) -- the
+        # "before" state of the potential function, prior to this step's move.
+        _b_pos_before_move = b_pop.positions
+        _r_pos_before_move = r_pop.positions
+
         b_new_pos, _ = apply_moves(b_pop.positions, b_actions, b_pop.alive, gs, grid.walls, grid.barrier_hp_map, False)
         r_new_pos, r_intended_pos = apply_moves(r_pop.positions, r_actions, r_pop.alive, gs, grid.walls, grid.barrier_hp_map, True)
-        
+
         b_moved = (b_new_pos != b_pop.positions).any(axis=-1) & b_pop.alive
         r_moved = (r_new_pos != r_pop.positions).any(axis=-1) & r_pop.alive
         b_pop = b_pop.replace(positions=b_new_pos)
@@ -667,6 +679,9 @@ def make_sim_step(
 
         # ── Catch detection (optional predator jitter via red_catch_prob) ──
         catch_rng = jax.random.split(key_misc)[1]
+        # Captured for the CtD red shaping term -- alive state as seen by
+        # apply_catches, before this step's catches are resolved.
+        _b_alive_before_catch = b_pop.alive
         b_new_alive, caught_b, r_caught_small, r_caught_big_coop, r_caught_big_solo, r_mauled, b_catch_pen = apply_catches(
             b_pop.positions, b_pop.alive, b_pop.is_big_green,
             r_pop.positions, r_pop.alive, r_actions,
@@ -688,6 +703,21 @@ def make_sim_step(
 
         # ── Red starvation tracking ─────────────────────────────
         r_caught_any = (r_caught_small > 0) | (r_caught_big_coop > 0) | (r_caught_big_solo > 0)
+
+        # CtD red shaping ramp (Cam's sign-off, 2026-09-14): potential-based
+        # reward shaping on distance to the nearest living blue, active only
+        # while grid.red_ramp_active. Zeroed on catch steps (jax_sim/ctd_ramp.py's
+        # deliberate, logged exception -- Phi jumps discontinuously when a catch
+        # removes the nearest blue, which would otherwise claw back part of the
+        # catch reward it's meant to lead into).
+        _red_shaping_raw = red_shaping_term(
+            _r_pos_before_move, r_new_pos,
+            _b_pos_before_move, _b_alive_before_catch,
+            b_new_pos, b_new_alive,
+            r_caught_any,
+            _red_ramp_beta, _ppo_gamma_for_shaping, gs,
+        )
+        red_shaping = jnp.where(grid.red_ramp_active, _red_shaping_raw, 0.0)
         new_steps_since = jnp.where(r_caught_any, 0, r_pop.steps_since_catch + 1)
         new_steps_since = jnp.where(r_pop.alive, new_steps_since, 0)
         r_pop = r_pop.replace(steps_since_catch=new_steps_since)
@@ -702,13 +732,21 @@ def make_sim_step(
             items = jax.random.randint(k_rec1, (4,), 0, 5)
             mask = jax.random.bernoulli(k_rec2, 0.5)
             items = items.at[3].set(jnp.where(mask, items[3], 5))
-            counts = jnp.bincount(items, length=6)[:5]
-            
+            full_counts = jnp.bincount(items, length=6)[:5].astype(jnp.int32)
+
+            # CtD crafting ramp (Cam's sign-off, 2026-09-14): while active, every
+            # recipe is solo/pair-satisfiable (craft_ramp_max_units, no wasted
+            # slots) instead of up to 4 units across 5 materials. See
+            # jax_sim/ctd_ramp.py.
+            k_rec_ramp = jax.random.split(k_rec1)[0]
+            ramp_counts = capped_recipe_counts(k_rec_ramp, _craft_ramp_max_units)
+            counts = jnp.where(grid.craft_ramp_active, ramp_counts, full_counts)
+
             progress = jnp.clip(step_idx / 1500000.0, 0.0, 1.0)
             vis_prob = 0.5 - 0.3 * progress
             new_vis = jax.random.bernoulli(k_vis, vis_prob, (b_pop.max_pop,))
-            
-            return counts.astype(jnp.int32), jnp.array([1000], dtype=jnp.int32), new_vis
+
+            return counts, jnp.array([1000], dtype=jnp.int32), new_vis
             
         def keep_recipe(_):
             return grid.current_recipe, jnp.array([new_recipe_timer], dtype=jnp.int32), b_pop.can_see_recipe
@@ -793,6 +831,7 @@ def make_sim_step(
         # above, not replacing them, per Cam's ruling (Rule 12 doesn't gate making a
         # configured-but-unwired mechanism actually run).
         r_rew = r_rew + _reward_red_catch * r_caught_any.astype(jnp.float32)
+        r_rew = r_rew + red_shaping
         r_rew = r_rew + jnp.where(r_pop.alive, _reward_red_starve, 0.0)
         r_rew = r_rew + _reward_red_move * r_moved.astype(jnp.float32)
 
@@ -858,6 +897,8 @@ def make_sim_step(
             "futile_empty": futile_empty.astype(jnp.float32),
             "current_recipe": grid.current_recipe,
             "steps_since_dropout": b_pop.steps_since_dropout,
+            "craft_ramp_active": grid.craft_ramp_active,
+            "red_ramp_active": grid.red_ramp_active,
         }
         r_rollout = {
             "obs": r_obs, "actions": r_actions, "log_probs": r_log_probs_taken,
@@ -870,6 +911,9 @@ def make_sim_step(
             "signals": r_pop.signals,
             "energy": r_pop.energy,
             "alive": r_pop.alive,
+            "craft_ramp_active": grid.craft_ramp_active,
+            "red_ramp_active": grid.red_ramp_active,
+            "red_shaping": red_shaping,
         }
 
         new_carry = (grid, b_pop, r_pop, b_new_c, r_new_c, b_params, r_params)
@@ -977,6 +1021,11 @@ def _run_simulation_impl(
 
     # ── Init grid ─────────────────────────────────────────────
     grid = GridState(gs, symbol_dim=config["symbol_dim"])
+    _ramp_cfg_init = config.get("ctd_competence_ramp", {})
+    grid = grid.replace(
+        craft_ramp_active=jnp.array(bool(_ramp_cfg_init.get("craft_ramp_enabled", False)), dtype=jnp.bool_),
+        red_ramp_active=jnp.array(bool(_ramp_cfg_init.get("red_ramp_enabled", False)), dtype=jnp.bool_),
+    )
     wall_mask = jax.random.bernoulli(keys[0], config.get("wall_density", 0.08), (gs, gs))
     
     # Resource patches (structured hotspots, not uniform drizzle)
@@ -1601,6 +1650,46 @@ def _run_simulation_impl(
         flush=True,
     )
     _corpus_sig_dim = int(config["signal_dim"])
+
+    # ── CtD competence ramp state (Cam's sign-off, 2026-09-14) ───────
+    # Ratchet decision lives here (outer Python loop), mirroring the
+    # red_curriculum_idx/red_sustain_count pattern above -- floor + sustained
+    # bar + hard ceiling, evaluated once per PPO update from rollout_data.
+    # NOT persisted across process resume (same limitation as
+    # red_curriculum_idx/red_sustain_count already have, undocumented until
+    # RESEARCH_PROTOCOL.md; a process restart mid-ramp restarts its clock).
+    _ramp_cfg_outer = config.get("ctd_competence_ramp", {})
+    craft_ramp_enabled = bool(_ramp_cfg_outer.get("craft_ramp_enabled", False))
+    craft_ramp_min_steps = int(_ramp_cfg_outer.get("craft_ramp_min_steps", 200_000))
+    craft_ramp_success_bar = float(_ramp_cfg_outer.get("craft_ramp_success_bar", 0.20))
+    craft_ramp_success_window = int(_ramp_cfg_outer.get("craft_ramp_success_window", 10))
+    craft_ramp_max_steps = int(_ramp_cfg_outer.get("craft_ramp_max_steps", 1_000_000))
+    craft_ramp_active_outer = craft_ramp_enabled
+    craft_ramp_start_step = start_update * T
+    craft_ramp_success_streak = 0
+
+    red_ramp_enabled = bool(_ramp_cfg_outer.get("red_ramp_enabled", False))
+    red_ramp_min_steps = int(_ramp_cfg_outer.get("red_ramp_min_steps", 200_000))
+    red_ramp_catch_bar = float(_ramp_cfg_outer.get("red_ramp_catch_bar", 1.0))
+    red_ramp_catch_window = int(_ramp_cfg_outer.get("red_ramp_catch_window", 10))
+    red_ramp_max_steps = int(_ramp_cfg_outer.get("red_ramp_max_steps", 1_000_000))
+    red_ramp_active_outer = red_ramp_enabled
+    red_ramp_start_step = start_update * T
+    red_ramp_catch_streak = 0
+
+    if craft_ramp_enabled or red_ramp_enabled:
+        print(
+            f"[CTD-RAMP] crafting={craft_ramp_enabled} "
+            f"(max_units={int(_ramp_cfg_outer.get('craft_ramp_max_units', 2))}, "
+            f"floor={craft_ramp_min_steps:_}, bar={craft_ramp_success_bar:.0%}/"
+            f"{craft_ramp_success_window}upd, ceiling={craft_ramp_max_steps:_}) | "
+            f"red={red_ramp_enabled} "
+            f"(beta={float(_ramp_cfg_outer.get('red_ramp_beta', 2.5))}, "
+            f"floor={red_ramp_min_steps:_}, bar={red_ramp_catch_bar}/upd/"
+            f"{red_ramp_catch_window}upd, ceiling={red_ramp_max_steps:_})",
+            flush=True,
+        )
+
     for ui in range(start_update, n_updates):
         update_key = update_keys[ui]
         step_keys = jax.random.split(update_key, T)
@@ -2270,6 +2359,84 @@ def _run_simulation_impl(
                 f"futile_wrong_mats={_n_futile_wrong_mats} | futile_empty={_n_futile_empty} | "
                 f"rate={_n_craft_success / max(1, _n_craft_total):.1%}"
             )
+
+            # ── CtD competence ramp: per-update ratchet decision ─────
+            # Floor + sustained bar + hard ceiling, mirroring the red-curriculum
+            # pattern above. Evaluated every update (this block runs every ui,
+            # since step_val % 512 == 0 or T >= 512 is unconditionally true at
+            # T=512) -- not just on a print cadence.
+            _red_shaping_mean = float(np.asarray(rollout_data["red"]["red_shaping"]).mean())
+            print(
+                f"  CTD-RAMP: craft_active={craft_ramp_active_outer} "
+                f"(streak={craft_ramp_success_streak}/{craft_ramp_success_window}) | "
+                f"red_active={red_ramp_active_outer} "
+                f"(streak={red_ramp_catch_streak}/{red_ramp_catch_window}, "
+                f"shaping_mean={_red_shaping_mean:.5f})"
+            )
+
+            if craft_ramp_active_outer:
+                _steps_since_craft_ramp = (ui + 1) * T - craft_ramp_start_step
+                _craft_rate_this_update = _n_craft_success / max(1, _n_craft_total)
+                if _craft_rate_this_update >= craft_ramp_success_bar:
+                    craft_ramp_success_streak += 1
+                else:
+                    craft_ramp_success_streak = 0
+                _craft_ratchet_now = False
+                _craft_ratchet_reason = None
+                if (_steps_since_craft_ramp >= craft_ramp_min_steps
+                        and craft_ramp_success_streak >= craft_ramp_success_window):
+                    _craft_ratchet_now = True
+                    _craft_ratchet_reason = "bar met"
+                elif _steps_since_craft_ramp >= craft_ramp_max_steps:
+                    _craft_ratchet_now = True
+                    _craft_ratchet_reason = "CEILING FORCED -- bar never met"
+                    print(
+                        f"[CTD-RAMP] *** Crafting ramp forced off at hard ceiling "
+                        f"({craft_ramp_max_steps:_} steps) WITHOUT meeting its bar "
+                        f"({craft_ramp_success_bar:.0%} sustained {craft_ramp_success_window} "
+                        f"updates). This is a finding, not an inconvenience. ***",
+                        flush=True,
+                    )
+                if _craft_ratchet_now:
+                    craft_ramp_active_outer = False
+                    grid = grid.replace(craft_ramp_active=jnp.array(False, dtype=jnp.bool_))
+                    print(
+                        f"[CTD-RAMP] Crafting ramp ratcheted OFF ({_craft_ratchet_reason}) "
+                        f"at ppo={ui + 1}, step={(ui + 1) * T:_}",
+                        flush=True,
+                    )
+
+            if red_ramp_active_outer:
+                _steps_since_red_ramp = (ui + 1) * T - red_ramp_start_step
+                if blue_caught_rollout >= red_ramp_catch_bar:
+                    red_ramp_catch_streak += 1
+                else:
+                    red_ramp_catch_streak = 0
+                _red_ratchet_now = False
+                _red_ratchet_reason = None
+                if (_steps_since_red_ramp >= red_ramp_min_steps
+                        and red_ramp_catch_streak >= red_ramp_catch_window):
+                    _red_ratchet_now = True
+                    _red_ratchet_reason = "bar met"
+                elif _steps_since_red_ramp >= red_ramp_max_steps:
+                    _red_ratchet_now = True
+                    _red_ratchet_reason = "CEILING FORCED -- bar never met"
+                    print(
+                        f"[CTD-RAMP] *** Red shaping ramp forced off at hard ceiling "
+                        f"({red_ramp_max_steps:_} steps) WITHOUT meeting its bar "
+                        f"({red_ramp_catch_bar}/update sustained {red_ramp_catch_window} "
+                        f"updates). This is a finding, not an inconvenience. ***",
+                        flush=True,
+                    )
+                if _red_ratchet_now:
+                    red_ramp_active_outer = False
+                    grid = grid.replace(red_ramp_active=jnp.array(False, dtype=jnp.bool_))
+                    print(
+                        f"[CTD-RAMP] Red shaping ramp ratcheted OFF ({_red_ratchet_reason}) "
+                        f"at ppo={ui + 1}, step={(ui + 1) * T:_}",
+                        flush=True,
+                    )
+
             if bool((_p9 or {}).get("imagination_gating_enabled", False)):
                 im_agree_val = float("nan")
                 conf_gate_val = float("nan")
@@ -2573,6 +2740,8 @@ def _run_simulation_impl(
                     current_recipe_id=recipe_id,
                     inventory=inventory,
                     steps_since_dropout=b_steps_since_dropout_all[t, alive_idx],
+                    craft_ramp_active=bool(rollout_data["blue"]["craft_ramp_active"][t]),
+                    red_ramp_active=bool(rollout_data["blue"]["red_ramp_active"][t]),
                 )
                 if is_scout.any():
                     pos_b_alive_f = b_pos[alive_idx].astype(np.float32)
@@ -2666,6 +2835,8 @@ def _run_simulation_impl(
                     nb_hunter_dist_lag1=nb_hunter_dist_lag1,
                     nb_hunter_token_lag1=nb_hunter_token_lag1,
                     carry_fwd=r_carry_fwd_all[t, alive_idx_r],
+                    craft_ramp_active=bool(rollout_data["red"]["craft_ramp_active"][t]),
+                    red_ramp_active=bool(rollout_data["red"]["red_ramp_active"][t]),
                 )
                 if is_hunter.any():
                     pos_r_alive_f = r_pos[alive_idx_r].astype(np.float32)

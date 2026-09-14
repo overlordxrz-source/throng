@@ -51,7 +51,16 @@ RED_SEARCH_BLUE_DIST_MIN = 5.0
 # ── Loading ────────────────────────────────────────────────────────────────────
 
 def load_corpus(path: str, min_step: int = 0) -> dict:
+    """
+    Gate C exclusion (Cam, 2026-09-14): records written while a CtD
+    competence ramp (jax_sim/ctd_ramp.py) was active are dropped here, at
+    the read step -- a token's apparent meaning observed under scaffolded
+    (ramp) conditions is not evidence about its meaning under the real
+    ecology. A record with no craft_ramp_active/red_ramp_active key predates
+    the ramp mechanism and is treated as unramped.
+    """
     records = []
+    n_excluded_ramp = 0
     with open(path) as fh:
         for line in fh:
             line = line.strip()
@@ -59,11 +68,22 @@ def load_corpus(path: str, min_step: int = 0) -> dict:
                 continue
             try:
                 r = json.loads(line)
-                if r["step"] >= min_step:
-                    records.append(r)
+                if r["step"] < min_step:
+                    continue
+                if r.get("craft_ramp_active", False) or r.get("red_ramp_active", False):
+                    n_excluded_ramp += 1
+                    continue
+                records.append(r)
             except json.JSONDecodeError:
                 continue
 
+    if n_excluded_ramp:
+        print(
+            f"[GATE-C] Excluded {n_excluded_ramp} record(s) written while a CtD "
+            f"competence ramp was active -- not included in any classification "
+            f"below.",
+            file=sys.stderr,
+        )
     if not records:
         sys.exit(f"No valid records in {path}")
 
@@ -182,18 +202,34 @@ def _coerce_carry_fwd_row(v, carry_dim: int) -> list:
 
 
 def load_red_corpus(path: str) -> dict:
-    """Load Phase 12.1 red corpus (hunter / blue_dist schema)."""
+    """Load Phase 12.1 red corpus (hunter / blue_dist schema).
+
+    Gate C exclusion (Cam, 2026-09-14): same as load_corpus above -- records
+    written while a CtD competence ramp was active are dropped here.
+    """
     records = []
+    n_excluded_ramp = 0
     with open(path) as fh:
         for line in fh:
             line = line.strip()
             if not line:
                 continue
             try:
-                records.append(json.loads(line))
+                r = json.loads(line)
+                if r.get("craft_ramp_active", False) or r.get("red_ramp_active", False):
+                    n_excluded_ramp += 1
+                    continue
+                records.append(r)
             except json.JSONDecodeError:
                 continue
 
+    if n_excluded_ramp:
+        print(
+            f"[GATE-C] Excluded {n_excluded_ramp} record(s) written while a CtD "
+            f"competence ramp was active -- not included in any classification "
+            f"below.",
+            file=sys.stderr,
+        )
     if not records:
         sys.exit(f"No valid records in {path}")
 
