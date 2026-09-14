@@ -1261,6 +1261,11 @@ def _run_simulation_impl(
     dummy_carry_red = jnp.zeros((1, r_pop_hidden))
     _ckpt_latest = ckpt_mngr.latest_step()
     start_update = 0
+    # Training-loop state carried across resumes (CtD ramp progress, red
+    # curriculum) -- captured from the raw checkpoint below if present,
+    # mirroring how usage_ema/dead_streak already solve this for VQ codebooks.
+    # None on a fresh start, or when the checkpoint predates this mechanism.
+    _restored_training_state = None
     if _ckpt_latest is not None:
         print(
             f"[JAX] Checkpoint on volume: latest PPO update = {_ckpt_latest}",
@@ -1297,6 +1302,8 @@ def _run_simulation_impl(
             from flax.core import freeze, unfreeze
             target_dict = unfreeze(abstract_tree)
             source_dict = unfreeze(raw_restored)
+            if "training_state" in source_dict:
+                _restored_training_state = source_dict["training_state"]
             _restore_agents = ("b_params", "r_params")
             for agent_type in _restore_agents:
                 if agent_type not in source_dict or agent_type not in target_dict:
@@ -1332,6 +1339,8 @@ def _run_simulation_impl(
                     raw_restored = ckpt_mngr.restore(_ckpt_latest, items=target_dict)
                 
                 source_dict = unfreeze(raw_restored)
+                if "training_state" in source_dict:
+                    _restored_training_state = source_dict["training_state"]
                 _restore_agents = ("b_params", "r_params")
                 for agent_type in _restore_agents:
                     if agent_type not in source_dict or agent_type not in target_dict:
@@ -1655,9 +1664,19 @@ def _run_simulation_impl(
     # Ratchet decision lives here (outer Python loop), mirroring the
     # red_curriculum_idx/red_sustain_count pattern above -- floor + sustained
     # bar + hard ceiling, evaluated once per PPO update from rollout_data.
-    # NOT persisted across process resume (same limitation as
-    # red_curriculum_idx/red_sustain_count already have, undocumented until
-    # RESEARCH_PROTOCOL.md; a process restart mid-ramp restarts its clock).
+    #
+    # Persisted in the checkpoint under "training_state" (Cam's correction,
+    # 2026-09-14): red_curriculum_idx/red_sustain_count were plain Python ints,
+    # reset to zero on every process start, never restored -- the same defect
+    # class as the rest of the audit (state that exists, is read, shapes
+    # behaviour, has no durable write path), just the mirror image of the
+    # confidence-head fossil: there, stale state survived a reset it should
+    # have had; here, live state resets across a boundary it should survive.
+    # Both fields have been resetting on every resume since Phase 15/16
+    # (whenever red curriculum staging landed) -- see RESEARCH_PROTOCOL.md /
+    # THE-ECOLOGY-NEVER-RAN.md. Fixed the same way usage_ema/dead_streak
+    # already solve this for VQ codebooks: captured from the raw checkpoint
+    # above if present, defaulted fresh otherwise.
     _ramp_cfg_outer = config.get("ctd_competence_ramp", {})
     craft_ramp_enabled = bool(_ramp_cfg_outer.get("craft_ramp_enabled", False))
     craft_ramp_min_steps = int(_ramp_cfg_outer.get("craft_ramp_min_steps", 200_000))
@@ -1677,16 +1696,45 @@ def _run_simulation_impl(
     red_ramp_start_step = start_update * T
     red_ramp_catch_streak = 0
 
+    _training_state_source = "fresh start (no saved training_state)"
+    if _restored_training_state is not None:
+        _training_state_source = "RESTORED from checkpoint"
+        if craft_ramp_enabled:
+            craft_ramp_active_outer = bool(_restored_training_state.get("craft_ramp_active", craft_ramp_active_outer))
+            craft_ramp_start_step = int(_restored_training_state.get("craft_ramp_start_step", craft_ramp_start_step))
+            craft_ramp_success_streak = int(_restored_training_state.get("craft_ramp_success_streak", craft_ramp_success_streak))
+        if red_ramp_enabled:
+            red_ramp_active_outer = bool(_restored_training_state.get("red_ramp_active", red_ramp_active_outer))
+            red_ramp_start_step = int(_restored_training_state.get("red_ramp_start_step", red_ramp_start_step))
+            red_ramp_catch_streak = int(_restored_training_state.get("red_ramp_catch_streak", red_ramp_catch_streak))
+        red_curriculum_idx = int(_restored_training_state.get("red_curriculum_idx", red_curriculum_idx))
+        red_sustain_count = int(_restored_training_state.get("red_sustain_count", red_sustain_count))
+
+    # Sync grid (constructed before the checkpoint restore above) to whatever
+    # the ramp-active flags ended up being -- config-driven default, or
+    # restored-and-possibly-already-ratcheted history.
+    grid = grid.replace(
+        craft_ramp_active=jnp.array(craft_ramp_active_outer, dtype=jnp.bool_),
+        red_ramp_active=jnp.array(red_ramp_active_outer, dtype=jnp.bool_),
+    )
+
     if craft_ramp_enabled or red_ramp_enabled:
         print(
-            f"[CTD-RAMP] crafting={craft_ramp_enabled} "
+            f"[CTD-RAMP] state: {_training_state_source} | "
+            f"red_curriculum_idx={red_curriculum_idx} red_sustain_count={red_sustain_count}",
+            flush=True,
+        )
+        print(
+            f"[CTD-RAMP] crafting={craft_ramp_active_outer} "
             f"(max_units={int(_ramp_cfg_outer.get('craft_ramp_max_units', 2))}, "
             f"floor={craft_ramp_min_steps:_}, bar={craft_ramp_success_bar:.0%}/"
-            f"{craft_ramp_success_window}upd, ceiling={craft_ramp_max_steps:_}) | "
-            f"red={red_ramp_enabled} "
+            f"{craft_ramp_success_window}upd, ceiling={craft_ramp_max_steps:_}, "
+            f"streak={craft_ramp_success_streak}, start_step={craft_ramp_start_step:_}) | "
+            f"red={red_ramp_active_outer} "
             f"(beta={float(_ramp_cfg_outer.get('red_ramp_beta', 2.5))}, "
             f"floor={red_ramp_min_steps:_}, bar={red_ramp_catch_bar}/upd/"
-            f"{red_ramp_catch_window}upd, ceiling={red_ramp_max_steps:_})",
+            f"{red_ramp_catch_window}upd, ceiling={red_ramp_max_steps:_}, "
+            f"streak={red_ramp_catch_streak}, start_step={red_ramp_start_step:_})",
             flush=True,
         )
 
@@ -2867,9 +2915,24 @@ def _run_simulation_impl(
         ckpt_interval_steps = int(config.get("checkpoint_interval", 2000))
         ckpt_interval_updates = max(1, ckpt_interval_steps // T)
         if (ui + 1) % ckpt_interval_updates == 0:
+            # training_state (Cam, 2026-09-14): CtD ramp progress and red
+            # curriculum state, so a resume continues rather than restarting
+            # these clocks -- same durability usage_ema/dead_streak already
+            # have for VQ codebooks.
+            training_state = {
+                "craft_ramp_active": jnp.array(craft_ramp_active_outer, dtype=jnp.bool_),
+                "craft_ramp_start_step": jnp.array(craft_ramp_start_step, dtype=jnp.int32),
+                "craft_ramp_success_streak": jnp.array(craft_ramp_success_streak, dtype=jnp.int32),
+                "red_ramp_active": jnp.array(red_ramp_active_outer, dtype=jnp.bool_),
+                "red_ramp_start_step": jnp.array(red_ramp_start_step, dtype=jnp.int32),
+                "red_ramp_catch_streak": jnp.array(red_ramp_catch_streak, dtype=jnp.int32),
+                "red_curriculum_idx": jnp.array(red_curriculum_idx, dtype=jnp.int32),
+                "red_sustain_count": jnp.array(red_sustain_count, dtype=jnp.int32),
+            }
             ckpt_state = {
                 "b_params": b_params,
                 "r_params": r_params,
+                "training_state": training_state,
             }
             ckpt_mngr.save(ui + 1, items=ckpt_state)
             ckpt_mngr.wait_until_finished()

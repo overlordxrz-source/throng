@@ -28,6 +28,14 @@ compatible with nothing having occurred. Before believing any step did what it c
   hardest error to see. Derive offsets from the canonical layout function, never by hand.
 - **Fixtures from production config.** Zero-arg constructors test dataclass defaults. A test
   that cannot fail when the live layout changes is decoration.
+- **"Out of scope" is a decision, not an observation.** Noticing a defect while building on
+  the exact thing it affects is not a neutral fact to log and move past — the scope question
+  is already answered by the fact that you're standing inside it. `red_curriculum_idx` and
+  `red_sustain_count` (plain Python locals, reset to zero on every process resume, never
+  checkpointed) were noticed this way and scoped out once; the CtD competence ramp was then
+  built on the identical unpersisted pattern, silently inheriting the same defect a second
+  time (`THE-ECOLOGY-NEVER-RAN.md` #1). The noticing is the hard part. Don't spend it and then
+  not act on it.
 
 ## Part 2 — Experiment integrity: is the experiment running at all?
 
