@@ -234,12 +234,33 @@ def create_optimizer(lr: float = 3e-4, max_grad_norm: float = 2.0) -> optax.Grad
     return optax.adam(lr)
 
 
-@functools.partial(jax.jit, static_argnames=("apply_fn", "optimizer", "n_layers"))
+# Blue's comms subtree (2026-09-14, Cam): sender encoder (gwt_comms_1 +
+# head_signal_slot{0,1,2}), the codebook, and the receiver read path
+# (emb_nb, which embeds incoming neighbour signals). A subnetwork whose
+# objective is identically uninformative during a curriculum phase must not
+# be trained during that phase — CtD ramp stage 0 (solo-satisfiable craft)
+# gives this subtree zero reward gradient while the commitment loss keeps
+# pulling unopposed, a one-way ratchet toward encoder collapse. Frozen here
+# (grads zeroed pre-optimizer) for all of stage 0, unfrozen at the stage-1
+# transition. b_opt_state is freshly zero-initialized on every process start
+# (jax_sim/main_jax.py, `b_opt_state = b_optimizer.init(b_params)`), so
+# zero-gradient every step keeps Adam's m/v exactly zero for these leaves —
+# params stay bitwise identical, verified in
+# tests/test_comms_freeze.py.
+COMMS_SUBTREE_KEYS = (
+    "gwt_comms_1",
+    "head_signal_slot0", "head_signal_slot1", "head_signal_slot2",
+    "codebook_0", "codebook_1", "codebook_2",
+    "emb_nb",
+)
+
+
+@functools.partial(jax.jit, static_argnames=("apply_fn", "optimizer", "n_layers", "freeze_comms"))
 def _minibatch_step(
     params, opt_state, apply_fn, optimizer,
     obs, actions, alarm_actions, old_log_probs, advantages, returns, carries,
     n_layers, old_values, clip_eps, vf_coef, ent_coef, vq_coef, loss_vq, alive, rng_key,
-    ignition, ignition_discount, alarm_ent_coef
+    ignition, ignition_discount, alarm_ent_coef, freeze_comms=False,
 ):
     grad_fn = jax.value_and_grad(ppo_loss, has_aux=True)
     (loss, metrics), grads = grad_fn(
@@ -257,7 +278,14 @@ def _minibatch_step(
     
     # We assume 'params' is a flat dictionary of layer names (Flax style)
     target_dict = grads_dict["params"] if "params" in grads_dict else grads_dict
-    
+
+    # 2026-09-14 (Cam): stage-0 comms freeze. Zeroed before clipping so the
+    # frozen leaves clip to zero trivially either way.
+    if freeze_comms:
+        for _k in COMMS_SUBTREE_KEYS:
+            if _k in target_dict:
+                target_dict[_k] = jax.tree_util.tree_map(jnp.zeros_like, target_dict[_k])
+
     def _clip_group(group_dict, max_norm=2.0):
         norm = jnp.sqrt(sum(jnp.sum(g**2) for g in jax.tree_util.tree_leaves(group_dict)))
         scale = jnp.minimum(1.0, max_norm / (norm + 1e-6))
@@ -304,6 +332,7 @@ def ppo_update(
     team: str = "blue",
     ignition_discount: float = 0.1,
     alarm_ent_coef: float = 0.0,
+    freeze_comms: bool = False,
 ) -> Tuple[Dict, Any, Dict]:
     """
     Single gradient update step using minibatches.
@@ -411,7 +440,7 @@ def ppo_update(
             params, opt_state, apply_fn, optimizer,
             mb_obs, mb_act, mb_alarm_act, mb_lp, mb_adv, mb_ret, mb_c,
             n_layers, mb_v, clip_eps, vf_coef, ent_coef, vq_coef, mb_vq, mb_al, mb_key,
-            mb_ig, ignition_discount, alarm_ent_coef
+            mb_ig, ignition_discount, alarm_ent_coef, freeze_comms,
         )
 
         # Accumulate as Python floats to avoid holding 500 JAX arrays

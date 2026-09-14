@@ -1261,6 +1261,28 @@ def _run_simulation_impl(
     dummy_carry = jnp.zeros((1, hidden_d))
     dummy_carry_red = jnp.zeros((1, r_pop_hidden))
     _ckpt_latest = ckpt_mngr.latest_step()
+    # 2026-09-14 (Cam): resume_from_step pins an EARLIER-than-latest
+    # checkpoint deliberately -- the calibration ladder's codes_active rule
+    # ("latest checkpoint whose codes_active is within 2x of the per-slot
+    # ladder maximum, on every slot independently") picked 2541, not
+    # whatever the volume's newest checkpoint happens to be. Set in
+    # config.yaml, not a volume deletion -- explicit, auditable, reversible.
+    _resume_pin = config.get("resume_from_step")
+    if _resume_pin is not None:
+        _resume_pin = int(_resume_pin)
+        if _ckpt_latest is not None and _resume_pin > _ckpt_latest:
+            raise ValueError(
+                f"resume_from_step={_resume_pin} is AHEAD of the volume's "
+                f"latest checkpoint ({_ckpt_latest}) -- refusing a config "
+                f"that can't possibly be satisfied from disk."
+            )
+        print(
+            f"[JAX] resume_from_step={_resume_pin} set in config.yaml -- "
+            f"pinning resume to this step instead of the volume's latest "
+            f"({_ckpt_latest}). Deliberate rollback, not a bug.",
+            flush=True,
+        )
+        _ckpt_latest = _resume_pin
     start_update = 0
     # Training-loop state carried across resumes (CtD ramp progress, red
     # curriculum) -- captured from the raw checkpoint below if present,
@@ -1702,6 +1724,20 @@ def _run_simulation_impl(
     red_ramp_start_step = start_update * T
     red_ramp_catch_streak = 0
 
+    # Comms-freeze tripwires (Cam, 2026-09-14, Blocker 2 behavioral check):
+    # the freeze proves comms PARAMS don't move; it can't prove codes_active
+    # doesn't drift, because z_e comes out of the frozen head applied to a
+    # trunk that keeps training under the policy loss. C0 is captured once,
+    # on the first production update after THIS resume -- never hardcoded
+    # from the offline calibration ladder, which used a different batch and
+    # isn't comparable in absolute scale. Persisted across resumes so a
+    # crash mid-stage-0 doesn't reset the streak counters or re-capture C0.
+    comms_c0 = None  # (u0, u1, u2) at first production update after resume
+    comms_fast_streak = [0, 0, 0]   # consecutive updates below 0.5*C0, per slot
+    comms_slow_streak = [0, 0, 0]   # consecutive updates below 0.6*C0, per slot
+    comms_stage1_updates_elapsed = 0
+    comms_stage1_uncoordinated_seen = False
+
     _training_state_source = "fresh start (no saved training_state)"
     if _restored_training_state is not None:
         _training_state_source = "RESTORED from checkpoint"
@@ -1710,6 +1746,22 @@ def _run_simulation_impl(
             craft_ramp_stage_outer = int(_restored_training_state.get("craft_ramp_stage", craft_ramp_stage_outer))
             craft_ramp_start_step = int(_restored_training_state.get("craft_ramp_start_step", craft_ramp_start_step))
             craft_ramp_success_streak = int(_restored_training_state.get("craft_ramp_success_streak", craft_ramp_success_streak))
+            _tw_c0_restored = _restored_training_state.get("comms_tripwire_c0", None)
+            if _tw_c0_restored is not None:
+                _tw_c0_vals = [int(x) for x in np.asarray(_tw_c0_restored).tolist()]
+                comms_c0 = None if any(x < 0 for x in _tw_c0_vals) else tuple(_tw_c0_vals)
+            comms_fast_streak = [int(x) for x in np.asarray(
+                _restored_training_state.get("comms_fast_streak", comms_fast_streak)
+            ).tolist()]
+            comms_slow_streak = [int(x) for x in np.asarray(
+                _restored_training_state.get("comms_slow_streak", comms_slow_streak)
+            ).tolist()]
+            comms_stage1_updates_elapsed = int(_restored_training_state.get(
+                "comms_stage1_updates_elapsed", comms_stage1_updates_elapsed
+            ))
+            comms_stage1_uncoordinated_seen = bool(_restored_training_state.get(
+                "comms_stage1_uncoordinated_seen", comms_stage1_uncoordinated_seen
+            ))
         if red_ramp_enabled:
             red_ramp_active_outer = bool(_restored_training_state.get("red_ramp_active", red_ramp_active_outer))
             red_ramp_start_step = int(_restored_training_state.get("red_ramp_start_step", red_ramp_start_step))
@@ -1744,6 +1796,16 @@ def _run_simulation_impl(
             f"floor={red_ramp_min_steps:_}, bar={red_ramp_catch_bar}/upd/"
             f"{red_ramp_catch_window}upd, ceiling={red_ramp_max_steps:_}, "
             f"streak={red_ramp_catch_streak}, start_step={red_ramp_start_step:_})",
+            flush=True,
+        )
+        _c0_str = f"{comms_c0[0]}|{comms_c0[1]}|{comms_c0[2]}/64" if comms_c0 is not None else "not yet captured"
+        print(
+            f"[TRIPWIRE] comms-freeze tripwires: C0={_c0_str} | "
+            f"fast_streak={comms_fast_streak} (halt >=3 below 0.5*C0) | "
+            f"slow_streak={comms_slow_streak} (halt >=5 below 0.6*C0) | "
+            f"stage0_floor=zero-tolerance below C0 | "
+            f"stage1_updates_elapsed={comms_stage1_updates_elapsed} "
+            f"uncoordinated_seen={comms_stage1_uncoordinated_seen} (halt if still 0 after 10 updates in stage 1)",
             flush=True,
         )
 
@@ -1804,6 +1866,120 @@ def _run_simulation_impl(
         has_nan_rew = bool(np.isnan(b_batch["rewards"]).any())
         if ui == 0:
             print(f"[DEBUG] Rollout data NaN: obs={has_nan_obs} vals={has_nan_vals} logp={has_nan_logp} rew={has_nan_rew}")
+
+        # ── Comms-freeze tripwires (Cam, 2026-09-14) ─────────────────────
+        # Computed every update, unconditionally -- not nested inside any
+        # print-cadence gate, since "N consecutive updates" means consecutive
+        # PPO updates. Evaluated against craft_ramp_stage_outer/active_outer
+        # AS THEY STAND RIGHT NOW: the ratchet-advance decision runs later in
+        # this same loop body, so at this point they still describe the
+        # stage that produced the rollout just collected.
+        if craft_ramp_active_outer:
+            _tw_alive_mask = np.array(b_pop.alive).astype(bool)
+            _tw_codes_now = None
+            if "token_ids" in b_batch:
+                _tw_tok_last = np.array(b_batch["token_ids"])[-1]
+                if _tw_alive_mask.sum() > 0 and _tw_tok_last.ndim == 2 and _tw_tok_last.shape[1] == 3:
+                    _tw_alive_tok = _tw_tok_last[_tw_alive_mask]
+                    _tw_codes_now = (
+                        len(np.unique(_tw_alive_tok[:, 0])),
+                        len(np.unique(_tw_alive_tok[:, 1])),
+                        len(np.unique(_tw_alive_tok[:, 2])),
+                    )
+            _tw_futile_uncoordinated_now = (
+                int(np.asarray(b_batch["futile_uncoordinated"]).sum())
+                if "futile_uncoordinated" in b_batch else 0
+            )
+
+            if _tw_codes_now is not None:
+                if comms_c0 is None:
+                    comms_c0 = _tw_codes_now
+                    print(
+                        f"[TRIPWIRE] C0 captured at ppo={ui} (first production update "
+                        f"after resume): codes_active={comms_c0[0]}|{comms_c0[1]}|"
+                        f"{comms_c0[2]}/64",
+                        flush=True,
+                    )
+                else:
+                    _tw_halt_reasons = []
+                    for _i in range(3):
+                        _now = _tw_codes_now[_i]
+                        _c0 = comms_c0[_i]
+                        if _now < 0.5 * _c0:
+                            comms_fast_streak[_i] += 1
+                        else:
+                            comms_fast_streak[_i] = 0
+                        if _now < 0.6 * _c0:
+                            comms_slow_streak[_i] += 1
+                        else:
+                            comms_slow_streak[_i] = 0
+                        if comms_fast_streak[_i] >= 3:
+                            _tw_halt_reasons.append(
+                                f"FAST: slot{_i} codes_active={_now} < 0.5*C0={0.5 * _c0:.1f} "
+                                f"for {comms_fast_streak[_i]} consecutive updates"
+                            )
+                        if comms_slow_streak[_i] >= 5:
+                            _tw_halt_reasons.append(
+                                f"SLOW: slot{_i} codes_active={_now} < 0.6*C0={0.6 * _c0:.1f} "
+                                f"for {comms_slow_streak[_i]} consecutive updates"
+                            )
+                        # Stage-0 floor: zero tolerance -- the freeze's whole
+                        # job is to guarantee no regression below the
+                        # at-resume value while comms params are held still.
+                        if craft_ramp_stage_outer == 0 and _now < _c0:
+                            _tw_halt_reasons.append(
+                                f"STAGE-0 FLOOR: slot{_i} codes_active={_now} < C0={_c0} "
+                                f"-- the freeze is not holding codes_active at or above "
+                                f"its at-resume value"
+                            )
+
+                    if craft_ramp_stage_outer == 1:
+                        comms_stage1_updates_elapsed += 1
+                        if _tw_futile_uncoordinated_now > 0:
+                            comms_stage1_uncoordinated_seen = True
+                        if comms_stage1_updates_elapsed > 10 and not comms_stage1_uncoordinated_seen:
+                            _tw_halt_reasons.append(
+                                f"PRESSURE: futile_uncoordinated still 0 after "
+                                f"{comms_stage1_updates_elapsed} updates in stage 1 -- "
+                                f"the coordination pressure stage 1 is supposed to apply "
+                                f"is not showing up"
+                            )
+
+                    if _tw_halt_reasons:
+                        print("=" * 70, flush=True)
+                        print("[TRIPWIRE] HALT -- pre-registered comms-freeze tripwire fired:", flush=True)
+                        for _r in _tw_halt_reasons:
+                            print(f"[TRIPWIRE]   {_r}", flush=True)
+                        print(
+                            f"[TRIPWIRE] C0={comms_c0[0]}|{comms_c0[1]}|{comms_c0[2]}/64 | "
+                            f"now={_tw_codes_now[0]}|{_tw_codes_now[1]}|{_tw_codes_now[2]}/64 | "
+                            f"stage={craft_ramp_stage_outer} | ppo={ui}",
+                            flush=True,
+                        )
+                        print("=" * 70, flush=True)
+                        _tw_training_state = {
+                            "craft_ramp_active": jnp.array(craft_ramp_active_outer, dtype=jnp.bool_),
+                            "craft_ramp_stage": jnp.array(craft_ramp_stage_outer, dtype=jnp.int32),
+                            "craft_ramp_start_step": jnp.array(craft_ramp_start_step, dtype=jnp.int32),
+                            "craft_ramp_success_streak": jnp.array(craft_ramp_success_streak, dtype=jnp.int32),
+                            "red_ramp_active": jnp.array(red_ramp_active_outer, dtype=jnp.bool_),
+                            "red_ramp_start_step": jnp.array(red_ramp_start_step, dtype=jnp.int32),
+                            "red_ramp_catch_streak": jnp.array(red_ramp_catch_streak, dtype=jnp.int32),
+                            "red_curriculum_idx": jnp.array(red_curriculum_idx, dtype=jnp.int32),
+                            "red_sustain_count": jnp.array(red_sustain_count, dtype=jnp.int32),
+                            "comms_tripwire_c0": jnp.array(comms_c0, dtype=jnp.int32),
+                            "comms_fast_streak": jnp.array(comms_fast_streak, dtype=jnp.int32),
+                            "comms_slow_streak": jnp.array(comms_slow_streak, dtype=jnp.int32),
+                            "comms_stage1_updates_elapsed": jnp.array(comms_stage1_updates_elapsed, dtype=jnp.int32),
+                            "comms_stage1_uncoordinated_seen": jnp.array(comms_stage1_uncoordinated_seen, dtype=jnp.bool_),
+                        }
+                        ckpt_mngr.save(ui, items={
+                            "b_params": b_params, "r_params": r_params,
+                            "training_state": _tw_training_state,
+                        })
+                        ckpt_mngr.wait_until_finished()
+                        print(f"[TRIPWIRE] Emergency checkpoint saved at step {ui}.", flush=True)
+                        raise SystemExit(1)
 
         # ── Red Curriculum Advancement ────────────────────────────
         surv_rate = float(b_pop.alive.sum()) / float(max_pop)
@@ -1907,6 +2083,17 @@ def _run_simulation_impl(
             # Phase 18 VQ Reconnection Warmup (0.5x for 20 updates)
             _vq_coef = _base_vq_coef * 0.5 if ui < start_update + 20 else _base_vq_coef
             
+            # 2026-09-14 (Cam, Blocker 2): stage 0 is solo-satisfiable, so it
+            # gives the sender encoder / codebook / receiver read path zero
+            # reward gradient while the VQ commitment loss keeps pulling
+            # unopposed -- a one-way ratchet toward encoder collapse. Freeze
+            # that subtree (grads zeroed pre-optimizer, see
+            # rl_jax.COMMS_SUBTREE_KEYS) for all of stage 0; unfreeze at the
+            # stage-1 transition. b_batch was collected under whatever stage
+            # was active during the rollout just finished, so gate on the
+            # pre-advance craft_ramp_stage_outer (the ratchet decision below
+            # only fires after this update).
+            _freeze_comms = bool(craft_ramp_active_outer and craft_ramp_stage_outer == 0)
             b_params, b_opt_state, b_metrics = ppo_update(
                 b_params, b_opt_state, b_optimizer, model_apply,
                 b_batch, n_layers, update_key,
@@ -1920,7 +2107,13 @@ def _run_simulation_impl(
                 team="blue",
                 ignition_discount=float(config.get("phase16_5_enrichment", {}).get("ignition_discount", 0.1)),
                 alarm_ent_coef=float(config.get("alarm_ent_coef", 0.0)),
+                freeze_comms=_freeze_comms,
             )
+            if _freeze_comms and ui == start_update:
+                print("  [CTD-RAMP] comms subtree FROZEN for stage 0 (gwt_comms_1, "
+                      "head_signal_slot0/1/2, codebook_0/1/2, emb_nb) -- gradients "
+                      "zeroed pre-optimizer, unfreezes at the stage-1 transition",
+                      flush=True)
             if ui == start_update:
                 print(
                     f"  [JAX] Blue PPO done in {__import__('time').time() - _t_ppo0:.1f}s",
@@ -2465,6 +2658,7 @@ def _run_simulation_impl(
                         flush=True,
                     )
                 if _craft_advance_now:
+                    _leaving_stage0 = (craft_ramp_stage_outer == 0)
                     if craft_ramp_stage_outer < len(CRAFT_RAMP_STAGE_UNITS) - 1:
                         craft_ramp_stage_outer += 1
                         craft_ramp_start_step = (ui + 1) * T
@@ -2476,6 +2670,13 @@ def _run_simulation_impl(
                             f"{_craft_advance_reason}) at ppo={ui + 1}, step={(ui + 1) * T:_}",
                             flush=True,
                         )
+                        if _leaving_stage0:
+                            print(
+                                "  [CTD-RAMP] comms subtree UNFROZEN (stage-1 transition) -- "
+                                "gwt_comms_1, head_signal_slot0/1/2, codebook_0/1/2, emb_nb "
+                                "resume normal gradient updates next PPO step",
+                                flush=True,
+                            )
                     else:
                         craft_ramp_active_outer = False
                         grid = grid.replace(craft_ramp_active=jnp.array(False, dtype=jnp.bool_))
@@ -2960,6 +3161,11 @@ def _run_simulation_impl(
                 "red_ramp_catch_streak": jnp.array(red_ramp_catch_streak, dtype=jnp.int32),
                 "red_curriculum_idx": jnp.array(red_curriculum_idx, dtype=jnp.int32),
                 "red_sustain_count": jnp.array(red_sustain_count, dtype=jnp.int32),
+                "comms_tripwire_c0": jnp.array(comms_c0 if comms_c0 is not None else (-1, -1, -1), dtype=jnp.int32),
+                "comms_fast_streak": jnp.array(comms_fast_streak, dtype=jnp.int32),
+                "comms_slow_streak": jnp.array(comms_slow_streak, dtype=jnp.int32),
+                "comms_stage1_updates_elapsed": jnp.array(comms_stage1_updates_elapsed, dtype=jnp.int32),
+                "comms_stage1_uncoordinated_seen": jnp.array(comms_stage1_uncoordinated_seen, dtype=jnp.bool_),
             }
             ckpt_state = {
                 "b_params": b_params,

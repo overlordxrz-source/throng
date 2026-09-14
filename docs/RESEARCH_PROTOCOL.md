@@ -64,6 +64,21 @@ more expensive, because it produces publishable-looking nulls.
   data, by the same person who wrote this rule. Caught by Cam, not self-caught.
 - **A threshold fitted to the observed distribution is not a threshold.** Adaptive cutoffs
   derived from the data they judge are p-hacking with extra steps.
+- **Retiring an instrument is not the same act as moving a bar, but it is easy to disguise
+  one as the other.** Moving a bar is the same instrument with a new threshold picked after
+  it failed. Retiring an instrument requires independent evidence it doesn't track what it
+  proxies — not a threshold failing, not a checkpoint that happens to pass or fail under it.
+  **Confirmed instance (2026-09-14):** `rel_spread` (z_e cross-agent continuous variance,
+  relative to peak magnitude) was proposed as a proxy for codebook-channel health, then
+  retired within the same session, on a calibration ladder built specifically to test it:
+  step 2538 has the ladder's LOWEST `rel_spread` (1.18%) sitting next to near-top
+  `codes_active` (30|39|28/64); step 2862 (terminal collapse, `codes_active`=1|3|3/64) has a
+  HIGHER `rel_spread` than both 2760 and 2763. An instrument that goes up as the channel
+  dies is not measuring the channel. That contradiction is visible without reference to any
+  threshold and without any checkpoint passing or failing a gate — the retirement is
+  licensed by the ladder's internal structure, not by 2862's number being inconvenient. Any
+  future instrument swap must meet that same standard, stated in writing, before it is
+  accepted: name the independent contradiction, not the failed threshold.
 - **Source beats prose.** Where documentation and code disagree, the code wins and the
   disagreement is itself a finding to record.
 

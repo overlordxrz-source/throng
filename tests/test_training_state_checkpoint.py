@@ -39,6 +39,13 @@ def test_training_state_survives_a_real_checkpoint_round_trip():
             "red_ramp_catch_streak": jnp.array(10, dtype=jnp.int32),
             "red_curriculum_idx": jnp.array(2, dtype=jnp.int32),
             "red_sustain_count": jnp.array(3, dtype=jnp.int32),
+            # Comms-freeze tripwire state (Cam, 2026-09-14) -- C0 captured
+            # mid-stage-0, one slot already partway into its fast streak.
+            "comms_tripwire_c0": jnp.array((27, 12, 22), dtype=jnp.int32),
+            "comms_fast_streak": jnp.array((0, 2, 0), dtype=jnp.int32),
+            "comms_slow_streak": jnp.array((0, 3, 1), dtype=jnp.int32),
+            "comms_stage1_updates_elapsed": jnp.array(0, dtype=jnp.int32),
+            "comms_stage1_uncoordinated_seen": jnp.array(False, dtype=jnp.bool_),
         }
         # Dummy params trees alongside it, matching how main_jax.py's
         # ckpt_state is actually shaped ({"b_params", "r_params", "training_state"}).
@@ -74,6 +81,11 @@ def test_training_state_survives_a_real_checkpoint_round_trip():
         assert int(rts["red_ramp_catch_streak"]) == 10
         assert int(rts["red_curriculum_idx"]) == 2
         assert int(rts["red_sustain_count"]) == 3
+        assert tuple(int(x) for x in rts["comms_tripwire_c0"]) == (27, 12, 22)
+        assert tuple(int(x) for x in rts["comms_fast_streak"]) == (0, 2, 0)
+        assert tuple(int(x) for x in rts["comms_slow_streak"]) == (0, 3, 1)
+        assert int(rts["comms_stage1_updates_elapsed"]) == 0
+        assert bool(rts["comms_stage1_uncoordinated_seen"]) is False
     finally:
         shutil.rmtree(tmp_dir, ignore_errors=True)
 

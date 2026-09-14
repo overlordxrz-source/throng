@@ -1,18 +1,41 @@
 #!/usr/bin/env python3
-"""Cam's diagnostic 3 (2026-09-14): measure z_e variance across agents using
-the REAL checkpoint from the just-stopped launch (ppo 2842-2861, codes_active
-collapsed to 1|3|3/64, VQ loss=2.30e-09).
+"""Cam's diagnostic 3 (2026-09-14), generalized into a calibration ladder
+(Blocker 1, 2026-09-14).
 
-If z_e has collapsed to near-constant across agents despite genuinely varied
-inputs, the encoder is the cause and the codebook (which faithfully reports
-"nothing distinct to quantize") is downstream, not broken.
+Original ask: measure z_e variance across agents using the REAL checkpoint
+from the just-stopped launch (ppo 2842-2861, codes_active collapsed to
+1|3|3/64, VQ loss=2.30e-09). If z_e has collapsed to near-constant across
+agents despite genuinely varied inputs, the encoder is the cause and the
+codebook (which faithfully reports "nothing distinct to quantize") is
+downstream, not broken.
 
-z_e = concat([z_e_cont(8 zeros), z_e_0(12), z_e_1(8), z_e_2(12)]) -- a
-deterministic function of obs (minus the 4 zeroed metabolic dims) through one
-Dense+ReLU (gwt_comms_1) then three more Dense heads (head_signal_slot{0,1,2}).
-Offline, CPU only -- no GPU needed for this measurement.
+Cam accepted that finding but flagged it as necessary, not sufficient: the
+"20-25x below healthy" comparison was against a *hypothetical* uniform
+spread, not a measured reference on this network. Two things this script
+now gets that the single-checkpoint version couldn't:
 
-Usage: JAX_PLATFORMS=cpu PYTHONPATH=. .venv/bin/python3 scripts/diag_ze_variance.py <checkpoint_dir>
+  1. A measured healthy reference -- the spread this exact encoder produced
+     when it was demonstrably working (Phase 18.6, confirmed healthy in
+     THRONG.md: "blue VQ verified healthy, loss~=0.003-0.007, codes
+     45|39|43/64").
+  2. The onset step -- if an early Phase 18 checkpoint is already collapsed,
+     the causal story is not "stage 0 caused this," it predates the CtD run
+     entirely.
+
+Same method at every step: real checkpoint restore (CPU-sharded target,
+matching tests/test_checkpoint_compat.py), real forward pass, same fixed
+RNG seeds for obs/carries across all steps so only the PARAMS differ between
+measurements -- the ladder is only meaningful if the inputs are held
+constant.
+
+Usage:
+  JAX_PLATFORMS=cpu PYTHONPATH=. .venv/bin/python3 scripts/diag_ze_variance.py <checkpoint_parent_dir> [step ...]
+
+  <checkpoint_parent_dir> is the directory Orbax's CheckpointManager expects
+  (containing per-step subdirectories, e.g. .../checkpoints/2763/).
+  If no [step ...] is given, measures every step CheckpointManager finds.
+  Pass explicit steps to measure only those (e.g. a costly Modal-volume
+  fetch where you only downloaded specific steps).
 """
 from __future__ import annotations
 
@@ -28,15 +51,7 @@ from jax_sim.network_jax import AgentNetworkJax
 from jax_sim.obs_layout import make_obs_layout
 
 
-def main():
-    ckpt_dir = sys.argv[1] if len(sys.argv) > 1 else None
-    if not ckpt_dir:
-        print("usage: diag_ze_variance.py <checkpoint_dir_containing_step_subdir_parent>")
-        sys.exit(1)
-
-    with open("config.yaml") as f:
-        config = _normalize_config({**DEFAULT_CONFIG, **yaml.safe_load(f)})
-
+def build_model_and_inputs(config: dict):
     hidden_d = int(config["hidden_dim"])
     n_layers = int(config["n_layers"])
     n_actions = int(config.get("n_actions", 12))
@@ -78,56 +93,131 @@ def main():
         neighbor_k=neighbor_k,
     )
 
-    # Restore the real checkpoint's b_params (CPU sharding, matching
-    # tests/test_checkpoint_compat.py's pattern for a GPU-saved checkpoint).
-    options = ocp.CheckpointManagerOptions(max_to_keep=2, create=False)
-    ckpt_mngr = ocp.CheckpointManager(ckpt_dir, ocp.StandardCheckpointer(), options=options)
-    latest = ckpt_mngr.latest_step()
-    print(f"[diag] restoring checkpoint step {latest} from {ckpt_dir}")
-    meta = ckpt_mngr.item_metadata(latest)
+    N = 200  # matches production blue population size
+    rng = jax.random.PRNGKey(0)
+    k1, k2 = jax.random.split(rng)
+    # Genuinely varied per-agent observations, held IDENTICAL across every
+    # checkpoint in the ladder -- so a difference in z_e spread can only be
+    # the encoder's own doing (different params), never an artifact of
+    # different inputs.
+    obs = jax.random.normal(k1, (N, obs_dim)) * 0.1
+    obs = obs.at[:, 2].set(0.5)  # avoid the feral mask
+    carries = jax.random.normal(k2, (N, hidden_d)) * 0.1
+    return model, n_layers, obs, carries
+
+
+def restore_b_params(ckpt_mngr: ocp.CheckpointManager, step: int):
     cpu = jax.devices("cpu")[0]
+    meta = ckpt_mngr.item_metadata(step)
     target = jax.tree_util.tree_map(
         lambda leaf: jax.ShapeDtypeStruct(leaf.shape, leaf.dtype, sharding=SingleDeviceSharding(cpu)),
         meta,
         is_leaf=lambda x: hasattr(x, "shape"),
     )
-    restored = ckpt_mngr.restore(latest, args=ocp.args.StandardRestore(target))
-    b_params = restored["b_params"]
+    restored = ckpt_mngr.restore(step, args=ocp.args.StandardRestore(target))
+    # Some backup checkpoints stored the flat dict directly under 'b_params';
+    # accept both that and an already-flat structure defensively.
+    return restored["b_params"] if "b_params" in restored else restored
 
-    N = 200  # matches production blue population size
-    rng = jax.random.PRNGKey(0)
-    k1, k2 = jax.random.split(rng)
-    # Genuinely varied per-agent observations -- same construction pattern as
-    # tests/test_severance_sweep.py -- so a collapsed z_e can only be the
-    # encoder's own doing, not an artifact of degenerate/identical inputs.
-    obs = jax.random.normal(k1, (N, obs_dim)) * 0.1
-    obs = obs.at[:, 2].set(0.5)  # avoid the feral mask
-    carries = jax.random.normal(k2, (N, hidden_d)) * 0.1
 
+def measure_ze_spread(model, n_layers, obs, carries, b_params) -> dict:
+    """Real forward pass; returns per-slot + overall z_e cross-agent spread,
+    plus codes_active (distinct codes used by these N agents this pass) --
+    directly comparable to THRONG.md's documented healthy reference
+    ("codes 45|39|43/64", Phase 18.6) and this session's collapsed reference
+    ("codes_active=1|3|3", the stopped launch)."""
     _, outs = model.apply({"params": b_params}, carries, obs, n_layers)
     z_e = outs.z_e  # (N, 40): [8 zeros | slot0(12) | slot1(8) | slot2(12)]
+    token_ids = outs.token_ids  # (N, 3)
 
     slot0 = z_e[:, 8:20]
     slot1 = z_e[:, 20:28]
     slot2 = z_e[:, 28:40]
 
-    for name, slot in (("slot0", slot0), ("slot1", slot1), ("slot2", slot2)):
-        per_dim_var = jnp.var(slot, axis=0)          # variance across agents, per dim
+    result = {}
+    for i, (name, slot) in enumerate((("slot0", slot0), ("slot1", slot1), ("slot2", slot2))):
+        per_dim_var = jnp.var(slot, axis=0)
         mean_var = float(jnp.mean(per_dim_var))
         max_abs = float(jnp.max(jnp.abs(slot)))
-        # Relative spread: how big is the cross-agent variance relative to the
-        # signal's own magnitude? Near 0 with genuinely varied inputs means
-        # the encoder produces (near-)the same vector regardless of agent.
         rel_spread = mean_var / (max_abs ** 2 + 1e-12)
-        print(
-            f"[diag] {name}: mean cross-agent variance={mean_var:.6e} | "
-            f"max|value|={max_abs:.6e} | relative spread={rel_spread:.6e}"
-        )
+        codes_active = int(jnp.unique(token_ids[:, i]).shape[0])
+        result[name] = {
+            "mean_var": mean_var, "max_abs": max_abs, "rel_spread": rel_spread,
+            "codes_active": codes_active,
+        }
 
     overall = jnp.concatenate([slot0, slot1, slot2], axis=-1)
-    print(f"[diag] overall z_e (36 non-zeroed dims) mean cross-agent variance = {float(jnp.mean(jnp.var(overall, axis=0))):.6e}")
-    print(f"[diag] overall z_e max|value| = {float(jnp.max(jnp.abs(overall))):.6e}")
+    result["overall"] = {
+        "mean_var": float(jnp.mean(jnp.var(overall, axis=0))),
+        "max_abs": float(jnp.max(jnp.abs(overall))),
+    }
+    result["overall"]["rel_spread"] = result["overall"]["mean_var"] / (result["overall"]["max_abs"] ** 2 + 1e-12)
+    return result
+
+
+def main():
+    if len(sys.argv) < 2:
+        print("usage: diag_ze_variance.py <checkpoint_parent_dir> [step ...]")
+        sys.exit(1)
+    ckpt_dir = sys.argv[1]
+    requested_steps = [int(s) for s in sys.argv[2:]] if len(sys.argv) > 2 else None
+
+    with open("config.yaml") as f:
+        config = _normalize_config({**DEFAULT_CONFIG, **yaml.safe_load(f)})
+
+    model, n_layers, obs, carries = build_model_and_inputs(config)
     print(f"[diag] input obs std actually fed in (sanity check, should be ~0.1) = {float(jnp.std(obs)):.4f}")
+
+    options = ocp.CheckpointManagerOptions(create=False)
+    ckpt_mngr = ocp.CheckpointManager(ckpt_dir, ocp.StandardCheckpointer(), options=options)
+    all_steps = sorted(ckpt_mngr.all_steps())
+    if not all_steps:
+        print(f"[diag] no checkpoints found under {ckpt_dir}")
+        sys.exit(1)
+    steps = requested_steps if requested_steps else all_steps
+    missing = [s for s in steps if s not in all_steps]
+    if missing:
+        print(f"[diag] WARNING: requested steps not found in {ckpt_dir}: {missing}")
+        steps = [s for s in steps if s in all_steps]
+
+    print(f"[diag] measuring {len(steps)} checkpoint(s) from {ckpt_dir}: {steps}")
+
+    import flax.errors
+
+    ladder = []
+    skipped = []
+    for step in steps:
+        print(f"\n[diag] === step {step} ===")
+        try:
+            b_params = restore_b_params(ckpt_mngr, step)
+            spread = measure_ze_spread(model, n_layers, obs, carries, b_params)
+        except flax.errors.ScopeParamShapeError as exc:
+            # A checkpoint from before the current obs layout (own_state /
+            # env_channels grafts documented in THRONG.md) has genuinely
+            # different param shapes. Forcing it through the current
+            # architecture would require grafting/padding -- which injects
+            # fresh-initialized weights into exactly the dims this
+            # measurement is trying to characterize, contaminating the
+            # spread number. Skip and report rather than silently graft.
+            print(f"[diag] SKIPPED step {step}: architecture-incompatible ({exc})")
+            skipped.append(step)
+            continue
+        for name in ("slot0", "slot1", "slot2", "overall"):
+            s = spread[name]
+            ca = f" | codes_active={s['codes_active']}/64" if "codes_active" in s else ""
+            print(
+                f"[diag] {name}: mean cross-agent variance={s['mean_var']:.6e} | "
+                f"max|value|={s['max_abs']:.6e} | relative spread={s['rel_spread']:.6e}{ca}"
+            )
+        codes_str = "|".join(str(spread[n]["codes_active"]) for n in ("slot0", "slot1", "slot2"))
+        ladder.append((step, spread["overall"]["rel_spread"], codes_str))
+
+    print("\n[diag] ===== CALIBRATION LADDER (overall relative spread, ascending step) =====")
+    for step, rel_spread, codes_str in ladder:
+        bar = "#" * max(1, int(rel_spread * 2000))
+        print(f"[diag]   step {step:>6}: rel_spread={rel_spread:.6e}  codes={codes_str}/64  {bar}")
+    if skipped:
+        print(f"[diag] skipped (architecture-incompatible, pre-graft): {skipped}")
 
 
 if __name__ == "__main__":
