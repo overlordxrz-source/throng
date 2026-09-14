@@ -36,7 +36,7 @@ _REQUIREMENTS = str(Path(__file__).resolve().parents[1] / "requirements.txt")
 # Pinned at write-time via `git rev-parse origin/master`. Re-verify before
 # a real launch — if origin/master has moved, decide deliberately whether to
 # re-pin, not implicitly.
-PINNED_SHA = "fe258c3225c020da392a11fcef3f0977c69776c8"
+PINNED_SHA = "dcaeab37bcbc504a1ec2b0ec746aba10a25744f4"
 REPO_URL = "https://github.com/overlordxrz-source/throng.git"
 
 VOLUME_NAME = "throng-runs"
