@@ -42,6 +42,7 @@ class GridState:
 
         # CtD competence ramp (2026-09-14, Cam's sign-off) -- see jax_sim/ctd_ramp.py
         self.craft_ramp_active = jnp.array(False, dtype=jnp.bool_)
+        self.craft_ramp_stage = jnp.array(0, dtype=jnp.int32)  # 0: solo, 1: pair (see CRAFT_RAMP_STAGE_UNITS)
         self.red_ramp_active = jnp.array(False, dtype=jnp.bool_)
 
         # Puzzle
@@ -59,7 +60,7 @@ class GridState:
             self.puzzle_nodes, self.puzzle_active, self.puzzle_cooldown,
             self.wood_grid, self.stone_grid, self.flint_grid, self.clay_grid, self.vine_grid,
             self.current_recipe, self.recipe_timer,
-            self.craft_ramp_active, self.red_ramp_active,
+            self.craft_ramp_active, self.craft_ramp_stage, self.red_ramp_active,
         )
         aux = (self.size, self.symbol_dim)
         return children, aux
@@ -74,7 +75,7 @@ class GridState:
          gs.puzzle_nodes, gs.puzzle_active, gs.puzzle_cooldown,
          gs.wood_grid, gs.stone_grid, gs.flint_grid, gs.clay_grid, gs.vine_grid,
          gs.current_recipe, gs.recipe_timer,
-         gs.craft_ramp_active, gs.red_ramp_active) = children
+         gs.craft_ramp_active, gs.craft_ramp_stage, gs.red_ramp_active) = children
         return gs
 
     def replace(self, **kwargs):
@@ -101,6 +102,7 @@ class GridState:
         gs.current_recipe = kwargs.get("current_recipe", self.current_recipe)
         gs.recipe_timer = kwargs.get("recipe_timer", self.recipe_timer)
         gs.craft_ramp_active = kwargs.get("craft_ramp_active", self.craft_ramp_active)
+        gs.craft_ramp_stage = kwargs.get("craft_ramp_stage", self.craft_ramp_stage)
         gs.red_ramp_active = kwargs.get("red_ramp_active", self.red_ramp_active)
         return gs
 

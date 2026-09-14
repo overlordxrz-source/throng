@@ -20,15 +20,30 @@ import jax
 import jax.numpy as jnp
 
 
-def capped_recipe_counts(key: jax.Array, max_units: int) -> jnp.ndarray:
-    """Draw `max_units` live material slots uniformly over the 5 materials
-    (0=wood, 1=stone, 2=flint, 3=clay, 4=vine). Unlike the full recipe draw
-    (jax_sim/main_jax.py's update_recipe), no slot is ever wasted -- every
-    draw counts, so sum(counts) == max_units exactly. This is what makes the
-    ramp recipe solo- or pair-satisfiable rather than merely smaller.
+CRAFT_RAMP_STAGE_UNITS = (1, 2)  # stage 0: solo-satisfiable; stage 1: pair-satisfiable
+
+
+def staged_recipe_counts(key: jax.Array, stage: jnp.ndarray) -> jnp.ndarray:
+    """Recipe for the crafting ramp's two capped stages (Cam's correction,
+    2026-09-14: craft_ramp_max_units=2 alone was still a cooperative problem
+    at smaller scale, not the solo-catchable analogue -- max_units=1 was
+    missing entirely).
+
+    Stage 0 draws exactly 1 material unit -- solo-satisfiable, because
+    resolve_crafting's adjacency check counts an agent as adjacent to
+    itself, so one agent holding the one correct material succeeds alone.
+    Stage 1 draws exactly 2 -- pair-satisfiable, the old single-stage
+    behaviour. Neither wastes a slot (unlike the full recipe draw in
+    jax_sim/main_jax.py's update_recipe), so sum(counts) is exactly 1 or 2.
+
+    Both slots are drawn unconditionally regardless of `stage`, and only the
+    *values* are masked by stage -- the traced shape never depends on
+    `stage`, so advancing stages doesn't retrace/recompile update_recipe.
     """
-    items = jax.random.randint(key, (max_units,), 0, 5)
-    return jnp.bincount(items, length=5).astype(jnp.int32)
+    items = jax.random.randint(key, (2,), 0, 5)
+    counts_stage0 = jnp.bincount(items[:1], length=5).astype(jnp.int32)
+    counts_stage1 = jnp.bincount(items, length=5).astype(jnp.int32)
+    return jnp.where(stage == 0, counts_stage0, counts_stage1)
 
 
 def _nearest_alive_blue_dist(

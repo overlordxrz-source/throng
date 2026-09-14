@@ -310,13 +310,20 @@ phase16_combinatorial_syntax:
 # the mechanism it avoided is actually reachable before facing real friction.
 # This is a genuine ecological change (Rule 12) -- signed off explicitly, not
 # implemented by default judgment.
+#
+# Crafting ramp is two capped stages, not one (Cam's correction, 2026-09-14):
+# a single max_units=2 stage is still a cooperative problem at smaller scale,
+# not the solo-catchable analogue. Stage sequence is fixed by
+# jax_sim.ctd_ramp.CRAFT_RAMP_STAGE_UNITS = (1, 2) -- solo-satisfiable, then
+# pair-satisfiable, then this config's floor/bar/ceiling ratchets to the full
+# (up to 4-unit) recipe. Not configurable per-run; the floor/bar/window/
+# ceiling below are reapplied fresh at each stage.
 ctd_competence_ramp:
   craft_ramp_enabled: true
-  craft_ramp_max_units: 2          # recipes solo/pair-satisfiable during the ramp (vs. up to 4 full)
-  craft_ramp_min_steps: 200000     # floor: ratchet never fires before this many env steps
-  craft_ramp_success_bar: 0.20     # success rate that must be sustained to ratchet on the bar
+  craft_ramp_min_steps: 200000     # floor: an advance never fires before this many steps into the stage
+  craft_ramp_success_bar: 0.20     # success rate that must be sustained to advance on the bar
   craft_ramp_success_window: 10    # consecutive PPO updates the bar must hold
-  craft_ramp_max_steps: 1000000    # hard ceiling: forced ratchet + loud report if the bar is never met
+  craft_ramp_max_steps: 1000000    # hard ceiling per stage: forced advance + loud report if the bar is never met
   red_ramp_enabled: true
   red_ramp_beta: 2.5               # shaping coefficient (verified: full 1-cell close ~= reward_red_move)
   red_ramp_min_steps: 200000

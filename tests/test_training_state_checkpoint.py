@@ -31,6 +31,7 @@ def test_training_state_survives_a_real_checkpoint_round_trip():
         # just an in-progress one.
         training_state = {
             "craft_ramp_active": jnp.array(True, dtype=jnp.bool_),
+            "craft_ramp_stage": jnp.array(1, dtype=jnp.int32),  # advanced past solo stage
             "craft_ramp_start_step": jnp.array(1_414_656, dtype=jnp.int32),
             "craft_ramp_success_streak": jnp.array(7, dtype=jnp.int32),
             "red_ramp_active": jnp.array(False, dtype=jnp.bool_),  # already ratcheted off
@@ -65,6 +66,7 @@ def test_training_state_survives_a_real_checkpoint_round_trip():
         rts = restored["training_state"]
 
         assert bool(rts["craft_ramp_active"]) is True
+        assert int(rts["craft_ramp_stage"]) == 1
         assert int(rts["craft_ramp_start_step"]) == 1_414_656
         assert int(rts["craft_ramp_success_streak"]) == 7
         assert bool(rts["red_ramp_active"]) is False

@@ -43,7 +43,7 @@ from jax_sim.population_jax import (
     apply_auto_reproduce
 )
 from jax_sim.action_space import MASKED_ACTIONS, mask_disabled_actions, masked_actions_banner
-from jax_sim.ctd_ramp import capped_recipe_counts, red_shaping_term
+from jax_sim.ctd_ramp import staged_recipe_counts, red_shaping_term, CRAFT_RAMP_STAGE_UNITS
 from jax_sim.network_jax import (
     AgentNetworkJax,
     AUX_HEAD_KEYS,
@@ -254,9 +254,10 @@ def make_sim_step(
     _reward_craft_success = float(config.get("reward_craft_success", 3.0))
     _reward_futile_craft = float(config.get("reward_futile_craft", -0.20))
 
-    # CtD competence ramp (jax_sim/ctd_ramp.py) -- Cam's sign-off, 2026-09-14
+    # CtD competence ramp (jax_sim/ctd_ramp.py) -- Cam's sign-off, 2026-09-14.
+    # Crafting stages (solo -> pair -> full) are fixed by
+    # jax_sim.ctd_ramp.CRAFT_RAMP_STAGE_UNITS, not configurable per-run.
     _ramp_cfg = config.get("ctd_competence_ramp", {})
-    _craft_ramp_max_units = int(_ramp_cfg.get("craft_ramp_max_units", 2))
     _red_ramp_beta = float(_ramp_cfg.get("red_ramp_beta", 2.5))
     _ppo_gamma_for_shaping = float(config.get("ppo_gamma", 0.999))
 
@@ -734,12 +735,12 @@ def make_sim_step(
             items = items.at[3].set(jnp.where(mask, items[3], 5))
             full_counts = jnp.bincount(items, length=6)[:5].astype(jnp.int32)
 
-            # CtD crafting ramp (Cam's sign-off, 2026-09-14): while active, every
-            # recipe is solo/pair-satisfiable (craft_ramp_max_units, no wasted
-            # slots) instead of up to 4 units across 5 materials. See
-            # jax_sim/ctd_ramp.py.
+            # CtD crafting ramp (Cam's sign-off, 2026-09-14, corrected same
+            # day): while active, recipes are solo-satisfiable (stage 0, 1
+            # unit) then pair-satisfiable (stage 1, 2 units) instead of up to
+            # 4 units across 5 materials -- see jax_sim/ctd_ramp.py.
             k_rec_ramp = jax.random.split(k_rec1)[0]
-            ramp_counts = capped_recipe_counts(k_rec_ramp, _craft_ramp_max_units)
+            ramp_counts = staged_recipe_counts(k_rec_ramp, grid.craft_ramp_stage)
             counts = jnp.where(grid.craft_ramp_active, ramp_counts, full_counts)
 
             progress = jnp.clip(step_idx / 1500000.0, 0.0, 1.0)
@@ -1684,7 +1685,12 @@ def _run_simulation_impl(
     craft_ramp_success_window = int(_ramp_cfg_outer.get("craft_ramp_success_window", 10))
     craft_ramp_max_steps = int(_ramp_cfg_outer.get("craft_ramp_max_steps", 1_000_000))
     craft_ramp_active_outer = craft_ramp_enabled
-    craft_ramp_start_step = start_update * T
+    # Two capped stages (Cam's correction, 2026-09-14): max_units=2 alone was
+    # still a cooperative problem at smaller scale, not the solo-catchable
+    # analogue -- stage 0 (1 unit, solo-satisfiable) was missing entirely.
+    # Stage index into jax_sim.ctd_ramp.CRAFT_RAMP_STAGE_UNITS = (1, 2).
+    craft_ramp_stage_outer = 0
+    craft_ramp_start_step = start_update * T  # start of the CURRENT stage
     craft_ramp_success_streak = 0
 
     red_ramp_enabled = bool(_ramp_cfg_outer.get("red_ramp_enabled", False))
@@ -1701,6 +1707,7 @@ def _run_simulation_impl(
         _training_state_source = "RESTORED from checkpoint"
         if craft_ramp_enabled:
             craft_ramp_active_outer = bool(_restored_training_state.get("craft_ramp_active", craft_ramp_active_outer))
+            craft_ramp_stage_outer = int(_restored_training_state.get("craft_ramp_stage", craft_ramp_stage_outer))
             craft_ramp_start_step = int(_restored_training_state.get("craft_ramp_start_step", craft_ramp_start_step))
             craft_ramp_success_streak = int(_restored_training_state.get("craft_ramp_success_streak", craft_ramp_success_streak))
         if red_ramp_enabled:
@@ -1715,6 +1722,7 @@ def _run_simulation_impl(
     # restored-and-possibly-already-ratcheted history.
     grid = grid.replace(
         craft_ramp_active=jnp.array(craft_ramp_active_outer, dtype=jnp.bool_),
+        craft_ramp_stage=jnp.array(craft_ramp_stage_outer, dtype=jnp.int32),
         red_ramp_active=jnp.array(red_ramp_active_outer, dtype=jnp.bool_),
     )
 
@@ -1724,12 +1732,13 @@ def _run_simulation_impl(
             f"red_curriculum_idx={red_curriculum_idx} red_sustain_count={red_sustain_count}",
             flush=True,
         )
+        _craft_stage_units = CRAFT_RAMP_STAGE_UNITS[craft_ramp_stage_outer] if craft_ramp_active_outer else "full"
         print(
             f"[CTD-RAMP] crafting={craft_ramp_active_outer} "
-            f"(max_units={int(_ramp_cfg_outer.get('craft_ramp_max_units', 2))}, "
+            f"(stage={craft_ramp_stage_outer}/{len(CRAFT_RAMP_STAGE_UNITS) - 1} units={_craft_stage_units}, "
             f"floor={craft_ramp_min_steps:_}, bar={craft_ramp_success_bar:.0%}/"
             f"{craft_ramp_success_window}upd, ceiling={craft_ramp_max_steps:_}, "
-            f"streak={craft_ramp_success_streak}, start_step={craft_ramp_start_step:_}) | "
+            f"streak={craft_ramp_success_streak}, stage_start_step={craft_ramp_start_step:_}) | "
             f"red={red_ramp_active_outer} "
             f"(beta={float(_ramp_cfg_outer.get('red_ramp_beta', 2.5))}, "
             f"floor={red_ramp_min_steps:_}, bar={red_ramp_catch_bar}/upd/"
@@ -2414,45 +2423,67 @@ def _run_simulation_impl(
             # since step_val % 512 == 0 or T >= 512 is unconditionally true at
             # T=512) -- not just on a print cadence.
             _red_shaping_mean = float(np.asarray(rollout_data["red"]["red_shaping"]).mean())
+            _craft_stage_label = (
+                f"stage={craft_ramp_stage_outer}/{len(CRAFT_RAMP_STAGE_UNITS) - 1}"
+                if craft_ramp_active_outer else "off"
+            )
             print(
-                f"  CTD-RAMP: craft_active={craft_ramp_active_outer} "
-                f"(streak={craft_ramp_success_streak}/{craft_ramp_success_window}) | "
+                f"  CTD-RAMP: craft_active={craft_ramp_active_outer} ({_craft_stage_label}, "
+                f"streak={craft_ramp_success_streak}/{craft_ramp_success_window}) | "
                 f"red_active={red_ramp_active_outer} "
                 f"(streak={red_ramp_catch_streak}/{red_ramp_catch_window}, "
                 f"shaping_mean={_red_shaping_mean:.5f})"
             )
 
             if craft_ramp_active_outer:
+                # Two capped stages (Cam's correction, 2026-09-14): the same
+                # floor + sustained bar + hard ceiling shape is reapplied at
+                # each stage, clock reset to the stage's own start. Advancing
+                # from the last stage ratchets the ramp off entirely (full
+                # recipe); advancing from an earlier stage moves to the next.
                 _steps_since_craft_ramp = (ui + 1) * T - craft_ramp_start_step
                 _craft_rate_this_update = _n_craft_success / max(1, _n_craft_total)
                 if _craft_rate_this_update >= craft_ramp_success_bar:
                     craft_ramp_success_streak += 1
                 else:
                     craft_ramp_success_streak = 0
-                _craft_ratchet_now = False
-                _craft_ratchet_reason = None
+                _craft_advance_now = False
+                _craft_advance_reason = None
                 if (_steps_since_craft_ramp >= craft_ramp_min_steps
                         and craft_ramp_success_streak >= craft_ramp_success_window):
-                    _craft_ratchet_now = True
-                    _craft_ratchet_reason = "bar met"
+                    _craft_advance_now = True
+                    _craft_advance_reason = "bar met"
                 elif _steps_since_craft_ramp >= craft_ramp_max_steps:
-                    _craft_ratchet_now = True
-                    _craft_ratchet_reason = "CEILING FORCED -- bar never met"
+                    _craft_advance_now = True
+                    _craft_advance_reason = "CEILING FORCED -- bar never met"
                     print(
-                        f"[CTD-RAMP] *** Crafting ramp forced off at hard ceiling "
-                        f"({craft_ramp_max_steps:_} steps) WITHOUT meeting its bar "
-                        f"({craft_ramp_success_bar:.0%} sustained {craft_ramp_success_window} "
-                        f"updates). This is a finding, not an inconvenience. ***",
+                        f"[CTD-RAMP] *** Crafting ramp stage {craft_ramp_stage_outer} forced to "
+                        f"advance at hard ceiling ({craft_ramp_max_steps:_} steps) WITHOUT "
+                        f"meeting its bar ({craft_ramp_success_bar:.0%} sustained "
+                        f"{craft_ramp_success_window} updates). This is a finding, not an "
+                        f"inconvenience. ***",
                         flush=True,
                     )
-                if _craft_ratchet_now:
-                    craft_ramp_active_outer = False
-                    grid = grid.replace(craft_ramp_active=jnp.array(False, dtype=jnp.bool_))
-                    print(
-                        f"[CTD-RAMP] Crafting ramp ratcheted OFF ({_craft_ratchet_reason}) "
-                        f"at ppo={ui + 1}, step={(ui + 1) * T:_}",
-                        flush=True,
-                    )
+                if _craft_advance_now:
+                    if craft_ramp_stage_outer < len(CRAFT_RAMP_STAGE_UNITS) - 1:
+                        craft_ramp_stage_outer += 1
+                        craft_ramp_start_step = (ui + 1) * T
+                        craft_ramp_success_streak = 0
+                        grid = grid.replace(craft_ramp_stage=jnp.array(craft_ramp_stage_outer, dtype=jnp.int32))
+                        print(
+                            f"[CTD-RAMP] Crafting ramp advanced to stage {craft_ramp_stage_outer} "
+                            f"({CRAFT_RAMP_STAGE_UNITS[craft_ramp_stage_outer]} unit(s), "
+                            f"{_craft_advance_reason}) at ppo={ui + 1}, step={(ui + 1) * T:_}",
+                            flush=True,
+                        )
+                    else:
+                        craft_ramp_active_outer = False
+                        grid = grid.replace(craft_ramp_active=jnp.array(False, dtype=jnp.bool_))
+                        print(
+                            f"[CTD-RAMP] Crafting ramp ratcheted OFF ({_craft_advance_reason}) "
+                            f"at ppo={ui + 1}, step={(ui + 1) * T:_}",
+                            flush=True,
+                        )
 
             if red_ramp_active_outer:
                 _steps_since_red_ramp = (ui + 1) * T - red_ramp_start_step
@@ -2921,6 +2952,7 @@ def _run_simulation_impl(
             # have for VQ codebooks.
             training_state = {
                 "craft_ramp_active": jnp.array(craft_ramp_active_outer, dtype=jnp.bool_),
+                "craft_ramp_stage": jnp.array(craft_ramp_stage_outer, dtype=jnp.int32),
                 "craft_ramp_start_step": jnp.array(craft_ramp_start_step, dtype=jnp.int32),
                 "craft_ramp_success_streak": jnp.array(craft_ramp_success_streak, dtype=jnp.int32),
                 "red_ramp_active": jnp.array(red_ramp_active_outer, dtype=jnp.bool_),
