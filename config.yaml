@@ -352,7 +352,22 @@ ctd_competence_ramp:
   # success/living_blue_population isn't gameable the same way. 10% is
   # deliberately easy: at blue~195 that's ~20 successes, already well
   # inside the observed 35-40/update.
-  craft_ramp_min_steps: 50000      # floor: an advance never fires before this many steps into the stage
+  #
+  # min_steps dropped 50000 -> 5120 (10 updates), 2026-09-14 (Cam, next-
+  # launch change -- NOT applied retroactively to a run already in flight,
+  # since restarting to pick it up would throw away a healthy post-reset
+  # codebook and a hard-won stability-gated C0). The floor was sized for
+  # the retired success/attempts bar and now dominates the per-capita bar
+  # entirely: observed live, the per-capita bar cleared by update 4
+  # (streak 3/3, pop_frac 28-80%), but 50000 steps (~98 updates) blocked
+  # "bar met" from ever firing before stage0_hard_escape=40 updates
+  # (20480 steps) fired first -- the bar was doing nothing, the escape was
+  # the real exit every time. The floor exists to stop an exit on noise;
+  # "3 consecutive updates above 10% per-capita" already does that job, so
+  # a much shorter floor (10 updates -- enough for the streak window
+  # itself to complete once, no more) restores the bar as the mechanism
+  # that actually decides when stage 0 ends.
+  craft_ramp_min_steps: 5120        # floor: an advance never fires before this many steps into the stage
   craft_ramp_success_bar: 0.10     # successes this update, as a fraction of the LIVING BLUE POPULATION
   craft_ramp_success_window: 3     # consecutive PPO updates the bar must hold
   craft_ramp_max_steps: 1000000    # hard ceiling per stage: forced advance + loud report if the bar is never met

@@ -1042,12 +1042,47 @@ def _run_simulation_impl(
     ckpt_dir = config.get("checkpoint_dir") or os.path.abspath(
         f"runs/{run_name}/checkpoints"
     )
-    # Orbax mkdir fails on symlinks (FileExistsError); use real volume path.
-    ckpt_dir = str(Path(ckpt_dir).resolve())
-    assert_checkpoint_dir_is_not_protected_backup(ckpt_dir)
+    # 2026-09-14 (Cam): `str(Path(ckpt_dir).resolve())` used to sit here --
+    # added to dodge an old Orbax mkdir-on-symlink failure, but on a Modal
+    # Volume mount it silently resolves /mnt/throng-runs/checkpoints to the
+    # internal backing path (/__modal/volumes/vo-.../checkpoints), which
+    # bypasses the FUSE mount's write-tracking entirely: every checkpoint
+    # save since this line was added has gone to a path Volume.commit()
+    # never sees. Confirmed directly (Cam's one-measurement test, run live
+    # against the resumed container): the resolved path and every other
+    # view agreed on the same stale 3-checkpoint listing; a probe file
+    # written through the UNRESOLVED mount path committed and became
+    # visible externally on the first try. mkdir(parents=True,
+    # exist_ok=True) on the unresolved path was also verified to raise no
+    # symlink error on this Python/OS combination -- the historical failure
+    # this call was added to avoid does not reproduce here, so there is
+    # nothing left for .resolve() to buy us and a real cost to what it
+    # breaks. os.path.abspath() gives the same "always absolute, no
+    # trailing slash weirdness" guarantee `checkpoint_dir` already needs,
+    # without following symlinks -- for the already-absolute production
+    # value ("/mnt/throng-runs/checkpoints") it is a complete no-op.
+    ckpt_dir = os.path.abspath(ckpt_dir)
+    # The protected-backup guard still wants a resolved path (it compares
+    # against a resolved ~/throng_backup) -- resolve a LOCAL copy just for
+    # that comparison, so the guard still catches a checkpoint_dir that
+    # resolves into the backup via a symlink, without changing what the
+    # CheckpointManager itself writes through.
+    assert_checkpoint_dir_is_not_protected_backup(str(Path(ckpt_dir).resolve()))
     Path(ckpt_dir).mkdir(parents=True, exist_ok=True)
     options = ocp.CheckpointManagerOptions(max_to_keep=2, create=True)
     ckpt_mngr = ocp.CheckpointManager(ckpt_dir, ocp.StandardCheckpointer(), options=options)
+    # Cam's one-measurement diagnostic, made permanent: the resolved write
+    # path is not visible from the process's own print statements alone --
+    # the 2026-09-14 durability bug (checkpoints silently writing to a path
+    # Volume.commit() couldn't see) would have printed nothing wrong right
+    # up until the volume was checked externally. Print what we actually
+    # resolved to and prove a write there is visible on this same
+    # filesystem view, every launch, not just when something is suspected.
+    print(
+        f"[CKPT-PATH] ckpt_dir={ckpt_dir!r} | os.path.exists={os.path.exists(ckpt_dir)} | "
+        f"parent listing={sorted(os.listdir(ckpt_dir)) if os.path.exists(ckpt_dir) else 'N/A'}",
+        flush=True,
+    )
 
     key = jax.random.PRNGKey(seed)
     keys = jax.random.split(key, 10)
@@ -1783,7 +1818,12 @@ def _run_simulation_impl(
     # above if present, defaulted fresh otherwise.
     _ramp_cfg_outer = config.get("ctd_competence_ramp", {})
     craft_ramp_enabled = bool(_ramp_cfg_outer.get("craft_ramp_enabled", False))
-    craft_ramp_min_steps = int(_ramp_cfg_outer.get("craft_ramp_min_steps", 50_000))
+    # 2026-09-14 (Cam): 5_120 (10 updates), not 50_000 -- the old floor was
+    # sized for the retired success/attempts bar and now dominates the
+    # per-capita bar entirely (see config.yaml's ctd_competence_ramp comment
+    # for the measured live numbers). Registered as a next-launch change,
+    # not applied retroactively to any run already in flight.
+    craft_ramp_min_steps = int(_ramp_cfg_outer.get("craft_ramp_min_steps", 5_120))
     # 2026-09-14 (Cam): per-capita bar -- success as a fraction of the living
     # blue population, not success/attempts (attempts is agent-controlled;
     # that metric can't measure competence by construction, same instrument-
@@ -2413,10 +2453,22 @@ def _run_simulation_impl(
             # 14|13|13|30|52 while still settling). A code transiently unused
             # during that window would hit dead_streak_window at update 5-6
             # and reset for a "death" that's really just settling noise --
-            # seeding the exact cascade (reset perturbs codebook, strands more
-            # codes, resets more) the original collapse showed. Suppress the
-            # reset action (not the bookkeeping) until the SAME condition that
-            # arms the comms-freeze tripwires: C0 captured, one update later.
+            # a mechanism that CAN seed a cascade (reset perturbs codebook,
+            # strands more codes, resets more). MEASURED on this resume: 42
+            # of 64 codes in slot1 sat past the threshold pre-stability, all
+            # fired at once on arming, and codes_active recovered immediately
+            # (13-19 -> 47/49/49/52, held). CONJECTURED, not measured: that
+            # this same mechanism caused the ORIGINAL collapse -- that run
+            # resumed from 2763, not 2541, a different starting vocabulary,
+            # so it's a suggestive pair, not a controlled comparison. The
+            # ladder also shows codes declining gradually across ~220
+            # updates of ordinary training (2541->2763), far slower than a
+            # resume cascade -- most likely two distinct mechanisms: a fast
+            # resume cascade (now defused here) and a slow decay under
+            # absent communication pressure (unaddressed, the actual subject
+            # of the receiver-necessity thesis). Suppress the reset action
+            # (not the bookkeeping) until the SAME condition that arms the
+            # comms-freeze tripwires: C0 captured, one update later.
             _dc_armed = bool(
                 comms_c0 is not None and comms_updates_since_resume > comms_c0_captured_at_update
             )
@@ -2644,6 +2696,17 @@ def _run_simulation_impl(
             b_pop_np = jax.device_get(b_pop)
             b_alive_now = int(b_pop_np.alive.sum())
             r_alive_now = int(r_pop.alive.sum()) if r_pop is not None else 0
+            # 2026-09-14 (Cam): catch_attempted is small-blue-only by design
+            # (matches caught_small_potential in apply_catches -- big-green
+            # catches are a completely separate, Strike-gated path). Reading
+            # catch_attempts=0 for many updates says nothing about red's
+            # sensing if the small-blue population it's measured against has
+            # collapsed to near-zero (agents matured to big-green) -- that
+            # would be an instrument reporting a clean number about an empty
+            # set, the same class of defect as the rel_spread retirement.
+            # Split and normalize so the denominator is visible, not assumed.
+            small_blue_alive_now = int((b_pop_np.alive & ~b_pop_np.is_big_green).sum())
+            big_green_alive_now = int((b_pop_np.alive & b_pop_np.is_big_green).sum())
             
             # Action distribution (N=stay, S, E, W, stay=0)
             alive_actions = b_act_all[b_alive_all]
@@ -2838,6 +2901,10 @@ def _run_simulation_impl(
                 f"  Ecology: blue_caught={blue_caught_rollout} this rollout | "
                 f"catch_attempts={catch_attempted_rollout} "
                 f"(conversion={blue_caught_rollout / max(1, catch_attempted_rollout):.1%}) | "
+                f"pop_split=small:{small_blue_alive_now}|big_green:{big_green_alive_now} | "
+                f"attempts/small_blue={catch_attempted_rollout / max(1, small_blue_alive_now):.2f} "
+                f"(catch_attempted is small-blue-only by design -- 0 attempts against a "
+                f"near-empty small-blue count measures nothing about red's sensing) | "
                 f"red_floor={red_curriculum_stages[red_curriculum_idx]} "
                 f"sustain={red_sustain_count}/{red_sustain_needed} | brain={n_layers}L{medal_str} | barrier_sum={barrier_sum_val:.1f}"
             )

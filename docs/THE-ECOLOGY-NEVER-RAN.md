@@ -180,6 +180,60 @@ blue" and "the catch path itself is broken." This entry documents the mechanism 
 
 ---
 
+## 5. Checkpoint saves silently wrote to a path `Volume.commit()` never tracked
+
+**Introduced:** the line `ckpt_dir = str(Path(ckpt_dir).resolve())` in `_run_simulation_impl`'s
+checkpoint init (`jax_sim/main_jax.py`), added at an unknown earlier point specifically to dodge
+a historical Orbax `mkdir(exist_ok=True)` failure on a symlinked path (per its own comment: "Orbax
+mkdir fails on symlinks (FileExistsError); use real volume path").
+
+**Fixed:** 2026-09-14, same session as the volume-commit periodicity fix (`f367f02`) that this
+defect immediately exposed. `.resolve()` silently resolves Modal's mounted volume path
+(`/mnt/throng-runs/checkpoints`) to the volume's internal backing-store path
+(`/__modal/volumes/vo-.../checkpoints`) — which bypasses the FUSE mount's write-tracking
+entirely. Every checkpoint write went through the resolved path from the moment this line was
+added; `Volume.commit()` (added later, this same session, believing it fixed durability) kept
+returning successfully because it genuinely was committing the volume — the checkpoint files
+just were never part of it.
+
+**Duration:** unknown start (predates this session) through 2026-09-14. Every checkpoint saved
+in that window that wasn't captured by the run's own single end-of-run `commit()` (the pre-fix
+behavior) was lost on any interruption before natural completion — the same risk the periodicity
+fix believed it had already closed, and had not.
+
+**Effect:** compounds directly with instance found earlier: the periodicity fix (checkpoint saves
+now commit on the same cadence as the save itself) was necessary but not sufficient, because the
+thing being committed was never the checkpoint. Five real periodic saves during the 2541 resume
+(steps 1302528, 1304064, 1305600, 1307136, 1308672) all printed `[CKPT] Saved` / `[CKPT]
+Committed` with no error, and none were retrievable from the volume by any method — `modal volume
+ls`, a direct path lookup, and a raw filesystem check from inside the live container all agreed
+on the same stale 3-checkpoint listing. Not caught by the earlier fix's own verification, because
+that verification checked whether `commit()` was being *called*, not whether the write it was
+committing was in the volume at all.
+
+**Fix:** `os.path.abspath()` instead of `Path(...).resolve()` for the path the
+`CheckpointManager` actually writes through — absolute, but does not follow symlinks, so it
+cannot be silently redirected off the mounted volume. For the already-absolute production value
+this is a complete no-op. The protected-backup guard (`assert_checkpoint_dir_is_not_protected_backup`)
+still needs a genuinely resolved path to catch a `checkpoint_dir` that reaches the backup via a
+symlink — a separate local copy is resolved just for that one check, so the safety guarantee is
+unchanged. Verified empirically before landing: `mkdir(parents=True, exist_ok=True)` on the
+unresolved mount path raises no error on this Python/OS combination (the historical failure the
+`.resolve()` call was added to avoid does not reproduce here), and a probe file written through
+the unresolved path committed and became externally visible on the first try, while the resolved
+path never did across five real attempts.
+
+**How it was found:** Cam's one-measurement instruction — resolve the path the exact way
+`main_jax.py` does, `os.path.exists` it, list its parent, and compare against the mount root —
+run live against the actual running container via `modal container exec`, not reasoned about
+from source. The corpus writer (`communication/analysis.py`'s `SignalCorpusWriter`) was checked
+by the same standard and found NOT to share this defect: it checks `os.path.isdir("/mnt/throng-
+runs")` and joins onto that raw path directly, with no `.resolve()` anywhere in its construction
+— confirmed durable via the live volume listing (`signal_corpus.jsonl`, 623 MiB, modified
+throughout the run, not stale from an earlier one).
+
+---
+
 *(Log format: mechanism, when it was introduced not-actually-working, when
 it was fixed, how long the gap was, what it plausibly cost, and how it was
 found. Append new confirmed instances below this line — suspicions belong in

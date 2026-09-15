@@ -196,3 +196,22 @@ Separate **confirmed defects** from **suspicions** and label which is which. Rep
 checked and found clean, so coverage is visible rather than assumed. When you find one
 instance of a defect class, ask how many siblings it has — they cluster, because they come
 from the same habits.
+
+**Confirmed instance (2026-09-14, Cam's correction):** the dead-code-reset suppression fix was
+reported as having resolved the *original* codebook collapse. What was actually measured: 42
+of 64 codes in one slot sat past the dead-streak threshold during this resume's pre-stability
+window, fired in one shot at arming, and `codes_active` recovered immediately and held. That is
+real, and it's MEASURED. What was reported alongside it — that this same mechanism *caused* the
+original collapse — is CONJECTURED: the natural comparison is the previous (uncontrolled,
+collapsed) run, but that run resumed from a different checkpoint (2763, not 2541) with a
+materially different starting vocabulary. A suggestive pair, not a controlled one, and it was
+written up without that confound named. Compounding it: the calibration ladder itself (logged
+earlier the same day) shows `codes_active` declining gradually across ~220 ordinary training
+updates between those two checkpoints — far too slow to be the resume-cascade mechanism — which
+the causal claim, if accepted uncritically, would have implied was somehow explained by a
+fast-onset resume artifact. Two distinct mechanisms are more likely than one: a fast resume
+cascade (now defused) and a slow decay under absent communication pressure (still unaddressed,
+the actual subject of the receiver-necessity thesis this whole audit sits inside). **Tag every
+causal claim MEASURED or CONJECTURED explicitly, in the same sentence that makes it** — a strong
+result on one question is not evidence on an adjacent one just because it arrived in the same
+report.
