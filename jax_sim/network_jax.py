@@ -111,6 +111,7 @@ def dead_code_reset_codebook_params(
     min_pool_frac: float = 0.25,
     dead_streak_window: int = 5,
     ema_decay: float = 0.8,
+    suppress_reset: bool = False,
 ) -> Any:
     """
   Persist dead-code reset into the codebook embedding (runs after PPO on CPU/GPU).
@@ -140,6 +141,20 @@ def dead_code_reset_codebook_params(
     (blue Phase 18 3-slot) / ``red_codebook`` (Phase 12 predator).
   alive_pool_frac: fraction of (step, agent) cells alive during this rollout
     window (0..1) — pass e.g. ``float(alive_mask.mean())`` from the caller.
+  suppress_reset: (Cam, 2026-09-14) codes grafted fresh onto a resumed
+    checkpoint start with usage_ema=dead_streak=0 -- but updates 1-7 after a
+    resume are exactly when usage is LEAST stable (measured on this project's
+    own run: slot1 sampled 14|13|13|30|52 across that window while still
+    settling). A code transiently unused during the settling window hits
+    dead_streak_window at update 5-6 and gets reset for a "death" that's
+    really just noise from freshly-zeroed counters -- and the reset itself
+    perturbs the codebook, stranding more codes, resetting more: a cascade
+    seeded by counters that are themselves only a few updates old. When True,
+    usage_ema/dead_streak keep updating normally (so the streak measurement
+    stays live) but the embedding reset itself is skipped, and the count of
+    codes that WOULD have reset is logged instead of acted on -- arming
+    delayed until the stability-gated C0 window closes (main_jax.py), the
+    same condition that arms the comms-freeze tripwires.
     """
     if z_e.shape[0] == 0:
         return params
@@ -167,35 +182,56 @@ def dead_code_reset_codebook_params(
     dead_mask = pool_ok & (new_dead_streak >= dead_streak_window)
     num_dead = jnp.sum(dead_mask)
 
-    def _log_reset(nd, key, ema_all, mask_all, pool_frac, pool_was_ok):
+    def _log_pool_skip(pool_frac, pool_was_ok, key):
         if not bool(pool_was_ok):
             print(
                 f"[JAX] dead_code_reset ({key}): skipped this update — alive pool "
                 f"{float(pool_frac):.1%} below the {min_pool_frac:.0%} floor",
                 flush=True,
             )
-        elif nd > 0:
-            reset_emas = ema_all[mask_all][:10]
-            print(
-                f"[JAX] dead_code_reset ({key}): resetting {int(nd)} codes unused for "
-                f"{dead_streak_window}+ consecutive updates "
-                f"(usage_ema at trigger: {reset_emas})",
-                flush=True,
-            )
 
-    jax.debug.callback(
-        _log_reset, num_dead, codebook_key, new_usage_ema, dead_mask,
-        jnp.asarray(alive_pool_frac), pool_ok,
-    )
+    jax.debug.callback(_log_pool_skip, jnp.asarray(alive_pool_frac), pool_ok, codebook_key)
 
-    n_pool = z_e.shape[0]
-    rand_idx = jax.random.randint(rng, (vocab_size,), 0, n_pool)
-    replacement = jax.lax.stop_gradient(z_e[rand_idx])
-    new_embedding = jnp.where(dead_mask[:, None], replacement, embedding)
-    # A reset code gets a fresh dead_streak_window-update grace period rather
-    # than instantly re-triggering the reset on the very next update.
-    new_dead_streak = jnp.where(dead_mask, 0, new_dead_streak)
-    new_usage_ema = jnp.where(dead_mask, 0.0, new_usage_ema)
+    if suppress_reset:
+        # Arming delayed past the resume transient (Cam, 2026-09-14): counters
+        # keep updating (new_usage_ema/new_dead_streak above, already computed)
+        # so the streak measurement stays live and comparable to the armed
+        # period, but the embedding/state reset itself is skipped. Log what
+        # WOULD have reset -- this is the measurement that tells us whether the
+        # original collapse was seeded here.
+        def _log_suppressed(nd, key, pool_was_ok):
+            if bool(pool_was_ok) and nd > 0:
+                print(
+                    f"[VQ-RESET] suppressed (pre-stability), {int(nd)} codes "
+                    f"({key}) would have reset",
+                    flush=True,
+                )
+
+        jax.debug.callback(_log_suppressed, num_dead, codebook_key, pool_ok)
+        new_embedding = embedding
+    else:
+        def _log_reset(nd, key, ema_all, mask_all, pool_was_ok):
+            if bool(pool_was_ok) and nd > 0:
+                reset_emas = ema_all[mask_all][:10]
+                print(
+                    f"[JAX] dead_code_reset ({key}): resetting {int(nd)} codes unused for "
+                    f"{dead_streak_window}+ consecutive updates "
+                    f"(usage_ema at trigger: {reset_emas})",
+                    flush=True,
+                )
+
+        jax.debug.callback(
+            _log_reset, num_dead, codebook_key, new_usage_ema, dead_mask, pool_ok,
+        )
+
+        n_pool = z_e.shape[0]
+        rand_idx = jax.random.randint(rng, (vocab_size,), 0, n_pool)
+        replacement = jax.lax.stop_gradient(z_e[rand_idx])
+        new_embedding = jnp.where(dead_mask[:, None], replacement, embedding)
+        # A reset code gets a fresh dead_streak_window-update grace period rather
+        # than instantly re-triggering the reset on the very next update.
+        new_dead_streak = jnp.where(dead_mask, 0, new_dead_streak)
+        new_usage_ema = jnp.where(dead_mask, 0.0, new_usage_ema)
 
     flat[codebook_key] = {
         **cb,

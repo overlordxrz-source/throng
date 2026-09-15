@@ -938,6 +938,34 @@ def run_simulation(
     return _fresh_run(config, seed=seed, n_steps=n_steps, on_checkpoint_saved=on_checkpoint_saved)
 
 
+def _print_grafted_vq_counter_stats(src_agent: dict, injected_paths: list, agent_type: str) -> None:
+    """Cam, 2026-09-14: "prove what's in there" for any usage_ema/dead_streak
+    grafted fresh onto a resumed checkpoint -- printed as "randomly
+    initialized" by the caller, but never actually measured. Both fields are
+    zero-initialized by ensure_vq_usage_state() when built via
+    init_agent_params(), and graft_missing_param_subtrees() copies that
+    template value verbatim when the key is missing from the checkpoint -- so
+    this should always read exactly 0/0/0, but "should" is not "measured."
+    """
+    for path in injected_paths:
+        clean_path = path.split(" (")[0]  # strip "(zero-padded ...)"/"(shape mismatch ...)" suffixes
+        if not (clean_path.endswith("/usage_ema") or clean_path.endswith("/dead_streak")):
+            continue
+        node = src_agent
+        try:
+            for part in clean_path.split("/"):
+                node = node[part]
+        except (KeyError, TypeError):
+            continue
+        arr = np.asarray(node)
+        print(
+            f"[JAX] Grafted {clean_path} ({agent_type}): "
+            f"min={float(arr.min()):.4f} max={float(arr.max()):.4f} "
+            f"mean={float(arr.mean()):.4f} shape={arr.shape}",
+            flush=True,
+        )
+
+
 def _pad_comms_history(history: list) -> list:
     """Pad the comms-freeze tripwire's per-update codes_active history to a
     fixed (40, 3) shape for checkpointing -- 40 is the same hard-cap as the
@@ -1352,6 +1380,7 @@ def _run_simulation_impl(
                             f"into {agent_type}",
                             flush=True,
                         )
+                    _print_grafted_vq_counter_stats(src_agent, injected_paths, agent_type)
                     source_dict[agent_type] = freeze(src_agent)
             restored = freeze(source_dict)
         except ValueError as exc:
@@ -1427,6 +1456,8 @@ def _run_simulation_impl(
                             f"into {agent_type}",
                             flush=True,
                         )
+                    if injected_paths:
+                        _print_grafted_vq_counter_stats(src_agent, injected_paths, agent_type)
                     source_dict[agent_type] = freeze(src_agent)
                 restored = freeze(source_dict)
             elif "not compatible" in msg or "stored shape" in msg:
@@ -2376,6 +2407,21 @@ def _run_simulation_impl(
             _toks_alive = _toks[_alive]
             _ze_alive = _ze[_alive]
 
+            # 2026-09-14 (Cam): codes grafted fresh onto this resume start with
+            # usage_ema=dead_streak=0, and updates 1-7 post-resume are exactly
+            # when usage is least stable (measured on this run: slot1 sampled
+            # 14|13|13|30|52 while still settling). A code transiently unused
+            # during that window would hit dead_streak_window at update 5-6
+            # and reset for a "death" that's really just settling noise --
+            # seeding the exact cascade (reset perturbs codebook, strands more
+            # codes, resets more) the original collapse showed. Suppress the
+            # reset action (not the bookkeeping) until the SAME condition that
+            # arms the comms-freeze tripwires: C0 captured, one update later.
+            _dc_armed = bool(
+                comms_c0 is not None and comms_updates_since_resume > comms_c0_captured_at_update
+            )
+            _suppress_dead_code_reset = bool(craft_ramp_active_outer and not _dc_armed)
+
             if _toks_alive.ndim > 1 and _toks_alive.shape[-1] == 3:
                 # Phase 18: 3 slots. z_e layout: 8D cont + 12D slot0 + 8D slot1 + 12D slot2
                 _dc_key_0, _dc_key_1, _dc_key_2 = jax.random.split(_dc_key, 3)
@@ -2383,6 +2429,7 @@ def _run_simulation_impl(
                 _dc_kwargs = dict(
                     alive_pool_frac=_alive_pool_frac, min_pool_frac=_dc_min_pool_frac,
                     dead_streak_window=_dc_window, ema_decay=_dc_ema_decay,
+                    suppress_reset=_suppress_dead_code_reset,
                 )
                 b_params = dead_code_reset_codebook_params(
                     b_params, _toks_alive[:, 0], _ze_alive[:, 8:20], _vocab_size, _dc_key_0, "codebook_0", **_dc_kwargs
@@ -2400,6 +2447,7 @@ def _run_simulation_impl(
                     b_params, _toks_alive, _ze_alive, int(config["vocab_size"]), _dc_key, "codebook",
                     alive_pool_frac=_alive_pool_frac, min_pool_frac=_dc_min_pool_frac,
                     dead_streak_window=_dc_window, ema_decay=_dc_ema_decay,
+                    suppress_reset=_suppress_dead_code_reset,
                 )
 
         if ui == start_update:
