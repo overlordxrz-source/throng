@@ -242,6 +242,112 @@ general rule this instance forced into writing, and `scripts/modal_app.py`'s
 `DURABILITY-GATE` check for the fix: verify durability externally (`volume.listdir()`) after
 the first commit of any new launch, before trusting it with further GPU-hours.
 
+**Retraction (2026-09-15, same day, later):** the central causal claim above — that `.resolve()`
+bypassing `Volume.commit()`'s tracking was the mechanism losing checkpoints — does not survive a
+controlled test and should not be trusted. The "five real attempts" cited as evidence for the
+resolved path failing (steps 1302528/1304064/1305600/1307136/1308672, i.e. ppo 2544-2556) were
+**all** numerically below two fossil checkpoints (2859, 2862) already sitting in the same
+directory from an abandoned lineage — see instance 6, below. Every one of those five saves is
+fully and independently explained by Orbax's `max_to_keep` retention pruning them by step number,
+with zero need to invoke path resolution at all. That evidence was never a controlled comparison;
+it was correlational, and confounded by a variable nobody had identified yet.
+
+Re-tested properly on 2026-09-15, in a fresh directory with no fossils (`_diag_resolve_test/`, so
+retention pruning cannot be an alternative explanation for anything observed): one file written
+via `str(Path(...).resolve())` (the retired construction, literally reproduced), one via
+`os.path.abspath()` (the current one), one `volume.commit()` covering both, checked externally.
+**Both files appeared.** `.resolve()` resolving `/mnt/throng-runs/_diag_resolve_test` to
+`/__modal/volumes/vo-T496EY9LIBErLGI6JuMxzs/_diag_resolve_test` is real (confirmed, both dated
+2026-09-15 11:13 EDT) — but a write through that resolved path commits and becomes externally
+visible identically to a write through the unresolved one. There is no evidence, controlled or
+otherwise, that `.resolve()` ever bypassed `Volume.commit()`'s tracking.
+
+Verdict, per Cam's own framework (Part 2 of `RESEARCH_PROTOCOL.md`, "an instrument can fail on
+its construction alone"): this was not a genuine latent bug that happened not to be the bug
+losing checkpoints — there is no bug in `.resolve()` at all, here. It was a diagnosis built on a
+confounded correlation, and a change to working code made under that mistaken theory. `git diff`
+against `os.path.abspath()`: functionally identical for the production path (already absolute, no
+`../` segments, both proven to commit correctly), so it is not reverted — there is no benefit to
+reverting a change that is now proven harmless, only churn. But it fixed nothing, and did not
+cause the loss it was credited with preventing on the SHA that carried it. The actual fix is
+instance 6's guard, not this one. Docs and commit messages crediting `os.path.abspath()` /
+`11f0bb2` with resolving checkpoint durability should be read with this retraction attached.
+
+---
+
+## 6. `max_to_keep` retention silently deleted every checkpoint a rolled-back resume saved
+
+**Introduced:** not a code change at all — `ocp.CheckpointManagerOptions(max_to_keep=2, create=True)`
+in `_run_simulation_impl`'s checkpoint init has read `max_to_keep=2` since before this session.
+The defect is a configuration meeting a situation it was never checked against: Orbax's retention
+prunes by **step number**, not save recency, keeping only the numerically highest `max_to_keep`
+checkpoints it finds in the directory on each save. `resume_from_step=2541` in `config.yaml` is a
+**deliberate rollback** ("2026-09-14 (Cam): resume_from_step pins an EARLIER-than-latest checkpoint
+deliberately... Set in config.yaml, not a volume deletion — explicit, auditable, reversible" —
+`jax_sim/main_jax.py`). Rolling back to 2541 while the directory still held `2859` and `2862`
+(fossils from the lineage the rollback was rolling back *from*) meant every checkpoint the
+resumed run went on to save — 2544, 2545, 2546, ... — was numerically *lower* than those fossils.
+Orbax's own retention pruned each one on save, silently, before `Volume.commit()` ever ran.
+`[CKPT] Saved` / `[CKPT] Committed` printed unconditionally regardless — neither line checks
+whether the thing just saved is still there a moment later.
+
+**Fixed:** 2026-09-15.
+
+**Duration:** the rollback to 2541 was set 2026-09-14; the defect existed the entire time
+`checkpoints/` held both the 2541-lineage and the higher-numbered 2859/2862 fossils from the
+abandoned lineage — i.e. for both of the checkpoint-durability incidents logged in instance 5,
+end to end. Not a new defect discovered on 2026-09-15; the same defect, finally isolated from the
+`.resolve()` misdiagnosis that had been standing in front of it.
+
+**Effect:** explains **both** lost runs without any reference to `.resolve()` or the FUSE mount at
+all — the 2026-09-14 19:12 EDT–2026-09-15 02:51 EDT run (7.5 hours, 44 PPO updates, the entire
+cascade-defusal sequence) and the first 2026-09-15 relaunch attempt (killed independently by an
+unrelated bug in the new durability gate's own `volume.reload()` call, but its one real checkpoint
+at ppo=2544 was *already* gone from the volume by the time that crash happened — confirmed absent
+on a fresh `modal volume ls` immediately after, and again ~19 minutes later, ruling out
+propagation delay). Both runs did everything right — saved on schedule, called `commit()` on
+schedule — and lost their output anyway, because the directory they were pointed at was not the
+clean, single-lineage directory everyone believed it was.
+
+**Fix:** three parts, deliberately non-destructive (see the retraction on instance 5 for why
+deletion was ruled out as a response to a deletion mistake made diagnosing this one):
+1. `max_to_keep=2` → `10` (`jax_sim/main_jax.py`) — defense in depth, not the actual fix; ~26MB
+   per checkpoint makes 10 negligible, and it removes the single-fault-tolerance failure mode
+   where one bad save plus one bad predecessor loses everything.
+2. A startup guard (`jax_sim/main_jax.py`, right after the resume target resolves, before the
+   first rollout): enumerate every step Orbax recognizes in `checkpoint_dir` via
+   `ckpt_mngr.all_steps()`, and refuse to launch (print the offending steps, `SystemExit(1)`) if
+   any sits numerically ahead of the resume target. Same shape as `scripts/modal_app.py`'s
+   `DURABILITY-GATE`: assert the environment is what you think it is before you run in it, rather
+   than discovering the mismatch after GPU-hours are spent.
+3. New lineage, new directory: `checkpoint_dir` now points at `checkpoints_r2541/`, seeded with
+   only the 2541 checkpoint (restored from the local `~/throng_backup` copy — the volume's own
+   2541 was deleted, see below). `checkpoints/` (2862, and this session's own diagnostic litter
+   from before the mistake was caught) is left exactly as it was: inert once nothing points at
+   it, and now itself evidence for this instance rather than live state.
+
+**How it was found:** Cam's own three-outcome discriminator, run CPU-only before spending GPU
+time on a third launch attempt: probe file + real Orbax save + `volume.commit()`, checked
+externally. Both appeared — ruling out the path and ruling out Orbax's write pattern — which by
+elimination pointed at "timing or state-dependent, what's different in the real run." The
+discriminator itself was run against the *live* `checkpoints/` directory (matching production
+exactly, per the instructions), which is what exposed the actual mechanism directly: the
+diagnostic's own save (step 999999) triggered the same retention pass, and the before/after
+external listing showed `2541` and `2859` gone immediately after — an unintended, costly, but
+diagnostically decisive side effect, reported in full before any further action was taken.
+
+**Incidental cost:** running the discriminator against the live directory (as specified, without
+first isolating it into a scratch directory) deleted `checkpoints/2541` and `checkpoints/2859`
+from the volume. `2541` was recoverable intact from `~/throng_backup/checkpoints/2541` (verified,
+26MB, standard Orbax layout) and has been restored into the new `checkpoints_r2541/` lineage.
+`2859` was not in that backup (which tops out at `2763`) and is not recoverable — low-stakes,
+since it was one of the two fossils implicated in this instance to begin with, not a checkpoint
+anyone was resuming from. The backup itself was, at the time this was noticed, the only surviving
+copy of the entire pre-2859 record of this project outside the volume — six ladder checkpoints
+(2490, 2493, 2538, 2541, 2760, 2763) have since been archived into a `fossils/` directory on the
+volume, restoring off-laptop redundancy, deliberately separate from any directory a
+`CheckpointManager` is ever pointed at live.
+
 ---
 
 *(Log format: mechanism, when it was introduced not-actually-working, when

@@ -211,6 +211,30 @@ def assert_checkpoint_dir_is_not_protected_backup(resolved_ckpt_dir: str) -> Non
         )
 
 
+def find_fossil_checkpoints(ckpt_mngr, resume_target: int) -> list:
+    """
+    STRUCTURAL SAFEGUARD (2026-09-15, Cam's instruction): the guard that
+    would have caught both of that day's checkpoint losses before a dollar
+    was spent. Orbax's `max_to_keep` retention prunes by STEP NUMBER, not
+    save recency -- a checkpoint directory holding a step numerically ahead
+    of `resume_target` (a fossil from an abandoned lineage, or any other
+    reason the directory isn't single-lineage) means every new checkpoint
+    the resumed run saves is "older" than that fossil by the metric Orbax
+    actually uses, and gets silently garbage collected on save, before
+    `Volume.commit()` is even in the picture. Nothing downstream can detect
+    this: "[CKPT] Saved" / "[CKPT] Committed" print unconditionally
+    regardless of whether the save survived retention. See
+    docs/THE-ECOLOGY-NEVER-RAN.md instance 6.
+
+    Returns the sorted list of fossil steps (empty if the directory is
+    clean relative to `resume_target`). Callers should refuse to launch if
+    this is non-empty -- checked here, not left to be discovered 7.5 hours
+    later.
+    """
+    all_steps = sorted(int(s) for s in ckpt_mngr.all_steps())
+    return [s for s in all_steps if s > resume_target]
+
+
 # ── Rollout → CPU (free GPU before PPO backward) ───────────────────────────
 
 def _rollout_to_cpu(rollout_data: Dict) -> Dict:
@@ -1069,7 +1093,18 @@ def _run_simulation_impl(
     # CheckpointManager itself writes through.
     assert_checkpoint_dir_is_not_protected_backup(str(Path(ckpt_dir).resolve()))
     Path(ckpt_dir).mkdir(parents=True, exist_ok=True)
-    options = ocp.CheckpointManagerOptions(max_to_keep=2, create=True)
+    # 2026-09-15 (Cam): max_to_keep=2 was the actual mechanism behind both
+    # of tonight's "durable checkpoint never appears" losses -- Orbax prunes
+    # by STEP NUMBER, not save recency, so a directory holding a
+    # higher-numbered fossil from an abandoned lineage silently garbage
+    # collects every new checkpoint a lower-numbered resume saves, the
+    # instant it saves it (see docs/THE-ECOLOGY-NEVER-RAN.md instance 6).
+    # 10 at ~26MB/checkpoint is ~260MB -- nothing -- and removes the
+    # single-fault-tolerance failure mode where one bad save plus one bad
+    # predecessor loses everything. The startup guard just below is the
+    # actual fix (refuses to run at all into a fossil-contaminated
+    # directory); this is defense in depth, not a substitute for it.
+    options = ocp.CheckpointManagerOptions(max_to_keep=10, create=True)
     ckpt_mngr = ocp.CheckpointManager(ckpt_dir, ocp.StandardCheckpointer(), options=options)
     # Cam's one-measurement diagnostic, made permanent: the resolved write
     # path is not visible from the process's own print statements alone --
@@ -1357,6 +1392,37 @@ def _run_simulation_impl(
             flush=True,
         )
         _ckpt_latest = _resume_pin
+    # 2026-09-15 (Cam): the guard that would have caught both of tonight's
+    # losses before a dollar was spent. A deliberate rollback into a
+    # directory that also holds a numerically-higher checkpoint from a
+    # different lineage is a self-deleting run: Orbax's max_to_keep
+    # retention prunes by step number, not save recency, so every new
+    # checkpoint this run saves is "older" than the fossil by that metric
+    # and gets silently garbage collected on save, before Volume.commit()
+    # is even in the picture. Nothing downstream can detect this --
+    # "[CKPT] Saved" / "[CKPT] Committed" print unconditionally regardless.
+    # Check the actual on-disk state against what we're about to resume
+    # into, before the first rollout, not after 7.5 hours: assert the
+    # environment is what we think it is, same shape as the durability
+    # gate in scripts/modal_app.py.
+    if _ckpt_latest is not None:
+        _fossil_steps = find_fossil_checkpoints(ckpt_mngr, _ckpt_latest)
+        if _fossil_steps:
+            _all_steps = sorted(int(s) for s in ckpt_mngr.all_steps())
+            print(
+                f"[FOSSIL-GUARD] FATAL: {ckpt_dir!r} contains checkpoint(s) "
+                f"{_fossil_steps} numerically AHEAD of the resume target "
+                f"({_ckpt_latest}). Resuming here would let Orbax's own "
+                f"max_to_keep retention silently prune every checkpoint this "
+                f"run saves, the instant it saves it -- the exact mechanism "
+                f"that lost two real launches on 2026-09-15 (see "
+                f"docs/THE-ECOLOGY-NEVER-RAN.md instance 6). All steps "
+                f"present: {_all_steps}. Move the fossil(s) out (see "
+                f"fossils/ on the volume) or point checkpoint_dir at a fresh, "
+                f"fossil-free directory before launching. Refusing to run.",
+                flush=True,
+            )
+            raise SystemExit(1)
     start_update = 0
     # Training-loop state carried across resumes (CtD ramp progress, red
     # curriculum) -- captured from the raw checkpoint below if present,

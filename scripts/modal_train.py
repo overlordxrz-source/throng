@@ -48,7 +48,15 @@ def build_cfg() -> dict:
     """
     with open(REPO / "config.yaml") as f:
         cfg = yaml.safe_load(f)
-    cfg["checkpoint_dir"] = "/mnt/throng-runs/checkpoints"
+    # 2026-09-15 (Cam): checkpoints/ still holds a fossil (2862, from an
+    # abandoned lineage) that Orbax's max_to_keep retention would prune
+    # every new save against -- the actual mechanism behind two lost
+    # launches tonight (docs/THE-ECOLOGY-NEVER-RAN.md instance 6). New
+    # directory, new lineage, seeded with only the checkpoint we're
+    # actually resuming from (2541, restored from ~/throng_backup). The old
+    # checkpoints/ is left exactly as it was -- inert once nothing points
+    # at it, and 2862 is now evidence, not live state.
+    cfg["checkpoint_dir"] = "/mnt/throng-runs/checkpoints_r2541"
     return cfg
 
 

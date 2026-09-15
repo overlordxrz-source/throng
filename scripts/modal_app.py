@@ -84,9 +84,19 @@ image = (
     # 2026-09-14: was 600s, sized for the old "zero real updates" smoke test.
     # Now that this actually runs real post-resume updates (see the n_steps
     # padding below), one CPU-only rollout+PPO-backward pair alone measured
-    # >600s locally -- 600s guaranteed a timeout, not a check. 1800s gives
-    # comfortable margin for 1 real update on Modal's CPU tier.
-    timeout=1800,
+    # >600s locally -- 600s guaranteed a timeout, not a check. Raised to
+    # 1800s on that basis.
+    #
+    # 2026-09-15 (Cam): 1800s timed out at the same place twice, same
+    # reasoning both times -- that's not a judgment call anymore, it's a
+    # mis-scoped budget. Measured for real this run: blue rollout alone
+    # 723.1s, blue PPO backward 879.0s -- 1602.1s before red's update even
+    # starts, against an 1800s ceiling. Raised generously (5400s) rather
+    # than fine-tuning a third guess -- this function is CPU-tier and rare
+    # (one pre-flight per launch), so the cost of a wide margin is trivial
+    # next to the cost of a preflight whose PASS means nothing because it
+    # never actually reaches the finish line.
+    timeout=5400,
     volumes={VOLUME_MOUNT: volume},
 )
 def _tiny_cpu_smoke(n_steps: int) -> str:

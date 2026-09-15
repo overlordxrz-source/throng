@@ -154,6 +154,16 @@ more expensive, because it produces publishable-looking nulls.
   `DURABILITY-GATE` check in `scripts/modal_app.py` (`volume.listdir()` after the first
   commit, not the container's own print, not its own FUSE view), added directly in response
   to this instance.
+  **Correction (2026-09-15):** the mechanism named above (`Path(...).resolve()` bypassing
+  `Volume.commit()`) does not survive a controlled test and has been retracted — see
+  docs/THE-ECOLOGY-NEVER-RAN.md instance 5's retraction and instance 6. The actual mechanism
+  losing both this run and a same-day relaunch attempt was Orbax's `max_to_keep` retention
+  pruning by step number, silently deleting every checkpoint a *deliberately rolled-back*
+  resume saved because a higher-numbered fossil from an abandoned lineage sat in the same
+  directory. The principle this bullet states held regardless — durability was still the
+  actual precondition being violated, and external verification was still what caught it — but
+  the specific fix credited above was not the fix; read the two entries it points to for what
+  was.
 
 ## Part 3 — Fossils
 
