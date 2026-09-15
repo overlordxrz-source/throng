@@ -244,7 +244,15 @@ def train(n_steps: int = N_STEPS_FULL) -> None:
         volume.commit()
         if _durability_state["verified"]:
             return
-        volume.reload()
+        # 2026-09-15: NOT volume.reload() -- that refreshes THIS container's
+        # own local FUSE view, and fails outright ("there are open files
+        # preventing the operation: path train.log is open") for the
+        # entire run, since the Tee below holds train.log open the whole
+        # time. volume.listdir() is a separate RPC against the backing
+        # store's committed state, not a read through the local mount --
+        # it doesn't need or want reload() first. Confirmed by the first
+        # real launch on this fix: the FATAL branch below fired for this
+        # reason, not a real durability failure, the first time this ran.
         try:
             _ckpt_paths_after = {e.path for e in volume.listdir("checkpoints")}
         except Exception as exc:
