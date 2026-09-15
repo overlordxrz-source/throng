@@ -106,6 +106,80 @@ codes_active ladder rule, not by habit).
 
 ---
 
+## 3. `--test` preflight never executed a training-loop iteration on a resumed checkpoint
+
+**Introduced:** `scripts/modal_app.py`'s `_tiny_cpu_smoke` has passed a flat `n_steps=50` to
+`run_simulation` since the file's creation. `jax_sim/main_jax.py`'s `n_updates = n_steps // T`
+is an ABSOLUTE target update count, not "updates to run from here" — the loop is `for ui in
+range(start_update, n_updates)`. With `n_steps=50` and `T=512`, `n_updates=0`; for any resumed
+checkpoint (`start_update>0`), `range(start_update, 0)` is empty. The preflight printed every
+restore-path banner (checkpoint restored, CTD-RAMP state, TRIPWIRE config) and returned
+"[preflight] smoke test completed" — a real success message — without executing a single PPO
+update, tripwire evaluation, or crafting-bar check.
+
+**Fixed:** 2026-09-14, in the same session that built the tripwire and per-capita-bar logic
+this gap would have silently failed to verify. `_tiny_cpu_smoke` now resolves the actual resume
+point the same way `main_jax.py` will (`resume_from_step` if pinned, else the volume's own
+`latest_step()`) and pads `n_steps` to guarantee at least 3 real post-resume updates run.
+
+**Duration:** unknown start (present since the file's creation, 2026-09-14 per this session's
+own commit history) through 2026-09-14 later the same day — every `--test` preflight run this
+session against a resumed checkpoint (three of them, all reported as "passed") verified the
+restore path only, never the loop body.
+
+**Effect:** every "preflight passed" claim made earlier in this session about the comms
+freeze, the tripwire thresholds, or the crafting-bar logic taking effect correctly was true
+only for the banners printed before the loop starts. None of it proved the loop body itself
+ran without error on the actual pinned SHA. The real detached launches were the first genuine
+exercise of that code each time — Rule 13 in a form the reporting agent produced and repeated
+without noticing.
+
+**How it was found:** a local CPU smoke test run with a correctly-scaled `n_steps` (to verify
+the stability-gated C0 capture and per-capita bar before trusting them) printed
+`[JAX] Training PPO updates 2541 → -1` in an EARLIER attempt with a too-small `n_steps` —
+noticing that "→ -1" meant zero updates were about to run, rather than assuming a completed
+process meant work happened.
+
+---
+
+## 4. `red_detection_radius` — misidentified, then found to be disabled by design with an inverted comment
+
+**Not a defect in the mechanism's operation** — a defect in this session's own citation of it,
+caught before it reached a code change. Worth logging because the comment it was caught
+against is itself wrong and could mislead the next person who reads it.
+
+`red_detection_radius` gates whether **blue can see red** beyond a Chebyshev radius
+(`jax_sim/observations_jax.py:206-209`, `_mask_loc_env_red_channel`) — introduced at value `8`
+in commit `92479cc` ("Phase 5: forced communication architecture", 2026-05-19) specifically to
+force blues who can't directly see a red to rely on neighbour alarm signals instead. It has
+**nothing to do with red's ability to sense blue** — `limit_red_sensing=True` (the flag that
+gates this masking) is passed only when building blue's own observations
+(`jax_sim/main_jax.py:353`); red's observation build never receives it.
+
+Commit `775ec7db` (2026-06-23, "Repo cleanup + config rename...") changed the value from `8` to
+`0`, carrying forward a `# blues stay blind` design note from the P10.4 era and relabeling the
+config comment to `# 0 = blind beyond 5×5 patch`. But the code's actual condition is
+`if det_r > 0: apply the mask` (`observations_jax.py:207`) — at `det_r=0` the mask is **skipped
+entirely**, so blue sees red **without any radius restriction**. The current comment asserts
+the opposite of what the code does; the ORIGINAL 2026-05-19 comment had it right (`0 =
+all-seeing (disables the mechanic)`). Source beats prose, confirmed here in both directions:
+the mechanic has been off since 2026-06-23 (~3 months), and the reason it looks intentional
+("blind") in the config is a comment that inverted during a rename, not a description of
+current behavior. Plausible connection, not yet verified: `Alarm_Rate` has read ~0.001-0.003
+in every live rollout this session — consistent with blue having no need to alarm-signal about
+red sightings when it can already see every red on the grid directly.
+
+This was caught here, not shipped: a subagent investigating predation cited
+`red_detection_radius=0` as evidence that red can't sense blue, and the report to Cam repeated
+that framing before the code was actually read. Corrected on Cam's explicit request to check
+history before trusting either the comment or the earlier report.
+
+**No code change made** — Cam's instruction was to hold any detection-radius change until
+`catch_attempted`/`caught_b` data from a live rollout discriminates between "red can't find
+blue" and "the catch path itself is broken." This entry documents the mechanism as found, nothing more.
+
+---
+
 *(Log format: mechanism, when it was introduced not-actually-working, when
 it was fixed, how long the gap was, what it plausibly cost, and how it was
 found. Append new confirmed instances below this line — suspicions belong in

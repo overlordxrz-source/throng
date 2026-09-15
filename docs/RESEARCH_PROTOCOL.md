@@ -99,6 +99,37 @@ more expensive, because it produces publishable-looking nulls.
   decline that crosses 0.75 and stays there for hundreds of updates without ever forming a
   5-update streak below 0.6) — replaced with a `<0.75*C0`-for-15 drift trip verified against
   the real 2541→2763 history (slot1: 35→12, 0.34x over ~220 updates) before being trusted.
+  **Second instance of the same error, same parameter, live on the GPU (2026-09-14, Cam's
+  own again):** the fixed-window fix above still compared against a fixed calendar window
+  (updates 3-7) rather than a *stable* one. Live data: slot1 sampled 14|13|13|30|52 across
+  those five updates while still climbing out of the post-resume transient toward its
+  settled ~50s — the median (14) landed on the floor of a recovery, not a baseline. Indexed
+  to that C0, slot1's fast trip would fire at 7 against an operating level near 52: a 70%
+  real collapse would have passed silently. Caught by re-deriving the rule from the raw
+  per-update samples before trusting the number, not by the tripwire firing. Fixed:
+  fixed-window capture replaced with stability-gated capture — `C0` = median of the first 5
+  *consecutive* updates (window start ≥3) in which every internal update-over-update
+  transition is ≤20% relative change on all three slots, forced to the median of updates
+  35-40 (logged loudly) if nothing stabilizes by the same 40-update budget as the stage-0
+  hard escape. Every candidate window is printed as evaluated, so the stabilization is
+  visible in the log rather than asserted. Verified against the real data before landing:
+  the rule rejects the 3-7 window it replaces (fails at 4→5, −24%; 5→6, +130%; 6→7, +73%)
+  and accepts the first window where all three slots move under 8% between consecutive
+  updates.
+- **An instrument can fail on its construction alone, independent of any threshold or any
+  update ever passing or failing it — check the mechanism, not just the outcome.**
+  **Confirmed instance (2026-09-14, Cam):** the CtD crafting ramp's stage-advance bar was
+  `successes / (successes + futile attempts)`, i.e. success rate. Live data: `success` held
+  flat (40→35 update-over-update) while `futile_wrong_mats` nearly tripled (2875→7432), so
+  the rate *fell* (1.3%→0.4%) — not because blue got worse at crafting, but because blue
+  tried harder without materials. The denominator is under the agent's own control; an
+  agent that attempts more looks less competent by this metric regardless of what it
+  actually achieves. That is a construction defect, provable by reading the formula against
+  what the policy can influence, and does not require the bar to ever have passed or failed
+  to be disqualified — same standard as the `rel_spread` retirement (Part 2, above): name
+  the mechanism-level defect, not a failed threshold. Replaced with a per-capita bar —
+  `successes / living_blue_population ≥ 10%`, sustained 3 updates — which the policy cannot
+  depress by attempting more.
 - **Source beats prose.** Where documentation and code disagree, the code wins and the
   disagreement is itself a finding to record.
 

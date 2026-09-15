@@ -938,6 +938,14 @@ def run_simulation(
     return _fresh_run(config, seed=seed, n_steps=n_steps, on_checkpoint_saved=on_checkpoint_saved)
 
 
+def _pad_comms_history(history: list) -> list:
+    """Pad the comms-freeze tripwire's per-update codes_active history to a
+    fixed (40, 3) shape for checkpointing -- 40 is the same hard-cap as the
+    stage-0 escape and the forced-C0-capture deadline. Unfilled rows get a
+    (-1, -1, -1) sentinel."""
+    return [list(history[i]) if i < len(history) else [-1, -1, -1] for i in range(40)]
+
+
 def _run_simulation_impl(
     config: Dict,
     seed: int = 42,
@@ -1745,8 +1753,13 @@ def _run_simulation_impl(
     _ramp_cfg_outer = config.get("ctd_competence_ramp", {})
     craft_ramp_enabled = bool(_ramp_cfg_outer.get("craft_ramp_enabled", False))
     craft_ramp_min_steps = int(_ramp_cfg_outer.get("craft_ramp_min_steps", 50_000))
-    craft_ramp_success_bar = float(_ramp_cfg_outer.get("craft_ramp_success_bar", 0.02))
-    craft_ramp_success_window = int(_ramp_cfg_outer.get("craft_ramp_success_window", 5))
+    # 2026-09-14 (Cam): per-capita bar -- success as a fraction of the living
+    # blue population, not success/attempts (attempts is agent-controlled;
+    # that metric can't measure competence by construction, same instrument-
+    # validity standard as the rel_spread retirement). 10% sustained 3
+    # updates.
+    craft_ramp_success_bar = float(_ramp_cfg_outer.get("craft_ramp_success_bar", 0.10))
+    craft_ramp_success_window = int(_ramp_cfg_outer.get("craft_ramp_success_window", 3))
     craft_ramp_max_steps = int(_ramp_cfg_outer.get("craft_ramp_max_steps", 1_000_000))
     # 2026-09-14 (Cam): a hard escape scoped to stage 0 specifically, tighter
     # than the general craft_ramp_max_steps ceiling. Stage 0 has no
@@ -1783,19 +1796,25 @@ def _run_simulation_impl(
     # head applied to a trunk that keeps training under the policy loss.
     #
     # C0 = per-slot MEDIAN of codes_active over updates 3-7 after resume
-    # (updates 1-2 discarded outright; updates 3-7 are five samples, not
-    # one). A single-update sample is a zero-tolerance floor compared
-    # against one stochastic draw of the exact quantity being floored --
-    # codes_active over a rollout batch lands below any given sample about
-    # half the time, so a single-sample C0 produces a false halt in
-    # expectation within 2-3 updates. Tripwires do not arm until update 8.
-    # Never hardcoded from the offline calibration ladder, which used a
-    # different batch and isn't comparable in absolute scale. All of this
-    # persists across resumes so a crash mid-collection or mid-stage-0
-    # doesn't reset the streak counters or restart C0 collection.
+    # (updates 1-2 discarded outright). Capture is stability-gated, not a
+    # fixed window (Cam's second registered correction, 2026-09-14): the
+    # first fixed-window draft (median of updates 3-7) landed on a
+    # transient -- slot1 sampled 14|13|13|30|52 while it was still
+    # recovering toward its settled ~50s, giving a fast trip that would
+    # fire on a 70% collapse silently. C0 = median of the first 5
+    # consecutive updates (window start >= 3) in which every internal
+    # update-over-update transition is <=20% relative change on all three
+    # slots. If no such window forms by update 40, force-capture the
+    # median of updates 35-40 and log it loudly -- tied to the same
+    # 40-update budget as the stage-0 hard escape. Tripwires arm the
+    # update after capture. Never hardcoded from the offline calibration
+    # ladder, which used a different batch and isn't comparable in
+    # absolute scale. All of this persists across resumes so a crash
+    # mid-search or mid-stage-0 doesn't restart C0 collection.
     comms_updates_since_resume = 0   # counts qualifying updates since THIS resume
-    comms_c0_samples = [[], [], []]  # per-slot codes_active samples from updates 3-7
-    comms_c0 = None                  # (u0, u1, u2) per-slot median, set once at update 7
+    comms_sample_history = []        # list of (u0,u1,u2) per-slot codes_active, one per update, index 0 = update 1
+    comms_c0 = None                  # (u0, u1, u2) per-slot median, set once a stable window is found (or forced at 40)
+    comms_c0_captured_at_update = 0  # update index capture happened at; tripwires arm the update after
     comms_fast_streak = [0, 0, 0]    # consecutive updates below 0.5*C0, per slot
     comms_drift_streak = [0, 0, 0]   # consecutive updates below 0.75*C0, per slot
     comms_floor_streak = [0, 0, 0]   # consecutive updates below 0.85*C0, per slot (stage 0 only)
@@ -1813,12 +1832,15 @@ def _run_simulation_impl(
             comms_updates_since_resume = int(_restored_training_state.get(
                 "comms_updates_since_resume", comms_updates_since_resume
             ))
-            _tw_samples_restored = _restored_training_state.get("comms_c0_samples", None)
-            if _tw_samples_restored is not None:
-                _tw_samples_arr = np.asarray(_tw_samples_restored)  # (3, 5), -1 = not yet collected
-                comms_c0_samples = [
-                    [int(v) for v in row if int(v) >= 0] for row in _tw_samples_arr.tolist()
+            _tw_history_restored = _restored_training_state.get("comms_sample_history", None)
+            if _tw_history_restored is not None:
+                _tw_history_arr = np.asarray(_tw_history_restored)  # (40, 3), -1 row = not yet collected
+                comms_sample_history = [
+                    tuple(int(v) for v in row) for row in _tw_history_arr.tolist() if row[0] >= 0
                 ]
+            comms_c0_captured_at_update = int(_restored_training_state.get(
+                "comms_c0_captured_at_update", comms_c0_captured_at_update
+            ))
             _tw_c0_restored = _restored_training_state.get("comms_tripwire_c0", None)
             if _tw_c0_restored is not None:
                 _tw_c0_vals = [float(x) for x in np.asarray(_tw_c0_restored).tolist()]
@@ -1875,11 +1897,14 @@ def _run_simulation_impl(
             f"streak={red_ramp_catch_streak}, start_step={red_ramp_start_step:_})",
             flush=True,
         )
-        _c0_str = f"{comms_c0[0]}|{comms_c0[1]}|{comms_c0[2]}/64" if comms_c0 is not None else "not yet captured"
+        _c0_str = f"{comms_c0[0]:.1f}|{comms_c0[1]:.1f}|{comms_c0[2]:.1f}/64" if comms_c0 is not None else "not yet captured"
         print(
             f"[TRIPWIRE] comms-freeze tripwires: C0={_c0_str} "
-            f"(median of updates 3-7 after resume, updates 1-2 discarded, armed from update 8) | "
+            f"(stability-gated: median of first 5-consecutive-update window with all "
+            f"transitions <=20%, window start >=3, forced at 35-40 if none stabilizes; "
+            f"armed the update after capture) | "
             f"updates_since_resume={comms_updates_since_resume} | "
+            f"captured_at_update={comms_c0_captured_at_update} | "
             f"fast_streak={comms_fast_streak} (halt >=3 below 0.5*C0) | "
             f"drift_streak={comms_drift_streak} (halt >=15 below 0.75*C0) | "
             f"floor_streak={comms_floor_streak} (halt >=3 below 0.85*C0, stage 0 only) | "
@@ -1956,14 +1981,17 @@ def _run_simulation_impl(
         # this same loop body, so at this point they still describe the
         # stage that produced the rollout just collected.
         #
-        # C0 = per-slot MEDIAN of codes_active over updates 3-7 after resume,
-        # not a single sample: codes_active over a rollout batch is noisy
-        # enough that a lone sample lands below the next one about half the
-        # time, and update 1 is a distribution-shock sample (trained under
-        # the old ecology, resuming into the fixed one) -- anchoring a
-        # zero-tolerance floor to it would false-halt within 2-3 updates.
-        # Updates 1-2 are discarded outright; tripwires do not arm until
-        # update 8.
+        # C0 capture is stability-gated (Cam's second registered correction,
+        # 2026-09-14), not a fixed window: the first fixed-window draft
+        # (median of updates 3-7) landed on a transient for slot1 (sampled
+        # 14|13|13|30|52 while still recovering toward its settled ~50s),
+        # which would have let a 70% real collapse pass the fast trip
+        # silently. C0 = median of the first 5 consecutive updates (window
+        # start >= 3) in which every internal update-over-update transition
+        # is <=20% relative change on all three slots -- forced at the
+        # median of updates 35-40 if nothing stabilizes by then, tied to the
+        # same 40-update budget as the stage-0 hard escape. Tripwires arm
+        # the update after capture.
         if craft_ramp_active_outer:
             _tw_alive_mask = np.array(b_pop.alive).astype(bool)
             _tw_codes_now = None
@@ -1983,27 +2011,77 @@ def _run_simulation_impl(
 
             if _tw_codes_now is not None:
                 comms_updates_since_resume += 1
+                _u = comms_updates_since_resume
 
-                if comms_c0 is None and 3 <= comms_updates_since_resume <= 7:
-                    for _i in range(3):
-                        comms_c0_samples[_i].append(_tw_codes_now[_i])
-                    print(
-                        f"[TRIPWIRE] C0 sample {comms_updates_since_resume - 2}/5 at "
-                        f"ppo={ui} (update {comms_updates_since_resume} after resume): "
-                        f"codes_active={_tw_codes_now[0]}|{_tw_codes_now[1]}|{_tw_codes_now[2]}/64",
-                        flush=True,
-                    )
-                    if comms_updates_since_resume == 7:
-                        comms_c0 = tuple(
-                            float(np.median(comms_c0_samples[_i])) for _i in range(3)
-                        )
+                if comms_c0 is None:
+                    comms_sample_history.append(_tw_codes_now)
+
+                    # Earliest possible 5-consecutive-update window with a
+                    # start >= 3 ends at update 7 (window [3,4,5,6,7]).
+                    if _u >= 7:
+                        _win_start = _u - 4
+                        # comms_sample_history is 0-indexed by (update - 1);
+                        # window covers updates [_win_start .. _u].
+                        _window = comms_sample_history[_win_start - 1: _u]
+                        _transition_strs = []
+                        _window_stable = True
+                        for _t in range(4):
+                            _old, _new = _window[_t], _window[_t + 1]
+                            _changes = [
+                                abs(_new[_s] - _old[_s]) / max(_old[_s], 1e-9) for _s in range(3)
+                            ]
+                            _t_pass = all(_c <= 0.20 for _c in _changes)
+                            _window_stable = _window_stable and _t_pass
+                            _tag = "OK" if _t_pass else "FAIL"
+                            _transition_strs.append(
+                                f"{_win_start + _t}->{_win_start + _t + 1}:{_tag}"
+                                f"({','.join(f'{c:+.0%}' for c in _changes)})"
+                            )
                         print(
-                            f"[TRIPWIRE] C0 captured (median of updates 3-7 after resume): "
-                            f"{comms_c0[0]:.1f}|{comms_c0[1]:.1f}|{comms_c0[2]:.1f}/64 -- "
-                            f"tripwires ARM at update 8",
+                            f"[TRIPWIRE] C0 search: window upd{_win_start}-upd{_u} "
+                            f"[{'; '.join(f'{s0}|{s1}|{s2}' for s0, s1, s2 in _window)}] "
+                            f"| {' '.join(_transition_strs)} "
+                            f"| {'STABLE' if _window_stable else 'not stable'}",
                             flush=True,
                         )
-                elif comms_c0 is not None and comms_updates_since_resume >= 8:
+                        if _window_stable:
+                            comms_c0 = tuple(
+                                float(np.median([w[_s] for w in _window])) for _s in range(3)
+                            )
+                            comms_c0_captured_at_update = _u
+                            print(
+                                f"[TRIPWIRE] C0 captured (stable window upd{_win_start}-upd{_u}, "
+                                f"5 updates, all transitions <=20%): {comms_c0[0]:.1f}|"
+                                f"{comms_c0[1]:.1f}|{comms_c0[2]:.1f}/64 -- tripwires ARM at "
+                                f"update {_u + 1}",
+                                flush=True,
+                            )
+
+                    if comms_c0 is None and _u == 40:
+                        _fallback_window = comms_sample_history[34:40]  # updates 35-40
+                        comms_c0 = tuple(
+                            float(np.median([w[_s] for w in _fallback_window])) for _s in range(3)
+                        )
+                        comms_c0_captured_at_update = 40
+                        print(
+                            "=" * 70,
+                            flush=True,
+                        )
+                        print(
+                            f"[TRIPWIRE] *** C0 FORCED at update 40 -- no stable window "
+                            f"(all transitions <=20%) ever formed. Capturing median of "
+                            f"updates 35-40: {comms_c0[0]:.1f}|{comms_c0[1]:.1f}|"
+                            f"{comms_c0[2]:.1f}/64. This is a finding, not an "
+                            f"inconvenience -- the channel never settled within the "
+                            f"same 40-update budget as the stage-0 hard escape. "
+                            f"Tripwires ARM at update 41. ***",
+                            flush=True,
+                        )
+                        print(
+                            "=" * 70,
+                            flush=True,
+                        )
+                elif comms_updates_since_resume > comms_c0_captured_at_update:
                     _tw_halt_reasons = []
                     for _i in range(3):
                         _now = _tw_codes_now[_i]
@@ -2062,10 +2140,6 @@ def _run_simulation_impl(
                             flush=True,
                         )
                         print("=" * 70, flush=True)
-                        _tw_c0_padded = np.full((3, 5), -1, dtype=np.int32)
-                        for _i in range(3):
-                            _row = comms_c0_samples[_i][:5]
-                            _tw_c0_padded[_i, :len(_row)] = _row
                         _tw_training_state = {
                             "craft_ramp_active": jnp.array(craft_ramp_active_outer, dtype=jnp.bool_),
                             "craft_ramp_stage": jnp.array(craft_ramp_stage_outer, dtype=jnp.int32),
@@ -2077,8 +2151,11 @@ def _run_simulation_impl(
                             "red_curriculum_idx": jnp.array(red_curriculum_idx, dtype=jnp.int32),
                             "red_sustain_count": jnp.array(red_sustain_count, dtype=jnp.int32),
                             "comms_updates_since_resume": jnp.array(comms_updates_since_resume, dtype=jnp.int32),
-                            "comms_c0_samples": jnp.array(_tw_c0_padded, dtype=jnp.int32),
-                            "comms_tripwire_c0": jnp.array(comms_c0, dtype=jnp.float32),
+                            "comms_sample_history": jnp.array(_pad_comms_history(comms_sample_history), dtype=jnp.int32),
+                            "comms_c0_captured_at_update": jnp.array(comms_c0_captured_at_update, dtype=jnp.int32),
+                            "comms_tripwire_c0": jnp.array(
+                                comms_c0 if comms_c0 is not None else (-1.0, -1.0, -1.0), dtype=jnp.float32
+                            ),
                             "comms_fast_streak": jnp.array(comms_fast_streak, dtype=jnp.int32),
                             "comms_drift_streak": jnp.array(comms_drift_streak, dtype=jnp.int32),
                             "comms_floor_streak": jnp.array(comms_floor_streak, dtype=jnp.int32),
@@ -2731,10 +2808,20 @@ def _run_simulation_impl(
             _n_craft_total = (
                 _n_craft_success + _n_futile_uncoordinated + _n_futile_wrong_mats + _n_futile_empty
             )
+            # 2026-09-14 (Cam): success/attempts has an agent-controlled
+            # denominator -- blue can depress "rate" by spamming Craft harder
+            # without materials (observed live: success flat 40->35,
+            # futile_wrong_mats nearly tripled 2875->7432, rate fell 1.3%->
+            # 0.4%). Retired as the stage-advance gate on that mechanism, not
+            # because it failed a threshold (same standard as the rel_spread
+            # retirement) -- kept here as diagnostic context only, alongside
+            # the per-capita figure that replaces it below.
             print(
                 f"  Crafting: success={_n_craft_success} | futile_uncoordinated={_n_futile_uncoordinated} | "
                 f"futile_wrong_mats={_n_futile_wrong_mats} | futile_empty={_n_futile_empty} | "
-                f"rate={_n_craft_success / max(1, _n_craft_total):.1%}"
+                f"rate={_n_craft_success / max(1, _n_craft_total):.1%} (diagnostic only, not the "
+                f"stage-advance gate) | pop_frac={_n_craft_success / max(1, b_alive_now):.1%} "
+                f"(this IS the gate, vs living blue={b_alive_now})"
             )
 
             # ── CtD competence ramp: per-update ratchet decision ─────
@@ -2763,8 +2850,16 @@ def _run_simulation_impl(
                 # recipe); advancing from an earlier stage moves to the next.
                 _steps_since_craft_ramp = (ui + 1) * T - craft_ramp_start_step
                 _updates_since_craft_ramp = (ui + 1) - (craft_ramp_start_step // T)
-                _craft_rate_this_update = _n_craft_success / max(1, _n_craft_total)
-                if _craft_rate_this_update >= craft_ramp_success_bar:
+                # Per-capita bar (Cam's third registered correction,
+                # 2026-09-14), replacing success/attempts: attempts is an
+                # agent-controlled denominator -- an agent that tries more
+                # looks less competent, which cannot measure competence by
+                # construction. success/living_population isn't controllable
+                # the same way. Default 10%, sustained 3 updates -- at
+                # blue~195 that's ~20 successes, already well inside the
+                # observed 35-40/update.
+                _craft_success_frac_of_pop = _n_craft_success / max(1, b_alive_now)
+                if _craft_success_frac_of_pop >= craft_ramp_success_bar:
                     craft_ramp_success_streak += 1
                 else:
                     craft_ramp_success_streak = 0
@@ -2780,10 +2875,11 @@ def _run_simulation_impl(
                     _craft_advance_reason = "STAGE-0 HARD ESCAPE -- bar never cleared within 40 updates"
                     print(
                         f"[CTD-RAMP] *** Stage-0 hard escape fired: {_updates_since_craft_ramp} "
-                        f"updates since stage 0 began, bar ({craft_ramp_success_bar:.0%} sustained "
-                        f"{craft_ramp_success_window} updates) never cleared (current streak="
-                        f"{craft_ramp_success_streak}, this update's rate="
-                        f"{_craft_rate_this_update:.1%}). Advancing to stage 1 anyway -- a "
+                        f"updates since stage 0 began, bar ({craft_ramp_success_bar:.0%} of living "
+                        f"population sustained {craft_ramp_success_window} updates) never cleared "
+                        f"(current streak={craft_ramp_success_streak}, this update's "
+                        f"success={_n_craft_success}/{b_alive_now} living blue = "
+                        f"{_craft_success_frac_of_pop:.1%}). Advancing to stage 1 anyway -- a "
                         f"curriculum phase with no exit is a trap, and stage 0 is the phase "
                         f"with no communication pressure. This is a finding, not an "
                         f"inconvenience. ***",
@@ -2795,8 +2891,8 @@ def _run_simulation_impl(
                     print(
                         f"[CTD-RAMP] *** Crafting ramp stage {craft_ramp_stage_outer} forced to "
                         f"advance at hard ceiling ({craft_ramp_max_steps:_} steps) WITHOUT "
-                        f"meeting its bar ({craft_ramp_success_bar:.0%} sustained "
-                        f"{craft_ramp_success_window} updates). This is a finding, not an "
+                        f"meeting its bar ({craft_ramp_success_bar:.0%} of living population "
+                        f"sustained {craft_ramp_success_window} updates). This is a finding, not an "
                         f"inconvenience. ***",
                         flush=True,
                     )
@@ -3305,9 +3401,8 @@ def _run_simulation_impl(
                 "red_curriculum_idx": jnp.array(red_curriculum_idx, dtype=jnp.int32),
                 "red_sustain_count": jnp.array(red_sustain_count, dtype=jnp.int32),
                 "comms_updates_since_resume": jnp.array(comms_updates_since_resume, dtype=jnp.int32),
-                "comms_c0_samples": jnp.array(
-                    [(row + [-1, -1, -1, -1, -1])[:5] for row in comms_c0_samples], dtype=jnp.int32
-                ),
+                "comms_sample_history": jnp.array(_pad_comms_history(comms_sample_history), dtype=jnp.int32),
+                "comms_c0_captured_at_update": jnp.array(comms_c0_captured_at_update, dtype=jnp.int32),
                 "comms_tripwire_c0": jnp.array(
                     comms_c0 if comms_c0 is not None else (-1.0, -1.0, -1.0), dtype=jnp.float32
                 ),

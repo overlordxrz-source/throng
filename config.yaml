@@ -341,9 +341,20 @@ ctd_competence_ramp:
   # (teach that Craft has value), which success=123 at 7.1% already showed
   # was learned well inside the old bar. New bar is deliberately easier to
   # clear, not harder: every update past competence is pure channel atrophy.
+  # Bar retired from success/attempts to per-capita 2026-09-14 (Cam):
+  # attempts is an agent-controlled denominator -- observed live, success
+  # stayed flat (40->35) while futile_wrong_mats nearly tripled
+  # (2875->7432), so the rate FELL (1.3%->0.4%) purely because blue spammed
+  # Craft harder without materials. An agent that tries more looks less
+  # competent under that metric; it cannot measure competence, by
+  # construction (same instrument-validity standard as the rel_spread
+  # retirement -- argued from the mechanism, not from whether it passed).
+  # success/living_blue_population isn't gameable the same way. 10% is
+  # deliberately easy: at blue~195 that's ~20 successes, already well
+  # inside the observed 35-40/update.
   craft_ramp_min_steps: 50000      # floor: an advance never fires before this many steps into the stage
-  craft_ramp_success_bar: 0.02     # success rate that must be sustained to advance on the bar
-  craft_ramp_success_window: 5     # consecutive PPO updates the bar must hold
+  craft_ramp_success_bar: 0.10     # successes this update, as a fraction of the LIVING BLUE POPULATION
+  craft_ramp_success_window: 3     # consecutive PPO updates the bar must hold
   craft_ramp_max_steps: 1000000    # hard ceiling per stage: forced advance + loud report if the bar is never met
   # 2026-09-14 (Cam): stage-0-specific hard escape, tighter than
   # craft_ramp_max_steps above. Live on the 2541 resume: craft rate 1.3% ->

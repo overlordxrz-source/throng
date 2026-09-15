@@ -108,7 +108,39 @@ def _tiny_cpu_smoke(n_steps: int) -> str:
 
     cfg = build_cfg()
     print(f"[preflight] build_cfg() OK, checkpoint_dir={cfg['checkpoint_dir']}", flush=True)
-    run_simulation(cfg, seed=42, n_steps=n_steps)
+
+    # 2026-09-14: n_updates = n_steps // T is an ABSOLUTE target step count,
+    # not "steps to run from here" -- the training loop is `for ui in
+    # range(start_update, n_updates)`. A flat n_steps=50 (n_updates=0) gives
+    # an EMPTY range whenever start_update > 0, so every preflight against a
+    # resumed checkpoint has been completing "successfully" without ever
+    # executing a single loop iteration -- restore-path banners printed,
+    # zero PPO updates, zero tripwire/crafting-bar code ever touched. Caught
+    # by actually checking, not by trusting "smoke test completed" (Rule
+    # 13). Resolve the real resume point the same way main_jax.py will, and
+    # pad enough steps for a handful of genuine post-resume updates.
+    _T = int(cfg.get("ppo_rollout_steps", 512))
+    _resume_pin = cfg.get("resume_from_step")
+    if _resume_pin is not None:
+        _start_update = int(_resume_pin)
+    else:
+        import orbax.checkpoint as ocp
+        _mngr = ocp.CheckpointManager(
+            cfg["checkpoint_dir"], ocp.StandardCheckpointer(),
+            options=ocp.CheckpointManagerOptions(create=False),
+        )
+        _latest = _mngr.latest_step()
+        _start_update = int(_latest) if _latest is not None else 0
+    _min_steps = (_start_update + 3) * _T
+    steps = max(n_steps, _min_steps)
+    if steps != n_steps:
+        print(
+            f"[preflight] n_steps={n_steps} would give an EMPTY update range "
+            f"resuming from update {_start_update} -- padded to {steps} so at "
+            f"least 3 real post-resume updates actually run.",
+            flush=True,
+        )
+    run_simulation(cfg, seed=42, n_steps=steps)
     return head
 
 
