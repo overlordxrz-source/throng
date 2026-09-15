@@ -52,6 +52,7 @@ def run_simulation(
     config: Dict,
     seed: int = 42,
     n_steps: int = 100_000,
+    on_checkpoint_saved: Any = None,
 ) -> Tuple[Any, Dict]:
     """Run JAX training with a fresh import of jax_sim + communication from disk."""
     _evict_stale_modules()
@@ -59,4 +60,4 @@ def run_simulation(
 
     _assert_observations_module()
     _assert_corpus_writer()
-    return _run_simulation_impl(config, seed=seed, n_steps=n_steps)
+    return _run_simulation_impl(config, seed=seed, n_steps=n_steps, on_checkpoint_saved=on_checkpoint_saved)

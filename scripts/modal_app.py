@@ -167,7 +167,17 @@ def train(n_steps: int = N_STEPS_FULL) -> None:
         "PPO-bound path but is cheaper per unit compute)",
         flush=True,
     )
-    run_simulation(build_cfg(), seed=42, n_steps=n_steps)
+    # 2026-09-14: Volume.commit() was previously called only once, after the
+    # ENTIRE run_simulation() call returns (i.e. after all n_steps complete
+    # or the run crashes past this line). Modal Volume writes are not
+    # guaranteed durable/visible until commit() runs, so every periodic
+    # checkpoint saved during the run was uncommitted -- any stop, crash, or
+    # preemption before natural completion could lose all progress since the
+    # last full run, regardless of how many "[CKPT] Saved" lines printed.
+    # Confirmed empirically 2026-09-14: after ~20 min and 15+ PPO updates
+    # past a resume, `modal volume ls` still showed no checkpoint newer than
+    # the resume point. Commit on the same cadence as the checkpoint itself.
+    run_simulation(build_cfg(), seed=42, n_steps=n_steps, on_checkpoint_saved=volume.commit)
     volume.commit()
 
 

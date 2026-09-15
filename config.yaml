@@ -345,6 +345,14 @@ ctd_competence_ramp:
   craft_ramp_success_bar: 0.02     # success rate that must be sustained to advance on the bar
   craft_ramp_success_window: 5     # consecutive PPO updates the bar must hold
   craft_ramp_max_steps: 1000000    # hard ceiling per stage: forced advance + loud report if the bar is never met
+  # 2026-09-14 (Cam): stage-0-specific hard escape, tighter than
+  # craft_ramp_max_steps above. Live on the 2541 resume: craft rate 1.3% ->
+  # 0.4% while futile_wrong_mats nearly tripled -- the bar was receding, not
+  # approaching. Stage 0 has no communication pressure (it's the phase that
+  # ate the channel last time), so a bar that may never clear would silently
+  # turn a deliberately short phase into an unbounded one. 40 PPO updates,
+  # measured from stage 0's own start.
+  craft_ramp_stage0_max_updates: 40
   red_ramp_enabled: true
   red_ramp_beta: 2.5               # shaping coefficient (verified: full 1-cell close ~= reward_red_move)
   red_ramp_min_steps: 200000

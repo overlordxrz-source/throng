@@ -683,7 +683,7 @@ def make_sim_step(
         # Captured for the CtD red shaping term -- alive state as seen by
         # apply_catches, before this step's catches are resolved.
         _b_alive_before_catch = b_pop.alive
-        b_new_alive, caught_b, r_caught_small, r_caught_big_coop, r_caught_big_solo, r_mauled, b_catch_pen = apply_catches(
+        b_new_alive, caught_b, r_caught_small, r_caught_big_coop, r_caught_big_solo, r_mauled, b_catch_pen, catch_attempted = apply_catches(
             b_pop.positions, b_pop.alive, b_pop.is_big_green,
             r_pop.positions, r_pop.alive, r_actions,
             gs, step_idx, _coop_threshold_step,
@@ -884,6 +884,7 @@ def make_sim_step(
             "energy": b_pop.energy,
             "alive": b_pop.alive,
             "blue_caught": caught_b.astype(jnp.float32),
+            "catch_attempted": catch_attempted.astype(jnp.float32),
             "imagined_action": b_a_imagined,
             "imagination_gain": b_im_gain,
             "imagination_agree": b_imagination_agree,
@@ -929,17 +930,19 @@ def run_simulation(
     config: Dict,
     seed: int = 42,
     n_steps: int = 100000,
+    on_checkpoint_saved: Any = None,
 ) -> Tuple[Dict, Dict]:
     """Prefer ``from jax_sim.train_entry import run_simulation`` after git pull."""
     from jax_sim.train_entry import run_simulation as _fresh_run
 
-    return _fresh_run(config, seed=seed, n_steps=n_steps)
+    return _fresh_run(config, seed=seed, n_steps=n_steps, on_checkpoint_saved=on_checkpoint_saved)
 
 
 def _run_simulation_impl(
     config: Dict,
     seed: int = 42,
     n_steps: int = 100000,
+    on_checkpoint_saved: Any = None,
 ) -> Tuple[Dict, Dict]:
     """
     Run full JAX simulation.
@@ -1745,6 +1748,16 @@ def _run_simulation_impl(
     craft_ramp_success_bar = float(_ramp_cfg_outer.get("craft_ramp_success_bar", 0.02))
     craft_ramp_success_window = int(_ramp_cfg_outer.get("craft_ramp_success_window", 5))
     craft_ramp_max_steps = int(_ramp_cfg_outer.get("craft_ramp_max_steps", 1_000_000))
+    # 2026-09-14 (Cam): a hard escape scoped to stage 0 specifically, tighter
+    # than the general craft_ramp_max_steps ceiling. Stage 0 has no
+    # communication pressure -- it's the phase that ate the channel last
+    # time -- and shortening it was the whole point of the three-stage
+    # design. A bar that may never clear (observed live: craft rate 1.3% ->
+    # 0.4% while futile_wrong_mats nearly tripled, receding not approaching)
+    # would silently convert a deliberately short phase into an unbounded
+    # one. 40 updates, in PPO updates not steps, measured from stage 0's own
+    # start (== run start on a fresh resume into stage 0).
+    craft_ramp_stage0_max_updates = int(_ramp_cfg_outer.get("craft_ramp_stage0_max_updates", 40))
     craft_ramp_active_outer = craft_ramp_enabled
     # Two capped stages (Cam's correction, 2026-09-14): max_units=2 alone was
     # still a cooperative problem at smaller scale, not the solo-catchable
@@ -1853,6 +1866,7 @@ def _run_simulation_impl(
             f"(stage={craft_ramp_stage_outer}/{len(CRAFT_RAMP_STAGE_UNITS) - 1} units={_craft_stage_units}, "
             f"floor={craft_ramp_min_steps:_}, bar={craft_ramp_success_bar:.0%}/"
             f"{craft_ramp_success_window}upd, ceiling={craft_ramp_max_steps:_}, "
+            f"stage0_hard_escape={craft_ramp_stage0_max_updates}upd, "
             f"streak={craft_ramp_success_streak}, stage_start_step={craft_ramp_start_step:_}) | "
             f"red={red_ramp_active_outer} "
             f"(beta={float(_ramp_cfg_outer.get('red_ramp_beta', 2.5))}, "
@@ -2077,6 +2091,13 @@ def _run_simulation_impl(
                         })
                         ckpt_mngr.wait_until_finished()
                         print(f"[TRIPWIRE] Emergency checkpoint saved at step {ui}.", flush=True)
+                        if on_checkpoint_saved is not None:
+                            # A checkpoint save that isn't committed (Modal
+                            # Volumes: writes aren't guaranteed durable/visible
+                            # to other containers until Volume.commit()) is
+                            # not proof the emergency save survives the
+                            # SystemExit about to happen. Commit before exiting.
+                            on_checkpoint_saved()
                         raise SystemExit(1)
 
         # ── Red Curriculum Advancement ────────────────────────────
@@ -2675,6 +2696,12 @@ def _run_simulation_impl(
             blue_caught_rollout = 0
             if "blue_caught" in rollout_data["blue"]:
                 blue_caught_rollout = int(np.asarray(rollout_data["blue"]["blue_caught"]).sum())
+            # 2026-09-14 (Cam): catch attempts vs conversions, from instrumentation
+            # not config -- distinguishes "red can't find blue" (attempts=0) from
+            # "the catch path is broken" (attempts>0, conversions=0).
+            catch_attempted_rollout = 0
+            if "catch_attempted" in rollout_data["blue"]:
+                catch_attempted_rollout = int(np.asarray(rollout_data["blue"]["catch_attempted"]).sum())
             barrier_sum_val = 0
             if "barrier_sum" in rollout_data["blue"]:
                 barrier_sum_val = float(np.asarray(rollout_data["blue"]["barrier_sum"]).mean())
@@ -2684,6 +2711,8 @@ def _run_simulation_impl(
                 medal_str = f" | expert_dropouts={int(_md)}"
             print(
                 f"  Ecology: blue_caught={blue_caught_rollout} this rollout | "
+                f"catch_attempts={catch_attempted_rollout} "
+                f"(conversion={blue_caught_rollout / max(1, catch_attempted_rollout):.1%}) | "
                 f"red_floor={red_curriculum_stages[red_curriculum_idx]} "
                 f"sustain={red_sustain_count}/{red_sustain_needed} | brain={n_layers}L{medal_str} | barrier_sum={barrier_sum_val:.1f}"
             )
@@ -2733,6 +2762,7 @@ def _run_simulation_impl(
                 # from the last stage ratchets the ramp off entirely (full
                 # recipe); advancing from an earlier stage moves to the next.
                 _steps_since_craft_ramp = (ui + 1) * T - craft_ramp_start_step
+                _updates_since_craft_ramp = (ui + 1) - (craft_ramp_start_step // T)
                 _craft_rate_this_update = _n_craft_success / max(1, _n_craft_total)
                 if _craft_rate_this_update >= craft_ramp_success_bar:
                     craft_ramp_success_streak += 1
@@ -2744,6 +2774,21 @@ def _run_simulation_impl(
                         and craft_ramp_success_streak >= craft_ramp_success_window):
                     _craft_advance_now = True
                     _craft_advance_reason = "bar met"
+                elif (craft_ramp_stage_outer == 0
+                        and _updates_since_craft_ramp >= craft_ramp_stage0_max_updates):
+                    _craft_advance_now = True
+                    _craft_advance_reason = "STAGE-0 HARD ESCAPE -- bar never cleared within 40 updates"
+                    print(
+                        f"[CTD-RAMP] *** Stage-0 hard escape fired: {_updates_since_craft_ramp} "
+                        f"updates since stage 0 began, bar ({craft_ramp_success_bar:.0%} sustained "
+                        f"{craft_ramp_success_window} updates) never cleared (current streak="
+                        f"{craft_ramp_success_streak}, this update's rate="
+                        f"{_craft_rate_this_update:.1%}). Advancing to stage 1 anyway -- a "
+                        f"curriculum phase with no exit is a trap, and stage 0 is the phase "
+                        f"with no communication pressure. This is a finding, not an "
+                        f"inconvenience. ***",
+                        flush=True,
+                    )
                 elif _steps_since_craft_ramp >= craft_ramp_max_steps:
                     _craft_advance_now = True
                     _craft_advance_reason = "CEILING FORCED -- bar never met"
@@ -3280,6 +3325,20 @@ def _run_simulation_impl(
             ckpt_mngr.save(ui + 1, items=ckpt_state)
             ckpt_mngr.wait_until_finished()
             print(f"  [CKPT] Saved step {(ui+1)*T}")
+            if on_checkpoint_saved is not None:
+                # 2026-09-14: ckpt_mngr.save()+wait_until_finished() writes to
+                # the container's local view of the mount; on Modal Volumes
+                # that is NOT guaranteed durable or visible to any other
+                # container (including a future resume) until Volume.commit()
+                # runs. Without this, "[CKPT] Saved step N" was a success
+                # message with no proof behind it (Rule 13) -- every periodic
+                # save since the last natural run-completion could vanish on
+                # any interruption (stop, crash, preemption) that never
+                # reaches the one commit() call at the very end of
+                # scripts/modal_app.py's train(). Commit on the same cadence
+                # as the checkpoint itself.
+                on_checkpoint_saved()
+                print(f"  [CKPT] Committed step {(ui+1)*T}", flush=True)
 
         if (ui + 1) % 10 == 0 or ui == 0:
             alive_count = int(b_pop.alive.sum())

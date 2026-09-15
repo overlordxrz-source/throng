@@ -279,9 +279,16 @@ def apply_catches(
     catch_radius: int = 1,
     catch_prob: float = 1.0,
     rng: jnp.ndarray | None = None,
-) -> Tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray]:
+) -> Tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray]:
     """
-    Returns (b_new_alive, caught_b, r_caught_small, r_caught_big_coop, r_caught_big_solo, r_mauled, b_penalty)
+    Returns (b_new_alive, caught_b, r_caught_small, r_caught_big_coop, r_caught_big_solo, r_mauled, b_penalty, catch_attempted)
+
+    catch_attempted (B,): per-blue-agent indicator -- at least one living red was
+    within catch_radius of this (living, non-big-green) blue this step, whether or
+    not the catch converted (jitter, or simply not the only red in range). 2026-09-14
+    (Cam): "prove it produces catches or prove why it can't, from instrumentation" --
+    no attempt/conversion split existed before this; only the post-jitter outcome
+    (caught_b) was ever surfaced.
     """
     max_b = b_pos.shape[0]
 
@@ -328,7 +335,9 @@ def apply_catches(
 
     b_penalty = -1.0 * caught_b.astype(jnp.float32)
 
-    return b_new_alive, caught_b, r_caught_small, r_caught_big_coop, r_caught_big_solo, r_mauled, b_penalty
+    catch_attempted = caught_small_potential & b_alive
+
+    return b_new_alive, caught_b, r_caught_small, r_caught_big_coop, r_caught_big_solo, r_mauled, b_penalty, catch_attempted
 
 
 # ── Symbol / culture writes ─────────────────────────────────────────────────
