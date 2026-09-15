@@ -132,6 +132,28 @@ more expensive, because it produces publishable-looking nulls.
   depress by attempting more.
 - **Source beats prose.** Where documentation and code disagree, the code wins and the
   disagreement is itself a finding to record.
+- **Durability is a precondition for running, not a property to fix while running. A run
+  that cannot save its output has zero expected value no matter how well it's going.**
+  Restarting costs only elapsed time; losing unsaved progress costs the progress. Weigh them
+  accordingly, and weigh them *before* launching, not after a convenient reason not to
+  restart presents itself. **Confirmed instance (2026-09-14 to 2026-09-15, Cam's own):** the
+  checkpoint-durability bug (`Path(...).resolve()` silently bypassing `Volume.commit()`'s
+  write-tracking, docs/THE-ECOLOGY-NEVER-RAN.md instance 5) was diagnosed and fixed
+  (`11f0bb2`) while a run built on the *pre-fix* pinned SHA was already in flight. Cam ruled
+  "leave it, this run" to avoid discarding 20 updates of ramp-floor convenience and a
+  hard-won post-cascade codebook state — weighing durability against convenience without
+  weighing what durability actually gates: whether the run's output exists at all. The run
+  trained for 7.5 hours (44 PPO updates, ppo 2541→2584, including the entire cascade-defusal
+  sequence the fix had just been proven against) and was lost in full when a second, unrelated
+  tripwire halt fired — every checkpoint saved during that window, including the emergency
+  save at the halt itself, silently failed to commit, for exactly the bug already diagnosed
+  and already fixed in the repo. A fix that exists in the repo but not in the pinned SHA of
+  the running container is not a fix. Once durability is confirmed broken, the only correct
+  ruling is: stop, relaunch on the fix, resume the small loss now, before it becomes a large
+  one. Verify durability *externally* before trusting further GPU-hours to any run — see the
+  `DURABILITY-GATE` check in `scripts/modal_app.py` (`volume.listdir()` after the first
+  commit, not the container's own print, not its own FUSE view), added directly in response
+  to this instance.
 
 ## Part 3 — Fossils
 

@@ -261,6 +261,7 @@ def _minibatch_step(
     obs, actions, alarm_actions, old_log_probs, advantages, returns, carries,
     n_layers, old_values, clip_eps, vf_coef, ent_coef, vq_coef, loss_vq, alive, rng_key,
     ignition, ignition_discount, alarm_ent_coef, freeze_comms=False,
+    comms_lr_warmup=1.0,
 ):
     grad_fn = jax.value_and_grad(ppo_loss, has_aux=True)
     (loss, metrics), grads = grad_fn(
@@ -309,6 +310,37 @@ def _minibatch_step(
         grads = grads_dict
 
     updates, new_opt_state = optimizer.update(grads, opt_state, params)
+
+    # 2026-09-15 (Cam): the freeze holds Adam's m/v at exactly zero for
+    # COMMS_SUBTREE_KEYS (zero gradient in, every step, since b_opt_state is
+    # freshly zero-initialized -- see the comment above COMMS_SUBTREE_KEYS).
+    # That makes the freeze bitwise-exact, which is what it was for. It also
+    # means the first unfrozen gradient is Adam's t=1 case: m_hat = g,
+    # v_hat = g**2, so m_hat/sqrt(v_hat) = sign(g) regardless of g's
+    # magnitude -- a maximal lr*sign(g) step on the first real gradient
+    # after 40 updates of accumulated trunk drift. Scaling the GRADIENT fed
+    # into Adam would not defuse this (Adam is scale-invariant to its first
+    # input by construction, same reason the freeze is exact). Scaling the
+    # already-Adam-normalized UPDATE, after optimizer.update() and before
+    # apply_updates(), shrinks the actual step regardless of Adam's internal
+    # normalization -- this is what caused the ppo=2582->2583 collapse
+    # (single update, all channels together, unremarkable grad_norm) on the
+    # 2026-09-14 run. comms_lr_warmup ramps 0->1 over the 10 updates
+    # following unfreeze; 1.0 (no-op) at all other times. comms_lr_warmup is
+    # a traced value under this function's jax.jit (it varies update to
+    # update, so it can't be a static_argname without recompiling every
+    # update) -- always apply the multiply rather than branching on it in
+    # Python; multiplying by 1.0 is a numeric no-op.
+    is_frozen_u = isinstance(updates, flax.core.FrozenDict)
+    updates_dict = updates.unfreeze() if is_frozen_u else dict(updates)
+    u_target = updates_dict["params"] if "params" in updates_dict else updates_dict
+    for _k in COMMS_SUBTREE_KEYS:
+        if _k in u_target:
+            u_target[_k] = jax.tree_util.tree_map(
+                lambda u: u * comms_lr_warmup, u_target[_k]
+            )
+    updates = flax.core.freeze(updates_dict) if is_frozen_u else updates_dict
+
     new_params = optax.apply_updates(params, updates)
     metrics["total_loss"] = loss
     return new_params, new_opt_state, metrics, grads
@@ -333,6 +365,7 @@ def ppo_update(
     ignition_discount: float = 0.1,
     alarm_ent_coef: float = 0.0,
     freeze_comms: bool = False,
+    comms_lr_warmup: float = 1.0,
 ) -> Tuple[Dict, Any, Dict]:
     """
     Single gradient update step using minibatches.
@@ -441,6 +474,7 @@ def ppo_update(
             mb_obs, mb_act, mb_alarm_act, mb_lp, mb_adv, mb_ret, mb_c,
             n_layers, mb_v, clip_eps, vf_coef, ent_coef, vq_coef, mb_vq, mb_al, mb_key,
             mb_ig, ignition_discount, alarm_ent_coef, freeze_comms,
+            comms_lr_warmup,
         )
 
         # Accumulate as Python floats to avoid holding 500 JAX arrays

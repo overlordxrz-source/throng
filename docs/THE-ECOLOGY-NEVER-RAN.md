@@ -232,6 +232,16 @@ runs")` and joins onto that raw path directly, with no `.resolve()` anywhere in 
 — confirmed durable via the live volume listing (`signal_corpus.jsonl`, 623 MiB, modified
 throughout the run, not stale from an earlier one).
 
+**Postscript (2026-09-15):** this fix (`11f0bb2`) never reached the container running at the
+time it was diagnosed — that run was already provisioned from the older, pre-fix pinned SHA
+(`a0c48ed`), and per Cam's explicit ruling was deliberately not restarted onto the fix. It ran a
+further 7.5 hours (ppo 2541→2584) and was lost in full to this exact bug when an unrelated
+tripwire halted it — the emergency checkpoint at the halt included. See
+`docs/RESEARCH_PROTOCOL.md` Part 2, "durability is a precondition for running," for the
+general rule this instance forced into writing, and `scripts/modal_app.py`'s
+`DURABILITY-GATE` check for the fix: verify durability externally (`volume.listdir()`) after
+the first commit of any new launch, before trusting it with further GPU-hours.
+
 ---
 
 *(Log format: mechanism, when it was introduced not-actually-working, when

@@ -1850,6 +1850,15 @@ def _run_simulation_impl(
     craft_ramp_stage_outer = 0
     craft_ramp_start_step = start_update * T  # start of the CURRENT stage
     craft_ramp_success_streak = 0
+    # 2026-09-15 (Cam): ppo update index at which the comms subtree last
+    # unfroze, or None before that's happened / once the 10-update warmup
+    # below has fully elapsed. Drives comms_lr_warmup in the ppo_update call
+    # below -- see the comment in rl_jax._minibatch_step for why a step-size
+    # warmup (not a gradient-magnitude one) is what defuses the freeze-exit
+    # spring. Not restored across a resume: the window is 10 updates, short
+    # enough that a resume landing inside it is an edge case left unhandled.
+    _comms_unfreeze_at_update = None
+    _comms_lr_warmup_updates = 10
 
     red_ramp_enabled = bool(_ramp_cfg_outer.get("red_ramp_enabled", False))
     red_ramp_min_steps = int(_ramp_cfg_outer.get("red_ramp_min_steps", 200_000))
@@ -2361,6 +2370,25 @@ def _run_simulation_impl(
             # pre-advance craft_ramp_stage_outer (the ratchet decision below
             # only fires after this update).
             _freeze_comms = bool(craft_ramp_active_outer and craft_ramp_stage_outer == 0)
+            # 2026-09-15 (Cam): linear warmup on the comms subtree's applied
+            # update for the 10 PPO updates immediately after unfreeze --
+            # 0.0 on the first unfrozen update, 1.0 (no-op) from update 10
+            # onward. See the comment at the comms_lr_warmup scaling site in
+            # rl_jax._minibatch_step for the mechanism this defuses.
+            if _comms_unfreeze_at_update is None:
+                _comms_lr_warmup = 1.0
+            else:
+                _updates_since_unfreeze = ui - _comms_unfreeze_at_update
+                _comms_lr_warmup = min(1.0, max(0.0, _updates_since_unfreeze / _comms_lr_warmup_updates))
+                if _updates_since_unfreeze >= _comms_lr_warmup_updates:
+                    _comms_unfreeze_at_update = None  # warmup elapsed, stop computing/logging it
+                else:
+                    print(
+                        f"  [COMMS-WARMUP] update {ui + 1}: warmup_factor={_comms_lr_warmup:.2f} "
+                        f"effective_comms_lr={float(config.get('ppo_lr', 1e-4)) * _comms_lr_warmup:.2e} "
+                        f"({_updates_since_unfreeze}/{_comms_lr_warmup_updates} updates since unfreeze)",
+                        flush=True,
+                    )
             b_params, b_opt_state, b_metrics = ppo_update(
                 b_params, b_opt_state, b_optimizer, model_apply,
                 b_batch, n_layers, update_key,
@@ -2375,6 +2403,7 @@ def _run_simulation_impl(
                 ignition_discount=float(config.get("phase16_5_enrichment", {}).get("ignition_discount", 0.1)),
                 alarm_ent_coef=float(config.get("alarm_ent_coef", 0.0)),
                 freeze_comms=_freeze_comms,
+                comms_lr_warmup=_comms_lr_warmup,
             )
             if _freeze_comms and ui == start_update:
                 print("  [CTD-RAMP] comms subtree FROZEN for stage 0 (gwt_comms_1, "
@@ -3025,10 +3054,14 @@ def _run_simulation_impl(
                             flush=True,
                         )
                         if _leaving_stage0:
+                            _comms_unfreeze_at_update = ui + 1
                             print(
                                 "  [CTD-RAMP] comms subtree UNFROZEN (stage-1 transition) -- "
                                 "gwt_comms_1, head_signal_slot0/1/2, codebook_0/1/2, emb_nb "
-                                "resume normal gradient updates next PPO step",
+                                "resume normal gradient updates next PPO step, ramping in over "
+                                f"{_comms_lr_warmup_updates} updates (2026-09-15, Cam: defuses "
+                                "the Adam bias-correction spring on the first post-freeze "
+                                "gradient -- see rl_jax._minibatch_step)",
                                 flush=True,
                             )
                     else:
