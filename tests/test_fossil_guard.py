@@ -66,14 +66,57 @@ def test_guard_stays_quiet_on_a_fresh_single_lineage_directory():
         )
 
 
+def test_a_standing_resume_pin_would_fight_the_guard_on_its_own_next_restart():
+    """Documents the exact hazard Cam caught (2026-09-15) and the reason
+    resume_from_step was removed from config.yaml rather than left standing
+    at 2541: a permanent pin and this guard actively contradict each other.
+    Simulates one full cycle -- launch pinned to an old step, save real
+    forward progress, restart still pinned to the same old step -- and
+    shows the guard (correctly) refuses, reading the run's own progress as
+    a fossil. This is not a bug in the guard: it is proof that a standing
+    pin is the bug, and the fix is removing the pin (checkpoint_dir starts
+    single-lineage instead), not weakening the guard."""
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        # First launch: only 2541 present, pinned to 2541 -- fine, matches "latest."
+        mngr = _make_manager(tmp_dir, steps=[2541])
+        pinned_resume_target = 2541
+        assert find_fossil_checkpoints(mngr, pinned_resume_target) == []
+
+        # The run saves real forward progress: 2542.
+        mngr.save(2542, items={"dummy": jnp.array([2542.0])})
+        mngr.wait_until_finished()
+
+        # Restart, with the pin left standing at 2541 (config.yaml unchanged,
+        # the exact mistake this test exists to rule out): the guard now sees
+        # 2542 -- the run's OWN real progress -- as a fossil ahead of the
+        # (stale) pinned target, and correctly refuses.
+        fossils_with_stale_pin = find_fossil_checkpoints(mngr, pinned_resume_target)
+        assert fossils_with_stale_pin == [2542], (
+            f"expected a standing pin to make the guard flag the run's own "
+            f"progress (2542) as a fossil, got {fossils_with_stale_pin!r} -- "
+            f"if this is empty, the guard is no longer enforcing the invariant "
+            f"and a stale pin could silently roll back real progress instead."
+        )
+
+        # With the pin removed (this session's actual fix), the resume target
+        # tracks the true latest checkpoint instead, and the guard is quiet.
+        true_latest_target = mngr.latest_step()
+        assert true_latest_target == 2542
+        assert find_fossil_checkpoints(mngr, true_latest_target) == []
+
+
 if __name__ == "__main__":
     test_guard_fires_when_a_fossil_sits_ahead_of_a_rolled_back_resume()
     test_guard_stays_quiet_on_a_clean_forward_resume()
     test_guard_stays_quiet_on_a_fresh_single_lineage_directory()
+    test_a_standing_resume_pin_would_fight_the_guard_on_its_own_next_restart()
     print(
         "OK: the fossil guard correctly flags a higher-numbered checkpoint left over "
         "from an abandoned lineage when resuming below it (the exact mechanism that "
         "silently lost two real launches on 2026-09-15), stays quiet on a clean "
-        "forward resume to the latest step, and stays quiet on the new "
-        "checkpoints_r2541/-style single-checkpoint directory this fix actually uses."
+        "forward resume to the latest step, stays quiet on the new "
+        "checkpoints_r2541/-style single-checkpoint directory this fix actually uses, "
+        "and -- the reason resume_from_step was removed from config.yaml rather than "
+        "left pointed at 2541 -- correctly refuses on a run's own next restart if a "
+        "pin is left standing instead of tracking the true latest checkpoint."
     )
