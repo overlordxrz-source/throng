@@ -81,7 +81,12 @@ image = (
 @app.function(
     image=image,
     gpu=None,
-    timeout=600,
+    # 2026-09-14: was 600s, sized for the old "zero real updates" smoke test.
+    # Now that this actually runs real post-resume updates (see the n_steps
+    # padding below), one CPU-only rollout+PPO-backward pair alone measured
+    # >600s locally -- 600s guaranteed a timeout, not a check. 1800s gives
+    # comfortable margin for 1 real update on Modal's CPU tier.
+    timeout=1800,
     volumes={VOLUME_MOUNT: volume},
 )
 def _tiny_cpu_smoke(n_steps: int) -> str:
@@ -118,7 +123,13 @@ def _tiny_cpu_smoke(n_steps: int) -> str:
     # zero PPO updates, zero tripwire/crafting-bar code ever touched. Caught
     # by actually checking, not by trusting "smoke test completed" (Rule
     # 13). Resolve the real resume point the same way main_jax.py will, and
-    # pad enough steps for a handful of genuine post-resume updates.
+    # Pad enough steps for a genuine post-resume update -- just 1: CPU-only,
+    # one rollout+PPO-backward pair alone measured >600s locally, so this
+    # trades thoroughness for actually fitting in the timeout above. 1 real
+    # update is still real coverage of the new code (the per-capita bar
+    # reads b_alive_now every craft-active update; the tripwire's history
+    # list gets its first real append) -- it just won't reach the
+    # stability-window search, which only starts evaluating at update 7.
     _T = int(cfg.get("ppo_rollout_steps", 512))
     _resume_pin = cfg.get("resume_from_step")
     if _resume_pin is not None:
@@ -131,13 +142,13 @@ def _tiny_cpu_smoke(n_steps: int) -> str:
         )
         _latest = _mngr.latest_step()
         _start_update = int(_latest) if _latest is not None else 0
-    _min_steps = (_start_update + 3) * _T
+    _min_steps = (_start_update + 1) * _T
     steps = max(n_steps, _min_steps)
     if steps != n_steps:
         print(
             f"[preflight] n_steps={n_steps} would give an EMPTY update range "
             f"resuming from update {_start_update} -- padded to {steps} so at "
-            f"least 3 real post-resume updates actually run.",
+            f"least 1 real post-resume update actually runs.",
             flush=True,
         )
     run_simulation(cfg, seed=42, n_steps=steps)
