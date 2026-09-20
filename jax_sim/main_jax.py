@@ -2396,8 +2396,24 @@ def _run_simulation_impl(
                     _active_captured_at = comms_c0_stage1_captured_at_update
                     _active_u = comms_stage1_c0_search_updates
 
+                # 2026-09-20 (Cam, self-caught): _tw_halt_reasons used to be
+                # initialized (and the PRESSURE check below used to live)
+                # INSIDE the `_active_c0 is not None` gate below -- meaning
+                # the whole PRESSURE tripwire (comms_stage1_updates_elapsed,
+                # entirely about futile_uncoordinated, nothing to do with
+                # codes_active or any C0 baseline) silently stopped
+                # incrementing for as long as comms_c0_stage1 hadn't
+                # captured -- which on the run this was found on was every
+                # update since the unfreeze. It did not change that run's
+                # outcome (uncoordinated_seen had already latched True), but
+                # the halt condition this counter exists to detect could
+                # never have fired while gated this way. Initialized here,
+                # unconditionally, so PRESSURE is checked on every real
+                # stage-1 update regardless of whether a codes_active
+                # baseline is active.
+                _tw_halt_reasons = []
+
                 if _active_c0 is not None and _active_u > _active_captured_at:
-                    _tw_halt_reasons = []
                     for _i in range(3):
                         _now = _tw_codes_now[_i]
                         _c0 = _active_c0[_i]
@@ -2435,77 +2451,84 @@ def _run_simulation_impl(
                                 f"consecutive updates"
                             )
 
-                    if craft_ramp_stage_outer == 1:
-                        comms_stage1_updates_elapsed += 1
-                        if _tw_futile_uncoordinated_now > 0:
-                            comms_stage1_uncoordinated_seen = True
-                        if comms_stage1_updates_elapsed > 10 and not comms_stage1_uncoordinated_seen:
-                            _tw_halt_reasons.append(
-                                f"PRESSURE: futile_uncoordinated still 0 after "
-                                f"{comms_stage1_updates_elapsed} updates in stage 1 -- "
-                                f"the coordination pressure stage 1 is supposed to apply "
-                                f"is not showing up"
-                            )
-
-                    if _tw_halt_reasons:
-                        print("=" * 70, flush=True)
-                        print("[TRIPWIRE] HALT -- pre-registered comms-freeze tripwire fired:", flush=True)
-                        for _r in _tw_halt_reasons:
-                            print(f"[TRIPWIRE]   {_r}", flush=True)
-                        print(
-                            f"[TRIPWIRE] C0_stage{craft_ramp_stage_outer} (active baseline)="
-                            f"{_active_c0[0]:.1f}|{_active_c0[1]:.1f}|{_active_c0[2]:.1f}/64 | "
-                            f"now={_tw_codes_now[0]}|{_tw_codes_now[1]}|{_tw_codes_now[2]}/64 | "
-                            f"stage={craft_ramp_stage_outer} | ppo={ui}",
-                            flush=True,
+                # PRESSURE: deliberately OUTSIDE the _active_c0 gate above --
+                # this check is about futile_uncoordinated, not about
+                # codes_active or any C0 baseline, and must not stop
+                # incrementing just because a baseline hasn't captured yet.
+                if craft_ramp_stage_outer == 1:
+                    comms_stage1_updates_elapsed += 1
+                    if _tw_futile_uncoordinated_now > 0:
+                        comms_stage1_uncoordinated_seen = True
+                    if comms_stage1_updates_elapsed > 10 and not comms_stage1_uncoordinated_seen:
+                        _tw_halt_reasons.append(
+                            f"PRESSURE: futile_uncoordinated still 0 after "
+                            f"{comms_stage1_updates_elapsed} updates in stage 1 -- "
+                            f"the coordination pressure stage 1 is supposed to apply "
+                            f"is not showing up"
                         )
-                        print("=" * 70, flush=True)
-                        _tw_training_state = {
-                            "craft_ramp_active": jnp.array(craft_ramp_active_outer, dtype=jnp.bool_),
-                            "craft_ramp_stage": jnp.array(craft_ramp_stage_outer, dtype=jnp.int32),
-                            "craft_ramp_start_step": jnp.array(craft_ramp_start_step, dtype=jnp.int32),
-                            "craft_ramp_success_streak": jnp.array(craft_ramp_success_streak, dtype=jnp.int32),
-                            "red_ramp_active": jnp.array(red_ramp_active_outer, dtype=jnp.bool_),
-                            "red_ramp_start_step": jnp.array(red_ramp_start_step, dtype=jnp.int32),
-                            "red_ramp_catch_streak": jnp.array(red_ramp_catch_streak, dtype=jnp.int32),
-                            "red_curriculum_idx": jnp.array(red_curriculum_idx, dtype=jnp.int32),
-                            "red_sustain_count": jnp.array(red_sustain_count, dtype=jnp.int32),
-                            "comms_updates_since_resume": jnp.array(comms_updates_since_resume, dtype=jnp.int32),
-                            "comms_sample_history": jnp.array(_pad_comms_history(comms_sample_history), dtype=jnp.int32),
-                            # Dict keys unchanged (comms_c0_captured_at_update /
-                            # comms_tripwire_c0) so old checkpoints still restore --
-                            # these now specifically hold the stage-0 baseline.
-                            "comms_c0_captured_at_update": jnp.array(comms_c0_stage0_captured_at_update, dtype=jnp.int32),
-                            "comms_tripwire_c0": jnp.array(
-                                comms_c0_stage0 if comms_c0_stage0 is not None else (-1.0, -1.0, -1.0), dtype=jnp.float32
-                            ),
-                            "comms_fast_streak": jnp.array(comms_fast_streak, dtype=jnp.int32),
-                            "comms_drift_streak": jnp.array(comms_drift_streak, dtype=jnp.int32),
-                            "comms_floor_streak": jnp.array(comms_floor_streak, dtype=jnp.int32),
-                            "comms_stage1_updates_elapsed": jnp.array(comms_stage1_updates_elapsed, dtype=jnp.int32),
-                            "comms_stage1_uncoordinated_seen": jnp.array(comms_stage1_uncoordinated_seen, dtype=jnp.bool_),
-                            "comms_stage1_c0_search_active": jnp.array(comms_stage1_c0_search_active, dtype=jnp.bool_),
-                            "comms_stage1_c0_search_updates": jnp.array(comms_stage1_c0_search_updates, dtype=jnp.int32),
-                            "comms_stage1_sample_history": jnp.array(_pad_comms_history(comms_stage1_sample_history), dtype=jnp.int32),
-                            "comms_c0_stage1_captured_at_update": jnp.array(comms_c0_stage1_captured_at_update, dtype=jnp.int32),
-                            "comms_tripwire_c0_stage1": jnp.array(
-                                comms_c0_stage1 if comms_c0_stage1 is not None else (-1.0, -1.0, -1.0), dtype=jnp.float32
-                            ),
-                        }
-                        ckpt_mngr.save(ui, items={
-                            "b_params": b_params, "r_params": r_params,
-                            "training_state": _tw_training_state,
-                        })
-                        ckpt_mngr.wait_until_finished()
-                        print(f"[TRIPWIRE] Emergency checkpoint saved at step {ui}.", flush=True)
-                        if on_checkpoint_saved is not None:
-                            # A checkpoint save that isn't committed (Modal
-                            # Volumes: writes aren't guaranteed durable/visible
-                            # to other containers until Volume.commit()) is
-                            # not proof the emergency save survives the
-                            # SystemExit about to happen. Commit before exiting.
-                            on_checkpoint_saved()
-                        raise SystemExit(1)
+
+                if _tw_halt_reasons:
+                    print("=" * 70, flush=True)
+                    print("[TRIPWIRE] HALT -- pre-registered comms-freeze tripwire fired:", flush=True)
+                    for _r in _tw_halt_reasons:
+                        print(f"[TRIPWIRE]   {_r}", flush=True)
+                    _active_c0_str = (
+                        f"{_active_c0[0]:.1f}|{_active_c0[1]:.1f}|{_active_c0[2]:.1f}/64"
+                        if _active_c0 is not None else "not active (halted on a check independent of any C0 baseline)"
+                    )
+                    print(
+                        f"[TRIPWIRE] C0_stage{craft_ramp_stage_outer} (active baseline)={_active_c0_str} | "
+                        f"now={_tw_codes_now[0]}|{_tw_codes_now[1]}|{_tw_codes_now[2]}/64 | "
+                        f"stage={craft_ramp_stage_outer} | ppo={ui}",
+                        flush=True,
+                    )
+                    print("=" * 70, flush=True)
+                    _tw_training_state = {
+                        "craft_ramp_active": jnp.array(craft_ramp_active_outer, dtype=jnp.bool_),
+                        "craft_ramp_stage": jnp.array(craft_ramp_stage_outer, dtype=jnp.int32),
+                        "craft_ramp_start_step": jnp.array(craft_ramp_start_step, dtype=jnp.int32),
+                        "craft_ramp_success_streak": jnp.array(craft_ramp_success_streak, dtype=jnp.int32),
+                        "red_ramp_active": jnp.array(red_ramp_active_outer, dtype=jnp.bool_),
+                        "red_ramp_start_step": jnp.array(red_ramp_start_step, dtype=jnp.int32),
+                        "red_ramp_catch_streak": jnp.array(red_ramp_catch_streak, dtype=jnp.int32),
+                        "red_curriculum_idx": jnp.array(red_curriculum_idx, dtype=jnp.int32),
+                        "red_sustain_count": jnp.array(red_sustain_count, dtype=jnp.int32),
+                        "comms_updates_since_resume": jnp.array(comms_updates_since_resume, dtype=jnp.int32),
+                        "comms_sample_history": jnp.array(_pad_comms_history(comms_sample_history), dtype=jnp.int32),
+                        # Dict keys unchanged (comms_c0_captured_at_update /
+                        # comms_tripwire_c0) so old checkpoints still restore --
+                        # these now specifically hold the stage-0 baseline.
+                        "comms_c0_captured_at_update": jnp.array(comms_c0_stage0_captured_at_update, dtype=jnp.int32),
+                        "comms_tripwire_c0": jnp.array(
+                            comms_c0_stage0 if comms_c0_stage0 is not None else (-1.0, -1.0, -1.0), dtype=jnp.float32
+                        ),
+                        "comms_fast_streak": jnp.array(comms_fast_streak, dtype=jnp.int32),
+                        "comms_drift_streak": jnp.array(comms_drift_streak, dtype=jnp.int32),
+                        "comms_floor_streak": jnp.array(comms_floor_streak, dtype=jnp.int32),
+                        "comms_stage1_updates_elapsed": jnp.array(comms_stage1_updates_elapsed, dtype=jnp.int32),
+                        "comms_stage1_uncoordinated_seen": jnp.array(comms_stage1_uncoordinated_seen, dtype=jnp.bool_),
+                        "comms_stage1_c0_search_active": jnp.array(comms_stage1_c0_search_active, dtype=jnp.bool_),
+                        "comms_stage1_c0_search_updates": jnp.array(comms_stage1_c0_search_updates, dtype=jnp.int32),
+                        "comms_stage1_sample_history": jnp.array(_pad_comms_history(comms_stage1_sample_history), dtype=jnp.int32),
+                        "comms_c0_stage1_captured_at_update": jnp.array(comms_c0_stage1_captured_at_update, dtype=jnp.int32),
+                        "comms_tripwire_c0_stage1": jnp.array(
+                            comms_c0_stage1 if comms_c0_stage1 is not None else (-1.0, -1.0, -1.0), dtype=jnp.float32
+                        ),
+                    }
+                    ckpt_mngr.save(ui, items={
+                        "b_params": b_params, "r_params": r_params,
+                        "training_state": _tw_training_state,
+                    })
+                    ckpt_mngr.wait_until_finished()
+                    print(f"[TRIPWIRE] Emergency checkpoint saved at step {ui}.", flush=True)
+                    if on_checkpoint_saved is not None:
+                        # A checkpoint save that isn't committed (Modal
+                        # Volumes: writes aren't guaranteed durable/visible
+                        # to other containers until Volume.commit()) is
+                        # not proof the emergency save survives the
+                        # SystemExit about to happen. Commit before exiting.
+                        on_checkpoint_saved()
+                    raise SystemExit(1)
 
         # ── Red Curriculum Advancement ────────────────────────────
         surv_rate = float(b_pop.alive.sum()) / float(max_pop)

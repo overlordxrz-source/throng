@@ -164,6 +164,25 @@ more expensive, because it produces publishable-looking nulls.
   actual precondition being violated, and external verification was still what caught it — but
   the specific fix credited above was not the fix; read the two entries it points to for what
   was.
+- **A safeguard's own arming condition needs the same scrutiny as the thing it guards.**
+  Nesting a check inside an unrelated gate silently disables it without changing anything
+  observable — no error, no different log line, nothing to notice short of asking whether the
+  gate is actually correct for what's nested inside it. **Confirmed instance (2026-09-20,
+  self-caught, answering Cam's direct question "is that tripwire armed"):** the PRESSURE
+  tripwire (halts if `futile_uncoordinated` is still 0 after 10 updates in stage 1 — the check
+  that the coordination-pressure ramp is actually applying pressure) had its own counter,
+  `comms_stage1_updates_elapsed`, nested inside the *codes_active* baseline-comparison gate
+  (`_active_c0 is not None and _active_u > _active_captured_at`) introduced by the same
+  session's C0_stage0/C0_stage1 split. PRESSURE has nothing to do with codes_active or any C0
+  baseline — it was disabled for as long as `comms_c0_stage1` hadn't captured, which on the
+  live run was every update since the unfreeze. Didn't change that run's outcome
+  (`uncoordinated_seen` had already latched `True`), but the halt condition this counter exists
+  to detect could never have fired while gated this way — a safeguard that only works when
+  another, unrelated safeguard happens to have already succeeded is not armed, whatever its own
+  logic says. Fixed by moving the counter and its halt check outside the C0 gate entirely
+  (`jax_sim/main_jax.py`). Found by direct interrogation ("what is X actually reading, is Y
+  actually armed") after a report cited the metric, not by the tripwire firing or by code
+  review before landing the refactor that caused it.
 
 ## Part 3 — Fossils
 
