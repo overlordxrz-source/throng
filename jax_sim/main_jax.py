@@ -1959,13 +1959,34 @@ def _run_simulation_impl(
     # mid-search or mid-stage-0 doesn't restart C0 collection.
     comms_updates_since_resume = 0   # counts qualifying updates since THIS resume
     comms_sample_history = []        # list of (u0,u1,u2) per-slot codes_active, one per update, index 0 = update 1
-    comms_c0 = None                  # (u0, u1, u2) per-slot median, set once a stable window is found (or forced at 40)
-    comms_c0_captured_at_update = 0  # update index capture happened at; tripwires arm the update after
+    comms_c0_stage0 = None                  # (u0, u1, u2) per-slot median, stage-0 (frozen-channel) baseline
+    comms_c0_stage0_captured_at_update = 0  # update index capture happened at; tripwires arm the update after
     comms_fast_streak = [0, 0, 0]    # consecutive updates below 0.5*C0, per slot
     comms_drift_streak = [0, 0, 0]   # consecutive updates below 0.75*C0, per slot
     comms_floor_streak = [0, 0, 0]   # consecutive updates below 0.85*C0, per slot (stage 0 only)
     comms_stage1_updates_elapsed = 0
     comms_stage1_uncoordinated_seen = False
+    # 2026-09-20 (Cam): stage-1 (live comms channel) baseline, separate from
+    # comms_c0_stage0. The single-baseline design compared LIVE stage-1
+    # codes_active against a median captured while the comms subtree was
+    # FROZEN (stage 0) -- correct for the floor tripwire (explicitly
+    # stage-0-only) but wrong for fast/drift, which kept comparing
+    # post-unfreeze dynamics against a frozen-channel number two updates
+    # stale by the time the channel came back to life (armed at update 8,
+    # unfreeze at ~update 10 on the run this was measured against). The
+    # tripwire firing on the 2026-09-20 collapse was still correct (82%
+    # drop, no baseline makes that healthy) -- this is about calibrating
+    # against what's actually live going forward, not about that call.
+    # comms_c0_stage1 uses the identical stability-gated capture algorithm
+    # as stage0, applied to codes_active samples collected only AFTER the
+    # comms_lr_warmup ramp fully completes (not during it -- the channel is
+    # still deliberately ramping in, not settled, so a "stable window"
+    # found there would be measuring the ramp schedule, not the channel).
+    comms_stage1_c0_search_active = False    # True once warmup has elapsed and stage-1 sample collection has begun
+    comms_stage1_c0_search_updates = 0       # counts qualifying updates since warmup completion (this resume)
+    comms_stage1_sample_history = []
+    comms_c0_stage1 = None
+    comms_c0_stage1_captured_at_update = 0
 
     _training_state_source = "fresh start (no saved training_state)"
     if _restored_training_state is not None:
@@ -1984,13 +2005,17 @@ def _run_simulation_impl(
                 comms_sample_history = [
                     tuple(int(v) for v in row) for row in _tw_history_arr.tolist() if row[0] >= 0
                 ]
-            comms_c0_captured_at_update = int(_restored_training_state.get(
-                "comms_c0_captured_at_update", comms_c0_captured_at_update
+            # Dict keys unchanged from before the stage0/stage1 split (only
+            # the local variable names changed, comms_c0 -> comms_c0_stage0)
+            # so this still restores correctly from a checkpoint saved by
+            # the pre-split code -- e.g. checkpoint 2544, saved 2026-09-15.
+            comms_c0_stage0_captured_at_update = int(_restored_training_state.get(
+                "comms_c0_captured_at_update", comms_c0_stage0_captured_at_update
             ))
             _tw_c0_restored = _restored_training_state.get("comms_tripwire_c0", None)
             if _tw_c0_restored is not None:
                 _tw_c0_vals = [float(x) for x in np.asarray(_tw_c0_restored).tolist()]
-                comms_c0 = None if any(x < 0 for x in _tw_c0_vals) else tuple(_tw_c0_vals)
+                comms_c0_stage0 = None if any(x < 0 for x in _tw_c0_vals) else tuple(_tw_c0_vals)
             comms_fast_streak = [int(x) for x in np.asarray(
                 _restored_training_state.get("comms_fast_streak", comms_fast_streak)
             ).tolist()]
@@ -2006,6 +2031,30 @@ def _run_simulation_impl(
             comms_stage1_uncoordinated_seen = bool(_restored_training_state.get(
                 "comms_stage1_uncoordinated_seen", comms_stage1_uncoordinated_seen
             ))
+            # New fields (2026-09-20): absent on any checkpoint saved before
+            # this split, defaults above (None/0/False/[]) apply -- a
+            # restore from an old checkpoint into stage 1 just starts the
+            # stage-1 search fresh, which is correct (no stage-1 baseline
+            # was ever captured under the old single-baseline code anyway).
+            comms_stage1_c0_search_active = bool(_restored_training_state.get(
+                "comms_stage1_c0_search_active", comms_stage1_c0_search_active
+            ))
+            comms_stage1_c0_search_updates = int(_restored_training_state.get(
+                "comms_stage1_c0_search_updates", comms_stage1_c0_search_updates
+            ))
+            _tw_stage1_history_restored = _restored_training_state.get("comms_stage1_sample_history", None)
+            if _tw_stage1_history_restored is not None:
+                _tw_stage1_history_arr = np.asarray(_tw_stage1_history_restored)
+                comms_stage1_sample_history = [
+                    tuple(int(v) for v in row) for row in _tw_stage1_history_arr.tolist() if row[0] >= 0
+                ]
+            comms_c0_stage1_captured_at_update = int(_restored_training_state.get(
+                "comms_c0_stage1_captured_at_update", comms_c0_stage1_captured_at_update
+            ))
+            _tw_c0_stage1_restored = _restored_training_state.get("comms_tripwire_c0_stage1", None)
+            if _tw_c0_stage1_restored is not None:
+                _tw_c0_stage1_vals = [float(x) for x in np.asarray(_tw_c0_stage1_restored).tolist()]
+                comms_c0_stage1 = None if any(x < 0 for x in _tw_c0_stage1_vals) else tuple(_tw_c0_stage1_vals)
         if red_ramp_enabled:
             red_ramp_active_outer = bool(_restored_training_state.get("red_ramp_active", red_ramp_active_outer))
             red_ramp_start_step = int(_restored_training_state.get("red_ramp_start_step", red_ramp_start_step))
@@ -2043,17 +2092,23 @@ def _run_simulation_impl(
             f"streak={red_ramp_catch_streak}, start_step={red_ramp_start_step:_})",
             flush=True,
         )
-        _c0_str = f"{comms_c0[0]:.1f}|{comms_c0[1]:.1f}|{comms_c0[2]:.1f}/64" if comms_c0 is not None else "not yet captured"
+        _c0_str = f"{comms_c0_stage0[0]:.1f}|{comms_c0_stage0[1]:.1f}|{comms_c0_stage0[2]:.1f}/64" if comms_c0_stage0 is not None else "not yet captured"
+        _c0_stage1_str = f"{comms_c0_stage1[0]:.1f}|{comms_c0_stage1[1]:.1f}|{comms_c0_stage1[2]:.1f}/64" if comms_c0_stage1 is not None else "not yet captured"
         print(
-            f"[TRIPWIRE] comms-freeze tripwires: C0={_c0_str} "
+            f"[TRIPWIRE] comms-freeze tripwires: C0_stage0={_c0_str} "
             f"(stability-gated: median of first 5-consecutive-update window with all "
             f"transitions <=20%, window start >=3, forced at 35-40 if none stabilizes; "
             f"armed the update after capture) | "
             f"updates_since_resume={comms_updates_since_resume} | "
-            f"captured_at_update={comms_c0_captured_at_update} | "
-            f"fast_streak={comms_fast_streak} (halt >=3 below 0.5*C0) | "
-            f"drift_streak={comms_drift_streak} (halt >=15 below 0.75*C0) | "
-            f"floor_streak={comms_floor_streak} (halt >=3 below 0.85*C0, stage 0 only) | "
+            f"captured_at_update={comms_c0_stage0_captured_at_update} | "
+            f"C0_stage1={_c0_stage1_str} (same stability-gated algorithm, applied to "
+            f"post-warmup stage-1 samples only) | "
+            f"stage1_search_active={comms_stage1_c0_search_active} "
+            f"stage1_search_updates={comms_stage1_c0_search_updates} "
+            f"captured_at_update={comms_c0_stage1_captured_at_update} | "
+            f"fast_streak={comms_fast_streak} (halt >=3 below 0.5*active_C0) | "
+            f"drift_streak={comms_drift_streak} (halt >=15 below 0.75*active_C0) | "
+            f"floor_streak={comms_floor_streak} (halt >=3 below 0.85*C0_stage0, stage 0 only) | "
             f"stage1_updates_elapsed={comms_stage1_updates_elapsed} "
             f"uncoordinated_seen={comms_stage1_uncoordinated_seen} (halt if still 0 after 10 updates in stage 1)",
             flush=True,
@@ -2159,7 +2214,7 @@ def _run_simulation_impl(
                 comms_updates_since_resume += 1
                 _u = comms_updates_since_resume
 
-                if comms_c0 is None:
+                if comms_c0_stage0 is None:
                     comms_sample_history.append(_tw_codes_now)
 
                     # Earliest possible 5-consecutive-update window with a
@@ -2184,40 +2239,40 @@ def _run_simulation_impl(
                                 f"({','.join(f'{c:+.0%}' for c in _changes)})"
                             )
                         print(
-                            f"[TRIPWIRE] C0 search: window upd{_win_start}-upd{_u} "
+                            f"[TRIPWIRE] C0_stage0 search: window upd{_win_start}-upd{_u} "
                             f"[{'; '.join(f'{s0}|{s1}|{s2}' for s0, s1, s2 in _window)}] "
                             f"| {' '.join(_transition_strs)} "
                             f"| {'STABLE' if _window_stable else 'not stable'}",
                             flush=True,
                         )
                         if _window_stable:
-                            comms_c0 = tuple(
+                            comms_c0_stage0 = tuple(
                                 float(np.median([w[_s] for w in _window])) for _s in range(3)
                             )
-                            comms_c0_captured_at_update = _u
+                            comms_c0_stage0_captured_at_update = _u
                             print(
-                                f"[TRIPWIRE] C0 captured (stable window upd{_win_start}-upd{_u}, "
-                                f"5 updates, all transitions <=20%): {comms_c0[0]:.1f}|"
-                                f"{comms_c0[1]:.1f}|{comms_c0[2]:.1f}/64 -- tripwires ARM at "
+                                f"[TRIPWIRE] C0_stage0 captured (stable window upd{_win_start}-upd{_u}, "
+                                f"5 updates, all transitions <=20%): {comms_c0_stage0[0]:.1f}|"
+                                f"{comms_c0_stage0[1]:.1f}|{comms_c0_stage0[2]:.1f}/64 -- tripwires ARM at "
                                 f"update {_u + 1}",
                                 flush=True,
                             )
 
-                    if comms_c0 is None and _u == 40:
+                    if comms_c0_stage0 is None and _u == 40:
                         _fallback_window = comms_sample_history[34:40]  # updates 35-40
-                        comms_c0 = tuple(
+                        comms_c0_stage0 = tuple(
                             float(np.median([w[_s] for w in _fallback_window])) for _s in range(3)
                         )
-                        comms_c0_captured_at_update = 40
+                        comms_c0_stage0_captured_at_update = 40
                         print(
                             "=" * 70,
                             flush=True,
                         )
                         print(
-                            f"[TRIPWIRE] *** C0 FORCED at update 40 -- no stable window "
+                            f"[TRIPWIRE] *** C0_stage0 FORCED at update 40 -- no stable window "
                             f"(all transitions <=20%) ever formed. Capturing median of "
-                            f"updates 35-40: {comms_c0[0]:.1f}|{comms_c0[1]:.1f}|"
-                            f"{comms_c0[2]:.1f}/64. This is a finding, not an "
+                            f"updates 35-40: {comms_c0_stage0[0]:.1f}|{comms_c0_stage0[1]:.1f}|"
+                            f"{comms_c0_stage0[2]:.1f}/64. This is a finding, not an "
                             f"inconvenience -- the channel never settled within the "
                             f"same 40-update budget as the stage-0 hard escape. "
                             f"Tripwires ARM at update 41. ***",
@@ -2227,11 +2282,115 @@ def _run_simulation_impl(
                             "=" * 70,
                             flush=True,
                         )
-                elif comms_updates_since_resume > comms_c0_captured_at_update:
+
+                # 2026-09-20 (Cam): stage-1 baseline search -- same
+                # stability-gated algorithm, applied only to samples
+                # collected after the comms_lr_warmup ramp has fully
+                # elapsed (the channel is deliberately still ramping in
+                # during warmup, not settled; a "stable window" found there
+                # would measure the ramp schedule, not the channel).
+                if (
+                    craft_ramp_stage_outer == 1
+                    and _comms_unfreeze_at_update is None
+                    and comms_c0_stage1 is None
+                ):
+                    comms_stage1_c0_search_active = True
+                    comms_stage1_c0_search_updates += 1
+                    _u1 = comms_stage1_c0_search_updates
+                    comms_stage1_sample_history.append(_tw_codes_now)
+
+                    if _u1 >= 7:
+                        _win1_start = _u1 - 4
+                        _window1 = comms_stage1_sample_history[_win1_start - 1: _u1]
+                        _transition1_strs = []
+                        _window1_stable = True
+                        for _t in range(4):
+                            _old, _new = _window1[_t], _window1[_t + 1]
+                            _changes = [
+                                abs(_new[_s] - _old[_s]) / max(_old[_s], 1e-9) for _s in range(3)
+                            ]
+                            _t_pass = all(_c <= 0.20 for _c in _changes)
+                            _window1_stable = _window1_stable and _t_pass
+                            _tag = "OK" if _t_pass else "FAIL"
+                            _transition1_strs.append(
+                                f"{_win1_start + _t}->{_win1_start + _t + 1}:{_tag}"
+                                f"({','.join(f'{c:+.0%}' for c in _changes)})"
+                            )
+                        print(
+                            f"[TRIPWIRE] C0_stage1 search: window upd{_win1_start}-upd{_u1} "
+                            f"post-warmup "
+                            f"[{'; '.join(f'{s0}|{s1}|{s2}' for s0, s1, s2 in _window1)}] "
+                            f"| {' '.join(_transition1_strs)} "
+                            f"| {'STABLE' if _window1_stable else 'not stable'}",
+                            flush=True,
+                        )
+                        if _window1_stable:
+                            comms_c0_stage1 = tuple(
+                                float(np.median([w[_s] for w in _window1])) for _s in range(3)
+                            )
+                            comms_c0_stage1_captured_at_update = _u1
+                            # Discard any partial streak accrued while
+                            # stage 0's (now stale) baseline was still
+                            # active -- a streak must be consecutive under
+                            # ONE baseline, not span the switch.
+                            comms_fast_streak = [0, 0, 0]
+                            comms_drift_streak = [0, 0, 0]
+                            print(
+                                f"[TRIPWIRE] C0_stage1 captured (stable window "
+                                f"upd{_win1_start}-upd{_u1} post-warmup, 5 updates, all "
+                                f"transitions <=20%): {comms_c0_stage1[0]:.1f}|"
+                                f"{comms_c0_stage1[1]:.1f}|{comms_c0_stage1[2]:.1f}/64 -- "
+                                f"fast/drift tripwires now compare against the live-channel "
+                                f"baseline from update {_u1 + 1} (streaks reset to isolate "
+                                f"from stage-0 carryover)",
+                                flush=True,
+                            )
+
+                    if comms_c0_stage1 is None and _u1 == 40:
+                        _fallback1_window = comms_stage1_sample_history[34:40]
+                        comms_c0_stage1 = tuple(
+                            float(np.median([w[_s] for w in _fallback1_window])) for _s in range(3)
+                        )
+                        comms_c0_stage1_captured_at_update = 40
+                        comms_fast_streak = [0, 0, 0]
+                        comms_drift_streak = [0, 0, 0]
+                        print("=" * 70, flush=True)
+                        print(
+                            f"[TRIPWIRE] *** C0_stage1 FORCED at update {_u1} post-warmup -- "
+                            f"no stable window ever formed. Capturing median of the last 5 "
+                            f"post-warmup updates: {comms_c0_stage1[0]:.1f}|"
+                            f"{comms_c0_stage1[1]:.1f}|{comms_c0_stage1[2]:.1f}/64. This is a "
+                            f"finding, not an inconvenience -- the live channel never settled "
+                            f"within the same 40-update budget as the stage-0 search. "
+                            f"Tripwires ARM at update {_u1 + 1}. ***",
+                            flush=True,
+                        )
+                        print("=" * 70, flush=True)
+
+                # Which baseline (if any) governs fast/drift this update:
+                # stage 0's while in stage 0, stage 1's once stage 1's OWN
+                # baseline has been captured -- never the stale stage-0
+                # number against live stage-1 dynamics. Neither during the
+                # blind window (mid-warmup, or post-warmup before a stage-1
+                # baseline forms) -- mirrors how stage 0's own pre-capture
+                # window already suppresses comparison entirely.
+                _active_c0 = None
+                _active_captured_at = None
+                _active_u = None
+                if craft_ramp_stage_outer == 0 and comms_c0_stage0 is not None:
+                    _active_c0 = comms_c0_stage0
+                    _active_captured_at = comms_c0_stage0_captured_at_update
+                    _active_u = comms_updates_since_resume
+                elif craft_ramp_stage_outer == 1 and comms_c0_stage1 is not None:
+                    _active_c0 = comms_c0_stage1
+                    _active_captured_at = comms_c0_stage1_captured_at_update
+                    _active_u = comms_stage1_c0_search_updates
+
+                if _active_c0 is not None and _active_u > _active_captured_at:
                     _tw_halt_reasons = []
                     for _i in range(3):
                         _now = _tw_codes_now[_i]
-                        _c0 = comms_c0[_i]
+                        _c0 = _active_c0[_i]
                         if _now < 0.5 * _c0:
                             comms_fast_streak[_i] += 1
                         else:
@@ -2240,25 +2399,29 @@ def _run_simulation_impl(
                             comms_drift_streak[_i] += 1
                         else:
                             comms_drift_streak[_i] = 0
-                        if craft_ramp_stage_outer == 0 and _now < 0.85 * _c0:
+                        if (
+                            craft_ramp_stage_outer == 0
+                            and comms_c0_stage0 is not None
+                            and _now < 0.85 * comms_c0_stage0[_i]
+                        ):
                             comms_floor_streak[_i] += 1
                         else:
                             comms_floor_streak[_i] = 0
 
                         if comms_fast_streak[_i] >= 3:
                             _tw_halt_reasons.append(
-                                f"FAST: slot{_i} codes_active={_now} < 0.5*C0={0.5 * _c0:.1f} "
-                                f"for {comms_fast_streak[_i]} consecutive updates"
+                                f"FAST: slot{_i} codes_active={_now} < 0.5*C0_stage{craft_ramp_stage_outer}"
+                                f"={0.5 * _c0:.1f} for {comms_fast_streak[_i]} consecutive updates"
                             )
                         if comms_drift_streak[_i] >= 15:
                             _tw_halt_reasons.append(
-                                f"DRIFT: slot{_i} codes_active={_now} < 0.75*C0={0.75 * _c0:.1f} "
-                                f"for {comms_drift_streak[_i]} consecutive updates"
+                                f"DRIFT: slot{_i} codes_active={_now} < 0.75*C0_stage{craft_ramp_stage_outer}"
+                                f"={0.75 * _c0:.1f} for {comms_drift_streak[_i]} consecutive updates"
                             )
                         if comms_floor_streak[_i] >= 3:
                             _tw_halt_reasons.append(
                                 f"STAGE-0 FLOOR: slot{_i} codes_active={_now} < "
-                                f"0.85*C0={0.85 * _c0:.1f} for {comms_floor_streak[_i]} "
+                                f"0.85*C0_stage0={0.85 * comms_c0_stage0[_i]:.1f} for {comms_floor_streak[_i]} "
                                 f"consecutive updates"
                             )
 
@@ -2280,7 +2443,8 @@ def _run_simulation_impl(
                         for _r in _tw_halt_reasons:
                             print(f"[TRIPWIRE]   {_r}", flush=True)
                         print(
-                            f"[TRIPWIRE] C0={comms_c0[0]:.1f}|{comms_c0[1]:.1f}|{comms_c0[2]:.1f}/64 | "
+                            f"[TRIPWIRE] C0_stage{craft_ramp_stage_outer} (active baseline)="
+                            f"{_active_c0[0]:.1f}|{_active_c0[1]:.1f}|{_active_c0[2]:.1f}/64 | "
                             f"now={_tw_codes_now[0]}|{_tw_codes_now[1]}|{_tw_codes_now[2]}/64 | "
                             f"stage={craft_ramp_stage_outer} | ppo={ui}",
                             flush=True,
@@ -2298,15 +2462,25 @@ def _run_simulation_impl(
                             "red_sustain_count": jnp.array(red_sustain_count, dtype=jnp.int32),
                             "comms_updates_since_resume": jnp.array(comms_updates_since_resume, dtype=jnp.int32),
                             "comms_sample_history": jnp.array(_pad_comms_history(comms_sample_history), dtype=jnp.int32),
-                            "comms_c0_captured_at_update": jnp.array(comms_c0_captured_at_update, dtype=jnp.int32),
+                            # Dict keys unchanged (comms_c0_captured_at_update /
+                            # comms_tripwire_c0) so old checkpoints still restore --
+                            # these now specifically hold the stage-0 baseline.
+                            "comms_c0_captured_at_update": jnp.array(comms_c0_stage0_captured_at_update, dtype=jnp.int32),
                             "comms_tripwire_c0": jnp.array(
-                                comms_c0 if comms_c0 is not None else (-1.0, -1.0, -1.0), dtype=jnp.float32
+                                comms_c0_stage0 if comms_c0_stage0 is not None else (-1.0, -1.0, -1.0), dtype=jnp.float32
                             ),
                             "comms_fast_streak": jnp.array(comms_fast_streak, dtype=jnp.int32),
                             "comms_drift_streak": jnp.array(comms_drift_streak, dtype=jnp.int32),
                             "comms_floor_streak": jnp.array(comms_floor_streak, dtype=jnp.int32),
                             "comms_stage1_updates_elapsed": jnp.array(comms_stage1_updates_elapsed, dtype=jnp.int32),
                             "comms_stage1_uncoordinated_seen": jnp.array(comms_stage1_uncoordinated_seen, dtype=jnp.bool_),
+                            "comms_stage1_c0_search_active": jnp.array(comms_stage1_c0_search_active, dtype=jnp.bool_),
+                            "comms_stage1_c0_search_updates": jnp.array(comms_stage1_c0_search_updates, dtype=jnp.int32),
+                            "comms_stage1_sample_history": jnp.array(_pad_comms_history(comms_stage1_sample_history), dtype=jnp.int32),
+                            "comms_c0_stage1_captured_at_update": jnp.array(comms_c0_stage1_captured_at_update, dtype=jnp.int32),
+                            "comms_tripwire_c0_stage1": jnp.array(
+                                comms_c0_stage1 if comms_c0_stage1 is not None else (-1.0, -1.0, -1.0), dtype=jnp.float32
+                            ),
                         }
                         ckpt_mngr.save(ui, items={
                             "b_params": b_params, "r_params": r_params,
@@ -2565,7 +2739,7 @@ def _run_simulation_impl(
             # (not the bookkeeping) until the SAME condition that arms the
             # comms-freeze tripwires: C0 captured, one update later.
             _dc_armed = bool(
-                comms_c0 is not None and comms_updates_since_resume > comms_c0_captured_at_update
+                comms_c0_stage0 is not None and comms_updates_since_resume > comms_c0_stage0_captured_at_update
             )
             _suppress_dead_code_reset = bool(craft_ramp_active_outer and not _dc_armed)
 
@@ -3616,15 +3790,25 @@ def _run_simulation_impl(
                 "red_sustain_count": jnp.array(red_sustain_count, dtype=jnp.int32),
                 "comms_updates_since_resume": jnp.array(comms_updates_since_resume, dtype=jnp.int32),
                 "comms_sample_history": jnp.array(_pad_comms_history(comms_sample_history), dtype=jnp.int32),
-                "comms_c0_captured_at_update": jnp.array(comms_c0_captured_at_update, dtype=jnp.int32),
+                # Dict keys unchanged (comms_c0_captured_at_update /
+                # comms_tripwire_c0) so old checkpoints still restore --
+                # these now specifically hold the stage-0 baseline.
+                "comms_c0_captured_at_update": jnp.array(comms_c0_stage0_captured_at_update, dtype=jnp.int32),
                 "comms_tripwire_c0": jnp.array(
-                    comms_c0 if comms_c0 is not None else (-1.0, -1.0, -1.0), dtype=jnp.float32
+                    comms_c0_stage0 if comms_c0_stage0 is not None else (-1.0, -1.0, -1.0), dtype=jnp.float32
                 ),
                 "comms_fast_streak": jnp.array(comms_fast_streak, dtype=jnp.int32),
                 "comms_drift_streak": jnp.array(comms_drift_streak, dtype=jnp.int32),
                 "comms_floor_streak": jnp.array(comms_floor_streak, dtype=jnp.int32),
                 "comms_stage1_updates_elapsed": jnp.array(comms_stage1_updates_elapsed, dtype=jnp.int32),
                 "comms_stage1_uncoordinated_seen": jnp.array(comms_stage1_uncoordinated_seen, dtype=jnp.bool_),
+                "comms_stage1_c0_search_active": jnp.array(comms_stage1_c0_search_active, dtype=jnp.bool_),
+                "comms_stage1_c0_search_updates": jnp.array(comms_stage1_c0_search_updates, dtype=jnp.int32),
+                "comms_stage1_sample_history": jnp.array(_pad_comms_history(comms_stage1_sample_history), dtype=jnp.int32),
+                "comms_c0_stage1_captured_at_update": jnp.array(comms_c0_stage1_captured_at_update, dtype=jnp.int32),
+                "comms_tripwire_c0_stage1": jnp.array(
+                    comms_c0_stage1 if comms_c0_stage1 is not None else (-1.0, -1.0, -1.0), dtype=jnp.float32
+                ),
             }
             ckpt_state = {
                 "b_params": b_params,

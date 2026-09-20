@@ -87,15 +87,28 @@ def test_suppressed_reset_still_updates_usage_ema_for_used_codes():
     )
 
 
-def test_default_behavior_unchanged_when_suppress_reset_not_passed():
-    """suppress_reset defaults to False -- every pre-existing call site (not
-    yet updated to pass it) must behave exactly as before."""
+def test_default_behavior_still_resets_when_suppress_reset_not_passed():
+    """suppress_reset defaults to False -- a code that crosses the dead_streak
+    threshold still actually resets (not just gets queued) when it's the only
+    one eligible, well within max_reset_per_update's default of 2. Uses its
+    own fixture (not _base_params, which puts every code at dead_streak=4 --
+    fine for the suppression tests above, which don't care which codes would
+    reset, but would make THIS test's pass depend on max_reset_per_update's
+    tie-break order among 5 simultaneously-eligible codes rather than on the
+    real-reset behavior it's meant to isolate)."""
     vocab_size = 8
-    params = _base_params(vocab_size)
-    embedding_before = params["codebook_0"]["embedding"]
+    embedding = jnp.arange(vocab_size * 4, dtype=jnp.float32).reshape(vocab_size, 4)
+    usage_ema = jnp.zeros((vocab_size,), dtype=jnp.float32)
+    # Only code 0 is one update from the threshold; everything else starts
+    # at 0 and gets a fresh streak too (still far below the window=5 bar).
+    dead_streak = jnp.zeros((vocab_size,), dtype=jnp.float32).at[0].set(4.0)
+    params = {"codebook_0": {"embedding": embedding, "usage_ema": usage_ema, "dead_streak": dead_streak}}
+    embedding_before = embedding
 
-    token_ids = jnp.array([1, 2, 3])
-    z_e = jnp.ones((3, 4))
+    # Nobody uses code 0 this window; codes 1-7 are, so only code 0 is
+    # eligible for reset (dead_streak 4 -> 5, crossing the window).
+    token_ids = jnp.array([1, 2, 3, 4, 5, 6, 7])
+    z_e = jnp.ones((7, 4))
 
     new_params = dead_code_reset_codebook_params(
         params, token_ids, z_e, vocab_size, jax.random.PRNGKey(0),
@@ -104,8 +117,9 @@ def test_default_behavior_unchanged_when_suppress_reset_not_passed():
         dead_streak_window=5, ema_decay=0.8,
     )
     assert not bool(jnp.array_equal(new_params["codebook_0"]["embedding"], embedding_before)), (
-        "without suppress_reset, code 0 (dead_streak crosses threshold this "
-        "update) must actually reset, exactly as before this change"
+        "without suppress_reset, code 0 (the only code crossing the dead_streak "
+        "threshold this update, well within max_reset_per_update) must actually "
+        "reset, exactly as before this change"
     )
     assert float(new_params["codebook_0"]["dead_streak"][0]) == 0.0, (
         "a real reset must zero dead_streak (the existing grace-period "
@@ -116,10 +130,10 @@ def test_default_behavior_unchanged_when_suppress_reset_not_passed():
 if __name__ == "__main__":
     test_suppressed_reset_leaves_embedding_untouched_but_keeps_streak_live()
     test_suppressed_reset_still_updates_usage_ema_for_used_codes()
-    test_default_behavior_unchanged_when_suppress_reset_not_passed()
+    test_default_behavior_still_resets_when_suppress_reset_not_passed()
     print(
         "OK: suppress_reset=True leaves the embedding untouched while dead_streak "
         "keeps climbing past the window (measurement stays live); used codes still "
-        "get normal bookkeeping; suppress_reset=False (the default, every "
-        "pre-existing call site) behaves exactly as before this change."
+        "get normal bookkeeping; suppress_reset=False (the default) still actually "
+        "resets a code that crosses the threshold when it's the only one eligible."
     )

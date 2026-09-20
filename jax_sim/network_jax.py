@@ -112,6 +112,7 @@ def dead_code_reset_codebook_params(
     dead_streak_window: int = 5,
     ema_decay: float = 0.8,
     suppress_reset: bool = False,
+    max_reset_per_update: int = 2,
 ) -> Any:
     """
   Persist dead-code reset into the codebook embedding (runs after PPO on CPU/GPU).
@@ -155,6 +156,25 @@ def dead_code_reset_codebook_params(
     codes that WOULD have reset is logged instead of acted on -- arming
     delayed until the stability-gated C0 window closes (main_jax.py), the
     same condition that arms the comms-freeze tripwires.
+  max_reset_per_update: (Cam, 2026-09-15) resetting an unbounded number of
+    codes in one update is a shock, not drift-tracking -- a discontinuous
+    rewrite of the channel every agent reads, applied in a single step, the
+    same structural error as the pre-warmup Adam spring on the comms
+    unfreeze. Measured on the 2026-09-20 relaunch: a mass reset of 31/33/19
+    codes (roughly half each codebook) immediately after the comms
+    unfreeze, reseeded from current z_e samples so they landed squarely in
+    the encoder's occupied region, over-concentrating the codebook and
+    producing a limit cycle -- codes_active overshot to 47-59 (healing),
+    then a small drift stranded a large fraction of the reseeded codes
+    simultaneously (47-59 -> 8-14), at higher amplitude than the original
+    decline. Rate-limited to the `max_reset_per_update` codes with the
+    LONGEST dead_streak per codebook per update; everything else stays
+    queued (dead_streak keeps accumulating, so a queued code is first in
+    line next update, not reset again from scratch). Logged every update,
+    not just when something resets, so the queue's own trajectory is the
+    experiment: draining steadily under a stabilizing codes_active means
+    the shock was the problem; growing unbounded while codes keep dying
+    means the reset was never load-bearing.
     """
     if z_e.shape[0] == 0:
         return params
@@ -210,28 +230,50 @@ def dead_code_reset_codebook_params(
         jax.debug.callback(_log_suppressed, num_dead, codebook_key, pool_ok)
         new_embedding = embedding
     else:
-        def _log_reset(nd, key, ema_all, mask_all, pool_was_ok):
-            if bool(pool_was_ok) and nd > 0:
-                reset_emas = ema_all[mask_all][:10]
-                print(
-                    f"[JAX] dead_code_reset ({key}): resetting {int(nd)} codes unused for "
-                    f"{dead_streak_window}+ consecutive updates "
-                    f"(usage_ema at trigger: {reset_emas})",
-                    flush=True,
-                )
-
-        jax.debug.callback(
-            _log_reset, num_dead, codebook_key, new_usage_ema, dead_mask, pool_ok,
-        )
-
         n_pool = z_e.shape[0]
         rand_idx = jax.random.randint(rng, (vocab_size,), 0, n_pool)
         replacement = jax.lax.stop_gradient(z_e[rand_idx])
-        new_embedding = jnp.where(dead_mask[:, None], replacement, embedding)
+
+        # 2026-09-15 (Cam): resetting every dead code in one update is a
+        # shock, not drift-tracking -- see the max_reset_per_update
+        # docstring entry above for the measured limit-cycle this caused.
+        # Select at most max_reset_per_update codes, longest dead_streak
+        # first; everything else stays queued (dead_streak, computed
+        # above as dead_streak+1 for an unused code, is left to keep
+        # accumulating for queued codes -- not reset to 0 -- so a queued
+        # code is first in line next update, not starting its grace
+        # period over).
+        k = min(max_reset_per_update, vocab_size)
+        streak_for_topk = jnp.where(dead_mask, new_dead_streak, -1.0)
+        top_vals, top_idx = jax.lax.top_k(streak_for_topk, k=k)
+        valid_topk = top_vals >= 0.0
+        selected_mask = jnp.zeros((vocab_size,), dtype=bool).at[top_idx].set(valid_topk)
+        num_selected = jnp.sum(selected_mask.astype(jnp.int32))
+        num_queued = num_dead - num_selected
+
+        def _log_reset(n_sel, n_queued, key, ema_all, sel_mask, pool_was_ok):
+            if not bool(pool_was_ok):
+                return
+            msg = (
+                f"[VQ-RESET] reset {int(n_sel)}/{vocab_size} ({key}), "
+                f"{int(n_queued)} still queued"
+            )
+            if int(n_sel) > 0:
+                msg += f" (usage_ema at trigger: {ema_all[sel_mask][:10]})"
+            print(msg, flush=True)
+
+        jax.debug.callback(
+            _log_reset, num_selected, num_queued, codebook_key, new_usage_ema,
+            selected_mask, pool_ok,
+        )
+
+        new_embedding = jnp.where(selected_mask[:, None], replacement, embedding)
         # A reset code gets a fresh dead_streak_window-update grace period rather
-        # than instantly re-triggering the reset on the very next update.
-        new_dead_streak = jnp.where(dead_mask, 0, new_dead_streak)
-        new_usage_ema = jnp.where(dead_mask, 0.0, new_usage_ema)
+        # than instantly re-triggering the reset on the very next update. A
+        # queued-but-not-selected code keeps its accumulated streak (already
+        # computed above), so it isn't penalized for waiting its turn.
+        new_dead_streak = jnp.where(selected_mask, 0, new_dead_streak)
+        new_usage_ema = jnp.where(selected_mask, 0.0, new_usage_ema)
 
     flat[codebook_key] = {
         **cb,
