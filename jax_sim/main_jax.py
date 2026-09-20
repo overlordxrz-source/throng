@@ -13,6 +13,7 @@ Everything inside scan is @jit-compiled to a single XLA kernel.
 """
 
 import os
+import uuid
 from pathlib import Path
 os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2")  # suppress INFO/WARN
 os.environ.setdefault("XLA_FLAGS", "--xla_gpu_autotune_level=0")  # disable autotune spam
@@ -1034,10 +1035,18 @@ def _run_simulation_impl(
     _p12_early = config.get("phase12_coevolution") or {}
     _corpus_frac = float(config.get("corpus_sample_frac", 0.08))
     _corpus_every = int(config.get("corpus_every_n_steps", 20))
+    # 2026-09-20 (Cam): one id per process, shared by both writers below, so
+    # every record this launch ever writes (blue or red) can be attributed
+    # to it -- see SignalCorpusWriter's launch_id docstring for why this
+    # exists (overlapping step ranges across launches into the same
+    # append-only corpus, undetectable without a per-launch marker).
+    _launch_id = uuid.uuid4().hex[:12]
+    print(f"[JAX] launch_id={_launch_id} (tags every corpus record this process writes)", flush=True)
     corpus_writer = SignalCorpusWriter(
         path=f"runs/{run_name}/signal_corpus.jsonl",
         sample_frac=_corpus_frac,
         every_n_steps=_corpus_every,
+        launch_id=_launch_id,
     )
     corpus_writer_red = None
     _red_corpus_enabled = (
@@ -1055,6 +1064,7 @@ def _run_simulation_impl(
             path=f"runs/{run_name}/signal_corpus_red.jsonl",
             sample_frac=_corpus_frac,
             every_n_steps=_corpus_every,
+            launch_id=_launch_id,
         )
         print(
             f"[JAX] Red corpus: signal_corpus_red.jsonl "

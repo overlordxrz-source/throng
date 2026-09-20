@@ -26,6 +26,7 @@ import json
 import os
 import threading
 import queue
+import uuid
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Tuple
 
@@ -324,6 +325,15 @@ class SignalCorpusWriter:
 
     The file accumulates across restarts (opened in append mode) so a single
     corpus spans multiple resume sessions.
+
+    launch_id (Cam, 2026-09-20): the corpus is append-only across every
+    launch that ever points at it, and step numbers reset on every resume --
+    two different launches routinely write overlapping step ranges (e.g.
+    four separate 2541-resume attempts in one evening, one of them from a
+    since-collapsed channel). Without a per-launch marker, detecting that
+    contamination means reconstructing launch history from train.log and a
+    duplicate-(agent,step)-key scan after the fact. Every record now carries
+    the launch_id it was written under, so overlap is a `groupby` away.
     """
 
     def __init__(
@@ -333,11 +343,17 @@ class SignalCorpusWriter:
         every_n_steps: int   = 20,
         rng:           Optional[np.random.Generator] = None,
         volume_dir:    Optional[str] = None,
+        launch_id:     Optional[str] = None,
     ) -> None:
         self.sample_frac   = sample_frac
         self.every_n_steps = every_n_steps
         self._rng          = rng or np.random.default_rng()
         self._last_step    = -(every_n_steps + 1)
+        # Minted once per process if the caller doesn't supply one (e.g. a
+        # shared id across the blue/red writers of the same launch, see
+        # jax_sim/main_jax.py) -- a fallback exists so this class is still
+        # self-sufficient when used standalone (tests, scripts).
+        self.launch_id     = launch_id or uuid.uuid4().hex[:12]
 
         persist_root = volume_dir
         if persist_root is None and os.path.isdir("/mnt/throng-runs"):
@@ -397,6 +413,7 @@ class SignalCorpusWriter:
         for i in sel:
             idx = int(alive_idx[i])
             rec = {
+                "launch_id": self.launch_id,
                 "step":      step,
                 "agent":     idx,
                 "sig":       [round(float(v), 5) for v in signals[idx]],

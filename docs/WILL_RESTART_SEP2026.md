@@ -665,6 +665,34 @@ matching `2763 * ppo_rollout_steps(512) = 1414656` and the startup line `Trainin
 2763 → 5858 (~env steps 1414656 → 3000000)`. Use `--min-step 1414656` for any decode or ATE
 tool run against this run's corpus from here on.
 
+**SUPERSEDED, 2026-09-20.** `min-step = 1414656` no longer applies to anything: the resume
+point rolled back from 2763 to 2541 on 2026-09-14 (calibration-ladder decision, see
+`config.yaml`'s retired `resume_from_step` comment and `docs/THE-ECOLOGY-NEVER-RAN.md`
+instance 6), and `signal_corpus.jsonl` was never re-uploaded/reset for the new lineage --
+every launch since keeps appending to the same file. Four separate launches wrote into the
+2541-lineage's step range with overlapping ppo coverage (2542→2584, 2544→2567, 2568→2583,
+2583→ongoing), one of them from a channel that had collapsed to `8|10|14` right before its
+tripwire HALT. Any analysis over the union pools dead-channel and live-channel records at the
+same step numbers.
+
+Measured, not estimated: scanned the corpus for duplicate `(agent, step)` keys. Every step
+from **1,300,992** (ppo 2541, the resume point) through **1,323,007** (the last raw step of
+ppo 2583's rollout) has duplicate rows -- as many as ~575 duplicate rows out of ~7,400 in a
+single update's window. **Step 1,323,008 (ppo 2584) is the first clean, single-sourced step**
+and stays clean through the most recent scan (ppo 2589, current as of this run) -- row counts
+per update halve exactly at this boundary (~7,400/update contaminated -> ~3,750/update clean),
+consistent with exactly two overlapping sources merging below it and one above.
+
+**Use `--min-step 1323008` for any decode or ATE tool run against the 2541-lineage corpus.**
+Not `1414656` (stale, wrong lineage) and not `1323520`/ppo 2585 (the pre-registered guess this
+measurement was checked against, per Cam's 2026-09-20 message -- the real boundary is one
+update earlier/cleaner than that guess: ppo 2584, not 2585).
+
+Every corpus record now also carries a `launch_id` (see `communication/analysis.py`,
+2026-09-20) -- a future contamination boundary like this one is detectable by inspection
+(`grep`/`groupby` on `launch_id` for a given step range) rather than by reconstructing launch
+history from `train.log` and a duplicate-key scan.
+
 ## 5.5 — Gate A (first ~20 updates): stop conditions, not observations
 
 Stop the run and report if any of these holds: any non-finite `grad_norm`; `codes_active` does

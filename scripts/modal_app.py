@@ -7,9 +7,15 @@ so the box provably runs what we think it does (same discipline as the §5.3
 banner check in docs/WILL_RESTART_SEP2026.md, applied to provisioning itself).
 
 Usage:
-    # Cheap pre-flight: proves the image builds, the volume mounts, the repo
-    # clones at the pinned SHA, and the expected startup banners print.
-    # Runs on CPU with a tiny n_steps — no GPU is billed.
+    # Cheap pre-flight (2026-09-20, rescoped -- see _tiny_cpu_smoke's own
+    # docstring for why): proves the image builds, the volume mounts, the
+    # repo clones at the pinned SHA, build_cfg() loads, the checkpoint
+    # restores, and the fossil guard evaluates against the real
+    # checkpoint_dir. No GPU billed, and cheap enough (~1-5 min, no JAX
+    # rollout) to run before every launch with no exceptions -- it does NOT
+    # exercise training-loop logic (no rollout, no PPO update, no
+    # tripwire/comms-warmup/dead-code-reset dynamics); only the real launch
+    # verifies those.
     modal run scripts/modal_app.py --test
 
     # Real run. --detach matters: the run must outlive this session.
@@ -81,26 +87,58 @@ image = (
 @app.function(
     image=image,
     gpu=None,
-    # 2026-09-14: was 600s, sized for the old "zero real updates" smoke test.
-    # Now that this actually runs real post-resume updates (see the n_steps
-    # padding below), one CPU-only rollout+PPO-backward pair alone measured
-    # >600s locally -- 600s guaranteed a timeout, not a check. Raised to
-    # 1800s on that basis.
-    #
-    # 2026-09-15 (Cam): 1800s timed out at the same place twice, same
-    # reasoning both times -- that's not a judgment call anymore, it's a
-    # mis-scoped budget. Measured for real this run: blue rollout alone
-    # 723.1s, blue PPO backward 879.0s -- 1602.1s before red's update even
-    # starts, against an 1800s ceiling. Raised generously (5400s) rather
-    # than fine-tuning a third guess -- this function is CPU-tier and rare
-    # (one pre-flight per launch), so the cost of a wide margin is trivial
-    # next to the cost of a preflight whose PASS means nothing because it
-    # never actually reaches the finish line.
-    timeout=5400,
+    # 2026-09-20 (Cam): this function's scope was rewritten, which is why
+    # the timeout dropped back down -- see the docstring below. Old history
+    # for context: 2026-09-14 raised 600s->1800s once this started forcing a
+    # real post-resume update; 2026-09-15 raised 1800s->5400s after that
+    # timed out at the same place twice (measured: blue rollout 723.1s +
+    # blue PPO backward 879.0s = 1602.1s before red's update even starts).
+    # 2026-09-20: skipped three times running under deadline pressure, each
+    # time with a locally sound reason -- which is exactly the failure mode
+    # Cam flagged: "a check that's skipped whenever it's inconvenient isn't
+    # a check." The real problem wasn't the reasons, it was the function:
+    # even paid for in full, it never once exercised what actually broke
+    # this session (the durability gate needs a checkpoint-interval of
+    # updates; the tripwire/rate-limit/C0-split logic needs dozens of
+    # updates post-unfreeze) -- 30-50 minutes of CPU time bought coverage of
+    # exactly one real update of stage-0 logic, no more. Rescoped to what it
+    # can actually verify cheaply (see docstring) so it can run every time,
+    # no exceptions, rather than being a step that exists on paper. Model
+    # init/restore compile can still take a few minutes; this is not "runs
+    # instantly," just "affordable enough to never skip."
+    timeout=600,
     volumes={VOLUME_MOUNT: volume},
 )
-def _tiny_cpu_smoke(n_steps: int) -> str:
-    """CPU pre-flight: proves clone/volume/import/banners without a GPU."""
+def _tiny_cpu_smoke() -> str:
+    """CPU pre-flight, rescoped 2026-09-20 (Cam) to what it can actually
+    verify cheaply, so it can run before every launch with no exceptions.
+
+    Proves: the image builds, the volume mounts, the repo clones at the
+    pinned SHA, build_cfg() loads, and -- the part that matters most,
+    because it's the exact class of thing that has actually broken this
+    session -- the checkpoint restores and the fossil guard evaluates
+    against the REAL checkpoint_dir on the REAL volume, using the same
+    CheckpointManager construction and the same find_fossil_checkpoints()
+    call main_jax.py uses for the real launch.
+
+    Deliberately does NOT run any training-loop logic (no rollout, no PPO
+    update, no tripwire, no comms-freeze/warmup/dead-code-reset dynamics).
+    That was the old design (padding n_steps to force exactly one real
+    post-resume update) -- paid for in full (30-50 CPU-minutes), it still
+    never once exercised what actually broke this session: the durability
+    gate needs a checkpoint-interval of updates to even attempt a save; the
+    tripwire baseline split, the comms warmup, and the rate-limited dead-
+    code reset all need dozens of updates post-unfreeze to do anything
+    observable. One forced update bought real but narrow coverage (stage-0
+    setup code only) at a cost high enough to make skipping this preflight
+    tempting under time pressure -- which happened three times this
+    session, each time for a locally sound reason. A check skipped whenever
+    it's inconvenient isn't a check. This version is cheap enough that
+    there's no longer a reason to skip it, and it says plainly what it does
+    and doesn't cover instead of quietly implying more than it proves:
+    verifying deep training-loop behavior still requires watching the real
+    launch, not a substitute for it.
+    """
     import os
     import subprocess
     import sys
@@ -119,49 +157,41 @@ def _tiny_cpu_smoke(n_steps: int) -> str:
     print(f"[preflight] volume mounted at {VOLUME_MOUNT}: OK", flush=True)
 
     from scripts.modal_train import build_cfg
-    from jax_sim.train_entry import run_simulation
 
     cfg = build_cfg()
     print(f"[preflight] build_cfg() OK, checkpoint_dir={cfg['checkpoint_dir']}", flush=True)
 
-    # 2026-09-14: n_updates = n_steps // T is an ABSOLUTE target step count,
-    # not "steps to run from here" -- the training loop is `for ui in
-    # range(start_update, n_updates)`. A flat n_steps=50 (n_updates=0) gives
-    # an EMPTY range whenever start_update > 0, so every preflight against a
-    # resumed checkpoint has been completing "successfully" without ever
-    # executing a single loop iteration -- restore-path banners printed,
-    # zero PPO updates, zero tripwire/crafting-bar code ever touched. Caught
-    # by actually checking, not by trusting "smoke test completed" (Rule
-    # 13). Resolve the real resume point the same way main_jax.py will, and
-    # Pad enough steps for a genuine post-resume update -- just 1: CPU-only,
-    # one rollout+PPO-backward pair alone measured >600s locally, so this
-    # trades thoroughness for actually fitting in the timeout above. 1 real
-    # update is still real coverage of the new code (the per-capita bar
-    # reads b_alive_now every craft-active update; the tripwire's history
-    # list gets its first real append) -- it just won't reach the
-    # stability-window search, which only starts evaluating at update 7.
-    _T = int(cfg.get("ppo_rollout_steps", 512))
-    _resume_pin = cfg.get("resume_from_step")
-    if _resume_pin is not None:
-        _start_update = int(_resume_pin)
+    import orbax.checkpoint as ocp
+    from jax_sim.main_jax import find_fossil_checkpoints
+
+    ckpt_dir = os.path.abspath(cfg["checkpoint_dir"])
+    mngr = ocp.CheckpointManager(
+        ckpt_dir, ocp.StandardCheckpointer(),
+        # max_to_keep matches main_jax.py's real construction -- this
+        # CheckpointManager only reads (all_steps()/latest_step()) so it
+        # can't prune anything, but keep it faithful to what the real
+        # launch constructs rather than assuming it's irrelevant.
+        options=ocp.CheckpointManagerOptions(max_to_keep=10, create=False),
+    )
+    latest = mngr.latest_step()
+    print(f"[preflight] checkpoint_dir latest step = {latest}", flush=True)
+    resume_pin = cfg.get("resume_from_step")
+    resume_target = int(resume_pin) if resume_pin is not None else (int(latest) if latest is not None else None)
+    if resume_target is not None:
+        fossils = find_fossil_checkpoints(mngr, resume_target)
+        if fossils:
+            all_steps = sorted(int(s) for s in mngr.all_steps())
+            raise AssertionError(
+                f"[preflight] FOSSIL-GUARD would refuse this launch: {ckpt_dir!r} contains "
+                f"checkpoint(s) {fossils} numerically ahead of the resume target "
+                f"({resume_target}). All steps present: {all_steps}. Fix before launching on "
+                f"a GPU -- this is exactly the mechanism that silently lost two real launches "
+                f"on 2026-09-15 (docs/THE-ECOLOGY-NEVER-RAN.md instance 6)."
+            )
+        print(f"[preflight] fossil guard OK -- no checkpoint ahead of resume target {resume_target}", flush=True)
     else:
-        import orbax.checkpoint as ocp
-        _mngr = ocp.CheckpointManager(
-            cfg["checkpoint_dir"], ocp.StandardCheckpointer(),
-            options=ocp.CheckpointManagerOptions(create=False),
-        )
-        _latest = _mngr.latest_step()
-        _start_update = int(_latest) if _latest is not None else 0
-    _min_steps = (_start_update + 1) * _T
-    steps = max(n_steps, _min_steps)
-    if steps != n_steps:
-        print(
-            f"[preflight] n_steps={n_steps} would give an EMPTY update range "
-            f"resuming from update {_start_update} -- padded to {steps} so at "
-            f"least 1 real post-resume update actually runs.",
-            flush=True,
-        )
-    run_simulation(cfg, seed=42, n_steps=steps)
+        print("[preflight] no checkpoint present yet (fresh start) -- fossil guard not applicable", flush=True)
+
     return head
 
 
@@ -321,9 +351,8 @@ def train(n_steps: int = N_STEPS_FULL) -> None:
 @app.local_entrypoint()
 def main(test: bool = False, n_steps: int = 0):
     if test:
-        steps = n_steps or 50
-        print(f"[preflight] running CPU smoke test, n_steps={steps}")
-        head = _tiny_cpu_smoke.remote(steps)
+        print("[preflight] running CPU smoke test (SHA/volume/config/checkpoint-restore/fossil-guard only)")
+        head = _tiny_cpu_smoke.remote()
         print(f"[preflight] smoke test completed, cloned HEAD={head}")
         return
     steps = n_steps or N_STEPS_FULL
