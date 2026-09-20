@@ -233,20 +233,37 @@ def train(n_steps: int = N_STEPS_FULL) -> None:
     #
     # 2026-09-15 (Cam): that fix landed in this SHA but never reached the run
     # it was diagnosed on -- the run was already on an older pinned SHA and
-    # died 7.5 hours later without ever writing a durable checkpoint, on
-    # exactly this mechanism (checkpoint_dir resolved off the FUSE mount via
-    # Path.resolve(), fixed separately in main_jax.py). "[CKPT] Committed"
-    # printed the whole time; it was not evidence. Durability is a
-    # precondition for running, not a property to fix while running --
-    # verify it BEFORE trusting any further GPU-hours to this run. Snapshot
-    # checkpoints/ now, and after the very first commit, confirm via a
-    # volume.listdir() RPC (not the container's own FUSE view -- the same
-    # class of blind spot that hid the original bug) that a new entry
-    # actually landed. Halt immediately if it didn't.
+    # died 7.5 hours later without ever writing a durable checkpoint. (Later
+    # the same night: the actual mechanism turned out to be checkpoint
+    # retention pruning, not the FUSE path -- see
+    # docs/THE-ECOLOGY-NEVER-RAN.md instances 5's retraction and 6. The
+    # durability-verification discipline below stands regardless of which
+    # mechanism it was catching.) "[CKPT] Committed" printed the whole time;
+    # it was not evidence. Durability is a precondition for running, not a
+    # property to fix while running -- verify it BEFORE trusting any
+    # further GPU-hours to this run. Snapshot checkpoint_dir now, and after
+    # the very first commit, confirm via a volume.listdir() RPC (not the
+    # container's own FUSE view -- the same class of blind spot that hid
+    # the original bug) that a new entry actually landed. Halt immediately
+    # if it didn't.
+    #
+    # 2026-09-20 (Will, self-caught): this hardcoded "checkpoints" here --
+    # stale from before checkpoint_dir moved to checkpoints_r2541/ the same
+    # night. Fired FATAL on the very first real checkpoint of the
+    # relaunch (ppo=2544): it was checking the OLD, abandoned checkpoints/
+    # directory, which this run never writes to, while the real save into
+    # checkpoints_r2541/2544 had genuinely succeeded (confirmed durable via
+    # `modal volume ls` five days later). A false alarm from watching the
+    # wrong directory, not a real durability failure -- but it still halted
+    # the run, exactly as a real one would have. Derive the path to watch
+    # from the same config the run itself uses, so the two can't drift
+    # apart again.
+    _cfg = build_cfg()
+    _ckpt_subdir = os.path.relpath(_cfg["checkpoint_dir"], VOLUME_MOUNT)
     try:
-        _ckpt_paths_before = {e.path for e in volume.listdir("checkpoints")}
+        _ckpt_paths_before = {e.path for e in volume.listdir(_ckpt_subdir)}
     except Exception:
-        _ckpt_paths_before = set()  # e.g. checkpoints/ doesn't exist yet on a fresh volume
+        _ckpt_paths_before = set()  # e.g. checkpoint_dir doesn't exist yet on a fresh volume
 
     _durability_state = {"verified": False}
 
@@ -264,10 +281,10 @@ def train(n_steps: int = N_STEPS_FULL) -> None:
         # real launch on this fix: the FATAL branch below fired for this
         # reason, not a real durability failure, the first time this ran.
         try:
-            _ckpt_paths_after = {e.path for e in volume.listdir("checkpoints")}
+            _ckpt_paths_after = {e.path for e in volume.listdir(_ckpt_subdir)}
         except Exception as exc:
             print(
-                f"[DURABILITY-GATE] FATAL: could not list checkpoints/ via the volume "
+                f"[DURABILITY-GATE] FATAL: could not list {_ckpt_subdir}/ via the volume "
                 f"RPC after the first commit to verify durability: {exc!r}. Halting "
                 f"before burning more GPU.",
                 flush=True,
@@ -276,7 +293,7 @@ def train(n_steps: int = N_STEPS_FULL) -> None:
         _new_paths = _ckpt_paths_after - _ckpt_paths_before
         if not _new_paths:
             print(
-                "[DURABILITY-GATE] FATAL: no new entry visible under checkpoints/ via "
+                f"[DURABILITY-GATE] FATAL: no new entry visible under {_ckpt_subdir}/ via "
                 "volume.listdir() after the first commit -- the checkpoint save is not "
                 "durable. This is the exact failure mode that silently lost the "
                 "2026-09-14 19:12 EDT - 2026-09-15 02:51 EDT run (7.5 hours, 44 PPO "
@@ -288,14 +305,14 @@ def train(n_steps: int = N_STEPS_FULL) -> None:
             raise SystemExit(1)
         print(
             f"[DURABILITY-GATE] OK: {sorted(_new_paths)} confirmed visible under "
-            f"checkpoints/ via volume.listdir() after the first commit -- durability "
+            f"{_ckpt_subdir}/ via volume.listdir() after the first commit -- durability "
             f"verified externally, not just trusted from the container's own print.",
             flush=True,
         )
         _durability_state["verified"] = True
 
     run_simulation(
-        build_cfg(), seed=42, n_steps=n_steps,
+        _cfg, seed=42, n_steps=n_steps,
         on_checkpoint_saved=_commit_and_verify_durability,
     )
     volume.commit()
