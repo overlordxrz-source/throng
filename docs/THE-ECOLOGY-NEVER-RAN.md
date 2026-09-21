@@ -245,12 +245,43 @@ instance 9, below, for the full mechanism writeup.
   109 passed / 56 skipped / 1 expected-and-explained failure
   (`test_checkpoint_compatibility` against the pre-hearth local backup).
 
-**Relaunch gate still holds and is now sharper: nothing relaunches until Gate 0 has been
-checked on the first 50 real updates, per Cam's explicit "I want Gate 0 checked on the first
-fifty updates and nothing assumed past it."** Everything above is implemented and unit/
-production-shape/smoke tested; none of the three gates has been evaluated against a real
-training run, because none has happened yet. **Do not relaunch training** — that determination
-is Cam's to make once this report is reviewed.
+**Update, 2026-09-21 (later the same day) — three launch-blocker items Cam required before
+relaunch are now verified; launch is authorized:**
+
+- **The own_state_dim 22→29 restore was verified, not assumed, against a real pre-hearth
+  checkpoint** (`tests/test_hearth_checkpoint_pad.py`, checkpoint step 2763 from
+  `~/throng_backup/checkpoints`). Cam's concern was specific and correct to raise: a changed
+  *input dimension on an existing weight tensor* is not something `graft_missing_param_subtrees`
+  handles the same way as a genuinely missing subtree, and if it silently dropped or
+  reinitialized `emb_own`'s kernel instead of zero-padding it, a resumed run would forget how to
+  read its own state while every banner reported a successful restore. Measured directly: the
+  restore-time grafting already in the codebase (`graft_missing_param_subtrees` +
+  `ensure_aux_head_params`, both pre-existing infrastructure from an earlier own_state_dim
+  change, not newly written for hearths) correctly zero-pads three affected tensors —
+  `emb_own/kernel` (input-dim growth), `gwt_comms_1/kernel` (input-dim growth), and
+  `head_vqel_recon_2/kernel`+`bias` (output-dim growth, from `spatial_ego_dim`) — none are
+  reinitialized. A full forward pass through the padded model, with the 7 new input dims
+  zeroed, against the *same real checkpoint's* params applied to the old 22-dim model shape,
+  produces **bit-identical `action_logits` and carries (max abs diff 0.0)**. The pad is correct.
+- **Stage A is confirmed N=1, not N=2** — `HEARTH_RAMP_STAGE_N = (1, 2, 3)`, index 0 is 1,
+  confirmed both by reading `jax_sim/ctd_ramp.py` directly and by the end-to-end smoke run's own
+  dashboard line: `[CTD-RAMP] hearths=True (stage=0/2 N=1, ...)`. The solo bootstrap is real, not
+  rebuilt as a two-agent cliff under new vocabulary.
+- **Comms freeze/unfreeze and the Adam-bias-correction-spring defusal survived the rename
+  intact** — `_freeze_comms = bool(craft_ramp_active_outer and craft_ramp_stage_outer == 0)` and
+  `_leaving_stage0 = (craft_ramp_stage_outer == 0)` (`jax_sim/main_jax.py`) were never touched by
+  the `CRAFT_RAMP_STAGE_UNITS` → `HEARTH_RAMP_STAGE_N` rename — both still key off the generic
+  stage index, which still means "the first, solo-only stage" under hearths exactly as it did
+  under pair-adjacency crafting. Confirmed live in the smoke run: `[CTD-RAMP] comms subtree
+  FROZEN for stage 0 (gwt_comms_1, head_signal_slot0/1/2, codebook_0/1/2, emb_nb) -- gradients
+  zeroed pre-optimizer, unfreezes at the stage-1 transition` fired correctly.
+
+**Relaunch gate, per Cam: "Once those three are done: launch, with Gate 0 armed from update
+one."** All three are done and verified above. **Launch is authorized.** Nothing past Gate 0 is
+assumed: "If per-capita deposit rate doesn't rise within 50 updates at N=1, agents can't learn
+one-body navigation and we stop there rather than spending on the rest." The actual Modal launch
+itself is the user's/M's to run — this agent has no Modal access (see `[Modal workflow]` in
+project memory) and pushes to git for that purpose, which is done (commit `d788804`, pushed).
 
 ---
 

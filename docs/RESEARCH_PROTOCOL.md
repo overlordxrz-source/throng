@@ -318,7 +318,14 @@ more expensive, because it produces publishable-looking nulls.
   assumed past it."** Instrumentation for all three gates is landed and the mechanism is
   tested at production shapes and end-to-end under real JIT compilation (see
   `THE-ECOLOGY-NEVER-RAN.md`), but none of the three has been evaluated against a real run —
-  none has happened. No relaunch.
+  none has happened.
+  **Update, 2026-09-21 (later): three launch-blocker items were required before relaunch and
+  are now verified** — the own_state_dim 22→29 checkpoint restore pads rather than drops or
+  reinitializes the affected tensors (bit-identical output verified against a real pre-hearth
+  checkpoint, `tests/test_hearth_checkpoint_pad.py`), Stage A is confirmed N=1 (not N=2), and
+  comms freeze/unfreeze plus the Adam-spring defusal survived the `HEARTH_RAMP_STAGE_N` rename
+  intact — see `THE-ECOLOGY-NEVER-RAN.md`'s 2026-09-21 (later) status entry for the full
+  verification. **Launch is authorized**, Gate 0 armed from update one, nothing past it assumed.
 
 ## Part 3 — Fossils
 
