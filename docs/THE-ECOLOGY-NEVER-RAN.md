@@ -31,26 +31,30 @@ checked directly against the corpus and log, on the actual live-run data, this s
   being real but below the population's current learning threshold, not with the mechanism
   being broken. Verified to fire correctly under ideal conditions at production shapes
   (`tests/test_pair_craft_success_production_shapes.py`).
-- **Informed agents (`can_see_recipe`) are measurably *worse*, not better, at holding a
-  needed material when attempting to craft** (95% CI entirely below zero — see
-  `RESEARCH_PROTOCOL.md` Part 2's 2026-09-20 entry). This bears directly on whether the
-  receiver-necessity premise (recipe knowledge should confer an advantage) holds at all, and
-  was logged as **measured, not diagnosed** at the time. It was in fact the second instance of
-  instance 7's ratchet — see instance 8, below. **Fixed**
-  (`can_see_recipe_mutation_rate: 0.03`, verified against the real reproduction path over 300
-  generations, same as `is_big_green`) but likewise **not yet exercised on a real run**.
-- **The mechanism behind the craft-material gap was tested and is not what it was suspected to
-  be.** Cam's conjecture — informed agents search specifically for a needed material in a
-  world where materials are zoned (each cell yields only 2 of 5), so they're more often
-  empty-handed because they searched the wrong zone — was tested directly. Zone availability
-  (the demanded material present anywhere in the agent's own zone at craft-attempt time): 
-  **58.07%** measured across informed craft attempts (prior stated as "around 40%"). The
-  specific causal cross-tab contradicts the conjectured mechanism: empty-handed *is higher*,
-  not lower, for informed agents even when their zone does contain the needed material — the
-  zoning mismatch is real but is not, by itself, the explanation for the measured gap. See
-  `RESEARCH_PROTOCOL.md` Part 2's 2026-09-20 zone-availability entry for the full breakdown.
-  **The zone/recipe mismatch fix itself (zone-local recipes vs. de-zoning) has deliberately not
-  been implemented** — Cam: "Don't implement yet," pending review of this number.
+- ~~**Informed agents (`can_see_recipe`) are measurably *worse*, not better, at holding a
+  needed material when attempting to craft** (95% CI entirely below zero).~~ **RETRACTED IN
+  FULL, 2026-09-21 — do not cite this bullet.** `can_see_recipe` was found (instance 10, below)
+  to have been globally re-rolled for the whole population every ~1000 steps throughout the
+  entire measured window, so "informed" and "uninformed" were never stable groups — the
+  comparison measures nothing coherent. See `RESEARCH_PROTOCOL.md`'s 2026-09-21 retraction for
+  the full reasoning. **What survives:** nothing about this specific claim — the hearth design
+  rests on the collision-rate result below instead, which never used `can_see_recipe`. **What
+  is NOT established:** that information wasn't helping. Only that coordination was at chance.
+  The mutation-rate fix below (instance 8) survives on independent, structural grounds — see
+  instance 8's own updated entry — not on this retracted measurement.
+- ~~**The mechanism behind the craft-material gap was tested and is not what it was suspected
+  to be**~~ **— moot, 2026-09-21: the gap this bullet explains is itself retracted (above).**
+  Cam's conjecture (informed agents search specifically for a needed material in a zoned world,
+  so they're more often empty-handed from searching the wrong zone) was tested and falsified on
+  its own terms regardless — the causal cross-tab showed empty-handed *higher*, not lower, when
+  the zone did contain the material — but the behavioral zone-availability percentage (58.07%)
+  and that cross-tab both inherit the same `can_see_recipe`-churn defect as the gap they were
+  built to explain, and are struck for the same reason (`RESEARCH_PROTOCOL.md`, 2026-09-21).
+  The raw geometric fact that materials are zoned 2-of-5 per cell is untouched (it's read
+  directly from `material_zone_masks`, no corpus measurement involved) — only the behavioral
+  percentage and cross-tab are void. **The zone/recipe mismatch fix itself was withdrawn
+  anyway**, on independent grounds — see the collision-rate entry below, which replaced
+  pair-adjacency crafting with hearths.
 - **Big-green catching requires 2+ coordinating red agents**, not that big-green is
   uncatchable — a red-policy coordination-rate question, separate from and downstream of the
   population fix above. **Known open item, explicitly not being fixed now** — see instance 8's
@@ -59,9 +63,11 @@ checked directly against the corpus and log, on the actual live-run data, this s
   `is_big_green_mutation_rate: 0.03` (instance 7) nor `can_see_recipe_mutation_rate: 0.03`
   (instance 8) has been exercised against a live training run — both were verified only
   against the real `apply_auto_reproduce` function directly, over 300 synthetic generations
-  each, with a mortality asymmetry standing in for the measured fitness disadvantage. The run
-  was stopped before either fix could be landed and relaunched, and relaunch remains gated (see
-  below), so this stays true going into the next session.
+  each, with a mortality asymmetry standing in for *a* modeled net-negative selection pressure
+  (see instance 8's 2026-09-21 correction: the specific craft-material numbers that mortality
+  asymmetry was originally said to model are retracted; the mutation fix and its verification
+  don't depend on them). The run was stopped before either fix could be landed and relaunched,
+  and relaunch remains gated (see below), so this stays true going into the next session.
 - **The zone-local-recipe proposal (Rule 12) is withdrawn.** Cam's own empty-handed mechanism
   (informed agents search the wrong zone) was tested and falsified — see the zone-availability
   entry above. What replaced it: **the collision arithmetic**, independently re-derived from
@@ -648,8 +654,8 @@ nonzero at generation 7) and stabilizes at a low nonzero tail frequency (0.74% m
 
 ---
 
-## 8. `can_see_recipe` was the second one-way demographic ratchet, under measured negative
-selection with no reverse path
+## 8. `can_see_recipe` was the second one-way demographic ratchet — solving a hypothetical
+until instance 10 made it real
 
 **Introduced:** same code, same day as instance 7 — `init_population` draws `can_see_recipe`
 as a one-time 50% random assignment; `apply_auto_reproduce` inherited it unchanged from an
@@ -660,28 +666,38 @@ trait alone: the fix needed a *reason*, not just a structural match, and at the 
 checked whether `can_see_recipe` was actually under selection pressure, in which direction, or
 by how much.
 
-**The reason arrived the same day.** `RESEARCH_PROTOCOL.md` Part 2's 2026-09-20 entry measured
-informed agents (`can_see_recipe=True`) holding a recipe-needed material at craft-attempt time
-*less* often than uninformed agents — 11.89% vs 16.19%, 95% CI on the difference [-5.60, -2.99]
-points, entirely below zero. Informed is measurably the *worse* trait to inherit right now.
-Combined with the zero-selection-weighted parent sampling instance 7 already proved makes any
-net-disadvantaged fixed trait a one-way ratchet, `can_see_recipe` was heading for fixation at
-0% on exactly the same mechanism as small-blue — a second, independent ratchet that would have
-killed the informed caste, and with it the entire receiver-necessity premise the ecology is
-built to test, regardless of whatever else got fixed about recipe zoning.
+**CORRECTION, 2026-09-21 (Cam) — the original "reason" is retracted; read this before the rest
+of this entry.** The reason originally cited here — `RESEARCH_PROTOCOL.md` Part 2's 2026-09-20
+measurement that informed agents held a needed material less often than uninformed (11.89% vs
+16.19%, z=−6.46) — is **struck from the record** (see `RESEARCH_PROTOCOL.md`'s 2026-09-21
+retraction and instance 10, below): `can_see_recipe` was being globally re-rolled for the
+entire population every ~1000 steps throughout the measured window, so "informed" and
+"uninformed" were never stable groups to compare. **This does not weaken the fix below — it
+changes what justifies it, and in one specific way makes it *more* necessary, not less.**
+Instance 7's ratchet argument was always structural, not directional: zero-selection-weighted
+parent sampling turns *any* fixed trait's zero-population state into an absorbing state, with
+or without a measured fitness gap driving it there — pure drift in a finite population
+eventually fixes at 0% or 100% on its own. That argument never needed the craft-material gap to
+be true; it only needed `can_see_recipe` to be a genuinely fixed, purely inherited trait. **It
+was not, until today.** The global re-roll this session deleted (instance 9, while removing the
+global recipe it was bundled with) constantly reintroduced both values into the population
+regardless of any drift or selection under way — which means the ratchet this fix was written
+to prevent **could not have run to completion while the re-roll was still live**. The mutation
+rate was landed to break a ratchet that, mechanically, didn't yet exist. Now that the re-roll
+is gone, `can_see_recipe` is for the first time actually the fixed, purely-inherited trait
+instance 7's argument requires — and the ratchet instance 8 was written to prevent is real for
+the first time. **Instance 8 is correct, and newly load-bearing; it was solving a hypothetical
+until 2026-09-21, and now isn't.**
 
-**Duration:** structurally present since `init_population`/`apply_auto_reproduce` were written
-(same "always," unknown-start caveat as instance 7); confirmed under active negative selection
-as of the 2026-09-20 craft-material measurement above. Not yet observed to reach 0% on a live
-run — caught and fixed from the mechanism and the measured fitness gap, the same way instance 7
-was fixed before small-blue's reappearance was ever tested live, not after a `pop_split` read
-showed it gone.
+**Duration:** the *fix* is structurally present since it was landed 2026-09-20. The *problem it
+solves* — a genuine absorbing-state ratchet, not merely a modeled one — has existed only since
+2026-09-21, when instance 9's deletion of the competing global re-roll made `can_see_recipe`
+purely inherited for the first time. Not yet observed to reach 0% on a live run, and now that it
+can actually be reached, this remains worth watching once a run is live.
 
-**Effect:** none yet observed on a live run (no run has stayed up long enough post-diagnosis to
-reach fixation), but the same argument that made instance 7's fix non-optional applies here:
-absent mutation, a fixed trait under sustained net-negative selection with zero reverse path
-converges to 0% given enough generations, deterministically, independent of policy quality on
-either side.
+**Effect:** as of 2026-09-21, absent mutation, a fixed trait with zero-weighted parent sampling
+converges to 0% or 100% given enough generations, deterministically, independent of any
+directional fitness gap — this is now a real, not hypothetical, exposure for `can_see_recipe`.
 
 **Fix:** identical medicine to instance 7, per Cam's direct instruction ("Apply the same
 medicine... Same rate, same test"): added `can_see_recipe_mutation_rate` (default `0.03`,
@@ -691,18 +707,19 @@ Uses its own RNG split (`k6`, distinct from `is_big_green`'s `k5`) so the two mu
 don't interfere; confirmed independent in
 `tests/test_is_big_green_and_can_see_recipe_mutation_are_independent`.
 
-**How it was found:** not found — anticipated. Cam named the structural parallel directly
-("`can_see_recipe` is the second ratchet... same structure as `is_big_green`... Apply the same
-medicine") once the craft-material measurement gave the fix a justified direction (informed is
-disadvantaged, so mutation should be introducing informed agents into an uninformed-trending
-population, not the reverse). Verified, not asserted, the same way as instance 7:
-`tests/test_can_see_recipe_mutation.py` runs the real `apply_auto_reproduce` forward 300 real
-generations from a 100%-uninformed start, under a mortality asymmetry standing in for the
-measured fitness disadvantage (informed agents die at 0.25/generation vs uninformed at 0.05,
-modeling the measured craft-material gap), and confirms informed reappears (first nonzero at
-generation 4) and stabilizes at a low nonzero tail frequency (0.43% mean, range 0-1.5% over the
-final 50 generations) rather than staying extinct. A `mutation_rate=0.0` regression guard
-confirms the original lock-in reproduces exactly when the fix is disabled.
+**How it was found:** not found — anticipated, from the structural parallel to instance 7 (`
+can_see_recipe` is the second ratchet... same structure as `is_big_green`), landed the same day
+the (now-retracted) craft-material measurement was reported. Verified against the real
+mechanism, not asserted: `tests/test_can_see_recipe_mutation.py` runs the real
+`apply_auto_reproduce` forward 300 real generations from a 100%-uninformed start, under an
+asymmetric mortality standing in for *a* net-negative selection pressure (informed agents die at
+0.25/generation vs uninformed at 0.05) — the test verifies the mutation mechanism reintroduces
+and stabilizes a disadvantaged trait under *some* real directional pressure, a modeling choice
+that does not depend on the specific (retracted) craft-material numbers being true, and confirms
+informed reappears (first nonzero at generation 4) and stabilizes at a low nonzero tail
+frequency (0.43% mean, range 0-1.5% over the final 50 generations) rather than staying extinct.
+A `mutation_rate=0.0` regression guard confirms the original lock-in reproduces exactly when the
+fix is disabled.
 
 **Known open item, explicitly not being fixed now:** red's catch mechanic requires 2+
 coordinating reds post-`coop_threshold_step` (instance 7's cross-reference) — a red-policy
@@ -773,14 +790,35 @@ contradicting instances 7 and 8's central premise (`can_see_recipe` is "a one-ti
 init_population, inherited unchanged... never updated during an agent's life") for the entire
 time both instances were diagnosed and fixed, on 2026-09-20.
 
-**Effect:** `can_see_recipe` was never purely the fixed, inherited trait the population-genetics
-diagnosis (instance 8) treated it as — it was that inheritance path *and* a competing global
-rewrite, superimposed, the whole time. This doesn't invalidate instance 8's fix (a per-birth
-mutation rate is still correct and still needed for the inheritance path, which is real and
-does ratchet), but it means every `can_see_recipe`-conditioned measurement taken from a live run
-before 2026-09-21 (the craft-material holding gap, the zone-availability numbers, both in
-`RESEARCH_PROTOCOL.md` Part 2) reflects both mechanisms at once, not pure inheritance — worth
-remembering if any of those numbers are ever re-measured post-hearths and come out different.
+**Effect — stated at full size, per Cam's correction (2026-09-21), not softened:**
+`can_see_recipe` was globally re-rolled for the entire living population every ~1000 steps for
+the *entire* measured history this project has data for — not occasionally, not at the margins.
+That means the informed/uninformed material-holding comparison
+(`RESEARCH_PROTOCOL.md` Part 2's 2026-09-20 entry, 11.89% vs 16.19%, z=−6.46) **is void, not
+merely confounded, and is struck from the record.** A `can_see_recipe` label at the moment of a
+craft attempt is a real snapshot, but the material-holding *outcome* being compared was produced
+by that agent's gathering behavior over the preceding steps, under whatever `can_see_recipe`
+value it happened to have *then* — which could differ from the label at craft-attempt time.
+"Informed" and "uninformed" were never stable groups; membership churned inside the very window
+the comparison treated as fixed. The zone-availability cross-tab built to explain that gap
+(same Part 2 entry, later the same session) inherits the identical defect and is struck for the
+same reason. **What survives:** the hearth design's collision-rate evidence (this file's
+2026-09-21 entry) never used `can_see_recipe` and is untouched — it remains the load-bearing
+justification for replacing pair-adjacency crafting. **What does not survive:** any claim that
+information wasn't helping. The correct state of knowledge is narrower and weaker than that —
+only that coordination was at chance — and nothing in this project's record should be written or
+read as if the stronger claim survived.
+**Instance 8 changes character, not just footnote:** its fix (a per-birth mutation rate) does
+not depend on the retracted gap — instance 7's ratchet argument was always structural
+(zero-selection-weighted parent sampling turns a trait's zero-population state into an absorbing
+state regardless of any measured direction), and never needed the craft-material numbers to be
+true. What it *did* need was for `can_see_recipe` to be a genuinely fixed, purely inherited
+trait — and because of the mechanism documented in this instance, it was not: the global re-roll
+constantly reintroduced both values, so the ratchet instance 8 was written to prevent could not
+have run to completion while the re-roll was still live. Instance 8's mutation rate was solving
+a hypothetical. Deleting the re-roll below is what makes `can_see_recipe` purely inherited for
+the first time, which is what makes the ratchet — and instance 8's fix for it — real for the
+first time, as of this same day. See instance 8's own updated entry for the full statement.
 
 **Fix:** deleted, not patched — the competing rewrite lived entirely inside the same
 `update_recipe` block instance 9 removed for unrelated reasons (the global recipe it rotated no

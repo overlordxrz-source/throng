@@ -190,38 +190,31 @@ more expensive, because it produces publishable-looking nulls.
   (`jax_sim/main_jax.py`). Found by direct interrogation ("what is X actually reading, is Y
   actually armed") after a report cited the metric, not by the tripwire firing or by code
   review before landing the refactor that caused it.
-- **A pressure can be real and still ill-posed — check that the resource being rewarded
-  actually confers the advantage the design assumes it does, not just that the pressure
-  exists.** The receiver-necessity design (`THRONG.md`) rests on one load-bearing premise:
-  an agent who knows the recipe must do better than one who doesn't, because that's the only
-  thing that makes transmitting the knowledge worth anything. That premise is a testable claim
-  about the ecology, separate from whether any channel is good at transmitting it.
-  **Confirmed instance (2026-09-20, Cam's own — "the most important number available"):**
-  split blue's stage-1 corpus records by `can_see_recipe`, measuring whether an agent holds a
-  recipe-needed material at the moment it attempts to craft (the closest answerable proxy to
-  full pair-success — see below for why full success isn't measurable from this corpus at
-  all). Informed agents held a needed material 11.89% of the time (n=2,700); uninformed,
-  16.19% (n=24,973). Difference −4.30 points, 95% CI [−5.60, −2.99], z=−6.46 — informed agents
-  are *worse*, not merely no-better, at the one behavior the entire design assumes recipe
-  knowledge should improve. This is stronger than a null result: it fails the premise in the
-  wrong direction, not just below significance.
-  **A second, independent structural finding sits underneath this one and needs its own
-  scrutiny before any conclusion is drawn:** `can_see_recipe`, like `is_big_green`
-  (`docs/THE-ECOLOGY-NEVER-RAN.md` instance 7), is a **fixed trait** — a one-time 50% draw at
-  `init_population`, inherited unchanged from an assigned parent at reproduction
-  (`jax_sim/population_jax.py`), never updated by proximity, communication, or anything an
-  agent does during its life. It is not "this agent currently perceives the recipe board"; it
-  is "this agent was born sighted." Whether the −4.3-point gap reflects (a) sighted agents
-  genuinely doing worse at material choice for some real reason, (b) a confound correlated
-  with the fixed trait (scouting assignment, spawn-position correlation with material zones —
-  neither checked), or (c) `can_see_recipe` not actually gating what the policy's own
-  observation contains the way its name implies, is **not yet known and was deliberately not
-  chased** — the instruction that produced this measurement was explicit that a result outside
-  the stated gate condition should stop, not trigger a redesign in the same pass. Log as
-  **measured, not diagnosed**: the direction and magnitude of the gap are confirmed; the
-  mechanism behind it is not.
+- **RETRACTED IN FULL, 2026-09-21 (Cam) — struck from the record, not softened: the
+  informed-vs-uninformed material-holding comparison below measures nothing coherent and
+  must not be cited.** Original claim, entered 2026-09-20 as "the most important number
+  available": split blue's stage-1 corpus records by `can_see_recipe`, informed agents held a
+  needed material 11.89% of the time (n=2,700) vs uninformed 16.19% (n=24,973), difference
+  −4.30 points, 95% CI [−5.60, −2.99], z=−6.46. **Why it's void, not merely uncertain:**
+  `docs/THE-ECOLOGY-NEVER-RAN.md` instance 10 (found 2026-09-21, while deleting the code that
+  did it) established that `can_see_recipe` was globally re-rolled for the *entire living
+  population* every ~1000 steps, for the entire measured history this corpus covers — not a
+  one-time inherited trait as this entry originally assumed. That means "informed" and
+  "uninformed" were never stable groups: an agent's `can_see_recipe` label at the moment of a
+  craft attempt is a snapshot, but the material-holding *outcome* being measured was produced
+  by that agent's gathering behavior over the preceding steps, under whatever `can_see_recipe`
+  value it had *then* — which could differ from the label at craft-attempt time. Membership
+  churned inside the very window the comparison treats as fixed. The comparison is not weakened
+  or confounded, it is measuring an undefined quantity, and is struck rather than caveated.
+  **What survives:** the hearth design's collision-rate evidence (`THE-ECOLOGY-NEVER-RAN.md`'s
+  2026-09-21 entry, 2.00 observed vs 2.44–2.59 expected, z=−1.17) never depended on
+  `can_see_recipe` and is untouched. **What does not survive, and must not be implied by
+  anything written about this project going forward:** there is no evidence information
+  *wasn't* helping. There is only evidence that coordination was at chance. Don't let the
+  absence of the struck finding read as its opposite.
   **Also measured the same session, directly bearing on what "success" the pressure could
-  even reward:** the literal informed-vs-uninformed *pair-success* rate (not the material-
+  even reward, and independent of the `can_see_recipe` defect above (this part is not
+  retracted):** the literal informed-vs-uninformed *pair-success* rate (not the material-
   choice proxy above) cannot be measured from this corpus at all —
   `sample_frac=0.08` means P(both members of a real successful pair are independently sampled
   at the same step) = 0.08² = 0.64%; across 481,631 stage-1-window corpus records (14,592
@@ -282,6 +275,16 @@ more expensive, because it produces publishable-looking nulls.
   null that means nothing." The number is in; the fix has not landed; no relaunch.
   **Superseded, 2026-09-21:** Cam's own empty-handed mechanism above was falsified cleanly by
   the cross-tab. The zone-local-recipe fix is withdrawn; see the next entry.
+  **Further struck, same day:** the gap this entry was built to explain is itself retracted
+  (see the entry above — `can_see_recipe` churned globally throughout the measured history, so
+  no informed/uninformed behavioral comparison from that corpus is coherent). This entry's
+  causal cross-tab (empty-handed rate split by zone-availability) inherits the identical
+  defect — it relates a snapshot `can_see_recipe` label to a behavioral outcome (holding
+  material) produced by earlier gathering under a possibly-different label — and is void for
+  the same reason. What is NOT affected: the raw geometric fact that materials are zoned
+  2-of-5 per cell (`material_zone_masks`, read directly from code, no corpus measurement
+  involved) stands untouched; only the *behavioral* zone-availability percentage and its
+  cross-tab are struck.
 - **The zone-local-recipe fix is withdrawn; the mechanism itself was replaced (Hearths), and
   three gates were pre-registered, with fixed thresholds, before implementing anything.**
   Independently re-deriving the collision arithmetic (not taking Cam's hand estimate on faith —

@@ -1,24 +1,31 @@
 """Cam's instance-8 instruction (2026-09-20): can_see_recipe is built exactly
 like is_big_green -- a one-time 50% draw at init_population, inherited
 unchanged from an assigned parent at reproduction, never updated during an
-agent's life (jax_sim/population_jax.py). The same session measured that
-informed agents (can_see_recipe=True) hold a recipe-needed material at craft
-time LESS often than uninformed agents (11.89% vs 16.19%, 95% CI on the
-difference entirely below zero -- RESEARCH_PROTOCOL.md Part 2). Combined
-with apply_auto_reproduce's uniform-by-alive-count parent sampling (zero
+agent's life (jax_sim/population_jax.py). Combined with
+apply_auto_reproduce's uniform-by-alive-count parent sampling (zero
 weighting by can_see_recipe, exactly as for is_big_green -- already proven
 in tests/test_population_composition_lockin.py to make is_big_green a
-one-way ratchet), a heritable trait currently under negative selection with
-no reverse path heads for fixation at 0%: given enough generations the
-informed caste disappears and receiver-necessity dies on its own,
-independent of whatever else gets fixed about recipe zoning.
+one-way ratchet), a heritable trait under any net-negative selection with
+no reverse path heads for fixation at 0%, structurally, independent of the
+specific direction or size of whatever selection pressure is acting on it.
+
+CORRECTION, 2026-09-21 (Cam): the informed/uninformed craft-material gap
+this docstring originally cited as the fix's motivation (11.89% vs 16.19%,
+RESEARCH_PROTOCOL.md Part 2) is retracted in full -- can_see_recipe was
+found to have been globally re-rolled for the whole population every
+~1000 steps throughout the measured window (THE-ECOLOGY-NEVER-RAN.md
+instance 10), so "informed" and "uninformed" were never stable groups to
+compare. That retraction does not weaken this fix or this test: instance
+7/8's ratchet argument was always structural (see above), never dependent
+on the retracted numbers being true. The mortality asymmetry below models
+*a* net-negative selection pressure for verification purposes only -- it
+is not a claim that this specific pressure is what's real in the ecology.
 
 Same medicine as tests/test_is_big_green_mutation.py: run the REAL
 apply_auto_reproduce forward, many real generations, from a
-100%-can_see_recipe population, under a mortality asymmetry standing in for
-the OBSERVED fitness disadvantage (informed agents measurably worse at the
-one behavior recipe knowledge is supposed to help with), and confirm the
-trait stabilizes at a low nonzero frequency rather than going extinct.
+100%-can_see_recipe population, under a modeled mortality asymmetry, and
+confirm the trait stabilizes at a low nonzero frequency rather than going
+extinct.
 """
 
 import jax
@@ -32,10 +39,9 @@ SIGNAL_DIM = 4
 GRID_SIZE = 128
 MUTATION_RATE = 0.03
 
-# Mortality asymmetry standing in for the measured fitness disadvantage:
-# informed agents hold a needed material at craft time ~27% less often in
-# relative terms (11.89% vs 16.19%, RESEARCH_PROTOCOL.md Part 2, 2026-09-20)
-# -- modeled here as an elevated death rate for the disadvantaged
+# Mortality asymmetry standing in for *a* modeled net-negative selection
+# pressure (not a claim about a specific measured one -- see the docstring's
+# 2026-09-21 correction) -- elevated death rate for the disadvantaged
 # (informed) type, the same modeling choice test_is_big_green_mutation.py
 # makes for small-blue's measured predation exposure.
 P_DEATH_INFORMED = 0.25

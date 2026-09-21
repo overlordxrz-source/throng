@@ -12,15 +12,20 @@ from jax_sim.network_jax import AgentNetworkJax, PredatorNetworkJax
 def test_checkpoint_compatibility():
     # 2026-09-21 (hearths): this test opportunistically checks whatever
     # checkpoint happens to be cached locally (~/throng_backup/checkpoints)
-    # against the repo's *current* config.yaml shape. Phase 19 hearths
-    # deliberately changed own_state_dim 22 -> 29 (see
-    # docs/THE-ECOLOGY-NEVER-RAN.md's hearth entry) -- any checkpoint saved
-    # before that change is now genuinely, permanently incompatible with the
-    # current code, by design, not by regression. Expect a
-    # flax.errors.ScopeParamShapeError ("(29, 256)" vs "(22, 256)") here
-    # until this machine's local backup is replaced by a checkpoint actually
-    # trained under the hearth architecture -- that is this test correctly
-    # doing its job, not a bug to chase.
+    # against the repo's *current* config.yaml shape -- deliberately WITHOUT
+    # the restore-time grafting main_jax.py's real resume path always
+    # applies (ensure_aux_head_params/graft_missing_param_subtrees), so it's
+    # answering a stricter question ("is this checkpoint plug-compatible
+    # with zero adaptation") than "can the repo actually resume this
+    # checkpoint." Phase 19 hearths changed own_state_dim 22 -> 29 (see
+    # docs/THE-ECOLOGY-NEVER-RAN.md's hearth entry), so this strict check
+    # now fails here as expected (flax.errors.ScopeParamShapeError, "(29,
+    # 256)" vs "(22, 256)") -- that's this test correctly doing its narrower
+    # job, not evidence the checkpoint is unusable. The actual production
+    # resume path (with grafting) is separately verified, against this same
+    # real checkpoint, to produce BIT-IDENTICAL output on the pre-existing
+    # 22 dims with the 7 new ones zeroed, in
+    # test_hearth_checkpoint_pad.py::test_restore_time_pad_matches_pre_hearth_checkpoint_exactly.
     # 1. Find checkpoint dir
     ckpt_dir = "/mnt/throng-runs/checkpoints"
     config_path = "/mnt/throng-runs/config.json"
