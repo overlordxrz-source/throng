@@ -249,6 +249,37 @@ more expensive, because it produces publishable-looking nulls.
   downstream of the population-ratchet fix (instance 7) — worth revisiting once small-blue's
   mutation-restored presence (also instance 7) gives red an easier target to practice on
   again, before concluding anything further about red's own policy specifically.
+- **A specific causal conjecture for a measured gap needs its own direct test — a plausible
+  mechanism is not evidence until it's checked against the data it's supposed to explain.**
+  The −4.3-point informed-vs-uninformed material-holding gap above (Cam's own conjecture,
+  2026-09-20): informed agents search specifically for the recipe's needed material in a world
+  where materials are zoned (`jax_sim/grid_jax.py`'s `material_zone_masks` — wood/stone split
+  on x, flint/clay/vine split on y, every cell yields exactly 2 of 5 materials), so they're
+  more often empty-handed because the zone they're standing in and the material their recipe
+  demands don't line up. Stated prior: "around 40%."
+  **Tested directly, as specified:** for each informed agent at each craft attempt, whether the
+  demanded material is present anywhere in that agent's zone. **Measured: 58.07%** of informed
+  craft attempts occur in a zone that does contain the demanded material — well above the
+  stated 40% prior. **The specific causal mechanism is not supported by the cross-tab:**
+  splitting empty-handed rate by zone-availability, informed agents are *more* often
+  empty-handed when their zone *does* contain the needed material, not less — the reverse of
+  what the conjecture predicts. The zoning/recipe mismatch is real (58.07% means a substantial
+  minority of informed attempts happen in a zone that structurally cannot supply the recipe),
+  but it is not, by itself, the explanation for why informed agents are worse than uninformed
+  at holding a needed material. Reported as measured, not reconciled — the zone-availability
+  number and the causal cross-tab are both facts about this corpus; a full explanation of the
+  original gap remains open.
+  **Ruling on what to do about the mismatch (Cam, Rule 12, 2026-09-20):** favor zone-local
+  recipes (constrain what a recipe can demand to materials actually reachable from the zone a
+  recipe-holder starts in or is assigned) over removing zoning entirely — this preserves the
+  receiver-necessity structure (knowledge should still need to travel) rather than flattening
+  the world to make the mismatch disappear. **Not yet implemented** — explicit instruction:
+  "Don't implement yet. Give me the zone-availability number first; it decides the magnitude
+  and it may change which option is right." The number above is that input; the fix itself is
+  still pending review against it.
+  **Relaunch gate:** "Nothing relaunches until the zone-availability number is in and the
+  recipe fix lands. Running Gate C in a world that punishes using information would produce a
+  null that means nothing." The number is in; the fix has not landed; no relaunch.
 
 ## Part 3 — Fossils
 

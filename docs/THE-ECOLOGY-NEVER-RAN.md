@@ -35,11 +35,31 @@ checked directly against the corpus and log, on the actual live-run data, this s
   needed material when attempting to craft** (95% CI entirely below zero — see
   `RESEARCH_PROTOCOL.md` Part 2's 2026-09-20 entry). This bears directly on whether the
   receiver-necessity premise (recipe knowledge should confer an advantage) holds at all, and
-  is logged as **measured, not diagnosed** — the mechanism behind the gap is not yet known
-  and was deliberately not chased in the same pass that found it.
+  was logged as **measured, not diagnosed** at the time. It was in fact the second instance of
+  instance 7's ratchet — see instance 8, below. **Fixed**
+  (`can_see_recipe_mutation_rate: 0.03`, verified against the real reproduction path over 300
+  generations, same as `is_big_green`) but likewise **not yet exercised on a real run**.
+- **The mechanism behind the craft-material gap was tested and is not what it was suspected to
+  be.** Cam's conjecture — informed agents search specifically for a needed material in a
+  world where materials are zoned (each cell yields only 2 of 5), so they're more often
+  empty-handed because they searched the wrong zone — was tested directly. Zone availability
+  (the demanded material present anywhere in the agent's own zone at craft-attempt time): 
+  **58.07%** measured across informed craft attempts (prior stated as "around 40%"). The
+  specific causal cross-tab contradicts the conjectured mechanism: empty-handed *is higher*,
+  not lower, for informed agents even when their zone does contain the needed material — the
+  zoning mismatch is real but is not, by itself, the explanation for the measured gap. See
+  `RESEARCH_PROTOCOL.md` Part 2's 2026-09-20 zone-availability entry for the full breakdown.
+  **The zone/recipe mismatch fix itself (zone-local recipes vs. de-zoning) has deliberately not
+  been implemented** — Cam: "Don't implement yet," pending review of this number.
 - **Big-green catching requires 2+ coordinating red agents**, not that big-green is
   uncatchable — a red-policy coordination-rate question, separate from and downstream of the
-  population fix above.
+  population fix above. **Known open item, explicitly not being fixed now** — see instance 8's
+  closing note.
+
+**Relaunch gate, verbatim (Cam, 2026-09-20): "Nothing relaunches until the zone-availability
+number is in and the recipe fix lands. Running Gate C in a world that punishes using
+information would produce a null that means nothing."** The zone-availability number is in
+(above); the recipe fix has not landed. **Do not relaunch training.**
 
 **Migration bundle:** the full state needed to resume on a new Modal account/workspace —
 both live checkpoints, all 6 ladder fossils, both signal corpora, the complete `train.log`,
@@ -442,10 +462,9 @@ outcome selection is producing; mutation is a rule of the world." Added
 per-birth probability the offspring's `is_big_green` flips relative to its parent's,
 independent of current population composition — present at 0% small-blue exactly as it's
 present at 50%, the same way a real mutation rate doesn't care how rare the recessive allele
-has become. `can_see_recipe` was left untouched — same structural pattern (fixed trait, one-
-time draw, unchanged inheritance), but a measured, statistically significant *negative*
-informed-vs-uninformed gap (`RESEARCH_PROTOCOL.md` Part 2, 2026-09-20 entry) means it needs a
-different kind of look before deciding anything, not the same fix applied by analogy.
+has become. `can_see_recipe` is the same structural pattern (fixed trait, one-time draw,
+unchanged inheritance) under its own measured negative selection — see instance 8, below,
+where the same fix was applied once the mechanism was understood well enough to justify it.
 
 **How it was found:** Cam asked directly — "What transitions an agent to big_green, is it
 reversible, and can small blue exist in steady state at all?" — after `pop_split=small:0` had
@@ -458,6 +477,69 @@ runs the real `apply_auto_reproduce` forward 300 real generations from a 100%-bi
 under asymmetric (predation-like) mortality and confirms small-blue reappears (first
 nonzero at generation 7) and stabilizes at a low nonzero tail frequency (0.74% mean, range
 0-2% over the final 50 generations) rather than staying extinct or exploding to parity.
+
+---
+
+## 8. `can_see_recipe` was the second one-way demographic ratchet, under measured negative
+selection with no reverse path
+
+**Introduced:** same code, same day as instance 7 — `init_population` draws `can_see_recipe`
+as a one-time 50% random assignment; `apply_auto_reproduce` inherited it unchanged from an
+assigned parent (`parent_can_see = pop.can_see_recipe[assigned_parents]`, `new_can_see =
+jnp.where(activate_mask, parent_can_see, pop.can_see_recipe)`) with the same uniform-by-alive-
+count parent sampling instance 7 diagnosed for `is_big_green`. Instance 7 deliberately left this
+trait alone: the fix needed a *reason*, not just a structural match, and at the time nobody had
+checked whether `can_see_recipe` was actually under selection pressure, in which direction, or
+by how much.
+
+**The reason arrived the same day.** `RESEARCH_PROTOCOL.md` Part 2's 2026-09-20 entry measured
+informed agents (`can_see_recipe=True`) holding a recipe-needed material at craft-attempt time
+*less* often than uninformed agents — 11.89% vs 16.19%, 95% CI on the difference [-5.60, -2.99]
+points, entirely below zero. Informed is measurably the *worse* trait to inherit right now.
+Combined with the zero-selection-weighted parent sampling instance 7 already proved makes any
+net-disadvantaged fixed trait a one-way ratchet, `can_see_recipe` was heading for fixation at
+0% on exactly the same mechanism as small-blue — a second, independent ratchet that would have
+killed the informed caste, and with it the entire receiver-necessity premise the ecology is
+built to test, regardless of whatever else got fixed about recipe zoning.
+
+**Duration:** structurally present since `init_population`/`apply_auto_reproduce` were written
+(same "always," unknown-start caveat as instance 7); confirmed under active negative selection
+as of the 2026-09-20 craft-material measurement above. Not yet observed to reach 0% on a live
+run — caught and fixed from the mechanism and the measured fitness gap, the same way instance 7
+was fixed before small-blue's reappearance was ever tested live, not after a `pop_split` read
+showed it gone.
+
+**Effect:** none yet observed on a live run (no run has stayed up long enough post-diagnosis to
+reach fixation), but the same argument that made instance 7's fix non-optional applies here:
+absent mutation, a fixed trait under sustained net-negative selection with zero reverse path
+converges to 0% given enough generations, deterministically, independent of policy quality on
+either side.
+
+**Fix:** identical medicine to instance 7, per Cam's direct instruction ("Apply the same
+medicine... Same rate, same test"): added `can_see_recipe_mutation_rate` (default `0.03`,
+`config.yaml`) to `apply_auto_reproduce` — a per-birth probability the offspring's
+`can_see_recipe` flips relative to its parent's, independent of current population composition.
+Uses its own RNG split (`k6`, distinct from `is_big_green`'s `k5`) so the two mutation rolls
+don't interfere; confirmed independent in
+`tests/test_is_big_green_and_can_see_recipe_mutation_are_independent`.
+
+**How it was found:** not found — anticipated. Cam named the structural parallel directly
+("`can_see_recipe` is the second ratchet... same structure as `is_big_green`... Apply the same
+medicine") once the craft-material measurement gave the fix a justified direction (informed is
+disadvantaged, so mutation should be introducing informed agents into an uninformed-trending
+population, not the reverse). Verified, not asserted, the same way as instance 7:
+`tests/test_can_see_recipe_mutation.py` runs the real `apply_auto_reproduce` forward 300 real
+generations from a 100%-uninformed start, under a mortality asymmetry standing in for the
+measured fitness disadvantage (informed agents die at 0.25/generation vs uninformed at 0.05,
+modeling the measured craft-material gap), and confirms informed reappears (first nonzero at
+generation 4) and stabilizes at a low nonzero tail frequency (0.43% mean, range 0-1.5% over the
+final 50 generations) rather than staying extinct. A `mutation_rate=0.0` regression guard
+confirms the original lock-in reproduces exactly when the fix is disabled.
+
+**Known open item, explicitly not being fixed now:** red's catch mechanic requires 2+
+coordinating reds post-`coop_threshold_step` (instance 7's cross-reference) — a red-policy
+coordination-rate sparsity, separate from and downstream of both population ratchets above.
+Cam: "Red stays untouched... note it as a known open item, don't fix it now."
 
 ---
 
