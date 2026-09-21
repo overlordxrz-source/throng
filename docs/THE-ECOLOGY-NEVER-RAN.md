@@ -55,11 +55,66 @@ checked directly against the corpus and log, on the actual live-run data, this s
   uncatchable — a red-policy coordination-rate question, separate from and downstream of the
   population fix above. **Known open item, explicitly not being fixed now** — see instance 8's
   closing note.
+- **Both population-ratchet fixes landed this same day are untested on a real run.** Neither
+  `is_big_green_mutation_rate: 0.03` (instance 7) nor `can_see_recipe_mutation_rate: 0.03`
+  (instance 8) has been exercised against a live training run — both were verified only
+  against the real `apply_auto_reproduce` function directly, over 300 synthetic generations
+  each, with a mortality asymmetry standing in for the measured fitness disadvantage. The run
+  was stopped before either fix could be landed and relaunched, and relaunch remains gated (see
+  below), so this stays true going into the next session.
+- **The zone-local-recipe proposal (Rule 12) is withdrawn.** Cam's own empty-handed mechanism
+  (informed agents search the wrong zone) was tested and falsified — see the zone-availability
+  entry above. What replaced it: **the collision arithmetic**, independently re-derived from
+  the actual corpus and log (not taken on faith) — see below — showed the observed crafting
+  success rate is statistically indistinguishable from what pure independent-chance collision
+  between two randomly-moving agents would predict on its own, given their individually
+  measured (not assumed) rates of holding a needed material and choosing to craft. **No
+  coordination beyond chance has ever occurred at this mechanism**, and zone-local recipes
+  would not move a co-location rate this low. **New ruling: give the world a crafting site** —
+  a designated location where materials are deposited and persist, turning the two-body
+  simultaneity problem into a one-body navigation problem and making recipe knowledge
+  concretely actionable to transmit ("the site needs flint" vs. today's unusable "I have
+  flint, come to me"). **Not yet implemented** — pending a full spec.
+- **Collision-rate verification (2026-09-21, re-derived independently from the corpus/log,
+  correcting the scoping used in the first pass):** the naive `step >= 1,323,008` filter used
+  for a first attempt at this calculation is contaminated — `train.log` and the migration
+  bundle's corpus contain **two separate relaunches that both resume-renumber from ppo≈2542**,
+  so the same (step, ppo) pair appears more than once with different outcomes, and a step
+  threshold alone pulls in an unrelated later relaunch (ppo 2782+). The true clean window,
+  found by requiring file-order ppo continuity (not just a step floor), is the same one
+  already established for the trend measurement above: **ppo 2584–2596 (13 updates, steps
+  1,322,497–1,329,152)** — 100% genuine stage-1 (2-unit) recipes in this window, no stale
+  full-recipe or stage-0 contamination. Measured directly from the corpus in that window:
+  agents hold a recipe-needed material 17.80% of the time (not the ~13% estimated), and craft
+  7.07% of the time overall, 9.17% of the time specifically when already holding a needed
+  material (population-wide craft-action frequency is *not* the right multiplier once you've
+  already conditioned on holding — using it inflates the estimate by roughly 2x). Recomputing
+  Cam's exact model (Chebyshev radius-1 adjacency, `8/16,383` on a 128×128 torus — confirmed
+  against `resolve_crafting`'s actual adjacency check) with these self-consistent, corpus-
+  measured inputs: **expected 2.44–2.59 successes per 512-step rollout** (N=194–200) against
+  **observed 2.00** (26 `craft_success` flags over 13 updates) — a Poisson z-score of −1.17,
+  not significant. **Confirms Cam's conclusion, with corrected inputs**: the pressure has never
+  exceeded what two independently-moving agents would produce by accident.
+- **What already exists in the codebase resembling a site, checked before speccing a new
+  mechanism (Cam's request):** no crafting-site or depot mechanism exists. The closest
+  precedents, both in `jax_sim/grid_jax.py`, live and wired in but structurally different:
+  `generate_contested_nodes`/`contested_res` (fixed random grid locations, `contested_n_nodes`
+  of them, requiring `contested_min_harvesters` agents simultaneously *present* — not
+  depositing anything — in the same step for a resource-yield bonus; wired in
+  `jax_sim/main_jax.py` ~line 654-665, `agent_count` is a fresh per-step scatter-add headcount,
+  nothing persists) and `update_scent_trails`/`scent_trails` (a genuine deposit-and-decay
+  persistent grid field, but red-only, untyped — a single intensity scalar per cell, not a
+  material — and unrelated to crafting). Neither is a site in the sense Cam means (a fixed
+  place holding typed, persistent, depletable material); a real crafting depot would need to
+  combine `contested_res`'s "fixed known locations, config-driven count" with
+  `scent_trails`'s "deposit persists and decays/depletes over time" pattern, plus per-material
+  typing neither currently has.
 
 **Relaunch gate, verbatim (Cam, 2026-09-20): "Nothing relaunches until the zone-availability
 number is in and the recipe fix lands. Running Gate C in a world that punishes using
 information would produce a null that means nothing."** The zone-availability number is in
-(above); the recipe fix has not landed. **Do not relaunch training.**
+(above); the zone-local-recipe fix is withdrawn and replaced by the crafting-site proposal,
+which has not landed. **Do not relaunch training.**
 
 **Migration bundle:** the full state needed to resume on a new Modal account/workspace —
 both live checkpoints, all 6 ladder fossils, both signal corpora, the complete `train.log`,
