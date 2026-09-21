@@ -11,6 +11,55 @@ scratch a second time.
 
 ---
 
+## Status as of 2026-09-20 — read this first if picking up cold
+
+The run is **stopped, deliberately, and nothing should relaunch** until the items below are
+addressed. This is not a crash or an infrastructure failure — everything in instances 1-6 is
+fixed and confirmed working. The stop is because both of the ecology's pre-registered
+selection pressures (`RESEARCH_PROTOCOL.md`'s "two pressures must be live, not merely
+configured — predation must produce catches, and crafting must produce successes") were
+checked directly against the corpus and log, on the actual live-run data, this same day:
+
+- **Predation was structurally impossible**, independent of red's policy — see instance 7,
+  below. **Fixed** (`is_big_green_mutation_rate: 0.03`, verified against the real
+  reproduction path over 300 generations) but **not yet exercised on a real run** — the fix
+  landed after the run was stopped for this finding, not before.
+- **Crafting is real but rare** (103 successes across 41 stage-1 updates measured directly
+  from the log, not zero — an earlier single-snapshot read had wrongly suggested zero) and
+  **flat, not learning** (linear-fit slope ≈ 0.10 successes/update over the clean single-
+  sourced window, statistically indistinguishable from zero) — consistent with the pressure
+  being real but below the population's current learning threshold, not with the mechanism
+  being broken. Verified to fire correctly under ideal conditions at production shapes
+  (`tests/test_pair_craft_success_production_shapes.py`).
+- **Informed agents (`can_see_recipe`) are measurably *worse*, not better, at holding a
+  needed material when attempting to craft** (95% CI entirely below zero — see
+  `RESEARCH_PROTOCOL.md` Part 2's 2026-09-20 entry). This bears directly on whether the
+  receiver-necessity premise (recipe knowledge should confer an advantage) holds at all, and
+  is logged as **measured, not diagnosed** — the mechanism behind the gap is not yet known
+  and was deliberately not chased in the same pass that found it.
+- **Big-green catching requires 2+ coordinating red agents**, not that big-green is
+  uncatchable — a red-policy coordination-rate question, separate from and downstream of the
+  population fix above.
+
+**Migration bundle:** the full state needed to resume on a new Modal account/workspace —
+both live checkpoints, all 6 ladder fossils, both signal corpora, the complete `train.log`,
+`config.yaml`, and the exact pinned commit — was pulled to local disk at
+`~/throng_migration_2026-09-20/` (2.9 GB, verified: byte-identical to the independently-
+trusted `~/throng_backup` copy where overlapping, valid JSONL, valid Orbax metadata on every
+checkpoint). **Read `~/throng_migration_2026-09-20/MIGRATION.md` before uploading anything to
+a new volume** — it has the upload order and the fossil-guard constraint (never put a
+higher-numbered fossil in the live checkpoint directory; see instance 6, below, for what that
+costs).
+
+**Retractions on the record, so they aren't rediscovered:** instance 5's central causal claim
+(`.resolve()` bypassing `Volume.commit()`) does not survive a controlled test and is retracted
+in that entry's own postscript — the real mechanism was instance 6. `RESEARCH_PROTOCOL.md`
+Part 2 carries a matching correction. An earlier report this same day that crafting produced
+zero successes across stage 1 was also wrong (single-snapshot extrapolation) — see the
+success-series entry above.
+
+---
+
 ## 1. Red curriculum state reset to stage zero on every process resume
 
 **Introduced:** commit `8132d68`, "fix: value head init + red curriculum
@@ -393,8 +442,10 @@ outcome selection is producing; mutation is a rule of the world." Added
 per-birth probability the offspring's `is_big_green` flips relative to its parent's,
 independent of current population composition — present at 0% small-blue exactly as it's
 present at 50%, the same way a real mutation rate doesn't care how rare the recessive allele
-has become. `can_see_recipe` was left untouched (see instance 8, `RESEARCH_PROTOCOL.md`, for
-why that one needs a different kind of look before deciding anything).
+has become. `can_see_recipe` was left untouched — same structural pattern (fixed trait, one-
+time draw, unchanged inheritance), but a measured, statistically significant *negative*
+informed-vs-uninformed gap (`RESEARCH_PROTOCOL.md` Part 2, 2026-09-20 entry) means it needs a
+different kind of look before deciding anything, not the same fix applied by analogy.
 
 **How it was found:** Cam asked directly — "What transitions an agent to big_green, is it
 reversible, and can small blue exist in steady state at all?" — after `pop_split=small:0` had

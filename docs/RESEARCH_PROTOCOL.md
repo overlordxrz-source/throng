@@ -5,6 +5,13 @@ It is the distilled output of the Sep 2026 audit, in which thirteen defects were
 each had one property in common: something reported success while doing nothing, and a
 measurement was taken anyway.
 
+**Picking this up cold, on a new account or after a gap:** `docs/THE-ECOLOGY-NEVER-RAN.md`
+has a "Status as of 2026-09-20" section at the top with the current blocker (both ecology
+pressures were checked and one was structurally dead until that day's fix), what's fixed vs.
+still open, and where the migration bundle (`~/throng_migration_2026-09-20/MIGRATION.md`) is.
+Read that first if the question is "where do things stand," read this document for the
+standing rules that produced those findings.
+
 ---
 
 ## Part 1 — Code integrity: prove the work happened
@@ -183,6 +190,65 @@ more expensive, because it produces publishable-looking nulls.
   (`jax_sim/main_jax.py`). Found by direct interrogation ("what is X actually reading, is Y
   actually armed") after a report cited the metric, not by the tripwire firing or by code
   review before landing the refactor that caused it.
+- **A pressure can be real and still ill-posed — check that the resource being rewarded
+  actually confers the advantage the design assumes it does, not just that the pressure
+  exists.** The receiver-necessity design (`THRONG.md`) rests on one load-bearing premise:
+  an agent who knows the recipe must do better than one who doesn't, because that's the only
+  thing that makes transmitting the knowledge worth anything. That premise is a testable claim
+  about the ecology, separate from whether any channel is good at transmitting it.
+  **Confirmed instance (2026-09-20, Cam's own — "the most important number available"):**
+  split blue's stage-1 corpus records by `can_see_recipe`, measuring whether an agent holds a
+  recipe-needed material at the moment it attempts to craft (the closest answerable proxy to
+  full pair-success — see below for why full success isn't measurable from this corpus at
+  all). Informed agents held a needed material 11.89% of the time (n=2,700); uninformed,
+  16.19% (n=24,973). Difference −4.30 points, 95% CI [−5.60, −2.99], z=−6.46 — informed agents
+  are *worse*, not merely no-better, at the one behavior the entire design assumes recipe
+  knowledge should improve. This is stronger than a null result: it fails the premise in the
+  wrong direction, not just below significance.
+  **A second, independent structural finding sits underneath this one and needs its own
+  scrutiny before any conclusion is drawn:** `can_see_recipe`, like `is_big_green`
+  (`docs/THE-ECOLOGY-NEVER-RAN.md` instance 7), is a **fixed trait** — a one-time 50% draw at
+  `init_population`, inherited unchanged from an assigned parent at reproduction
+  (`jax_sim/population_jax.py`), never updated by proximity, communication, or anything an
+  agent does during its life. It is not "this agent currently perceives the recipe board"; it
+  is "this agent was born sighted." Whether the −4.3-point gap reflects (a) sighted agents
+  genuinely doing worse at material choice for some real reason, (b) a confound correlated
+  with the fixed trait (scouting assignment, spawn-position correlation with material zones —
+  neither checked), or (c) `can_see_recipe` not actually gating what the policy's own
+  observation contains the way its name implies, is **not yet known and was deliberately not
+  chased** — the instruction that produced this measurement was explicit that a result outside
+  the stated gate condition should stop, not trigger a redesign in the same pass. Log as
+  **measured, not diagnosed**: the direction and magnitude of the gap are confirmed; the
+  mechanism behind it is not.
+  **Also measured the same session, directly bearing on what "success" the pressure could
+  even reward:** the literal informed-vs-uninformed *pair-success* rate (not the material-
+  choice proxy above) cannot be measured from this corpus at all —
+  `sample_frac=0.08` means P(both members of a real successful pair are independently sampled
+  at the same step) = 0.08² = 0.64%; across 481,631 stage-1-window corpus records (14,592
+  distinct steps) exactly 1 fully-sampled successful pair was found, against an expected ~13
+  if even ~2,000 true successes existed in that window. This is an instrument-coverage
+  ceiling, not evidence of anything about the ecology — record it so nobody re-attempts the
+  same query expecting a different answer without first changing the corpus's sampling
+  design (e.g. a targeted denser sample keyed to craft attempts specifically).
+- **Read the mechanism before ruling on the policy it constrains.** `pop_split=small:0` and
+  `catch_attempts≈0` together look like "red can't catch anything" — but `blue_caught≈1 per
+  rollout, occasionally` was already visible in the same dashboard block, which a "predation is
+  dead" read doesn't explain. **Confirmed instance (2026-09-20, Cam's own — "different fixes;
+  I'm not ruling on red until I know which"):** `jax_sim/grid_jax.py`'s `apply_catches()` gates
+  big-green catches on `coop_active = step >= coop_threshold_step` (`coop_threshold_step:
+  100_000`, `config.yaml`) — past that step (current env step ~1.33M, 13x past it, for the
+  entire observable history of this checkpoint lineage), catching a big-green requires **2 or
+  more red agents simultaneously within `catch_radius=1` of the same target, both choosing
+  STRIKE on the same step**; a lone striking red "mauls" instead of catching, and is
+  *penalized* for it (`reward_big_green_solo_penalty: -1.0` vs `reward_big_green_success: 8.0`
+  for a real coop catch). With the population at ~100% big-green (instance 7,
+  `THE-ECOLOGY-NEVER-RAN.md`), every catch opportunity red has had is gated by this bar, and
+  the observed ~1-per-rollout rate is red *occasionally clearing* a genuinely demanding
+  2-agent coordination requirement across 250 largely-undirected agents — not a sign the
+  target is unreachable. This is a red-policy coordination-rate question, separate from and
+  downstream of the population-ratchet fix (instance 7) — worth revisiting once small-blue's
+  mutation-restored presence (also instance 7) gives red an easier target to practice on
+  again, before concluding anything further about red's own policy specifically.
 
 ## Part 3 — Fossils
 
