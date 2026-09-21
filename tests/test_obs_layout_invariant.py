@@ -37,7 +37,7 @@ def _live_layout():
         neighbor_k=int(_cfg["neighbor_k"]),
         local_cells=(2 * int(_cfg["local_obs_radius"]) + 1) ** 2,
         env_channels=int(_cfg.get("env_channels", 15)),
-        own_state_dim=int(_cfg.get("own_state_dim", 22)),
+        own_state_dim=int(_cfg.get("own_state_dim", 29)),
     )
 
 
@@ -46,19 +46,26 @@ def test_loc_env_start_is_pinned_for_the_live_config():
     memory_slots changed in config.yaml. That's fine — update the pinned
     value below — but ALSO go check every hand-rolled consumer of obs-layout
     boundaries (grep for `idx_offset`, `loc_env_start`, magic slice indices
-    into `obs`/`b_obs_all`) instead of just silencing this test."""
+    into `obs`/`b_obs_all`) instead of just silencing this test.
+
+    own_state_dim went 22 -> 29 on 2026-09-21 (Phase 19, hearths): Phase
+    18.7's masked_recipe[5] (a single global recipe, gated by
+    can_see_recipe) was replaced by hearth_rel[8] (4 hearths x dx,dy,
+    always visible) + hearth_need[4] (one per hearth, gated by
+    can_see_recipe) -- net +7, updating loc_env_start and total_dim by
+    the same +7."""
     layout = _live_layout()
-    assert layout.own_state_dim == 22, (
-        f"own_state_dim changed to {layout.own_state_dim} (was 22) — this is exactly "
+    assert layout.own_state_dim == 29, (
+        f"own_state_dim changed to {layout.own_state_dim} (was 29) — this is exactly "
         "the kind of change that broke the Finding 3 formula three times before."
     )
     assert layout.env_channels == 15, f"env_channels changed to {layout.env_channels} (was 15)"
-    assert layout.loc_env_start == 674, (
-        f"loc_env_start is {layout.loc_env_start}, expected 674 for the pinned config "
-        "(own_state=22, neighbor_k=6, signal_dim=40, symbol_dim=16). Update this pin "
+    assert layout.loc_env_start == 681, (
+        f"loc_env_start is {layout.loc_env_start}, expected 681 for the pinned config "
+        "(own_state=29, neighbor_k=6, signal_dim=40, symbol_dim=16). Update this pin "
         "AND check every hand-rolled consumer of obs-layout boundaries."
     )
-    assert layout.total_dim == 2731, f"total_dim is {layout.total_dim}, expected 2731"
+    assert layout.total_dim == 2738, f"total_dim is {layout.total_dim}, expected 2738"
 
 
 def test_corpus_writer_uses_make_obs_layout_not_a_hand_rolled_formula():

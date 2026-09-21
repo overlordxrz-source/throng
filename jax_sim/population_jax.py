@@ -71,6 +71,12 @@ class PopState:
         self.next_lineage_id = jnp.int32(1)
         self.is_big_green = jnp.zeros(max_pop, dtype=jnp.bool_)
 
+        # Phase 19 Hearths (2026-09-21): Gate 2's spatial-following control --
+        # large sentinel (never "recent") so a fresh/newborn agent starts as
+        # not-recently-near-an-informed-agent, matching steps_since_catch's
+        # convention of counting up from a clean state rather than down.
+        self.steps_since_informed_nearby = jnp.full(max_pop, 10_000, dtype=jnp.int32)
+
     # ── PyTree registration ───────────────────────────────────────────────
 
     def tree_flatten(self):
@@ -81,7 +87,7 @@ class PopState:
             self.lineage_ids, self.next_lineage_id, self.is_big_green, self.alarms,
             self.inventory_wood, self.inventory_stone, self.inventory_flint,
             self.inventory_clay, self.inventory_vine, self.inventory_axe,
-            self.can_see_recipe,
+            self.can_see_recipe, self.steps_since_informed_nearby,
         ]
         if self.memory_buffer is not None:
             children.append(self.memory_buffer)
@@ -102,9 +108,9 @@ class PopState:
          pop.lineage_ids, pop.next_lineage_id, pop.is_big_green, pop.alarms,
          pop.inventory_wood, pop.inventory_stone, pop.inventory_flint,
          pop.inventory_clay, pop.inventory_vine, pop.inventory_axe,
-         pop.can_see_recipe) = children[:22]
+         pop.can_see_recipe, pop.steps_since_informed_nearby) = children[:23]
         if memory_slots > 0:
-            pop.memory_buffer = children[22]
+            pop.memory_buffer = children[23]
         else:
             pop.memory_buffer = None
         return pop
@@ -139,6 +145,9 @@ class PopState:
         pop.inventory_vine = kwargs.get("inventory_vine", self.inventory_vine)
         pop.inventory_axe = kwargs.get("inventory_axe", self.inventory_axe)
         pop.can_see_recipe = kwargs.get("can_see_recipe", self.can_see_recipe)
+        pop.steps_since_informed_nearby = kwargs.get(
+            "steps_since_informed_nearby", self.steps_since_informed_nearby
+        )
         return pop
 
 

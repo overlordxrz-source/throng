@@ -20,30 +20,20 @@ import jax
 import jax.numpy as jnp
 
 
-CRAFT_RAMP_STAGE_UNITS = (1, 2)  # stage 0: solo-satisfiable; stage 1: pair-satisfiable
-
-
-def staged_recipe_counts(key: jax.Array, stage: jnp.ndarray) -> jnp.ndarray:
-    """Recipe for the crafting ramp's two capped stages (Cam's correction,
-    2026-09-14: craft_ramp_max_units=2 alone was still a cooperative problem
-    at smaller scale, not the solo-catchable analogue -- max_units=1 was
-    missing entirely).
-
-    Stage 0 draws exactly 1 material unit -- solo-satisfiable, because
-    resolve_crafting's adjacency check counts an agent as adjacent to
-    itself, so one agent holding the one correct material succeeds alone.
-    Stage 1 draws exactly 2 -- pair-satisfiable, the old single-stage
-    behaviour. Neither wastes a slot (unlike the full recipe draw in
-    jax_sim/main_jax.py's update_recipe), so sum(counts) is exactly 1 or 2.
-
-    Both slots are drawn unconditionally regardless of `stage`, and only the
-    *values* are masked by stage -- the traced shape never depends on
-    `stage`, so advancing stages doesn't retrace/recompile update_recipe.
-    """
-    items = jax.random.randint(key, (2,), 0, 5)
-    counts_stage0 = jnp.bincount(items[:1], length=5).astype(jnp.int32)
-    counts_stage1 = jnp.bincount(items, length=5).astype(jnp.int32)
-    return jnp.where(stage == 0, counts_stage0, counts_stage1)
+HEARTH_RAMP_STAGE_N = (1, 2, 3)  # required deposits to complete a hearth, per stage
+# 2026-09-21 (Cam), hearths replace pair-adjacency crafting entirely: the old
+# CRAFT_RAMP_STAGE_UNITS = (1, 2) recipe-unit cap and staged_recipe_counts()
+# are deleted, not kept alongside the new mechanism -- "every parallel
+# mechanism is another place for a silent bug, and we've found eight." The
+# same floor/bar/window/ceiling ratchet in jax_sim/main_jax.py's per-update
+# loop (generic over len(...)) now drives a hearth's required deposit count N
+# instead of a recipe's unit count: stage 0 (N=1) is solo-satisfiable -- one
+# agent's deposit alone completes a hearth, pure bootstrap, no coordination
+# possible or required. Stage 1 (N=2) and stage 2 (N=3) require multiple
+# deposits before the shared decay clock (see grid_jax.resolve_hearth_deposits)
+# erases the earlier ones, at which point coordination becomes the strictly
+# faster path without being the only possible one (a lone agent can still
+# complete a hearth solo via repeated round trips if it beats decay).
 
 
 def _nearest_alive_blue_dist(

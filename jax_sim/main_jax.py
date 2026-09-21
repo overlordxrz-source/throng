@@ -36,7 +36,7 @@ from jax_sim.grid_jax import (
     write_to_grid, decay_grid, decay_barrier_grid, get_local_patches, get_neighbour_signals,
     generate_puzzle_nodes, update_puzzle_grid, decay_puzzle_timeout, check_puzzle_solved,
     generate_resource_patches, generate_shelter_spots, generate_contested_nodes,
-    update_scent_trails, material_zone_masks, resolve_crafting,
+    update_scent_trails, material_zone_masks, resolve_hearth_deposits,
 )
 from communication.analysis import SignalCorpusWriter
 from jax_sim.population_jax import (
@@ -44,7 +44,7 @@ from jax_sim.population_jax import (
     apply_auto_reproduce
 )
 from jax_sim.action_space import MASKED_ACTIONS, mask_disabled_actions, masked_actions_banner
-from jax_sim.ctd_ramp import staged_recipe_counts, red_shaping_term, CRAFT_RAMP_STAGE_UNITS
+from jax_sim.ctd_ramp import red_shaping_term, HEARTH_RAMP_STAGE_N
 from jax_sim.network_jax import (
     AgentNetworkJax,
     AUX_HEAD_KEYS,
@@ -276,12 +276,27 @@ def make_sim_step(
     _reward_red_starve = float(config.get("reward_red_starve_per_step", -0.01))
     _red_catch_radius = int(config.get("red_catch_radius", 1))
     _red_catch_prob = float(config.get("red_catch_prob", 1.0))
-    _reward_craft_success = float(config.get("reward_craft_success", 3.0))
     _reward_futile_craft = float(config.get("reward_futile_craft", -0.20))
+    # Phase 19 Hearths (2026-09-21, Cam's spec): deposit reward small and
+    # positive (never punished, even if the hearth never completes);
+    # completion reward ~8x the deposit, split proportionally among whoever's
+    # (decayed) credit is still in the fill at completion -- sized so
+    # completing a hearth strictly beats solo-grinding deposits forever
+    # without ever finishing one, while a single agent completing a hearth
+    # alone (N=1, or a lone multi-trip fill before decay wins) is still
+    # straightforwardly profitable. See docs/THE-ECOLOGY-NEVER-RAN.md's
+    # hearth entry for the sizing rationale against the rest of the reward
+    # scale (reward_craft_success:3.0 is retired -- replaced by these two).
+    _reward_hearth_deposit = float(config.get("reward_hearth_deposit", 0.3))
+    _reward_hearth_completion = float(config.get("reward_hearth_completion", 2.4))
+    _hearth_decay_half_life = float(config.get("hearth_decay_half_life_steps", 200))
+    _hearth_decay_factor = jnp.array(0.5 ** (1.0 / max(_hearth_decay_half_life, 1.0)), dtype=jnp.float32)
+    _hearth_ramp_n = jnp.array(HEARTH_RAMP_STAGE_N, dtype=jnp.int32)
 
-    # CtD competence ramp (jax_sim/ctd_ramp.py) -- Cam's sign-off, 2026-09-14.
-    # Crafting stages (solo -> pair -> full) are fixed by
-    # jax_sim.ctd_ramp.CRAFT_RAMP_STAGE_UNITS, not configurable per-run.
+    # CtD competence ramp (jax_sim/ctd_ramp.py) -- Cam's sign-off, 2026-09-14,
+    # repurposed 2026-09-21 to drive a hearth's required deposit count N
+    # instead of a recipe's unit count. Stages (1 -> 2 -> 3) are fixed by
+    # jax_sim.ctd_ramp.HEARTH_RAMP_STAGE_N, not configurable per-run.
     _ramp_cfg = config.get("ctd_competence_ramp", {})
     _red_ramp_beta = float(_ramp_cfg.get("red_ramp_beta", 2.5))
     _ppo_gamma_for_shaping = float(config.get("ppo_gamma", 0.999))
@@ -452,7 +467,16 @@ def make_sim_step(
             b_sig_broadcast = jnp.zeros_like(b_signal_out)
         else:
             b_sig_broadcast = b_signal_out
-            
+
+        # Phase 19 Gate 2 control (2026-09-21, Cam's registered ablation):
+        # "zero the wire, measure whether accuracy falls." A separate,
+        # otherwise-identical run with this flag on isolates whether
+        # uninformed deposit accuracy above chance is coming from the
+        # symbol channel specifically, as opposed to spatial following
+        # (the other registered control, steps_since_informed_nearby).
+        if bool(config.get("hearth_channel_ablation_enabled", False)):
+            b_sig_broadcast = jnp.zeros_like(b_sig_broadcast)
+
         b_pop = b_pop.replace(
             signals=jnp.where(b_pop.alive[:, None], b_sig_broadcast, 0.0),
             alarms=jnp.where(b_pop.alive[:, None], b_alarm_out, 0.0)
@@ -614,33 +638,48 @@ def make_sim_step(
             vine_grid=jnp.maximum(new_vine_grid, 0.0)
         )
         
-        # 3. CRAFT (Action 10) -> shared reward
+        # 3. CRAFT (Action 10) -> Phase 19 hearth deposit (2026-09-21, Cam's
+        # spec; replaces Phase 18.7's pair-adjacency resolve_crafting()
+        # entirely -- no parallel path kept alive alongside it).
         is_craft = (b_actions == 10) & b_pop.alive
-        
-        _craft_result = resolve_crafting(
+        hearth_key = jax.random.split(key_misc, 4)[3]
+        _hearth_n_required = _hearth_ramp_n[grid.craft_ramp_stage]
+
+        _hearth_result = resolve_hearth_deposits(
             b_pop.positions, is_craft,
             new_inv_wood, new_inv_stone, new_inv_flint, new_inv_clay, new_inv_vine,
-            grid.current_recipe, gs,
+            grid.hearth_positions, grid.hearth_need, grid.hearth_fill, grid.hearth_credit,
+            _hearth_n_required, _hearth_decay_factor, hearth_key,
         )
-        craft_success = _craft_result["craft_success"]
-        futile_uncoordinated = _craft_result["futile_uncoordinated"]
-        futile_wrong_mats = _craft_result["futile_wrong_mats"]
-        futile_empty = _craft_result["futile_empty"]
+        hearth_deposited = _hearth_result["deposited"]
+        hearth_attempted = _hearth_result["attempted"]
+        hearth_completed = _hearth_result["completed"]
+        hearth_completion_share = _hearth_result["completion_share"]
 
-        consume_wood = craft_success & (new_inv_wood > 0)
-        consume_stone = craft_success & (new_inv_stone > 0)
-        consume_flint = craft_success & (new_inv_flint > 0)
-        consume_clay = craft_success & (new_inv_clay > 0)
-        consume_vine = craft_success & (new_inv_vine > 0)
-        
+        consume_wood = hearth_deposited & (new_inv_wood > 0)
+        consume_stone = hearth_deposited & (new_inv_stone > 0)
+        consume_flint = hearth_deposited & (new_inv_flint > 0)
+        consume_clay = hearth_deposited & (new_inv_clay > 0)
+        consume_vine = hearth_deposited & (new_inv_vine > 0)
+
         new_inv_wood = new_inv_wood - consume_wood.astype(jnp.int32)
         new_inv_stone = new_inv_stone - consume_stone.astype(jnp.int32)
         new_inv_flint = new_inv_flint - consume_flint.astype(jnp.int32)
         new_inv_clay = new_inv_clay - consume_clay.astype(jnp.int32)
         new_inv_vine = new_inv_vine - consume_vine.astype(jnp.int32)
-        
-        new_inv_axe = b_pop.inventory_axe | craft_success
-        
+
+        # Axe grant mirrors the old craft_success trigger, retargeted to
+        # "credited contributor of a hearth that completed this step" --
+        # the meaningful crafted outcome, not a mere deposit.
+        hearth_contributed_to_completion = jnp.sum(hearth_completion_share, axis=0) > 0.0
+        new_inv_axe = b_pop.inventory_axe | hearth_contributed_to_completion
+
+        grid = grid.replace(
+            hearth_need=_hearth_result["new_hearth_need"],
+            hearth_fill=_hearth_result["new_hearth_fill"],
+            hearth_credit=_hearth_result["new_hearth_credit"],
+        )
+
         b_pop = b_pop.replace(
             energy=jnp.clip(b_pop.energy + b_energy_gain, 0.0, 1.0),
             inventory_wood=new_inv_wood,
@@ -765,42 +804,28 @@ def make_sim_step(
         r_starved_hunt = r_pop.alive & (r_pop.steps_since_catch >= _red_starvation_steps)
         r_pop = kill_agents(r_pop, r_starved_hunt)
 
-        # ── Phase 18.7 Recipe Rotation & Visibility ────────────────────────
-        k_rec1, k_rec2, k_vis = jax.random.split(jax.random.split(key_misc)[2], 3)
-        new_recipe_timer = grid.recipe_timer[0] - 1
-        
-        def update_recipe(_):
-            items = jax.random.randint(k_rec1, (4,), 0, 5)
-            mask = jax.random.bernoulli(k_rec2, 0.5)
-            items = items.at[3].set(jnp.where(mask, items[3], 5))
-            full_counts = jnp.bincount(items, length=6)[:5].astype(jnp.int32)
-
-            # CtD crafting ramp (Cam's sign-off, 2026-09-14, corrected same
-            # day): while active, recipes are solo-satisfiable (stage 0, 1
-            # unit) then pair-satisfiable (stage 1, 2 units) instead of up to
-            # 4 units across 5 materials -- see jax_sim/ctd_ramp.py.
-            k_rec_ramp = jax.random.split(k_rec1)[0]
-            ramp_counts = staged_recipe_counts(k_rec_ramp, grid.craft_ramp_stage)
-            counts = jnp.where(grid.craft_ramp_active, ramp_counts, full_counts)
-
-            progress = jnp.clip(step_idx / 1500000.0, 0.0, 1.0)
-            vis_prob = 0.5 - 0.3 * progress
-            new_vis = jax.random.bernoulli(k_vis, vis_prob, (b_pop.max_pop,))
-
-            return counts, jnp.array([1000], dtype=jnp.int32), new_vis
-            
-        def keep_recipe(_):
-            return grid.current_recipe, jnp.array([new_recipe_timer], dtype=jnp.int32), b_pop.can_see_recipe
-            
-        new_recipe, recipe_timer, new_can_see = jax.lax.cond(
-            new_recipe_timer <= 0,
-            update_recipe,
-            keep_recipe,
-            operand=None
-        )
-        
-        grid = grid.replace(current_recipe=new_recipe, recipe_timer=recipe_timer)
-        b_pop = b_pop.replace(can_see_recipe=new_can_see)
+        # Phase 18.7's global recipe-rotation-and-visibility block is deleted
+        # here (2026-09-21, hearths). It did two things: rotated a single
+        # global `current_recipe` (now replaced by resolve_hearth_deposits'
+        # per-hearth `hearth_need`, re-rolled independently per hearth on
+        # completion, wired in the CRAFT resolution section above) -- and,
+        # found only by reading this block closely before deleting it,
+        # *also* globally re-rolled every living agent's `can_see_recipe`
+        # every ~1000 steps at a time-decaying probability
+        # (`0.5 - 0.3*progress`). That directly contradicts what
+        # RESEARCH_PROTOCOL.md and THE-ECOLOGY-NEVER-RAN.md (instances 7/8,
+        # 2026-09-20) asserted as measured fact: that can_see_recipe is a
+        # one-time draw at init_population, inherited unchanged, "never
+        # updated during an agent's life." It was not -- this competing
+        # global rewrite ran the whole time alongside the inheritance path.
+        # Deleting this block (not patching it) means can_see_recipe is now,
+        # for the first time, actually only what population_jax.py's
+        # init_population/apply_auto_reproduce set -- true inheritance, no
+        # competing overwrite. This makes the 2026-09-20 diagnosis and both
+        # mutation-rate fixes (instances 7/8) correct going forward, but
+        # means any *live-run* can_see_recipe statistics measured before
+        # today reflect both mechanisms superimposed, not pure inheritance.
+        # Logged as a new instance in THE-ECOLOGY-NEVER-RAN.md.
 
         # ── Puzzle logic ────────────────────────────────────────
         p_act, p_cool = decay_puzzle_timeout(grid.puzzle_active, grid.puzzle_cooldown)
@@ -842,6 +867,30 @@ def make_sim_step(
         new_steps = jnp.where(b_pop.alive, b_pop.steps_since_dropout + 1, 0)
         b_pop = b_pop.replace(steps_since_dropout=new_steps)
 
+        # ── Phase 19 Gate 2 control: "informed nearby recently" ─────────
+        # Cam's registered spatial-following control -- uninformed agents
+        # could be reading a symbol, or could just be tailing an informed
+        # agent and copying where it stands. Tracks, per agent, steps since
+        # any OTHER living informed agent was within radius; the aggregate
+        # print below cross-tabs uninformed deposit accuracy against this.
+        _informed_nearby_radius = float(config.get("hearth_informed_nearby_radius", 5))
+        _bb_dx = jnp.abs(b_pop.positions[:, None, 0] - b_pop.positions[None, :, 0])
+        _bb_dy = jnp.abs(b_pop.positions[:, None, 1] - b_pop.positions[None, :, 1])
+        _bb_dx = jnp.minimum(_bb_dx, gs - _bb_dx)
+        _bb_dy = jnp.minimum(_bb_dy, gs - _bb_dy)
+        _bb_dist = jnp.maximum(_bb_dx, _bb_dy)
+        _other_informed_alive = b_pop.can_see_recipe & b_pop.alive
+        _informed_within_radius = (
+            (_bb_dist <= _informed_nearby_radius) & _other_informed_alive[None, :]
+        )
+        _self_mask = jnp.eye(b_pop.max_pop, dtype=jnp.bool_)
+        _informed_nearby_now = jnp.any(_informed_within_radius & ~_self_mask, axis=1) & b_pop.alive
+        new_steps_since_informed = jnp.where(
+            _informed_nearby_now, 0,
+            jnp.where(b_pop.alive, b_pop.steps_since_informed_nearby + 1, b_pop.steps_since_informed_nearby),
+        )
+        b_pop = b_pop.replace(steps_since_informed_nearby=new_steps_since_informed)
+
         # ── Rewards (all from config) ───────────────────────────
         b_rew = jnp.where(b_pop.alive, _reward_blue_alive, 0.0)
         b_rew = b_rew + 0.02 * b_pop.energy
@@ -857,10 +906,15 @@ def make_sim_step(
         b_rew = b_rew - _alarm_penalty_coef * alarm_fired
 
         # ── Phase 18 Futile Action Penalty ──────────────────────
-        futile_craft = (b_actions == 10) & b_pop.alive & ~craft_success
+        futile_craft = is_craft & ~hearth_deposited
         futile_use = (b_actions == 11) & b_pop.alive & (b_pop.inventory_axe == 0)
         b_rew = b_rew + _reward_futile_craft * (futile_craft | futile_use).astype(jnp.float32)
-        b_rew = b_rew + _reward_craft_success * craft_success.astype(jnp.float32)
+        # Phase 19 hearth rewards: a deposit pays immediately and alone (the
+        # bootstrap -- solo deposits are never punished); a hearth's
+        # completion additionally pays each credited contributor its
+        # proportional share (see resolve_hearth_deposits' completion_share).
+        b_rew = b_rew + _reward_hearth_deposit * hearth_deposited.astype(jnp.float32)
+        b_rew = b_rew + _reward_hearth_completion * jnp.sum(hearth_completion_share, axis=0)
 
         r_rew = _rew_small_blue * r_caught_small
         r_rew = r_rew + (_rew_big_green_coop + _rew_coord) * r_caught_big_coop
@@ -932,12 +986,13 @@ def make_sim_step(
             "imagination_metabolic_cost": cog_cost,
             "ignition": ignition,
             "barrier_sum": jnp.sum(grid.barrier_hp_map),
-            "craft_success": craft_success.astype(jnp.float32),
             "futile_craft": futile_craft.astype(jnp.float32),
-            "futile_uncoordinated": futile_uncoordinated.astype(jnp.float32),
-            "futile_wrong_mats": futile_wrong_mats.astype(jnp.float32),
-            "futile_empty": futile_empty.astype(jnp.float32),
-            "current_recipe": grid.current_recipe,
+            "hearth_deposited": hearth_deposited.astype(jnp.float32),
+            "hearth_attempted": hearth_attempted.astype(jnp.float32),
+            "hearth_completed": hearth_completed.astype(jnp.float32),
+            "hearth_need": grid.hearth_need,
+            "can_see_recipe": b_pop.can_see_recipe.astype(jnp.float32),
+            "steps_since_informed_nearby": b_pop.steps_since_informed_nearby,
             "steps_since_dropout": b_pop.steps_since_dropout,
             "craft_ramp_active": grid.craft_ramp_active,
             "red_ramp_active": grid.red_ramp_active,
@@ -1155,16 +1210,20 @@ def _run_simulation_impl(
     T = config["ppo_rollout_steps"]
 
     # ── Init grid ─────────────────────────────────────────────
-    grid = GridState(gs, symbol_dim=config["symbol_dim"])
+    grid = GridState(gs, symbol_dim=config["symbol_dim"], max_pop=max_pop)
     _ramp_cfg_init = config.get("ctd_competence_ramp", {})
     grid = grid.replace(
         craft_ramp_active=jnp.array(bool(_ramp_cfg_init.get("craft_ramp_enabled", False)), dtype=jnp.bool_),
         red_ramp_active=jnp.array(bool(_ramp_cfg_init.get("red_ramp_enabled", False)), dtype=jnp.bool_),
     )
     wall_mask = jax.random.bernoulli(keys[0], config.get("wall_density", 0.08), (gs, gs))
-    
+
     # Resource patches (structured hotspots, not uniform drizzle)
-    k_res, k_shelter, k_contest, k_puzzle = jax.random.split(keys[9], 4)
+    k_res, k_shelter, k_contest, k_puzzle, k_hearth = jax.random.split(keys[9], 5)
+    # Phase 19 hearths: positions are deterministic (generate_hearth_positions,
+    # already set by GridState.__init__); only each hearth's initial need is
+    # randomized.
+    grid = grid.replace(hearth_need=jax.random.randint(k_hearth, (4,), 0, 5))
     _resource_max_init = float(config.get("resource_max", 1.0))
     resources = jnp.clip(
         generate_resource_patches(
@@ -1934,10 +1993,9 @@ def _run_simulation_impl(
     # start (== run start on a fresh resume into stage 0).
     craft_ramp_stage0_max_updates = int(_ramp_cfg_outer.get("craft_ramp_stage0_max_updates", 40))
     craft_ramp_active_outer = craft_ramp_enabled
-    # Two capped stages (Cam's correction, 2026-09-14): max_units=2 alone was
-    # still a cooperative problem at smaller scale, not the solo-catchable
-    # analogue -- stage 0 (1 unit, solo-satisfiable) was missing entirely.
-    # Stage index into jax_sim.ctd_ramp.CRAFT_RAMP_STAGE_UNITS = (1, 2).
+    # Three ratcheting stages (2026-09-21, hearths): stage 0 (N=1) is
+    # solo-satisfiable -- pure bootstrap, no coordination possible or
+    # required. Stage index into jax_sim.ctd_ramp.HEARTH_RAMP_STAGE_N = (1, 2, 3).
     craft_ramp_stage_outer = 0
     craft_ramp_start_step = start_update * T  # start of the CURRENT stage
     craft_ramp_success_streak = 0
@@ -1990,7 +2048,7 @@ def _run_simulation_impl(
     comms_drift_streak = [0, 0, 0]   # consecutive updates below 0.75*C0, per slot
     comms_floor_streak = [0, 0, 0]   # consecutive updates below 0.85*C0, per slot (stage 0 only)
     comms_stage1_updates_elapsed = 0
-    comms_stage1_uncoordinated_seen = False
+    comms_stage1_deposit_seen = False
     # 2026-09-20 (Cam): stage-1 (live comms channel) baseline, separate from
     # comms_c0_stage0. The single-baseline design compared LIVE stage-1
     # codes_active against a median captured while the comms subtree was
@@ -2053,8 +2111,8 @@ def _run_simulation_impl(
             comms_stage1_updates_elapsed = int(_restored_training_state.get(
                 "comms_stage1_updates_elapsed", comms_stage1_updates_elapsed
             ))
-            comms_stage1_uncoordinated_seen = bool(_restored_training_state.get(
-                "comms_stage1_uncoordinated_seen", comms_stage1_uncoordinated_seen
+            comms_stage1_deposit_seen = bool(_restored_training_state.get(
+                "comms_stage1_deposit_seen", comms_stage1_deposit_seen
             ))
             # New fields (2026-09-20): absent on any checkpoint saved before
             # this split, defaults above (None/0/False/[]) apply -- a
@@ -2102,10 +2160,10 @@ def _run_simulation_impl(
             f"red_curriculum_idx={red_curriculum_idx} red_sustain_count={red_sustain_count}",
             flush=True,
         )
-        _craft_stage_units = CRAFT_RAMP_STAGE_UNITS[craft_ramp_stage_outer] if craft_ramp_active_outer else "full"
+        _hearth_stage_n = HEARTH_RAMP_STAGE_N[craft_ramp_stage_outer] if craft_ramp_active_outer else "off"
         print(
-            f"[CTD-RAMP] crafting={craft_ramp_active_outer} "
-            f"(stage={craft_ramp_stage_outer}/{len(CRAFT_RAMP_STAGE_UNITS) - 1} units={_craft_stage_units}, "
+            f"[CTD-RAMP] hearths={craft_ramp_active_outer} "
+            f"(stage={craft_ramp_stage_outer}/{len(HEARTH_RAMP_STAGE_N) - 1} N={_hearth_stage_n}, "
             f"floor={craft_ramp_min_steps:_}, bar={craft_ramp_success_bar:.0%}/"
             f"{craft_ramp_success_window}upd, ceiling={craft_ramp_max_steps:_}, "
             f"stage0_hard_escape={craft_ramp_stage0_max_updates}upd, "
@@ -2135,7 +2193,7 @@ def _run_simulation_impl(
             f"drift_streak={comms_drift_streak} (halt >=15 below 0.75*active_C0) | "
             f"floor_streak={comms_floor_streak} (halt >=3 below 0.85*C0_stage0, stage 0 only) | "
             f"stage1_updates_elapsed={comms_stage1_updates_elapsed} "
-            f"uncoordinated_seen={comms_stage1_uncoordinated_seen} (halt if still 0 after 10 updates in stage 1)",
+            f"deposit_seen={comms_stage1_deposit_seen} (halt if still 0 after 10 updates in stage 1)",
             flush=True,
         )
 
@@ -2230,9 +2288,17 @@ def _run_simulation_impl(
                         len(np.unique(_tw_alive_tok[:, 1])),
                         len(np.unique(_tw_alive_tok[:, 2])),
                     )
-            _tw_futile_uncoordinated_now = (
-                int(np.asarray(b_batch["futile_uncoordinated"]).sum())
-                if "futile_uncoordinated" in b_batch else 0
+            # Phase 19 (2026-09-21): PRESSURE's signal is retargeted from the
+            # deleted futile_uncoordinated (pair-adjacency's "not enough
+            # co-located crafters") to hearth_deposited -- hearths have no
+            # analogous "insufficient simultaneous coordination" failure
+            # mode (a solo deposit at N>1 just doesn't complete yet, it
+            # isn't rejected), so the check that actually matters here is
+            # the same one Gate 0 asks: is the bootstrap even happening at
+            # all, i.e. is ANY valid deposit landing.
+            _tw_hearth_deposits_now = (
+                int(np.asarray(b_batch["hearth_deposited"]).sum())
+                if "hearth_deposited" in b_batch else 0
             )
 
             if _tw_codes_now is not None:
@@ -2467,16 +2533,16 @@ def _run_simulation_impl(
                             )
 
                 # PRESSURE: deliberately OUTSIDE the _active_c0 gate above --
-                # this check is about futile_uncoordinated, not about
-                # codes_active or any C0 baseline, and must not stop
+                # this check is about hearth deposits happening at all, not
+                # about codes_active or any C0 baseline, and must not stop
                 # incrementing just because a baseline hasn't captured yet.
                 if craft_ramp_stage_outer == 1:
                     comms_stage1_updates_elapsed += 1
-                    if _tw_futile_uncoordinated_now > 0:
-                        comms_stage1_uncoordinated_seen = True
-                    if comms_stage1_updates_elapsed > 10 and not comms_stage1_uncoordinated_seen:
+                    if _tw_hearth_deposits_now > 0:
+                        comms_stage1_deposit_seen = True
+                    if comms_stage1_updates_elapsed > 10 and not comms_stage1_deposit_seen:
                         _tw_halt_reasons.append(
-                            f"PRESSURE: futile_uncoordinated still 0 after "
+                            f"PRESSURE: hearth_deposited still 0 after "
                             f"{comms_stage1_updates_elapsed} updates in stage 1 -- "
                             f"the coordination pressure stage 1 is supposed to apply "
                             f"is not showing up"
@@ -2521,7 +2587,7 @@ def _run_simulation_impl(
                         "comms_drift_streak": jnp.array(comms_drift_streak, dtype=jnp.int32),
                         "comms_floor_streak": jnp.array(comms_floor_streak, dtype=jnp.int32),
                         "comms_stage1_updates_elapsed": jnp.array(comms_stage1_updates_elapsed, dtype=jnp.int32),
-                        "comms_stage1_uncoordinated_seen": jnp.array(comms_stage1_uncoordinated_seen, dtype=jnp.bool_),
+                        "comms_stage1_deposit_seen": jnp.array(comms_stage1_deposit_seen, dtype=jnp.bool_),
                         "comms_stage1_c0_search_active": jnp.array(comms_stage1_c0_search_active, dtype=jnp.bool_),
                         "comms_stage1_c0_search_updates": jnp.array(comms_stage1_c0_search_updates, dtype=jnp.int32),
                         "comms_stage1_sample_history": jnp.array(_pad_comms_history(comms_stage1_sample_history), dtype=jnp.int32),
@@ -3225,35 +3291,61 @@ def _run_simulation_impl(
                 f"red_floor={red_curriculum_stages[red_curriculum_idx]} "
                 f"sustain={red_sustain_count}/{red_sustain_needed} | brain={n_layers}L{medal_str} | barrier_sum={barrier_sum_val:.1f}"
             )
-            _n_craft_success = 0
-            _n_futile_uncoordinated = 0
-            _n_futile_wrong_mats = 0
-            _n_futile_empty = 0
-            if "craft_success" in rollout_data["blue"]:
-                _n_craft_success = int(np.asarray(rollout_data["blue"]["craft_success"]).sum())
-            if "futile_uncoordinated" in rollout_data["blue"]:
-                _n_futile_uncoordinated = int(np.asarray(rollout_data["blue"]["futile_uncoordinated"]).sum())
-            if "futile_wrong_mats" in rollout_data["blue"]:
-                _n_futile_wrong_mats = int(np.asarray(rollout_data["blue"]["futile_wrong_mats"]).sum())
-            if "futile_empty" in rollout_data["blue"]:
-                _n_futile_empty = int(np.asarray(rollout_data["blue"]["futile_empty"]).sum())
-            _n_craft_total = (
-                _n_craft_success + _n_futile_uncoordinated + _n_futile_wrong_mats + _n_futile_empty
-            )
-            # 2026-09-14 (Cam): success/attempts has an agent-controlled
-            # denominator -- blue can depress "rate" by spamming Craft harder
-            # without materials (observed live: success flat 40->35,
-            # futile_wrong_mats nearly tripled 2875->7432, rate fell 1.3%->
-            # 0.4%). Retired as the stage-advance gate on that mechanism, not
-            # because it failed a threshold (same standard as the rel_spread
-            # retirement) -- kept here as diagnostic context only, alongside
-            # the per-capita figure that replaces it below.
+            # Phase 19 hearths (2026-09-21): instrumentation for Cam's three
+            # pre-registered gates. Gate 0 (bootstrap): per-capita deposit
+            # rate, tracked update over update -- this IS the stage-advance
+            # gate (mirrors the old per-capita craft-success bar exactly,
+            # just retargeted to deposits). Gate 1 (coordination-beats-
+            # chance): completion count, to compare against the chance-
+            # collision baseline computed the same way as the 2026-09-21
+            # collision-arithmetic verification. Gate 2 (information
+            # reached them): uninformed deposit accuracy vs the 1/5 chance
+            # floor, plus the informed-nearby-recently control.
+            _n_hearth_deposits = 0
+            _n_hearth_attempts = 0
+            _n_hearth_completions = 0
+            _uninf_acc_str = "n/a"
+            _inf_acc_str = "n/a"
+            _n_uninf_recent_correct = _n_uninf_recent_att = 0
+            _n_uninf_notrecent_correct = _n_uninf_notrecent_att = 0
+            _uninf_recent_acc = _uninf_notrecent_acc = 0.0
+            _recent_thresh = int(config.get("hearth_informed_nearby_recent_steps", 50))
+            if "hearth_deposited" in rollout_data["blue"]:
+                _dep_arr = np.asarray(rollout_data["blue"]["hearth_deposited"]).astype(bool)   # (T, N)
+                _att_arr = np.asarray(rollout_data["blue"]["hearth_attempted"]).astype(bool)    # (T, N)
+                _csr_arr = np.asarray(rollout_data["blue"]["can_see_recipe"]).astype(bool)      # (T, N)
+                _nby_arr = np.asarray(rollout_data["blue"]["steps_since_informed_nearby"])       # (T, N)
+                _n_hearth_deposits = int(_dep_arr.sum())
+                _n_hearth_attempts = int(_att_arr.sum())
+                _n_hearth_completions = int(np.asarray(rollout_data["blue"]["hearth_completed"]).sum())
+
+                _uninf_mask = _att_arr & ~_csr_arr
+                _inf_mask = _att_arr & _csr_arr
+                _n_uninf_att = int(_uninf_mask.sum())
+                _n_uninf_correct = int((_dep_arr & _uninf_mask).sum())
+                _n_inf_att = int(_inf_mask.sum())
+                _n_inf_correct = int((_dep_arr & _inf_mask).sum())
+                _uninf_acc_str = f"{_n_uninf_correct}/{_n_uninf_att} ({_n_uninf_correct / max(1, _n_uninf_att):.1%})"
+                _inf_acc_str = f"{_n_inf_correct}/{_n_inf_att} ({_n_inf_correct / max(1, _n_inf_att):.1%})"
+
+                _uninf_recent_mask = _uninf_mask & (_nby_arr <= _recent_thresh)
+                _uninf_not_recent_mask = _uninf_mask & (_nby_arr > _recent_thresh)
+                _n_uninf_recent_att = int(_uninf_recent_mask.sum())
+                _n_uninf_recent_correct = int((_dep_arr & _uninf_recent_mask).sum())
+                _n_uninf_notrecent_att = int(_uninf_not_recent_mask.sum())
+                _n_uninf_notrecent_correct = int((_dep_arr & _uninf_not_recent_mask).sum())
+                _uninf_recent_acc = _n_uninf_recent_correct / max(1, _n_uninf_recent_att)
+                _uninf_notrecent_acc = _n_uninf_notrecent_correct / max(1, _n_uninf_notrecent_att)
+
+            _hearth_deposit_frac_of_pop = _n_hearth_deposits / max(1, b_alive_now)
             print(
-                f"  Crafting: success={_n_craft_success} | futile_uncoordinated={_n_futile_uncoordinated} | "
-                f"futile_wrong_mats={_n_futile_wrong_mats} | futile_empty={_n_futile_empty} | "
-                f"rate={_n_craft_success / max(1, _n_craft_total):.1%} (diagnostic only, not the "
-                f"stage-advance gate) | pop_frac={_n_craft_success / max(1, b_alive_now):.1%} "
-                f"(this IS the gate, vs living blue={b_alive_now})"
+                f"  Hearths: deposits={_n_hearth_deposits} attempts={_n_hearth_attempts} "
+                f"completions={_n_hearth_completions} | pop_frac={_hearth_deposit_frac_of_pop:.1%} "
+                f"(this IS the Gate 0 / stage-advance gate, vs living blue={b_alive_now}) | "
+                f"Gate2 uninformed_acc={_uninf_acc_str} informed_acc={_inf_acc_str} chance=20.0% | "
+                f"uninformed_acc[informed_nearby<={_recent_thresh}upd]="
+                f"{_n_uninf_recent_correct}/{_n_uninf_recent_att} ({_uninf_recent_acc:.1%}) vs "
+                f"[not recent]={_n_uninf_notrecent_correct}/{_n_uninf_notrecent_att} ({_uninf_notrecent_acc:.1%})"
             )
 
             # ── CtD competence ramp: per-update ratchet decision ─────
@@ -3263,11 +3355,11 @@ def _run_simulation_impl(
             # T=512) -- not just on a print cadence.
             _red_shaping_mean = float(np.asarray(rollout_data["red"]["red_shaping"]).mean())
             _craft_stage_label = (
-                f"stage={craft_ramp_stage_outer}/{len(CRAFT_RAMP_STAGE_UNITS) - 1}"
+                f"stage={craft_ramp_stage_outer}/{len(HEARTH_RAMP_STAGE_N) - 1}"
                 if craft_ramp_active_outer else "off"
             )
             print(
-                f"  CTD-RAMP: craft_active={craft_ramp_active_outer} ({_craft_stage_label}, "
+                f"  CTD-RAMP: hearths_active={craft_ramp_active_outer} ({_craft_stage_label}, "
                 f"streak={craft_ramp_success_streak}/{craft_ramp_success_window}) | "
                 f"red_active={red_ramp_active_outer} "
                 f"(streak={red_ramp_catch_streak}/{red_ramp_catch_window}, "
@@ -3275,23 +3367,20 @@ def _run_simulation_impl(
             )
 
             if craft_ramp_active_outer:
-                # Two capped stages (Cam's correction, 2026-09-14): the same
+                # Three ratcheting stages (2026-09-21, hearths): the same
                 # floor + sustained bar + hard ceiling shape is reapplied at
                 # each stage, clock reset to the stage's own start. Advancing
-                # from the last stage ratchets the ramp off entirely (full
-                # recipe); advancing from an earlier stage moves to the next.
+                # from the last stage ratchets the ramp off entirely;
+                # advancing from an earlier stage moves to the next N.
                 _steps_since_craft_ramp = (ui + 1) * T - craft_ramp_start_step
                 _updates_since_craft_ramp = (ui + 1) - (craft_ramp_start_step // T)
                 # Per-capita bar (Cam's third registered correction,
-                # 2026-09-14), replacing success/attempts: attempts is an
-                # agent-controlled denominator -- an agent that tries more
-                # looks less competent, which cannot measure competence by
-                # construction. success/living_population isn't controllable
-                # the same way. Default 10%, sustained 3 updates -- at
-                # blue~195 that's ~20 successes, already well inside the
-                # observed 35-40/update.
-                _craft_success_frac_of_pop = _n_craft_success / max(1, b_alive_now)
-                if _craft_success_frac_of_pop >= craft_ramp_success_bar:
+                # 2026-09-14, retargeted to hearth deposits 2026-09-21):
+                # this is also exactly Gate 0's own signal -- did the
+                # per-capita deposit rate rise measurably above its early
+                # value. Default 10%, sustained 3 updates.
+                _hearth_deposit_frac_of_pop = _n_hearth_deposits / max(1, b_alive_now)
+                if _hearth_deposit_frac_of_pop >= craft_ramp_success_bar:
                     craft_ramp_success_streak += 1
                 else:
                     craft_ramp_success_streak = 0
@@ -3310,8 +3399,8 @@ def _run_simulation_impl(
                         f"updates since stage 0 began, bar ({craft_ramp_success_bar:.0%} of living "
                         f"population sustained {craft_ramp_success_window} updates) never cleared "
                         f"(current streak={craft_ramp_success_streak}, this update's "
-                        f"success={_n_craft_success}/{b_alive_now} living blue = "
-                        f"{_craft_success_frac_of_pop:.1%}). Advancing to stage 1 anyway -- a "
+                        f"deposits={_n_hearth_deposits}/{b_alive_now} living blue = "
+                        f"{_hearth_deposit_frac_of_pop:.1%}). Advancing to stage 1 anyway -- a "
                         f"curriculum phase with no exit is a trap, and stage 0 is the phase "
                         f"with no communication pressure. This is a finding, not an "
                         f"inconvenience. ***",
@@ -3330,14 +3419,14 @@ def _run_simulation_impl(
                     )
                 if _craft_advance_now:
                     _leaving_stage0 = (craft_ramp_stage_outer == 0)
-                    if craft_ramp_stage_outer < len(CRAFT_RAMP_STAGE_UNITS) - 1:
+                    if craft_ramp_stage_outer < len(HEARTH_RAMP_STAGE_N) - 1:
                         craft_ramp_stage_outer += 1
                         craft_ramp_start_step = (ui + 1) * T
                         craft_ramp_success_streak = 0
                         grid = grid.replace(craft_ramp_stage=jnp.array(craft_ramp_stage_outer, dtype=jnp.int32))
                         print(
-                            f"[CTD-RAMP] Crafting ramp advanced to stage {craft_ramp_stage_outer} "
-                            f"({CRAFT_RAMP_STAGE_UNITS[craft_ramp_stage_outer]} unit(s), "
+                            f"[CTD-RAMP] Hearth ramp advanced to stage {craft_ramp_stage_outer} "
+                            f"(N={HEARTH_RAMP_STAGE_N[craft_ramp_stage_outer]}, "
                             f"{_craft_advance_reason}) at ppo={ui + 1}, step={(ui + 1) * T:_}",
                             flush=True,
                         )
@@ -3356,7 +3445,8 @@ def _run_simulation_impl(
                         craft_ramp_active_outer = False
                         grid = grid.replace(craft_ramp_active=jnp.array(False, dtype=jnp.bool_))
                         print(
-                            f"[CTD-RAMP] Crafting ramp ratcheted OFF ({_craft_advance_reason}) "
+                            f"[CTD-RAMP] Hearth ramp ratcheted OFF, frozen at N="
+                            f"{HEARTH_RAMP_STAGE_N[craft_ramp_stage_outer]} ({_craft_advance_reason}) "
                             f"at ppo={ui + 1}, step={(ui + 1) * T:_}",
                             flush=True,
                         )
@@ -3668,8 +3758,12 @@ def _run_simulation_impl(
                             np.where(inv_clay, 3,
                             np.where(inv_vine, 4, -1)))))
                 
-                cur_rec = np.array(rollout_data["blue"]["current_recipe"][t])
-                recipe_id = int(cur_rec[0] + cur_rec[1]*10 + cur_rec[2]*100 + cur_rec[3]*1000 + cur_rec[4]*10000)
+                hearth_need_t = np.array(rollout_data["blue"]["hearth_need"][t])
+                hearth_deposited_t = np.array(rollout_data["blue"]["hearth_deposited"][t])[alive_idx] > 0.5
+                hearth_attempted_t = np.array(rollout_data["blue"]["hearth_attempted"][t])[alive_idx] > 0.5
+                steps_since_informed_nearby_t = np.array(
+                    rollout_data["blue"]["steps_since_informed_nearby"][t]
+                )[alive_idx]
 
                 corpus_writer.maybe_record(
                     step=global_step,
@@ -3692,7 +3786,10 @@ def _run_simulation_impl(
                     adj_barrier=adj_barrier,
                     adj_red=adj_red,
                     can_see_recipe=can_see_recipe,
-                    current_recipe_id=recipe_id,
+                    hearth_need=hearth_need_t,
+                    hearth_deposited=hearth_deposited_t,
+                    hearth_attempted=hearth_attempted_t,
+                    steps_since_informed_nearby=steps_since_informed_nearby_t,
                     inventory=inventory,
                     steps_since_dropout=b_steps_since_dropout_all[t, alive_idx],
                     craft_ramp_active=bool(rollout_data["blue"]["craft_ramp_active"][t]),
@@ -3849,7 +3946,7 @@ def _run_simulation_impl(
                 "comms_drift_streak": jnp.array(comms_drift_streak, dtype=jnp.int32),
                 "comms_floor_streak": jnp.array(comms_floor_streak, dtype=jnp.int32),
                 "comms_stage1_updates_elapsed": jnp.array(comms_stage1_updates_elapsed, dtype=jnp.int32),
-                "comms_stage1_uncoordinated_seen": jnp.array(comms_stage1_uncoordinated_seen, dtype=jnp.bool_),
+                "comms_stage1_deposit_seen": jnp.array(comms_stage1_deposit_seen, dtype=jnp.bool_),
                 "comms_stage1_c0_search_active": jnp.array(comms_stage1_c0_search_active, dtype=jnp.bool_),
                 "comms_stage1_c0_search_updates": jnp.array(comms_stage1_c0_search_updates, dtype=jnp.int32),
                 "comms_stage1_sample_history": jnp.array(_pad_comms_history(comms_stage1_sample_history), dtype=jnp.int32),

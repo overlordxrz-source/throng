@@ -135,6 +135,119 @@ success-series entry above.
 
 ---
 
+## Status as of 2026-09-21 — Hearths implemented and tested, not yet run
+
+**The crafting-site proposal above (2026-09-20) has a full spec and a landed implementation:
+Hearths.** Pair-adjacency crafting (`resolve_crafting`, the global `current_recipe`/
+`recipe_timer`, `CRAFT_RAMP_STAGE_UNITS`) is deleted, not kept alongside the new mechanism —
+Cam: "every parallel mechanism is another place for a silent bug, and we've found eight." See
+instance 9, below, for the full mechanism writeup.
+
+- **The collision arithmetic was verified before implementing anything**, per Cam's own
+  instruction ("recompute the expected-collision rate from the actual logged values... if your
+  number also lands near the observed rate, we can state it as measured"). It landed within
+  noise of observed (see the 2026-09-21 collision-rate entry above) — this is what actually
+  killed pair-adjacency crafting, not a design preference.
+- **Four fixed hearths, one per quadrant of the 128×128 torus** (`generate_hearth_positions`,
+  deterministic, never randomized, never relocated). Each has an independent, one-material need
+  that re-rolls only on completion — not a global recipe, not on a shared timer.
+- **CRAFT (action 10, same id) on a hearth tile holding the matching material deposits**:
+  material consumed, an immediate small reward paid to that one agent alone (the bootstrap),
+  the hearth's fill increments. Deposits decay (half-life ≈200 steps,
+  `hearth_decay_half_life_steps`) rather than requiring same-step adjacency — this is what
+  turns the two-body simultaneity problem into a one-body navigation problem: an agent doesn't
+  need a partner standing next to it at the exact same instant, just for its own deposit to
+  still be "in" the fill by the time enough total deposits accumulate.
+- **Completion reward (~8× the deposit, per Cam's sizing instruction) splits proportional to
+  each agent's *undecayed* credit at the instant of completion** — an agent whose deposit has
+  already mostly rotted away gets a smaller share than one who just arrived, which is the same
+  mechanism as the fill level itself (`hearth_credit` decays at exactly the same rate as
+  `hearth_fill`, by construction, so credit always sums to fill). Verified in
+  `tests/test_hearth_resolution.py`.
+- **Curriculum reuses the existing CtD ramp machinery exactly, per Cam's instruction** — same
+  floor/bar/window/ceiling ratchet, same config keys (`craft_ramp_*`), just retargeted:
+  `jax_sim.ctd_ramp.HEARTH_RAMP_STAGE_N = (1, 2, 3)` replaces `CRAFT_RAMP_STAGE_UNITS`, and the
+  per-capita bar now reads hearth deposits instead of craft successes (this is also Gate 0's
+  own signal — see below). Stage 0 (N=1) is solo-satisfiable, pure bootstrap.
+- **Observation layer**: hearth positions are visible to every agent regardless of
+  `can_see_recipe` (own_state gains 8 always-on dims — 4 hearths × toroidal-wrapped dx,dy,
+  normalized — so navigation works from anywhere on the map, not only once a hearth happens to
+  already be in local view); hearth needs are gated by `can_see_recipe` exactly like the old
+  `masked_recipe` was (4 dims, zero for an uninformed agent). `own_state_dim` grew 22 → 29.
+  This is a hard, deliberate, non-backward-compatible shape change — **no checkpoint saved
+  before today can be resumed under this code**; `tests/test_checkpoint_compat.py` correctly
+  now fails against the cached local backup, by design (see that test's own updated comment).
+  Verified in `tests/test_hearth_observation_gating.py`.
+- **A ninth silent mismatch, found only by reading the deleted code closely before deleting
+  it, not by anyone asking about it:** the old `update_recipe` block didn't just rotate the
+  global recipe — it *also* globally re-rolled every living agent's `can_see_recipe` every
+  ~1000 steps at a time-decaying probability (`0.5 - 0.3*progress`). This directly contradicts
+  what `RESEARCH_PROTOCOL.md` and this file's instances 7/8 asserted as measured fact: that
+  `can_see_recipe` is a one-time draw at `init_population`, inherited unchanged, "never updated
+  during an agent's life." It was not — a competing global rewrite ran the whole time alongside
+  the inheritance path this session diagnosed and fixed. Deleting that block (required anyway,
+  since the global recipe it rotated no longer exists) means `can_see_recipe` is now, for the
+  first time, actually only what `population_jax.py`'s inheritance path sets. This makes
+  instances 7/8's diagnosis and both mutation-rate fixes *correct going forward*, but means any
+  can_see_recipe statistics measured on live runs *before* today (including the craft-material
+  gap and zone-availability numbers themselves) reflect both mechanisms superimposed, not pure
+  inheritance — worth remembering if that gap is ever re-measured post-hearths and comes out
+  differently.
+- **Three gates were pre-registered before implementing, with fixed thresholds, per Cam's
+  explicit instruction — not evaluated yet, because nothing has run.** Instrumentation for all
+  three is landed (the `[CTD-RAMP]`/`Hearths:` dashboard line, per-update, gated like every
+  other dashboard print on `step_val % 512 == 0 or T >= 512`):
+  - **Gate 0 (bootstrap)**: within 50 updates at N=1, per-capita deposit rate must rise
+    measurably above its value in the first 5 updates. This is also literally the stage-advance
+    bar (`craft_ramp_success_bar`, now reading hearth deposits).
+  - **Gate 1 (coordination beats chance)**: at N=2, completion rate must exceed the
+    chance-collision baseline, computed exactly the way the 2026-09-21 collision-rate
+    verification above computed it (measured holding rate, measured deposit rate conditional on
+    holding, real Chebyshev-radius-1 geometry) — reuse the method verbatim, don't re-derive it.
+  - **Gate 2 (information reached them)**: uninformed deposit accuracy vs. the 1/5 chance
+    floor, logged every update alongside two registered controls — accuracy conditional on
+    whether an informed agent was nearby recently (`steps_since_informed_nearby`, a new
+    `PopState` field, radius `hearth_informed_nearby_radius`, "recent" =
+    `hearth_informed_nearby_recent_steps`), and a channel-ablation flag
+    (`hearth_channel_ablation_enabled`) for a separate, otherwise-identical run with the wire
+    zeroed. Spatial following is still coordination, but it is not language, and these two
+    controls exist so the two can't be confused.
+- **Reward sizing proposed against the existing scale, not assumed**: `reward_hearth_deposit:
+  0.3`, `reward_hearth_completion: 2.4` (exactly 8×, per Cam's instruction) — sized against
+  `reward_resource:0.1` (a pickup), `reward_futile_craft:-0.20` (reused unchanged),
+  `reward_big_green_success:8.0` (red's own coordination payoff, though that one pays each
+  contributor the full amount rather than splitting it, unlike hearths). At N=2, two agents
+  who deposit once each and complete together net 1.5 each for one trip; a lone agent
+  completing the same hearth via two round trips nets 3.0 for double the travel time and full
+  decay exposure on the first deposit — cooperation is the faster, lower-risk path to the same
+  mechanism, never the only possible one, and a solo deposit is never punished even if its
+  hearth never completes.
+- **Tested at production shapes, and end-to-end under real JIT compilation**:
+  `tests/test_hearth_resolution.py` (11 unit tests against the real `resolve_hearth_deposits`:
+  solo N=1 bootstrap, N=2 needs two deposits same-step or across steps before decay wins, decay
+  alone can prevent completion, wrong-material/empty-handed/off-hearth classified correctly,
+  completion split proportional to undecayed credit, need re-rolls only for the completed
+  hearth, runs clean at max_pop=200), `tests/test_hearth_production_shapes.py` (grid_size=128,
+  max_pop=200, ideal agents embedded in a realistic scattered population with unrelated noise
+  crafters, reward payment matching main_jax.py's exact computation), and
+  `tests/test_hearth_observation_gating.py` (position visibility and need-gating verified
+  against the real `build_observations_jax`). Additionally smoke-tested end to end — full
+  `lax.scan` rollout, PPO backward, aux updates, all compiling and running clean with no NaN at
+  a tiny (grid=16, 6 blue, 6 red) shape — to catch any trace-time shape bug the unit tests,
+  which call individual functions directly, couldn't. Full suite: previously 104 passed / 56
+  skipped; now (2 old pair-adjacency test files deleted, 3 new hearth test files added)
+  109 passed / 56 skipped / 1 expected-and-explained failure
+  (`test_checkpoint_compatibility` against the pre-hearth local backup).
+
+**Relaunch gate still holds and is now sharper: nothing relaunches until Gate 0 has been
+checked on the first 50 real updates, per Cam's explicit "I want Gate 0 checked on the first
+fifty updates and nothing assumed past it."** Everything above is implemented and unit/
+production-shape/smoke tested; none of the three gates has been evaluated against a real
+training run, because none has happened yet. **Do not relaunch training** — that determination
+is Cam's to make once this report is reviewed.
+
+---
+
 ## 1. Red curriculum state reset to stage zero on every process resume
 
 **Introduced:** commit `8132d68`, "fix: value head init + red curriculum
@@ -595,6 +708,90 @@ confirms the original lock-in reproduces exactly when the fix is disabled.
 coordinating reds post-`coop_threshold_step` (instance 7's cross-reference) — a red-policy
 coordination-rate sparsity, separate from and downstream of both population ratchets above.
 Cam: "Red stays untouched... note it as a known open item, don't fix it now."
+
+---
+
+## 9. Pair-adjacency crafting was replaced by Hearths — the mechanism itself was a two-body
+same-instant simultaneity problem, unlearnable by construction, not merely under-rewarded
+
+**Introduced:** Phase 18.7's `resolve_crafting` (`jax_sim/grid_jax.py`) required two or more
+agents to be simultaneously adjacent, on the same env step, with capacity-1 inventories jointly
+satisfying a global `current_recipe`. Present from Phase 18.7's introduction through
+2026-09-21.
+
+**Effect:** the 2026-09-21 collision-rate verification (logged above, in the "Status as of
+2026-09-21" section and in `RESEARCH_PROTOCOL.md` Part 2) found the observed success rate
+statistically indistinguishable from the rate two independently-moving agents, with their
+individually-measured rates of holding the needed material and choosing to craft, would
+produce by pure accidental co-location. No coordination beyond chance was ever occurring, and
+nothing about the mechanism gave a single agent anything to learn from alone — a policy cannot
+bootstrap toward a behavior that only ever pays off through an event it cannot influence into
+existing (another specific agent arriving at its exact cell on its exact step).
+
+**Fix:** not a reward retune — a mechanism replacement, per Cam's own ruling once the
+collision arithmetic confirmed the diagnosis: **Hearths**. Four fixed, deterministic locations
+(`generate_hearth_positions`, one per quadrant, never relocated); CRAFT on a hearth tile
+holding its current one-material need deposits (material consumed, small immediate solo
+reward, hearth fill increments); deposits decay (half-life ≈200 steps) instead of requiring
+same-step adjacency, converting the two-body simultaneity problem into a one-body
+navigation-plus-information problem a single agent can learn alone (the bootstrap, N=1);
+completion (fill reaches curriculum stage N, ramping 1→2→3 on the existing CtD machinery, see
+`jax_sim.ctd_ramp.HEARTH_RAMP_STAGE_N`) pays a larger reward split proportional to each
+contributor's still-undecayed credit. Hearth positions are visible to every agent; hearth
+needs are gated by `can_see_recipe` — the design's whole point in one line: "the useful message
+is no longer 'I have flint, come to me at (x,y)'... but 'hearth 3 wants flint'" (Cam), a
+referent both parties can already see, not a sender-relative position a 3-slot wire can't
+really express. Full sizing, gate pre-registration, and test coverage in the "Status as of
+2026-09-21" section above; not implemented by default judgment — this is a genuine ecological
+redesign (Rule 12), signed off explicitly by spec.
+
+**The old mechanism was deleted, not kept running alongside the new one** —
+`resolve_crafting`, `current_recipe`/`recipe_timer` (`GridState`), `CRAFT_RAMP_STAGE_UNITS`/
+`staged_recipe_counts` (`jax_sim/ctd_ramp.py`), and their two dedicated test files
+(`tests/test_crafting_resolution.py`, `tests/test_pair_craft_success_production_shapes.py`)
+are all gone, not disabled. Cam: "don't keep the old pair-adjacency path alive alongside it...
+every parallel mechanism is another place for a silent bug, and we've found eight." (This
+instance is the ninth entry in this file, and instance 10 below — found while deleting this
+one — is the count's own best argument.)
+
+**How it was found:** not a bug hunt — a design failure diagnosed through the same discipline
+this file's other instances used: measure before ruling. Cam's own hand-derived collision
+estimate was itself independently re-verified against the real corpus (not taken on faith,
+per this project's standing rule) before being trusted as the basis for a redesign this large.
+
+---
+
+## 10. `can_see_recipe` was silently overwritten by a second mechanism the whole time
+instances 7/8 were being measured and fixed
+
+**Introduced:** Phase 18.7's `update_recipe` block (`jax_sim/main_jax.py`, deleted in instance
+9 above) did two things on every global recipe rotation (~every 1000 steps): drew a new
+`current_recipe`, *and* redrew **every living agent's** `can_see_recipe` via
+`jax.random.bernoulli(k_vis, vis_prob, (b_pop.max_pop,))`, with `vis_prob = 0.5 - 0.3*progress`
+decaying over the first 1.5M steps. Present since Phase 18.7's introduction, structurally
+contradicting instances 7 and 8's central premise (`can_see_recipe` is "a one-time 50% draw at
+init_population, inherited unchanged... never updated during an agent's life") for the entire
+time both instances were diagnosed and fixed, on 2026-09-20.
+
+**Effect:** `can_see_recipe` was never purely the fixed, inherited trait the population-genetics
+diagnosis (instance 8) treated it as — it was that inheritance path *and* a competing global
+rewrite, superimposed, the whole time. This doesn't invalidate instance 8's fix (a per-birth
+mutation rate is still correct and still needed for the inheritance path, which is real and
+does ratchet), but it means every `can_see_recipe`-conditioned measurement taken from a live run
+before 2026-09-21 (the craft-material holding gap, the zone-availability numbers, both in
+`RESEARCH_PROTOCOL.md` Part 2) reflects both mechanisms at once, not pure inheritance — worth
+remembering if any of those numbers are ever re-measured post-hearths and come out different.
+
+**Fix:** deleted, not patched — the competing rewrite lived entirely inside the same
+`update_recipe` block instance 9 removed for unrelated reasons (the global recipe it rotated no
+longer exists under hearths). `can_see_recipe` is now, for the first time, actually only what
+`population_jax.py`'s `init_population`/`apply_auto_reproduce` set.
+
+**How it was found:** not found by anyone asking about it — found by reading the block closely
+enough to delete it correctly for instance 9. Logged as its own instance rather than folded
+into instance 9's writeup because it is a genuinely separate historical defect (wrong claims
+about a different mechanism, made and believed for a full session) with its own blast radius,
+not a detail of the hearth redesign.
 
 ---
 

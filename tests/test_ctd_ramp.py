@@ -11,36 +11,24 @@ to be real rather than decorative.
 import jax
 import jax.numpy as jnp
 
-from jax_sim.ctd_ramp import staged_recipe_counts, red_shaping_term, CRAFT_RAMP_STAGE_UNITS
+from jax_sim.ctd_ramp import red_shaping_term, HEARTH_RAMP_STAGE_N
 
 GRID_SIZE = 128
 GAMMA = 0.999  # must match config.yaml's ppo_gamma
 BETA = 2.5
 
 
-def test_staged_recipe_sums_to_stage_units_exactly():
-    """Stage 0 (solo-satisfiable) sums to 1, stage 1 (pair-satisfiable) sums
-    to 2 -- Cam's correction, 2026-09-14: a single max_units=2 stage was still
-    a cooperative problem at smaller scale, not the solo-catchable analogue.
-    No wasted slots, unlike the full recipe's 50%-chance-wasted 4th slot."""
-    for stage, expected_units in enumerate(CRAFT_RAMP_STAGE_UNITS):
-        for seed in range(20):
-            counts = staged_recipe_counts(jax.random.PRNGKey(seed), jnp.array(stage))
-            assert counts.shape == (5,)
-            assert int(jnp.sum(counts)) == expected_units, (
-                f"stage={stage} seed={seed}: got total {int(jnp.sum(counts))}, "
-                f"expected {expected_units}"
-            )
-
-
-def test_staged_recipe_shape_is_stage_independent():
-    """The traced shape must never depend on the stage value (both slots are
-    always drawn, only masked) -- otherwise advancing a stage mid-run would
-    force a recompile of update_recipe."""
-    key = jax.random.PRNGKey(0)
-    s0 = staged_recipe_counts(key, jnp.array(0))
-    s1 = staged_recipe_counts(key, jnp.array(1))
-    assert s0.shape == s1.shape == (5,)
+def test_hearth_ramp_stage_n_is_solo_then_ratcheting_coop():
+    """Hearths (2026-09-21) replace pair-adjacency crafting; the ramp now
+    drives a hearth's required deposit count N. Stage 0 (N=1) must be
+    solo-satisfiable -- pure bootstrap, no coordination possible. Later
+    stages strictly increase N, matching the "1 -> 2 -> 3" curriculum
+    Cam specified."""
+    assert HEARTH_RAMP_STAGE_N[0] == 1, "stage 0 must be solo-satisfiable (N=1)"
+    assert list(HEARTH_RAMP_STAGE_N) == sorted(HEARTH_RAMP_STAGE_N), (
+        "N must strictly ratchet up, never down, across stages"
+    )
+    assert len(HEARTH_RAMP_STAGE_N) == 3, "spec: N ramps 1 -> 2 -> 3"
 
 
 def test_f_t_is_exactly_zero_on_every_catch_step():
@@ -134,13 +122,11 @@ def test_no_blue_alive_gives_zero_shaping_not_nan():
 
 
 if __name__ == "__main__":
-    test_staged_recipe_sums_to_stage_units_exactly()
-    test_staged_recipe_shape_is_stage_independent()
+    test_hearth_ramp_stage_n_is_solo_then_ratcheting_coop()
     test_f_t_is_exactly_zero_on_every_catch_step()
     test_f_t_matches_hand_computed_table()
     test_no_blue_alive_gives_zero_shaping_not_nan()
-    print("OK: staged recipe draws sum exactly to each stage's unit count "
-          "with a stage-independent shape; red shaping term matches the "
-          "hand-computed table; F_t is exactly zero on every catch step, "
-          "proven against a scenario that would otherwise be large and "
-          "negative.")
+    print("OK: hearth ramp stage schedule is solo-satisfiable at stage 0 and "
+          "strictly ratchets up; red shaping term matches the hand-computed "
+          "table; F_t is exactly zero on every catch step, proven against a "
+          "scenario that would otherwise be large and negative.")

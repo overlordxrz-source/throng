@@ -16,9 +16,10 @@ from typing import Tuple, Dict, Any
 
 class GridState:
     """All environment layers packed into a pytree-friendly dict."""
-    def __init__(self, size: int, symbol_dim: int = 16):
+    def __init__(self, size: int, symbol_dim: int = 16, max_pop: int = 200):
         self.size = size
         self.symbol_dim = symbol_dim
+        self.max_pop = max_pop
         self.symbols       = jnp.zeros((size, size, symbol_dim), dtype=jnp.float32)
         self.walls         = jnp.zeros((size, size), dtype=jnp.bool_)
         self.resources     = jnp.zeros((size, size), dtype=jnp.float32)
@@ -28,21 +29,28 @@ class GridState:
         self.cultural_fast = jnp.zeros((size, size, symbol_dim), dtype=jnp.float32)
         self.cultural_slow = jnp.zeros((size, size, symbol_dim), dtype=jnp.float32)
         self.barrier_hp_map = jnp.zeros((size, size), dtype=jnp.float32)
-        
+
         # Phase 18 Crafting Materials
         self.wood_grid = jnp.zeros((size, size), dtype=jnp.float32)
         self.stone_grid = jnp.zeros((size, size), dtype=jnp.float32)
         self.flint_grid = jnp.zeros((size, size), dtype=jnp.float32)
         self.clay_grid = jnp.zeros((size, size), dtype=jnp.float32)
         self.vine_grid = jnp.zeros((size, size), dtype=jnp.float32)
-        
-        # Phase 18.7 Receiver-Necessity Ecology
-        self.current_recipe = jnp.zeros((5,), dtype=jnp.int32) # [wood, stone, flint, clay, vine] counts
-        self.recipe_timer = jnp.zeros((1,), dtype=jnp.int32)
 
-        # CtD competence ramp (2026-09-14, Cam's sign-off) -- see jax_sim/ctd_ramp.py
+        # Phase 19 Hearths (2026-09-21, Cam's spec -- replaces Phase 18.7's
+        # global-recipe/pair-adjacency crafting entirely; see
+        # resolve_hearth_deposits below). Four fixed, deterministic quadrant-
+        # center locations -- never randomized, never relocated.
+        self.hearth_positions = generate_hearth_positions(size)  # (4, 2) int32, fixed for the run
+        self.hearth_need = jnp.zeros((4,), dtype=jnp.int32)      # material each hearth currently wants, 0-4
+        self.hearth_fill = jnp.zeros((4,), dtype=jnp.float32)    # decaying deposit level, completes at >= N
+        self.hearth_credit = jnp.zeros((4, max_pop), dtype=jnp.float32)  # per-agent share of the current fill
+
+        # CtD competence ramp (2026-09-14, Cam's sign-off) -- see jax_sim/ctd_ramp.py.
+        # Repurposed 2026-09-21: craft_ramp_stage now indexes HEARTH_RAMP_STAGE_N
+        # (a hearth's required deposit count), not a recipe's unit count.
         self.craft_ramp_active = jnp.array(False, dtype=jnp.bool_)
-        self.craft_ramp_stage = jnp.array(0, dtype=jnp.int32)  # 0: solo, 1: pair (see CRAFT_RAMP_STAGE_UNITS)
+        self.craft_ramp_stage = jnp.array(0, dtype=jnp.int32)  # 0: N=1 solo, see HEARTH_RAMP_STAGE_N
         self.red_ramp_active = jnp.array(False, dtype=jnp.bool_)
 
         # Puzzle
@@ -59,28 +67,28 @@ class GridState:
             self.puzzle_grid,
             self.puzzle_nodes, self.puzzle_active, self.puzzle_cooldown,
             self.wood_grid, self.stone_grid, self.flint_grid, self.clay_grid, self.vine_grid,
-            self.current_recipe, self.recipe_timer,
+            self.hearth_positions, self.hearth_need, self.hearth_fill, self.hearth_credit,
             self.craft_ramp_active, self.craft_ramp_stage, self.red_ramp_active,
         )
-        aux = (self.size, self.symbol_dim)
+        aux = (self.size, self.symbol_dim, self.max_pop)
         return children, aux
 
     @classmethod
     def tree_unflatten(cls, aux, children):
-        size, symbol_dim = aux
-        gs = cls(size, symbol_dim)
+        size, symbol_dim, max_pop = aux
+        gs = cls(size, symbol_dim, max_pop)
         (gs.symbols, gs.walls, gs.resources,
          gs.shelter_spots, gs.contested_res, gs.scent_trails,
          gs.cultural_fast, gs.cultural_slow, gs.barrier_hp_map, gs.puzzle_grid,
          gs.puzzle_nodes, gs.puzzle_active, gs.puzzle_cooldown,
          gs.wood_grid, gs.stone_grid, gs.flint_grid, gs.clay_grid, gs.vine_grid,
-         gs.current_recipe, gs.recipe_timer,
+         gs.hearth_positions, gs.hearth_need, gs.hearth_fill, gs.hearth_credit,
          gs.craft_ramp_active, gs.craft_ramp_stage, gs.red_ramp_active) = children
         return gs
 
     def replace(self, **kwargs):
         """Immutable update: return new GridState with replaced fields."""
-        gs = GridState(self.size, self.symbol_dim)
+        gs = GridState(self.size, self.symbol_dim, self.max_pop)
         gs.symbols = kwargs.get("symbols", self.symbols)
         gs.walls = kwargs.get("walls", self.walls)
         gs.resources = kwargs.get("resources", self.resources)
@@ -99,8 +107,10 @@ class GridState:
         gs.flint_grid = kwargs.get("flint_grid", self.flint_grid)
         gs.clay_grid = kwargs.get("clay_grid", self.clay_grid)
         gs.vine_grid = kwargs.get("vine_grid", self.vine_grid)
-        gs.current_recipe = kwargs.get("current_recipe", self.current_recipe)
-        gs.recipe_timer = kwargs.get("recipe_timer", self.recipe_timer)
+        gs.hearth_positions = kwargs.get("hearth_positions", self.hearth_positions)
+        gs.hearth_need = kwargs.get("hearth_need", self.hearth_need)
+        gs.hearth_fill = kwargs.get("hearth_fill", self.hearth_fill)
+        gs.hearth_credit = kwargs.get("hearth_credit", self.hearth_credit)
         gs.craft_ramp_active = kwargs.get("craft_ramp_active", self.craft_ramp_active)
         gs.craft_ramp_stage = kwargs.get("craft_ramp_stage", self.craft_ramp_stage)
         gs.red_ramp_active = kwargs.get("red_ramp_active", self.red_ramp_active)
@@ -177,6 +187,22 @@ def generate_contested_nodes(
         dist = jnp.maximum(dy, dx)
         contested = jnp.where(dist <= radius, yield_mult, contested)
     return contested
+
+
+def generate_hearth_positions(grid_size: int) -> jnp.ndarray:
+    """Four hearths, one per quadrant center, fixed for the life of the run
+    (Cam's hearth spec, 2026-09-21: "Fixed positions... no relocation").
+    Deterministic, not randomized, unlike shelter/contested nodes -- hearth
+    positions are meant to be a stable landmark every agent can learn to
+    navigate to from anywhere on the map from the first update onward, not a
+    per-seed surprise that has to be rediscovered."""
+    q = grid_size // 4
+    return jnp.array([
+        [q, q],
+        [q, 3 * q],
+        [3 * q, q],
+        [3 * q, 3 * q],
+    ], dtype=jnp.int32)
 
 
 def update_scent_trails(
@@ -597,67 +623,102 @@ def material_zone_masks(grid_size: int) -> Dict[str, jnp.ndarray]:
     }
 
 
-# ── Crafting resolution ──────────────────────────────────────────────────────
+# ── Hearth resolution (Phase 19, 2026-09-21) ─────────────────────────────────
+# Replaces Phase 18.7's pair-adjacency resolve_crafting() entirely -- Cam's
+# hearth spec: "don't keep the old pair-adjacency path alive alongside it...
+# every parallel mechanism is another place for a silent bug, and we've found
+# eight." A two-body same-instant simultaneity problem becomes a one-body
+# navigation-plus-information problem: CRAFT (action 10, same id, no new
+# action) on a hearth tile holding that hearth's needed material deposits;
+# deposits decay; reaching the requirement completes the hearth and splits a
+# larger reward among whoever's (decayed) deposits are still represented in
+# the fill at that instant.
 
-def resolve_crafting(
-    positions: jnp.ndarray,   # (N, 2) int32
-    is_craft: jnp.ndarray,    # (N,) bool -- action == CRAFT and alive
-    inv_wood: jnp.ndarray,    # (N,) int32
+def resolve_hearth_deposits(
+    positions: jnp.ndarray,        # (N, 2) int32
+    is_craft: jnp.ndarray,         # (N,) bool -- action == CRAFT and alive
+    inv_wood: jnp.ndarray,         # (N,) int32, capacity-1 fields as elsewhere
     inv_stone: jnp.ndarray,
     inv_flint: jnp.ndarray,
     inv_clay: jnp.ndarray,
     inv_vine: jnp.ndarray,
-    recipe: jnp.ndarray,      # (5,) int32: [req_wood, req_stone, req_flint, req_clay, req_vine]
-    grid_size: int,
+    hearth_positions: jnp.ndarray,  # (H, 2) int32, fixed
+    hearth_need: jnp.ndarray,       # (H,) int32, material 0-4 each hearth wants
+    hearth_fill: jnp.ndarray,       # (H,) float32, decaying deposit level
+    hearth_credit: jnp.ndarray,     # (H, N) float32, per-agent share of current fill
+    hearth_n_required: jnp.ndarray,  # scalar int, current curriculum stage's N
+    decay_factor: jnp.ndarray,      # scalar float, per-step multiplicative decay
+    reroll_key: jnp.ndarray,
 ) -> Dict[str, jnp.ndarray]:
-    """Resolve craft attempts and classify every failure by cause.
+    """One resolution step for all four hearths at once.
 
-    Only "wrong materials" is evidence about the communication channel -- "too
-    few crafters" and "nobody carrying anything" are logistics. The three
-    failure classes are mutually exclusive and, together with craft_success,
-    exhaustive over `is_craft` (Cam, 2026-09-13).
+    Crediting: hearth_credit decays at exactly the same rate as hearth_fill
+    (so credit always sums to fill, by construction) and each valid deposit
+    adds 1.0 to both. At completion, the completion reward is split
+    proportional to each agent's *decayed* credit -- whoever's material has
+    already rotted out of the fill by the time it completes gets no share of
+    that completion, which is the simplest self-consistent way to make
+    "deposits decay" and "contributors get credited" the same mechanism
+    rather than two mechanisms that can silently disagree. Any single-step
+    overflow past N (many simultaneous deposits) is not carried into the next
+    cycle -- fill and credit both reset to exactly 0 on completion -- a
+    deliberate simplification, not a bug: it only discards a same-step
+    excess, never a legitimate contribution counted once.
     """
-    dx = jnp.abs(positions[:, 0:1] - positions[None, :, 0])
-    dy = jnp.abs(positions[:, 1:2] - positions[None, :, 1])
-    dx = jnp.minimum(dx, grid_size - dx)
-    dy = jnp.minimum(dy, grid_size - dy)
-    dist = jnp.maximum(dx, dy)
-    adjacent = dist <= 1
+    H = hearth_positions.shape[0]
+    N = positions.shape[0]
 
-    craft_group = adjacent & is_craft[:, None] & is_craft[None, :]
+    held_material = jnp.where(
+        inv_wood > 0, 0,
+        jnp.where(inv_stone > 0, 1,
+        jnp.where(inv_flint > 0, 2,
+        jnp.where(inv_clay > 0, 3,
+        jnp.where(inv_vine > 0, 4, -1)))),
+    )  # (N,) int32, -1 = empty-handed
 
-    group_wood = jnp.sum(inv_wood[None, :] * craft_group, axis=1)
-    group_stone = jnp.sum(inv_stone[None, :] * craft_group, axis=1)
-    group_flint = jnp.sum(inv_flint[None, :] * craft_group, axis=1)
-    group_clay = jnp.sum(inv_clay[None, :] * craft_group, axis=1)
-    group_vine = jnp.sum(inv_vine[None, :] * craft_group, axis=1)
+    on_hearth_mask = jnp.all(
+        positions[:, None, :] == hearth_positions[None, :, :], axis=-1
+    )  # (N, H)
+    any_hearth = jnp.any(on_hearth_mask, axis=1)          # (N,)
+    agent_hearth_idx = jnp.argmax(on_hearth_mask, axis=1)  # (N,), garbage where ~any_hearth
 
-    recipe_satisfied = (
-        (group_wood >= recipe[0]) &
-        (group_stone >= recipe[1]) &
-        (group_flint >= recipe[2]) &
-        (group_clay >= recipe[3]) &
-        (group_vine >= recipe[4])
+    attempted = is_craft & any_hearth & (held_material >= 0)  # a real material guess at a hearth
+    hearth_need_at_agent = hearth_need[agent_hearth_idx]
+    deposited = attempted & (held_material == hearth_need_at_agent)  # correct-material deposit
+
+    safe_idx = jnp.where(any_hearth, agent_hearth_idx, 0)
+
+    decayed_fill = hearth_fill * decay_factor
+    decayed_credit = hearth_credit * decay_factor
+
+    deposits_per_hearth = jnp.zeros((H,), dtype=jnp.float32).at[safe_idx].add(
+        jnp.where(deposited, 1.0, 0.0)
     )
-    craft_success = is_craft & recipe_satisfied
-
-    group_size = jnp.sum(craft_group.astype(jnp.int32), axis=1)  # includes self
-    total_req = recipe[0] + recipe[1] + recipe[2] + recipe[3] + recipe[4]
-    is_carrying = (
-        (inv_wood > 0) | (inv_stone > 0) | (inv_flint > 0) | (inv_clay > 0) | (inv_vine > 0)
-    )
-    group_carrying_count = jnp.sum(
-        craft_group.astype(jnp.int32) * is_carrying[None, :].astype(jnp.int32), axis=1
+    new_fill = decayed_fill + deposits_per_hearth
+    new_credit = decayed_credit.at[safe_idx, jnp.arange(N)].add(
+        jnp.where(deposited, 1.0, 0.0)
     )
 
-    futile_attempt = is_craft & ~recipe_satisfied
-    futile_uncoordinated = futile_attempt & (group_size < total_req)
-    futile_empty = futile_attempt & (group_size >= total_req) & (group_carrying_count == 0)
-    futile_wrong_mats = futile_attempt & (group_size >= total_req) & (group_carrying_count > 0)
+    completed = new_fill >= hearth_n_required.astype(jnp.float32)  # (H,)
+
+    completion_share = jnp.where(
+        completed[:, None],
+        new_credit / jnp.maximum(new_fill[:, None], 1e-6),
+        0.0,
+    )  # (H, N), each row sums to ~1.0 where completed
+
+    reset_fill = jnp.where(completed, 0.0, new_fill)
+    reset_credit = jnp.where(completed[:, None], 0.0, new_credit)
+
+    reroll_draws = jax.random.randint(reroll_key, (H,), 0, 5)
+    new_need = jnp.where(completed, reroll_draws, hearth_need)
 
     return {
-        "craft_success": craft_success,
-        "futile_uncoordinated": futile_uncoordinated,
-        "futile_wrong_mats": futile_wrong_mats,
-        "futile_empty": futile_empty,
+        "deposited": deposited,                    # (N,) bool -- consume material, pay deposit reward
+        "attempted": attempted,                     # (N,) bool -- on a hearth, crafting, holding something
+        "completed": completed,                      # (H,) bool -- this hearth completed this step
+        "completion_share": completion_share,         # (H, N) float32 -- per-agent split of completion reward
+        "new_hearth_fill": reset_fill,
+        "new_hearth_credit": reset_credit,
+        "new_hearth_need": new_need,
     }

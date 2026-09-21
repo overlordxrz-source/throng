@@ -388,11 +388,14 @@ class SignalCorpusWriter:
         adj_barrier:       Optional[np.ndarray] = None,
         adj_red:           Optional[np.ndarray] = None,
         can_see_recipe:    Optional[np.ndarray] = None,
-        current_recipe_id: Optional[int] = None,
         inventory:         Optional[np.ndarray] = None,
         steps_since_dropout: Optional[np.ndarray] = None,
         craft_ramp_active: Optional[bool] = None,
         red_ramp_active:   Optional[bool] = None,
+        hearth_need:       Optional[np.ndarray] = None,
+        hearth_deposited:  Optional[np.ndarray] = None,
+        hearth_attempted:  Optional[np.ndarray] = None,
+        steps_since_informed_nearby: Optional[np.ndarray] = None,
     ) -> None:
         """Write sampled records; no-op if called more often than every_n_steps.
 
@@ -427,8 +430,14 @@ class SignalCorpusWriter:
             }
             if can_see_recipe is not None:
                 rec["can_see_recipe"] = bool(can_see_recipe[i])
-            if current_recipe_id is not None:
-                rec["current_recipe_id"] = int(current_recipe_id)
+            if hearth_need is not None:
+                rec["hearth_need"] = [int(v) for v in hearth_need]
+            if hearth_deposited is not None:
+                rec["hearth_deposited"] = bool(hearth_deposited[i])
+            if hearth_attempted is not None:
+                rec["hearth_attempted"] = bool(hearth_attempted[i])
+            if steps_since_informed_nearby is not None:
+                rec["steps_since_informed_nearby"] = int(steps_since_informed_nearby[i])
             if inventory is not None:
                 rec["inventory"] = int(inventory[i])
             if steps_since_dropout is not None:

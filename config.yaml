@@ -59,7 +59,10 @@ symbol_dim: 16
 neighbor_k: 6
 local_obs_radius: 2              # 5×5 patch
 env_channels: 15                 # Phase 18.7: 10 base + wood, stone, flint, clay, vine
-own_state_dim: 22                # Phase 18.7: 13 + flint, clay, vine, recipe[5], can_see_recipe
+own_state_dim: 29                # Phase 19 (2026-09-21, hearths): 13 base + hearth_rel[8] (4 hearths x
+                                 # dx,dy, always visible) + hearth_need[4] (one per hearth, gated by
+                                 # can_see_recipe) + intrinsic_entropy[4]. Replaces Phase 18.7's
+                                 # masked_recipe[5] (own_state was 22, now 29 -- net +7).
 n_actions: 12                    # Phase 18: N,S,E,W,Stay,Strike,Push,Guard,Build,PickUp,Craft,UseTool
                                  # (build_cfg overrides identically; defined here so direct-YAML loads
                                  #  — README quickstart, decode/test tools — don't default to 8 and crash
@@ -166,9 +169,36 @@ energy_decay: 0.001
 alarm_metabolic_cost: 0.006
 starvation_threshold: 0.1
 reward_resource: 0.1
-reward_craft_success: 3.0
 reward_futile_craft: -0.20
 resource_decay: 0.05                 # how much resource depletes per consumption step
+
+# ── Phase 19 Hearths (2026-09-21, Cam's spec) ───────────────────────────────
+# Replaces Phase 18.7's pair-adjacency crafting (reward_craft_success, now
+# retired) entirely. Sizing proposed against the existing reward scale --
+# reward_resource:0.1 (a pickup), reward_futile_craft:-0.20 (miscraft
+# penalty, reused unchanged), reward_big_green_success:8.0 (red's own
+# coordination payoff, NOT split among contributors, unlike this one) --
+# and verified by test at production shapes before landing, per Cam's
+# instruction; not yet exercised on a real run.
+#
+# Deposit reward small and positive (never punished, even if the hearth
+# never completes) -- this is the bootstrap: one agent, acting alone, gets
+# paid. Completion reward ~8x the deposit (Cam's own sizing instruction),
+# split proportional to each contributor's still-undecayed credit at the
+# instant of completion (see jax_sim.grid_jax.resolve_hearth_deposits).
+# At N=2, two agents who each deposit once and complete together net
+# 0.3 + 2.4/2 = 1.5 each for one trip; a lone agent completing the same
+# hearth via two round trips nets 2*0.3 + 2.4 = 3.0 for double the travel
+# time and full exposure to decay erasing the first deposit before the
+# second lands -- cooperation is the faster, lower-risk path to the same
+# mechanism, without solo completion (N=1, or a lucky fast solo double
+# trip) ever being a bad outcome.
+reward_hearth_deposit: 0.3
+reward_hearth_completion: 2.4
+hearth_decay_half_life_steps: 200   # Cam's number: "roughly 200"
+hearth_informed_nearby_radius: 5        # Gate 2 control: "was an informed agent nearby"
+hearth_informed_nearby_recent_steps: 50  # ...and how recently counts as "recently"
+hearth_channel_ablation_enabled: false  # Gate 2 control: zero the wire, see if accuracy falls
 
 # ── MAPPO ──────────────────────────────────────────────────────────────────────
 ppo_rollout_steps: 512
@@ -355,13 +385,13 @@ phase16_combinatorial_syntax:
 # This is a genuine ecological change (Rule 12) -- signed off explicitly, not
 # implemented by default judgment.
 #
-# Crafting ramp is two capped stages, not one (Cam's correction, 2026-09-14):
-# a single max_units=2 stage is still a cooperative problem at smaller scale,
-# not the solo-catchable analogue. Stage sequence is fixed by
-# jax_sim.ctd_ramp.CRAFT_RAMP_STAGE_UNITS = (1, 2) -- solo-satisfiable, then
-# pair-satisfiable, then this config's floor/bar/ceiling ratchets to the full
-# (up to 4-unit) recipe. Not configurable per-run; the floor/bar/window/
-# ceiling below are reapplied fresh at each stage.
+# Crafting ramp now drives Phase 19 hearths (2026-09-21), not a recipe unit
+# count: three ratcheting stages, N=1 (solo-satisfiable bootstrap) -> N=2 ->
+# N=3, fixed by jax_sim.ctd_ramp.HEARTH_RAMP_STAGE_N = (1, 2, 3). Same
+# floor/bar/window/ceiling machinery as before (Cam: "on the existing CtD
+# machinery"), just retargeted -- the per-capita bar now reads hearth
+# deposits instead of craft successes. Not configurable per-run; the
+# floor/bar/window/ceiling below are reapplied fresh at each stage.
 ctd_competence_ramp:
   craft_ramp_enabled: true
   # Exit criteria revised 2026-09-14 (Cam), after the real launch showed

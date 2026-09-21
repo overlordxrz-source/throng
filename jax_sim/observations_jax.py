@@ -110,7 +110,20 @@ def build_observations_jax(
     inv_clay = pop.inventory_clay.astype(jnp.float32)
     inv_vine = pop.inventory_vine.astype(jnp.float32)
     can_see_recipe = pop.can_see_recipe.astype(jnp.float32)
-    masked_recipe = grid.current_recipe.astype(jnp.float32)[None, :] * can_see_recipe[:, None]
+
+    # Phase 19 Hearths (2026-09-21, Cam's spec): "Hearth positions are visible
+    # to every agent. Hearth needs are gated by can_see_recipe." Positions are
+    # global (not local-patch) so navigation works from anywhere on the map,
+    # not just once a hearth happens to already be in view -- the whole point
+    # of a one-body navigation problem is that it's solvable from anywhere.
+    hearth_pos_f = grid.hearth_positions.astype(jnp.float32)          # (4, 2)
+    agent_pos_f = pop.positions.astype(jnp.float32)                   # (N, 2)
+    half = gs / 2.0
+    raw_diff = hearth_pos_f[None, :, :] - agent_pos_f[:, None, :]     # (N, 4, 2)
+    wrapped_diff = jnp.mod(raw_diff + half, gs) - half                # toroidal signed diff
+    hearth_rel = (wrapped_diff / half).reshape(N, 8)                  # (N, 8), each in (-1, 1]
+    hearth_need_norm = grid.hearth_need.astype(jnp.float32) / 4.0     # (4,), 0-1
+    hearth_need_masked = hearth_need_norm[None, :] * can_see_recipe[:, None]  # (N, 4), 0 if uninformed
 
     own_state_dim = int(config.get("own_state_dim", 22))
     if own_state_dim == 10:
@@ -125,9 +138,10 @@ def build_observations_jax(
         ], axis=1)
     else:
         own_state = jnp.concatenate([
-            jnp.stack([norm_age, mat_frac, energy, nl_norm, norm_x, norm_y, 
+            jnp.stack([norm_age, mat_frac, energy, nl_norm, norm_x, norm_y,
                        inv_wood, inv_stone, inv_axe, inv_flint, inv_clay, inv_vine, can_see_recipe], axis=1),
-            masked_recipe,
+            hearth_rel,
+            hearth_need_masked,
             intrinsic_entropy
         ], axis=1)
 

@@ -10,6 +10,17 @@ from jax_sim.main_jax import DEFAULT_CONFIG, _normalize_config, make_obs_layout
 from jax_sim.network_jax import AgentNetworkJax, PredatorNetworkJax
 
 def test_checkpoint_compatibility():
+    # 2026-09-21 (hearths): this test opportunistically checks whatever
+    # checkpoint happens to be cached locally (~/throng_backup/checkpoints)
+    # against the repo's *current* config.yaml shape. Phase 19 hearths
+    # deliberately changed own_state_dim 22 -> 29 (see
+    # docs/THE-ECOLOGY-NEVER-RAN.md's hearth entry) -- any checkpoint saved
+    # before that change is now genuinely, permanently incompatible with the
+    # current code, by design, not by regression. Expect a
+    # flax.errors.ScopeParamShapeError ("(29, 256)" vs "(22, 256)") here
+    # until this machine's local backup is replaced by a checkpoint actually
+    # trained under the hearth architecture -- that is this test correctly
+    # doing its job, not a bug to chase.
     # 1. Find checkpoint dir
     ckpt_dir = "/mnt/throng-runs/checkpoints"
     config_path = "/mnt/throng-runs/config.json"

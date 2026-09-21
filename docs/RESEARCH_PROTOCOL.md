@@ -280,6 +280,42 @@ more expensive, because it produces publishable-looking nulls.
   **Relaunch gate:** "Nothing relaunches until the zone-availability number is in and the
   recipe fix lands. Running Gate C in a world that punishes using information would produce a
   null that means nothing." The number is in; the fix has not landed; no relaunch.
+  **Superseded, 2026-09-21:** Cam's own empty-handed mechanism above was falsified cleanly by
+  the cross-tab. The zone-local-recipe fix is withdrawn; see the next entry.
+- **The zone-local-recipe fix is withdrawn; the mechanism itself was replaced (Hearths), and
+  three gates were pre-registered, with fixed thresholds, before implementing anything.**
+  Independently re-deriving the collision arithmetic (not taking Cam's hand estimate on faith —
+  see `docs/THE-ECOLOGY-NEVER-RAN.md`'s 2026-09-21 collision-rate entry for the full method and
+  numbers) confirmed observed crafting success is statistically indistinguishable from pure
+  accidental co-location given agents' own measured rates of holding the needed material and
+  choosing to craft. No coordination beyond chance ever occurred, and zone-local recipes would
+  not have moved a co-location rate that low — the mechanism itself, not its material
+  availability, was the problem. Ruling: pair-adjacency crafting is replaced entirely by
+  **Hearths** (`jax_sim/grid_jax.py`'s `resolve_hearth_deposits`, `jax_sim/ctd_ramp.py`'s
+  `HEARTH_RAMP_STAGE_N`) — four fixed locations, CRAFT-to-deposit with decay instead of
+  same-step adjacency, curriculum N ramping 1→2→3 on the existing CtD machinery, hearth
+  positions visible to everyone and hearth needs gated by `can_see_recipe`. Full mechanism,
+  reward sizing, and implementation status in `THE-ECOLOGY-NEVER-RAN.md`'s "Status as of
+  2026-09-21" section and instance 9.
+  **Three gates, pre-registered verbatim (Cam, 2026-09-21) before implementation, thresholds
+  fixed, not evaluated yet — nothing has run:**
+  - *Gate 0*: "Within 50 updates at N=1, per-capita deposit rate must rise measurably above its
+    value in the first 5 updates. If solo deposits don't increase when a single agent can earn
+    reward alone, agents cannot learn one-body navigation and nothing downstream matters."
+  - *Gate 1*: "At N=2, completion rate must exceed the random-collision baseline computed
+    exactly the way we just computed it — measured holding rate, measured deposit rate
+    conditional on holding, real geometry. We now have that method and it worked; reuse it
+    verbatim."
+  - *Gate 2*: "Measure whether uninformed agents deposit the correct material at a rate above
+    chance (1/5). If they do, information reached them... just a counter." Two registered
+    controls against the spatial-following confound: accuracy conditional on whether an
+    informed agent was nearby recently, and a channel-ablation run (zero the wire, see if
+    accuracy falls).
+  **Relaunch gate, verbatim: "I want Gate 0 checked on the first fifty updates and nothing
+  assumed past it."** Instrumentation for all three gates is landed and the mechanism is
+  tested at production shapes and end-to-end under real JIT compilation (see
+  `THE-ECOLOGY-NEVER-RAN.md`), but none of the three has been evaluated against a real run —
+  none has happened. No relaunch.
 
 ## Part 3 — Fossils
 
