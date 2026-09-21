@@ -350,6 +350,66 @@ volume, restoring off-laptop redundancy, deliberately separate from any director
 
 ---
 
+## 7. Blue's population composition was a one-way demographic ratchet — predation was
+structurally impossible independent of red's policy, and no line of code was wrong
+
+**Introduced:** `init_population` (`jax_sim/population_jax.py`, ~line 176) has always drawn
+`is_big_green` as a one-time 20% random assignment at simulation start. `apply_auto_reproduce`
+(~line 305-306) has always inherited it unchanged from an assigned parent at reproduction:
+`parent_is_big_green = pop.is_big_green[assigned_parents]`, `new_is_big_green =
+jnp.where(activate_mask, parent_is_big_green, pop.is_big_green)`. Both lines do exactly what
+they say. Neither is a bug. `can_see_recipe` (~line 176-177, ~line 308-309) is built the same
+way — a one-time 50% draw, inherited unchanged thereafter.
+
+**The defect is structural, not a line-level error — the cleanest instance in this file for
+exactly that reason.** `assigned_parents` (~line 239-241) is sampled *uniformly across the
+currently alive population*, zero weighting by `is_big_green`: `parent_weights =
+jnp.where(pop.alive, 1.0, 0.0)`. Combined with red's catch mechanic being small-blue-only in
+practice (big-green requires 2+ coordinating reds post-`coop_threshold_step`, see instance
+below in `RESEARCH_PROTOCOL.md`'s 2026-09-20 entries — small-blue has no equivalent
+protection), small-blue's population is a one-way ratchet: any net predation pressure pushes
+its alive-fraction down, which proportionally *lowers* its representation among new spawns
+too (no compensating force), which pushes the fraction down further. At exactly 0 alive, the
+parent-sampling weight for producing a new small-blue agent is exactly 0 — permanently, from
+that population state on. Every mechanism involved was doing precisely what it was written to
+do; the outcome is nevertheless a channel that spent its entire observable history unable to
+apply the predation pressure it was designed to test.
+
+**Duration:** unknown start (this is initial-population and reproduction logic, present since
+before any session covered in this log) through 2026-09-20. Measured live-run state on
+2026-09-20: `pop_split=small:0|big_green:194-200` across essentially every stage-1 update —
+confirmed via the corpus and `train.log`, not inferred.
+
+**Effect:** the entire red half of the ecology was decorative for as long as small-blue sat at
+or near 0. `catch_attempted` (small-blue-only by construction) correctly read 0 or
+near-0 — not an instrument failure (the earlier `catch_attempts=0` investigation, Part 2 of
+`RESEARCH_PROTOCOL.md`, correctly identified an empty denominator; this instance is *why* the
+denominator was empty). No amount of red-policy tuning could have produced catches during this
+period, because the prey type red's mechanic can actually reach barely existed.
+
+**Fix:** not a floor. Cam's explicit framing: "A floor is an external hand preventing an
+outcome selection is producing; mutation is a rule of the world." Added
+`is_big_green_mutation_rate` (default `0.03`, `config.yaml`) to `apply_auto_reproduce`: a
+per-birth probability the offspring's `is_big_green` flips relative to its parent's,
+independent of current population composition — present at 0% small-blue exactly as it's
+present at 50%, the same way a real mutation rate doesn't care how rare the recessive allele
+has become. `can_see_recipe` was left untouched (see instance 8, `RESEARCH_PROTOCOL.md`, for
+why that one needs a different kind of look before deciding anything).
+
+**How it was found:** Cam asked directly — "What transitions an agent to big_green, is it
+reversible, and can small blue exist in steady state at all?" — after `pop_split=small:0` had
+already been visible in the dashboard for three days without anyone asking what produced it.
+Answered by reading `apply_auto_reproduce` directly, not by reasoning about red's policy.
+Verified, not asserted: `tests/test_population_composition_lockin.py` proves the lock-in
+against the real function (at 0 small-blue alive, every new spawn under
+`is_big_green_mutation_rate=0.0` is confirmed big-green); `tests/test_is_big_green_mutation.py`
+runs the real `apply_auto_reproduce` forward 300 real generations from a 100%-big-green start
+under asymmetric (predation-like) mortality and confirms small-blue reappears (first
+nonzero at generation 7) and stabilizes at a low nonzero tail frequency (0.74% mean, range
+0-2% over the final 50 generations) rather than staying extinct or exploding to parity.
+
+---
+
 *(Log format: mechanism, when it was introduced not-actually-working, when
 it was fixed, how long the gap was, what it plausibly cost, and how it was
 found. Append new confirmed instances below this line — suspicions belong in

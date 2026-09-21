@@ -19,6 +19,15 @@ max_pop_red: 250
 min_red_population: 250          # P4b: max red pressure immediately on resume
 repro_energy_thresh: 0.95        # P10.2 Metabolic Squeeze: rare clones (was 0.80)
 repro_energy_cost: 0.80          # P10.2: cloning nearly starves parent (was 0.40)
+# 2026-09-20 (Cam): per-birth probability the offspring's is_big_green flips
+# relative to its parent -- a rule of the world, not a floor. Without this,
+# parent-sampling for new spawns is uniform by current alive count with zero
+# weighting by type, which makes small-blue extinction a one-way ratchet: at
+# 0 small-blue alive, every new spawn is confirmed big-green, permanently
+# (verified in tests/test_population_composition_lockin.py). Landed after
+# confirming predation is structurally impossible without it -- see
+# docs/THE-ECOLOGY-NEVER-RAN.md.
+is_big_green_mutation_rate: 0.03
 
 # Curriculum
 curriculum_red_count: 6

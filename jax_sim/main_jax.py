@@ -302,6 +302,13 @@ def make_sim_step(
     _min_pop_blue = int(config.get("min_population", 200))
     _repro_energy_thresh = float(config.get("repro_energy_thresh", 0.8))
     _repro_energy_cost = float(config.get("repro_energy_cost", 0.4))
+    # 2026-09-20 (Cam): mutation, not a floor -- per-birth probability the
+    # offspring's is_big_green flips relative to its parent, a rule of the
+    # world rather than an external hand. Verified in
+    # tests/test_population_composition_lockin.py that this breaks the
+    # one-way demographic ratchet (jax_sim/population_jax.py's
+    # apply_auto_reproduce docstring has the full reasoning).
+    _is_big_green_mutation_rate = float(config.get("is_big_green_mutation_rate", 0.03))
     _mind_meld = config.get("mind_meld_enabled", False)
     _mm_radius = int(config.get("mind_meld_radius", 1))
     _mm_rate = float(config.get("mind_meld_rate", 0.1))
@@ -695,6 +702,7 @@ def make_sim_step(
             min_pop=_min_pop_blue,
             energy_thresh=_repro_energy_thresh,
             energy_cost=_repro_energy_cost,
+            is_big_green_mutation_rate=_is_big_green_mutation_rate,
         )
 
         # ── Mind-Melding ─────────────────────────────────────────

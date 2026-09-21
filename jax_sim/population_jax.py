@@ -212,28 +212,48 @@ def kill_agents(pop: PopState, mask: jnp.ndarray) -> PopState:
 
 
 def apply_auto_reproduce(
-    pop: PopState, 
-    key: jax.Array, 
-    grid_size: int, 
-    min_pop: int, 
+    pop: PopState,
+    key: jax.Array,
+    grid_size: int,
+    min_pop: int,
     energy_thresh: float = 0.8,
-    energy_cost: float = 0.4
+    energy_cost: float = 0.4,
+    is_big_green_mutation_rate: float = 0.0,
 ) -> PopState:
     """
     JAX-compatible reproduction with static shapes.
     1. Enforces min_pop by cloning random alive agents.
     2. Allows agents with energy >= energy_thresh to clone themselves.
+
+    is_big_green_mutation_rate (Cam, 2026-09-20): parent-sampling for new
+    spawns is uniform by current alive count (see below), zero weighting by
+    is_big_green -- verified in tests/test_population_composition_lockin.py
+    that this makes small-blue extinction a one-way demographic ratchet: at
+    0 small-blue alive, every new spawn is confirmed big-green, permanently,
+    because there is no small-blue parent left to assign one to. A floor
+    would be an external hand overriding what selection produces; mutation
+    is a rule of the world -- a small, constant per-birth chance the
+    offspring's type flips relative to its parent's, present regardless of
+    current population composition, the same way a real mutation rate
+    doesn't care how rare the recessive allele has become. Verified in
+    tests/test_population_composition_lockin.py that a 100%-big-green
+    population, run forward through many real reproduction cycles, produces
+    small-blue and stabilizes at a low nonzero frequency rather than staying
+    extinct (proving the ratchet is broken) or exploding (proving the rate
+    doesn't overwhelm reproduction). 0.0 (off) by default -- pass explicitly
+    where the mutable trait actually matters (blue's is_big_green); red's
+    own call site is untouched.
     """
     n = pop.max_pop
     alive_count = jnp.sum(pop.alive)
-    
+
     # 1. Parents who reproduce due to high energy
     energy_repro_mask = pop.alive & (pop.energy >= energy_thresh)
-    
+
     # 2. How many shortfall to reach min_pop?
     shortfall = jnp.maximum(0, min_pop - alive_count)
-    
-    key, k1, k2, k3, k4 = jax.random.split(key, 5)
+
+    key, k1, k2, k3, k4, k5 = jax.random.split(key, 6)
     
     # Safe random parent sampling for shortfall
     parent_weights = jnp.where(pop.alive, 1.0, 0.0)
@@ -301,9 +321,14 @@ def apply_auto_reproduce(
     parent_alarms = pop.alarms[assigned_parents]
     new_alarms = jnp.where(activate_mask[:, None], parent_alarms, pop.alarms)
 
-    # We maintain the type of the parent
+    # We maintain the type of the parent, with a small per-birth chance of
+    # mutation (flips relative to the parent, independent of current
+    # population composition -- see is_big_green_mutation_rate docstring
+    # above for why this, not a floor).
     parent_is_big_green = pop.is_big_green[assigned_parents]
-    new_is_big_green = jnp.where(activate_mask, parent_is_big_green, pop.is_big_green)
+    mutate_is_big_green = jax.random.uniform(k5, (n,)) < is_big_green_mutation_rate
+    offspring_is_big_green = jnp.where(mutate_is_big_green, ~parent_is_big_green, parent_is_big_green)
+    new_is_big_green = jnp.where(activate_mask, offspring_is_big_green, pop.is_big_green)
     
     parent_can_see = pop.can_see_recipe[assigned_parents]
     new_can_see = jnp.where(activate_mask, parent_can_see, pop.can_see_recipe)
