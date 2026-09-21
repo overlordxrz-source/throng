@@ -309,6 +309,12 @@ def make_sim_step(
     # one-way demographic ratchet (jax_sim/population_jax.py's
     # apply_auto_reproduce docstring has the full reasoning).
     _is_big_green_mutation_rate = float(config.get("is_big_green_mutation_rate", 0.03))
+    # 2026-09-20 (Cam), instance 8 -- same diagnosis as is_big_green:
+    # can_see_recipe is a fixed, inherited-unchanged trait currently under
+    # measured negative selection (informed agents hold a needed material
+    # less often than uninformed, 95% CI entirely below zero), so without
+    # mutation it's a second one-way ratchet heading for fixation at 0%.
+    _can_see_recipe_mutation_rate = float(config.get("can_see_recipe_mutation_rate", 0.03))
     _mind_meld = config.get("mind_meld_enabled", False)
     _mm_radius = int(config.get("mind_meld_radius", 1))
     _mm_rate = float(config.get("mind_meld_rate", 0.1))
@@ -703,6 +709,7 @@ def make_sim_step(
             energy_thresh=_repro_energy_thresh,
             energy_cost=_repro_energy_cost,
             is_big_green_mutation_rate=_is_big_green_mutation_rate,
+            can_see_recipe_mutation_rate=_can_see_recipe_mutation_rate,
         )
 
         # ── Mind-Melding ─────────────────────────────────────────

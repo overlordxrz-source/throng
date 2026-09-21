@@ -219,6 +219,7 @@ def apply_auto_reproduce(
     energy_thresh: float = 0.8,
     energy_cost: float = 0.4,
     is_big_green_mutation_rate: float = 0.0,
+    can_see_recipe_mutation_rate: float = 0.0,
 ) -> PopState:
     """
     JAX-compatible reproduction with static shapes.
@@ -243,6 +244,29 @@ def apply_auto_reproduce(
     doesn't overwhelm reproduction). 0.0 (off) by default -- pass explicitly
     where the mutable trait actually matters (blue's is_big_green); red's
     own call site is untouched.
+
+    can_see_recipe_mutation_rate (Cam, 2026-09-20, instance 8 -- same
+    diagnosis, same medicine): can_see_recipe is built exactly like
+    is_big_green -- a one-time 50% draw at init_population, inherited
+    unchanged from an assigned parent here, never updated during an
+    agent's life. Measured the same session: informed agents
+    (can_see_recipe=True) hold a recipe-needed material at craft time
+    LESS often than uninformed agents (11.89% vs 16.19%, 95% CI on the
+    difference entirely below zero) -- informed is currently the WORSE
+    trait to inherit. Combined with the same uniform-by-alive-count
+    parent-sampling that makes is_big_green a one-way ratchet, a heritable
+    trait under active negative selection with no reverse path heads for
+    fixation at 0%: given enough generations the informed caste disappears
+    and receiver-necessity dies on its own, structurally, independent of
+    whatever else gets fixed about recipe zoning. Same fix, same
+    reasoning: a small constant per-birth flip probability, present
+    regardless of current fitness, not a floor. Verified in
+    tests/test_can_see_recipe_mutation.py the same way: real
+    apply_auto_reproduce, many real generations, run forward from a
+    100%-can_see_recipe population under the OBSERVED fitness
+    disadvantage (informed agents less likely to hold a needed material),
+    confirming the trait stabilizes at a low nonzero frequency rather than
+    going extinct. 0.0 (off) by default, same as above.
     """
     n = pop.max_pop
     alive_count = jnp.sum(pop.alive)
@@ -253,7 +277,7 @@ def apply_auto_reproduce(
     # 2. How many shortfall to reach min_pop?
     shortfall = jnp.maximum(0, min_pop - alive_count)
 
-    key, k1, k2, k3, k4, k5 = jax.random.split(key, 6)
+    key, k1, k2, k3, k4, k5, k6 = jax.random.split(key, 7)
     
     # Safe random parent sampling for shortfall
     parent_weights = jnp.where(pop.alive, 1.0, 0.0)
@@ -330,8 +354,14 @@ def apply_auto_reproduce(
     offspring_is_big_green = jnp.where(mutate_is_big_green, ~parent_is_big_green, parent_is_big_green)
     new_is_big_green = jnp.where(activate_mask, offspring_is_big_green, pop.is_big_green)
     
+    # Instance 8 (Cam, 2026-09-20): same medicine as is_big_green above --
+    # can_see_recipe is currently under negative selection (informed agents
+    # measurably worse at holding a needed material), so without mutation
+    # it's a second one-way ratchet, heading for fixation at 0%.
     parent_can_see = pop.can_see_recipe[assigned_parents]
-    new_can_see = jnp.where(activate_mask, parent_can_see, pop.can_see_recipe)
+    mutate_can_see = jax.random.uniform(k6, (n,)) < can_see_recipe_mutation_rate
+    offspring_can_see = jnp.where(mutate_can_see, ~parent_can_see, parent_can_see)
+    new_can_see = jnp.where(activate_mask, offspring_can_see, pop.can_see_recipe)
     
     new_inv_wood = jnp.where(activate_mask, 0, pop.inventory_wood)
     new_inv_stone = jnp.where(activate_mask, 0, pop.inventory_stone)

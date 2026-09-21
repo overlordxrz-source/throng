@@ -28,6 +28,14 @@ repro_energy_cost: 0.80          # P10.2: cloning nearly starves parent (was 0.4
 # confirming predation is structurally impossible without it -- see
 # docs/THE-ECOLOGY-NEVER-RAN.md.
 is_big_green_mutation_rate: 0.03
+# 2026-09-20 (Cam), instance 8: same diagnosis, same medicine, for
+# can_see_recipe. It's built identically to is_big_green (fixed trait,
+# inherited unchanged) and is currently under measured negative selection
+# (informed agents hold a needed material less often than uninformed, 95%
+# CI entirely below zero) -- without mutation it's a second one-way
+# ratchet, heading for fixation at 0% regardless of whatever else gets
+# fixed about recipe zoning. See docs/THE-ECOLOGY-NEVER-RAN.md instance 8.
+can_see_recipe_mutation_rate: 0.03
 
 # Curriculum
 curriculum_red_count: 6
