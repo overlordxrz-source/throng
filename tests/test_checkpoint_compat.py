@@ -7,25 +7,27 @@ import orbax.checkpoint as ocp
 from flax.core import freeze, unfreeze
 
 from jax_sim.main_jax import DEFAULT_CONFIG, _normalize_config, make_obs_layout
-from jax_sim.network_jax import AgentNetworkJax, PredatorNetworkJax
+from jax_sim.network_jax import (
+    AgentNetworkJax, PredatorNetworkJax,
+    init_agent_params, init_predator_params,
+    ensure_aux_head_params, ensure_predator_params,
+    graft_missing_param_subtrees, sanitize_agent_params,
+)
 
 def test_checkpoint_compatibility():
-    # 2026-09-21 (hearths): this test opportunistically checks whatever
-    # checkpoint happens to be cached locally (~/throng_backup/checkpoints)
-    # against the repo's *current* config.yaml shape -- deliberately WITHOUT
-    # the restore-time grafting main_jax.py's real resume path always
-    # applies (ensure_aux_head_params/graft_missing_param_subtrees), so it's
-    # answering a stricter question ("is this checkpoint plug-compatible
-    # with zero adaptation") than "can the repo actually resume this
-    # checkpoint." Phase 19 hearths changed own_state_dim 22 -> 29 (see
-    # docs/THE-ECOLOGY-NEVER-RAN.md's hearth entry), so this strict check
-    # now fails here as expected (flax.errors.ScopeParamShapeError, "(29,
-    # 256)" vs "(22, 256)") -- that's this test correctly doing its narrower
-    # job, not evidence the checkpoint is unusable. The actual production
-    # resume path (with grafting) is separately verified, against this same
-    # real checkpoint, to produce BIT-IDENTICAL output on the pre-existing
-    # 22 dims with the 7 new ones zeroed, in
-    # test_hearth_checkpoint_pad.py::test_restore_time_pad_matches_pre_hearth_checkpoint_exactly.
+    # 2026-09-21 (Cam): this test used to call model.apply on RAW, ungrafted
+    # checkpoint params -- a stricter bar than production ever hits (main_jax.py's
+    # real resume path always grafts: graft_missing_param_subtrees against a
+    # fresh template, then ensure_aux_head_params/ensure_predator_params).
+    # Phase 19 hearths' own_state_dim 22 -> 29 change made that strict,
+    # unrealistic bar fail permanently -- "a permanently-red test in a green
+    # suite is not [fine]... the next real regression will hide exactly
+    # there." Fixed by routing through the same grafting production actually
+    # uses, for BOTH teams (test_hearth_checkpoint_pad.py separately proves
+    # blue's pad is bit-identical to the pre-hearth checkpoint's own output;
+    # this test is the only one covering red's ensure_predator_params path
+    # against a real checkpoint, and is now a real smoke check of what
+    # production does, not a check of what it deliberately avoids doing).
     # 1. Find checkpoint dir
     ckpt_dir = "/mnt/throng-runs/checkpoints"
     config_path = "/mnt/throng-runs/config.json"
@@ -151,17 +153,37 @@ def test_checkpoint_compatibility():
     raw_restored = ckpt_mngr.restore(latest_step, args=ocp.args.StandardRestore(_target))
 
     source_dict = unfreeze(raw_restored)
-    b_params = freeze(source_dict["b_params"])
-    r_params = freeze(source_dict["r_params"])
-        
-    print("Checkpoint loaded. Running shape compatibility check...")
-    
-    # 6. Run one forward pass
+
+    print("Checkpoint loaded. Grafting through the real production restore path...")
+
+    # 5b. Graft exactly as main_jax.py's real resume path does: walk a fresh
+    # model template and zero-pad/inject anything missing or shape-changed
+    # (own_state_dim 22 -> 29 among them), rather than applying raw params.
     rng = jax.random.PRNGKey(0)
     bsz = 2
     b_obs = jnp.zeros((bsz, obs_dim))
     b_carries = jnp.zeros((bsz, config["hidden_dim"]))
     r_carries = jnp.zeros((bsz, red_hidden_d))
+
+    b_template = unfreeze(init_agent_params(model, rng, b_carries, b_obs, config["n_layers"]))
+    src_b = unfreeze(source_dict["b_params"])
+    graft_missing_param_subtrees(src_b, b_template)
+    b_params = sanitize_agent_params(
+        ensure_aux_head_params(
+            model, freeze(src_b), rng, config["hidden_dim"],
+            obs_dim=obs_dim, n_layers=config["n_layers"],
+        )
+    )
+
+    r_template = unfreeze(init_predator_params(model_red, rng, r_carries, b_obs, config["n_layers"]))
+    src_r = unfreeze(source_dict["r_params"])
+    graft_missing_param_subtrees(src_r, r_template)
+    r_params = sanitize_agent_params(
+        ensure_predator_params(
+            model_red, freeze(src_r), rng, red_hidden_d,
+            obs_dim=obs_dim, n_layers=config["n_layers"],
+        )
+    )
     
     try:
         new_b_c, b_outs = model.apply(
