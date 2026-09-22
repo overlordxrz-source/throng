@@ -279,9 +279,83 @@ relaunch are now verified; launch is authorized:**
 **Relaunch gate, per Cam: "Once those three are done: launch, with Gate 0 armed from update
 one."** All three are done and verified above. **Launch is authorized.** Nothing past Gate 0 is
 assumed: "If per-capita deposit rate doesn't rise within 50 updates at N=1, agents can't learn
-one-body navigation and we stop there rather than spending on the rest." The actual Modal launch
-itself is the user's/M's to run — this agent has no Modal access (see `[Modal workflow]` in
-project memory) and pushes to git for that purpose, which is done (commit `d788804`, pushed).
+one-body navigation and we stop there rather than spending on the rest." **Correction:** this
+agent *did* have direct Modal CLI access earlier this project (installed in the project
+`.venv`), lost it to account exhaustion, and regained it the same day via a new token onto a
+genuinely fresh workspace (`agictrlone`, confirmed by M) — see below. "No Modal access" was
+true at the moment it was written, not a standing limitation; the lesson (check before
+asserting, don't assume from a prior session's summary) is logged, not just the correction.
+
+---
+
+## Status as of 2026-09-21 (later still) — fresh workspace laid out, hearth run launched
+
+**`agictrlone` is a genuinely empty new Modal workspace** — zero volumes, zero apps, ever,
+confirmed via `modal volume list`/`modal app list` before touching anything. Not a credential
+failure, not an exhausted-credits block on an existing account: access works, there was simply
+nothing in it yet. Laid out from scratch (Cam: "treat the empty workspace as a gift"), verified
+externally at every step, never assumed from a clean write return:
+
+- **`throng-runs` volume created.** Three directories, by design, never mixed:
+  - `checkpoints_hearth/` — the live run directory. Seeded with **2541 only** (byte-identical to
+    the already-verified copy in the migration bundle, diffed before upload), nothing else, ever
+    — no fossils, no diagnostics. This is the direct structural fix for the self-deleting-run
+    bug (instance 6): that bug came from a live directory containing something numerically
+    higher than the resume target; it cannot recur if this directory only ever holds this
+    lineage. Verified via `modal volume ls` before the fossils upload started: exactly one
+    checkpoint, full internal Orbax structure present (`manifest.ocdbt`, `_METADATA`,
+    `_sharding`, `array_metadatas`, `d/`), not truncated.
+  - `fossils/` — the six ladder checkpoints (2490, 2493, 2538, 2541, 2760, 2763), read-only
+    archive, never a run's target. Verified via `modal volume ls`: exactly these six, no more.
+  - `archive/` — the old pair-craft-world corpora and `train.log` (they document a mechanism
+    that no longer exists — record, not data). Verified via `modal volume ls --json` with file
+    sizes cross-checked against the local originals: `train.log` 785.0 KiB, `signal_corpus.jsonl`
+    935.9 MiB, `signal_corpus_red.jsonl` 1.8 GiB — all matched exactly.
+- **A real corpus-durability defect was found and fixed before launch, not after.** The corpus
+  writer's path was an unconditional relative `runs/{run_name}/...`, which resolves against the
+  container's own repo clone (`/root/throng`), not the mounted volume — unlike `checkpoint_dir`
+  and `train.log`, both explicitly rooted under `/mnt/throng-runs`. Corpus files would have
+  silently lived on ephemeral container disk, lost on any teardown, discovered only the next
+  time someone went looking for them — the exact failure class this project has been burned by
+  repeatedly, just never previously checked for the corpus specifically. Fixed: made
+  config-driven (`corpus_dir`/`corpus_filename`/`corpus_filename_red`);
+  `scripts/modal_train.py`'s `build_cfg()` now points it at the volume root with a name distinct
+  from the archived corpus by construction — `signal_corpus_hearth.jsonl` /
+  `signal_corpus_hearth_red.jsonl`, never appending to a file that has pair-craft-world records
+  in it, exactly as Cam asked ("we prevent it by construction"). `launch_id` (already landed)
+  remains the second line of defense.
+- **Preflight rescoped further**: `_tiny_cpu_smoke` now actually restores the resume checkpoint
+  through the real production grafting path (`graft_missing_param_subtrees` +
+  `ensure_aux_head_params`/`ensure_predator_params`, both teams) and asserts the post-graft
+  `emb_own` kernel shape is correct — not just that a restore call and a fossil guard evaluate
+  against a listed step number. Run against the real new volume before the GPU launch: **all
+  green** — SHA matched, volume mounted, `checkpoint_dir=/mnt/throng-runs/checkpoints_hearth`,
+  latest step 2541, fossil guard clear, restore-through-grafting OK for both teams
+  (`emb_own` kernel: `(29, 256)`, matching the padded shape exactly). No GPU billed for this
+  check.
+- **`test_checkpoint_compatibility` no longer left red in a green suite** — Cam: "a
+  permanently-red test in a green suite is not [fine]... the next real regression will hide
+  exactly there." Routed through the same production grafting path (both teams, matching what
+  `_tiny_cpu_smoke` now also does) instead of testing raw ungrafted params. Full local suite:
+  **111 passed, 0 failed, 56 skipped.**
+- **Launched.** `modal run --detach scripts/modal_app.py`, pinned commit `5514f02`
+  (`throng-runs`/`agictrlone`). **App ID: `ap-bwFwMjl8vGuMLONTSE27sq`.** Confirmed live in the
+  stream: resumed from step 2541 (`[JAX] Checkpoint on volume: latest PPO update = 2541`),
+  grafting fired identically to the CPU preflight (`emb_own/kernel` zero-padded 7 inputs,
+  `gwt_comms_1/kernel` zero-padded 7 inputs, `head_vqel_recon_2` zero-padded 7 outputs, VQ
+  codebook usage_ema/dead_streak reset to a clean 0 state for both teams), `obs_dim=2738`
+  (matching the 29-dim own_state layout), corpus writing to
+  `/mnt/throng-runs/signal_corpus_hearth.jsonl` and `..._red.jsonl` as intended,
+  `checkpoint_dir` listing `['2541']` only, hearths active at `stage=0/2 N=1` — Stage A, exactly
+  as verified pre-launch, not N=2. Training PPO updates 2541 → 5858 (env steps 1,300,992 →
+  3,000,000).
+- **Durability gate on the first checkpoint**: pending — checkpoint_interval is 2000 env steps
+  (~4 updates); the first save has not landed yet as of this entry. Will be reported once
+  confirmed via external `volume.listdir()`, per the existing `_commit_and_verify_durability`
+  mechanism (halts immediately if the write doesn't externally verify).
+- **Gate 0**: armed from update one, per Cam's instruction. Not yet evaluated — needs ~50
+  updates of real data before any per-capita deposit-rate trend can be read. Nothing past Gate 0
+  is assumed.
 
 ---
 
