@@ -1099,8 +1099,26 @@ def _run_simulation_impl(
         )
 
     run_name = config.get("run_name", "jax_run")
-    os.makedirs(f"runs/{run_name}", exist_ok=True)
-    
+    # 2026-09-21 (Will, self-caught while wiring the hearth relaunch):
+    # this used to be an unconditional f"runs/{run_name}" relative path.
+    # scripts/modal_app.py's train() and scripts/modal_train.py both chdir
+    # to the repo clone (/root/throng) before calling this function --
+    # checkpoint_dir and train.log are both explicitly rooted under the
+    # mounted volume (/mnt/throng-runs), but this relative path was not,
+    # so corpus files silently landed on the container's own ephemeral
+    # disk instead of the durable volume. Unlike checkpoints (whose
+    # durability is externally verified via volume.listdir() before any
+    # GPU-hours are trusted to a run), nothing was ever checking this for
+    # the corpus -- it would have been lost on any container teardown,
+    # discovered only the next time someone went looking for it. Now
+    # config-driven (corpus_dir), defaulting to the old relative behavior
+    # for local/test runs that don't set it; scripts/modal_train.py's
+    # build_cfg() sets it explicitly onto the volume for real launches.
+    _corpus_dir = config.get("corpus_dir", f"runs/{run_name}")
+    os.makedirs(_corpus_dir, exist_ok=True)
+    _corpus_filename = config.get("corpus_filename", "signal_corpus.jsonl")
+    _corpus_filename_red = config.get("corpus_filename_red", "signal_corpus_red.jsonl")
+
     # ── Init corpus writers ─────────────────────────────────
     _p12_early = config.get("phase12_coevolution") or {}
     _corpus_frac = float(config.get("corpus_sample_frac", 0.08))
@@ -1112,8 +1130,10 @@ def _run_simulation_impl(
     # append-only corpus, undetectable without a per-launch marker).
     _launch_id = uuid.uuid4().hex[:12]
     print(f"[JAX] launch_id={_launch_id} (tags every corpus record this process writes)", flush=True)
+    _corpus_path = os.path.join(_corpus_dir, _corpus_filename)
+    print(f"[JAX] corpus_path={_corpus_path}", flush=True)
     corpus_writer = SignalCorpusWriter(
-        path=f"runs/{run_name}/signal_corpus.jsonl",
+        path=_corpus_path,
         sample_frac=_corpus_frac,
         every_n_steps=_corpus_every,
         launch_id=_launch_id,
@@ -1130,14 +1150,15 @@ def _run_simulation_impl(
         )
     )
     if _red_corpus_enabled:
+        _corpus_path_red = os.path.join(_corpus_dir, _corpus_filename_red)
         corpus_writer_red = SignalCorpusWriter(
-            path=f"runs/{run_name}/signal_corpus_red.jsonl",
+            path=_corpus_path_red,
             sample_frac=_corpus_frac,
             every_n_steps=_corpus_every,
             launch_id=_launch_id,
         )
         print(
-            f"[JAX] Red corpus: signal_corpus_red.jsonl "
+            f"[JAX] Red corpus: {_corpus_path_red} "
             f"(hunter = blue_dist <= hunt_scout_range={_hunt_range})",
             flush=True,
         )

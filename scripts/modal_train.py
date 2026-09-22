@@ -48,15 +48,28 @@ def build_cfg() -> dict:
     """
     with open(REPO / "config.yaml") as f:
         cfg = yaml.safe_load(f)
-    # 2026-09-15 (Cam): checkpoints/ still holds a fossil (2862, from an
-    # abandoned lineage) that Orbax's max_to_keep retention would prune
-    # every new save against -- the actual mechanism behind two lost
-    # launches tonight (docs/THE-ECOLOGY-NEVER-RAN.md instance 6). New
-    # directory, new lineage, seeded with only the checkpoint we're
-    # actually resuming from (2541, restored from ~/throng_backup). The old
-    # checkpoints/ is left exactly as it was -- inert once nothing points
-    # at it, and 2862 is now evidence, not live state.
-    cfg["checkpoint_dir"] = "/mnt/throng-runs/checkpoints_r2541"
+    # 2026-09-21 (Hearths relaunch, Cam's volume layout): fresh, empty
+    # workspace laid out from scratch to avoid inheriting the fossil/
+    # self-deleting-run problems the pre-hearth checkpoints/ directory had
+    # (docs/THE-ECOLOGY-NEVER-RAN.md instance 6). checkpoints_hearth/ is
+    # the live run directory and holds ONLY the 2541 resume point, ever --
+    # no fossils, no diagnostics. fossils/ (the six ladder checkpoints) and
+    # archive/ (the old pair-craft-world corpora and train.log) are
+    # read-only, never the run's target.
+    cfg["checkpoint_dir"] = "/mnt/throng-runs/checkpoints_hearth"
+    # Corpus durability fix (2026-09-21, Will, self-caught): the default
+    # relative "runs/{run_name}" path resolves against the repo clone
+    # (/root/throng), not the mounted volume, so it was never actually
+    # durable -- see jax_sim/main_jax.py's corpus_dir comment. Written
+    # directly at the volume root (same level as train.log), with a
+    # filename distinct from the old signal_corpus.jsonl by construction --
+    # Cam: "we spent real effort measuring a contamination boundary after
+    # the fact; this time we prevent it by construction." This is also a
+    # brand-new, empty volume, so there is no pre-existing corpus/log to
+    # collide with regardless.
+    cfg["corpus_dir"] = "/mnt/throng-runs"
+    cfg["corpus_filename"] = "signal_corpus_hearth.jsonl"
+    cfg["corpus_filename_red"] = "signal_corpus_hearth_red.jsonl"
     return cfg
 
 

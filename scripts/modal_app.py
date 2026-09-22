@@ -112,14 +112,19 @@ image = (
 def _tiny_cpu_smoke() -> str:
     """CPU pre-flight, rescoped 2026-09-20 (Cam) to what it can actually
     verify cheaply, so it can run before every launch with no exceptions.
+    Rescoped again 2026-09-21 (hearths) to also restore the resume
+    checkpoint through the real production grafting path.
 
     Proves: the image builds, the volume mounts, the repo clones at the
-    pinned SHA, build_cfg() loads, and -- the part that matters most,
-    because it's the exact class of thing that has actually broken this
-    session -- the checkpoint restores and the fossil guard evaluates
-    against the REAL checkpoint_dir on the REAL volume, using the same
-    CheckpointManager construction and the same find_fossil_checkpoints()
-    call main_jax.py uses for the real launch.
+    pinned SHA, build_cfg() loads, the fossil guard evaluates against the
+    REAL checkpoint_dir on the REAL volume (same CheckpointManager
+    construction and find_fossil_checkpoints() call main_jax.py uses), and
+    -- new for the hearth relaunch, since own_state_dim 22 -> 29 is exactly
+    the class of shape mismatch a listdir-only check can't catch -- the
+    resume checkpoint actually restores through graft_missing_param_
+    subtrees + ensure_aux_head_params/ensure_predator_params (both teams)
+    and produces the expected post-graft shape, not just that the restore
+    call doesn't raise.
 
     Deliberately does NOT run any training-loop logic (no rollout, no PPO
     update, no tripwire, no comms-freeze/warmup/dead-code-reset dynamics).
@@ -189,6 +194,101 @@ def _tiny_cpu_smoke() -> str:
                 f"on 2026-09-15 (docs/THE-ECOLOGY-NEVER-RAN.md instance 6)."
             )
         print(f"[preflight] fossil guard OK -- no checkpoint ahead of resume target {resume_target}", flush=True)
+
+        # 2026-09-21 (Cam, hearth relaunch): rescoped further to actually
+        # restore the resume checkpoint through the real production
+        # grafting path (graft_missing_param_subtrees + ensure_aux_head_
+        # params/ensure_predator_params) -- not just list its step number.
+        # own_state_dim changed 22 -> 29 for hearths; this is exactly the
+        # class of shape mismatch a listdir-only check can't catch, and
+        # it's cheap (CPU, no rollout) to verify before paying for a GPU.
+        from jax.sharding import SingleDeviceSharding
+        from flax.core import freeze, unfreeze
+        import jax as _jax
+        import jax.numpy as _jnp
+        from jax_sim.network_jax import (
+            AgentNetworkJax, PredatorNetworkJax,
+            init_agent_params, init_predator_params,
+            ensure_aux_head_params, ensure_predator_params,
+            graft_missing_param_subtrees, sanitize_agent_params,
+        )
+        from jax_sim.obs_layout import make_obs_layout
+        from jax_sim.main_jax import _normalize_config
+
+        _cfg = _normalize_config(cfg)
+        _layout = make_obs_layout(
+            signal_dim=_cfg["signal_dim"], symbol_dim=_cfg["symbol_dim"],
+            memory_slots=_cfg.get("memory_slots", 0), neighbor_k=_cfg["neighbor_k"],
+            local_cells=(2 * _cfg["local_obs_radius"] + 1) ** 2,
+            env_channels=int(_cfg.get("env_channels", 15)),
+            own_state_dim=int(_cfg.get("own_state_dim", 29)),
+        )
+        _obs_dim = _layout.total_dim
+        _model = AgentNetworkJax(
+            hidden_dim=_cfg["hidden_dim"], n_heads=_cfg["n_heads"], n_layers=_cfg["n_layers"],
+            obs_dim=_obs_dim, signal_dim=_cfg["signal_dim"], symbol_dim=_cfg["symbol_dim"],
+            vocab_size=_cfg["vocab_size"], vq_beta=float(_cfg.get("vq_beta", 0.25)),
+            vq_dead_code_reset=bool(_cfg.get("vq_dead_code_reset", True)),
+            memory_slots=_cfg.get("memory_slots", 0),
+            fwd_env_dim=_layout.loc_env_end - _layout.loc_env_start,
+            cross_attn_enabled=bool((_cfg.get("phase9_canvas") or {}).get("cross_attn_enabled", False)),
+            cross_attn_num_heads=int((_cfg.get("phase9_canvas") or {}).get("cross_attn_num_heads", _cfg["n_heads"])),
+            env_channels=int(_cfg.get("env_channels", 15)), own_state_dim=int(_cfg.get("own_state_dim", 29)),
+            n_actions=int(_cfg.get("n_actions", 8)),
+            local_cells=(2 * _cfg["local_obs_radius"] + 1) ** 2, neighbor_k=_cfg["neighbor_k"],
+        )
+        _p12 = _cfg.get("phase12_red") or {}
+        _red_hidden = _cfg.get("red_hidden_dim", _cfg["hidden_dim"])
+        _model_red = PredatorNetworkJax(
+            hidden_dim=_red_hidden, neighbor_k=_cfg["neighbor_k"], local_obs_radius=_cfg["local_obs_radius"],
+            n_heads=_cfg["n_heads"], n_layers=_cfg["n_layers"], signal_dim=_cfg["signal_dim"],
+            symbol_dim=_cfg["symbol_dim"], vocab_size=int(_p12.get("red_vocab_size", _cfg.get("vocab_size", 64))),
+            vq_beta=float(_cfg.get("vq_beta", 0.25)), vq_dead_code_reset=bool(_cfg.get("vq_dead_code_reset", True)),
+            memory_slots=_cfg.get("memory_slots", 0),
+            cross_attn_enabled=bool(_p12.get("red_cross_attn_enabled", True)),
+            cross_attn_num_heads=int((_cfg.get("phase9_canvas") or {}).get("cross_attn_num_heads", _cfg["n_heads"])),
+            env_channels=int(_cfg.get("env_channels", 15)), own_state_dim=int(_cfg.get("own_state_dim", 29)),
+            n_actions=int(_cfg.get("n_actions", 8)),
+        )
+
+        _cpu = _jax.devices("cpu")[0]
+        _meta = mngr.item_metadata(resume_target)
+        _target = _jax.tree_util.tree_map(
+            lambda leaf: _jax.ShapeDtypeStruct(leaf.shape, leaf.dtype, sharding=SingleDeviceSharding(_cpu)),
+            _meta, is_leaf=lambda x: hasattr(x, "shape"),
+        )
+        _raw = mngr.restore(resume_target, args=ocp.args.StandardRestore(_target))
+        _source = unfreeze(_raw)
+
+        _rng = _jax.random.PRNGKey(0)
+        _dummy_carry = _jnp.zeros((2, _cfg["hidden_dim"]))
+        _dummy_obs = _jnp.zeros((2, _obs_dim))
+        _b_template = unfreeze(init_agent_params(_model, _rng, _dummy_carry, _dummy_obs, _cfg["n_layers"]))
+        _src_b = unfreeze(_source["b_params"])
+        graft_missing_param_subtrees(_src_b, _b_template)
+        _b_params = sanitize_agent_params(
+            ensure_aux_head_params(_model, freeze(_src_b), _rng, _cfg["hidden_dim"], obs_dim=_obs_dim, n_layers=_cfg["n_layers"])
+        )
+        _dummy_carry_r = _jnp.zeros((2, _red_hidden))
+        _r_template = unfreeze(init_predator_params(_model_red, _rng, _dummy_carry_r, _dummy_obs, _cfg["n_layers"]))
+        _src_r = unfreeze(_source["r_params"])
+        graft_missing_param_subtrees(_src_r, _r_template)
+        _r_params = sanitize_agent_params(
+            ensure_predator_params(_model_red, freeze(_src_r), _rng, _red_hidden, obs_dim=_obs_dim, n_layers=_cfg["n_layers"])
+        )
+        # Confirms the graft itself produced the right final shape (not just
+        # that it ran without raising) -- the exact silent-lobotomy failure
+        # mode Cam flagged would otherwise pass this check.
+        _emb_kernel_shape = unfreeze(_b_params)["emb_own"]["kernel"].shape
+        assert _emb_kernel_shape == (int(_cfg.get("own_state_dim", 29)), _cfg["hidden_dim"]), (
+            f"[preflight] grafted emb_own kernel shape {_emb_kernel_shape} does not match "
+            f"expected ({_cfg.get('own_state_dim', 29)}, {_cfg['hidden_dim']}) -- the pad is wrong"
+        )
+        print(
+            f"[preflight] restore-through-grafting OK for both teams at step {resume_target} "
+            f"(emb_own kernel: {_emb_kernel_shape})",
+            flush=True,
+        )
     else:
         print("[preflight] no checkpoint present yet (fresh start) -- fossil guard not applicable", flush=True)
 
