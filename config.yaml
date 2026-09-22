@@ -196,6 +196,14 @@ resource_decay: 0.05                 # how much resource depletes per consumptio
 reward_hearth_deposit: 0.3
 reward_hearth_completion: 2.4
 hearth_decay_half_life_steps: 200   # Cam's number: "roughly 200"
+# 2026-09-22 (Cam, first real-run data): radius=0 (single tile) measured
+# flat mean-distance-to-nearest-hearth at the random-walk expectation for
+# the entire first run and attempts ~4x below the real chance baseline
+# (z~-7) -- too sparse to bootstrap from. radius=3 widens each hearth to a
+# 7x7 region (49 cells x 4 hearths = 196 of 16,384 cells, P=0.0120/step vs
+# 0.0244% at radius=0 -- ~fiftyfold). Same fixed centers, same curriculum,
+# same reward math -- only the encounter geometry changes.
+hearth_radius: 3
 hearth_informed_nearby_radius: 5        # Gate 2 control: "was an informed agent nearby"
 hearth_informed_nearby_recent_steps: 50  # ...and how recently counts as "recently"
 hearth_channel_ablation_enabled: false  # Gate 2 control: zero the wire, see if accuracy falls

@@ -649,6 +649,8 @@ def resolve_hearth_deposits(
     hearth_n_required: jnp.ndarray,  # scalar int, current curriculum stage's N
     decay_factor: jnp.ndarray,      # scalar float, per-step multiplicative decay
     reroll_key: jnp.ndarray,
+    grid_size: int = 128,
+    hearth_radius: int = 0,
 ) -> Dict[str, jnp.ndarray]:
     """One resolution step for all four hearths at once.
 
@@ -664,6 +666,19 @@ def resolve_hearth_deposits(
     cycle -- fill and credit both reset to exactly 0 on completion -- a
     deliberate simplification, not a bug: it only discards a same-step
     excess, never a legitimate contribution counted once.
+
+    hearth_radius (Cam, 2026-09-22, first real-run data): 0 (default) keeps
+    the original single-tile hearth -- P(on hearth) = H/grid_size^2 under a
+    random walk. The first hearth relaunch measured mean distance-to-
+    nearest-hearth flat at exactly the random-walk expectation for the
+    entire run (n=178,063 agent-step observations, 50 updates, zero
+    detectable approach learning) and total attempts running ~4x *below*
+    the chance baseline computed from the same real data (z~-7) --
+    confirming a single tile is too sparse an encounter rate to bootstrap
+    from at all, not merely slow. hearth_radius>0 makes each hearth a
+    (2*hearth_radius+1)^2 Chebyshev-distance region around its fixed
+    center instead of one cell -- same fixed positions, same curriculum,
+    same reward math, only the encounter geometry changes.
     """
     H = hearth_positions.shape[0]
     N = positions.shape[0]
@@ -676,11 +691,20 @@ def resolve_hearth_deposits(
         jnp.where(inv_vine > 0, 4, -1)))),
     )  # (N,) int32, -1 = empty-handed
 
-    on_hearth_mask = jnp.all(
-        positions[:, None, :] == hearth_positions[None, :, :], axis=-1
-    )  # (N, H)
+    _dx = jnp.abs(positions[:, None, 0] - hearth_positions[None, :, 0])
+    _dy = jnp.abs(positions[:, None, 1] - hearth_positions[None, :, 1])
+    _dx = jnp.minimum(_dx, grid_size - _dx)
+    _dy = jnp.minimum(_dy, grid_size - _dy)
+    _hearth_cheb_dist = jnp.maximum(_dx, _dy)  # (N, H), toroidal Chebyshev distance
+    on_hearth_mask = _hearth_cheb_dist <= hearth_radius  # (N, H); radius=0 == exact-tile match
     any_hearth = jnp.any(on_hearth_mask, axis=1)          # (N,)
-    agent_hearth_idx = jnp.argmax(on_hearth_mask, axis=1)  # (N,), garbage where ~any_hearth
+    # When a region is wide enough for two hearths' footprints to overlap
+    # (not the case at radius=3 on a 128-grid with quadrant-center hearths,
+    # but guarded generally): nearest hearth wins ties, matching the single
+    # "the" hearth an agent is "at" that deposits/credit/reward assume.
+    agent_hearth_idx = jnp.argmin(
+        jnp.where(on_hearth_mask, _hearth_cheb_dist, grid_size), axis=1
+    )  # (N,), garbage where ~any_hearth
 
     attempted = is_craft & any_hearth & (held_material >= 0)  # a real material guess at a hearth
     hearth_need_at_agent = hearth_need[agent_hearth_idx]

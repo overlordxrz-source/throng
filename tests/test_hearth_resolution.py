@@ -275,6 +275,64 @@ def test_max_pop_population_shape_runs_clean():
     assert bool(out["completed"][0])
 
 
+def test_hearth_radius_widens_the_footprint_without_changing_reward_math():
+    """Cam, 2026-09-22: radius=0 (default) is the single-tile hearth; a
+    wider radius must accept a deposit from anywhere within Chebyshev
+    distance, deposit/completion math otherwise unchanged."""
+    hearth_positions, hearth_need, hearth_fill, hearth_credit = _fresh_hearth_state(n := 1)
+    # 2 tiles away from hearth 0 (32,32) -- inside radius=3, outside radius=0/1.
+    positions = jnp.array([[34, 34]])
+    is_craft = jnp.array([True])
+    inv_wood, inv_stone, inv_flint, inv_clay, inv_vine = _inv(n, wood=[1])
+
+    out_r0 = resolve_hearth_deposits(
+        positions, is_craft, inv_wood, inv_stone, inv_flint, inv_clay, inv_vine,
+        hearth_positions, hearth_need, hearth_fill, hearth_credit,
+        hearth_n_required=jnp.array(1), decay_factor=jnp.array(0.99),
+        reroll_key=jax.random.PRNGKey(0), grid_size=GRID_SIZE, hearth_radius=0,
+    )
+    assert not bool(out_r0["attempted"][0]), "2 tiles away must miss at radius=0"
+
+    out_r3 = resolve_hearth_deposits(
+        positions, is_craft, inv_wood, inv_stone, inv_flint, inv_clay, inv_vine,
+        hearth_positions, hearth_need, hearth_fill, hearth_credit,
+        hearth_n_required=jnp.array(1), decay_factor=jnp.array(0.99),
+        reroll_key=jax.random.PRNGKey(0), grid_size=GRID_SIZE, hearth_radius=3,
+    )
+    assert bool(out_r3["deposited"][0]), "2 tiles away must hit at radius=3 (7x7 footprint)"
+    assert bool(out_r3["completed"][0])
+    assert float(out_r3["completion_share"][0, 0]) == 1.0
+
+    out_r3_far = resolve_hearth_deposits(
+        jnp.array([[38, 38]]), is_craft, inv_wood, inv_stone, inv_flint, inv_clay, inv_vine,
+        hearth_positions, hearth_need, hearth_fill, hearth_credit,
+        hearth_n_required=jnp.array(1), decay_factor=jnp.array(0.99),
+        reroll_key=jax.random.PRNGKey(0), grid_size=GRID_SIZE, hearth_radius=3,
+    )
+    assert not bool(out_r3_far["attempted"][0]), "6 tiles away must still miss at radius=3"
+
+
+def test_hearth_radius_toroidal_wrap():
+    """The radius check must wrap the torus, same as every other distance
+    check in this codebase -- an agent just past the grid edge from a
+    hearth near the opposite edge should still be in range."""
+    hearth_positions = jnp.array([[0, 0], [0, 96], [96, 0], [96, 96]])
+    hearth_need = jnp.zeros((4,), dtype=jnp.int32)
+    hearth_fill = jnp.zeros((4,), dtype=jnp.float32)
+    hearth_credit = jnp.zeros((4, 1), dtype=jnp.float32)
+    positions = jnp.array([[126, 2]])  # 2 tiles from (0,0) the wrapped way
+    is_craft = jnp.array([True])
+    inv_wood, inv_stone, inv_flint, inv_clay, inv_vine = _inv(1, wood=[1])
+
+    out = resolve_hearth_deposits(
+        positions, is_craft, inv_wood, inv_stone, inv_flint, inv_clay, inv_vine,
+        hearth_positions, hearth_need, hearth_fill, hearth_credit,
+        hearth_n_required=jnp.array(1), decay_factor=jnp.array(0.99),
+        reroll_key=jax.random.PRNGKey(0), grid_size=GRID_SIZE, hearth_radius=3,
+    )
+    assert bool(out["deposited"][0]), "toroidal wrap must put this agent in range of hearth (0,0)"
+
+
 if __name__ == "__main__":
     test_hearth_positions_are_one_per_quadrant_and_deterministic()
     test_solo_deposit_completes_a_stage0_n1_hearth()
@@ -287,6 +345,8 @@ if __name__ == "__main__":
     test_off_hearth_craft_is_neither_attempt_nor_deposit()
     test_need_rerolls_only_the_completed_hearth()
     test_max_pop_population_shape_runs_clean()
+    test_hearth_radius_widens_the_footprint_without_changing_reward_math()
+    test_hearth_radius_toroidal_wrap()
     print(
         "OK: resolve_hearth_deposits() -- solo N=1 bootstrap completes alone; N=2 needs two "
         "deposits, same-step or across steps before decay wins; decay can prevent completion; "
