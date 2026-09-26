@@ -938,6 +938,70 @@ not a detail of the hearth redesign.
 
 ---
 
+## 11. Tripwire streaks survived a change of world — the widened-hearth relaunch measured nothing
+
+**Introduced:** with training_state persistence of the comms-freeze tripwires (2026-09-14 onward).
+Every streak and C₀ capture restored unconditionally, whatever had changed in the world since.
+
+**Effect:** 2026-09-22 04:26 EDT. The PRESSURE counter reached 11 under single-tile hearths, carried
+into a relaunch with 49× the hearth area, and re-fired on the first update — before the new geometry
+could show anything. One launch spent, zero information about the widened hearth.
+
+**Fix:** an ecology fingerprint in training_state; any world-defining difference (or a checkpoint
+without one) resets every tripwire streak and C₀ capture and names each changed field. It also
+restarts the hearth ramp at stage 0: checkpoint 2591's stage 1 came from a hard escape at 0/188
+deposits, not from learning, and keeping it would have tested the 7×7 hearth under N=2 with no solo
+bootstrap. Proven end to end through the real save/restore. Full rule and caveats:
+`RESEARCH_PROTOCOL.md` Part 2.
+
+**How it was found:** Cam, from the halted run's log: "a streak counter is only meaningful within
+the regime it accumulated in" — the C₀-across-a-regime-change error, one level up.
+
+---
+
+## 12. The durability gate cried wolf — and had a latent hole that would have passed a half-written save
+
+**Introduced:** the false positive, with the emergency tripwire save (saved at `ui`, the step
+being processed, not `ui + 1` like the periodic save — so the first update after a resume
+re-targeted the step just resumed from). The hole, with the gate itself (2026-09-15): an orphaned
+Orbax tmp dir counted as a "new entry," so a write that started and never finished would have been
+reported VERIFIED.
+
+**Effect:** one false FATAL (2026-09-22 04:26 EDT; checkpoint 2591 verified intact afterward —
+mtime unchanged, no tmp dir, `_METADATA` parses). The hole never fired, but it sat under the one
+check whose whole job is catching silent checkpoint loss.
+
+**Fix:** emergency save targets `ui + 1`; both save sites report `save()`'s own return value
+instead of printing "saved" unconditionally, and pass it to the gate; the gate — extracted to
+`scripts/durability_gate.py` and tested branch by branch against a fake volume — treats "no write
+attempted" as neither FATAL nor verified, keeps "a write performed and nothing visible" FATAL with
+or without a tmp dir, and never counts a tmp dir as a checkpoint.
+
+**How it was found:** Cam predicted the false positive's mechanism from the log alone and named the
+cheap check (mtime + tmp); both confirmed it. A first draft of the fix softened "no new entry, no
+tmp" to a warning — which would have waved through both real historical losses (instances 5 and 6
+left no tmp dir) — caught in review before landing. The tmp hole surfaced while writing the test
+for that branch.
+
+---
+
+## Status as of 2026-09-26 — Gate 0 decided offline; both fixes landed; ready to relaunch
+
+- **Gate 0 FAILED, unconfounded, decided from the corpus already paid for (zero GPU).** Distance to
+  the nearest hearth sat flat at the exact random-walk expectation for all 50 updates of the
+  single-tile run (21.20 vs 21.336; slope +0.008/update). Attempts were 4× *below* chance (21 vs
+  85.7 expected; z=−6.99). Population never pinned at the floor (148–200, at or below 150 on 1
+  update of 50) and energy never fell below 0.35 — a stressed but functioning population that never
+  oriented on hearths, not a dying one. Per the pre-registered rule, **widening is justified**:
+  relaunch with `hearth_radius: 3`. Full numbers: `RESEARCH_PROTOCOL.md` Part 2.
+- **Instances 11 and 12 fixed** (above). Relaunching from 2591: its checkpoint predates the
+  fingerprint, so tripwire state and the hearth ramp both reset on resume by design. The widened
+  hearth gets a clean stage-0 window of its own (40-update hard escape, comms frozen), not an
+  inherited counter or an unearned N=2.
+- The Modal workspace (`agictrlone`) is now shared with other projects — budget accordingly.
+
+---
+
 *(Log format: mechanism, when it was introduced not-actually-working, when
 it was fixed, how long the gap was, what it plausibly cost, and how it was
 found. Append new confirmed instances below this line — suspicions belong in

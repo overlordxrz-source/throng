@@ -326,6 +326,68 @@ more expensive, because it produces publishable-looking nulls.
   comms freeze/unfreeze plus the Adam-spring defusal survived the `HEARTH_RAMP_STAGE_N` rename
   intact — see `THE-ECOLOGY-NEVER-RAN.md`'s 2026-09-21 (later) status entry for the full
   verification. **Launch is authorized**, Gate 0 armed from update one, nothing past it assumed.
+  **Gate 0 verdict (2026-09-22, decided offline from the corpus already paid for — zero GPU):
+  FAILED, unconfounded.** Single-tile run, ppo 2542–2591 (50 updates — exactly the Gate 0
+  window), corpus scoped to one `launch_id` (`2a5d48f7405f`, no contamination). Mean distance
+  from each living blue to its nearest hearth: flat at the random-walk expectation the whole
+  run — 21.20 overall vs an exact expectation of 21.336 (computed over every cell, not
+  sampled); first-5-update mean 21.30, last-5 21.37; slope +0.008/update. n≈3,600 agent-steps
+  per update, so this is a measurement, not a guess: they never oriented on hearths at all.
+  Attempts vs chance, computed from measured inputs (mean living pop 189.5, P(CRAFT)=7.24%,
+  P(on a single tile)=4/16384): expected 1.71/rollout, 85.7 over 50 updates; observed 21
+  (0.42/rollout), z=−6.99 — well *below* chance, not near it. (Cam's hand estimate was
+  2.4 expected vs 0.86 observed; corrected by the real P(CRAFT) and population, same
+  direction, larger gap.) Starvation confound checked and ruled out: living blue ranged
+  148–200 (mean 189.5), at or below the 150 floor on 1 update of 50, never 2 in a row; energy
+  0.410–0.546, never below 0.35. The registered starvation halt never fired — the run stopped on
+  the PRESSURE tripwire (zero deposits for 11 straight stage-1 updates), not on starvation. A
+  stressed but functioning population that didn't learn — not a dying one. **Decision rule
+  applied as pre-registered: distance flat → widening is justified; relaunch with the 7×7
+  hearth (`hearth_radius: 3`).**
+- **A streak counter, or a baseline, is only meaningful within the regime it accumulated in.**
+  Same class of error as capturing C₀ across a regime change, one level up. **Confirmed
+  instance (2026-09-22, Cam's diagnosis):** the PRESSURE counter reached 11 under single-tile
+  hearths, the checkpoint carried it into a relaunch with 49× the hearth area, and it re-fired
+  on the very first update — before the new geometry could show anything either way. The run
+  measured nothing, and cost a launch. **Rule:** training_state carries an *ecology
+  fingerprint* — a fixed-order vector of the config values that define the world agents live in
+  (`jax_sim/main_jax.py`'s `ecology_fingerprint_vector`: hearth radius, curriculum N schedule,
+  hearth rewards and decay, catch radius, coop threshold, catch rewards). On resume, any
+  difference — or a checkpoint that predates the fingerprint — resets every comms-freeze
+  tripwire streak and every C₀ capture, and prints each changed field by name
+  (`[ECOLOGY-FINGERPRINT] hearth_radius: 0.0 -> 3.0`). Keys that only describe how fast we get
+  there (learning rate, batch size) are deliberately excluded, so tuning doesn't reset the
+  instruments. **The hearth ramp restarts at stage 0 as well** (decided 2026-09-26). An earlier
+  draft kept the stage on the grounds that it's "what the population learned." For checkpoint
+  2591 that was false: it sat at stage 1 only because the stage-0 hard escape fired at 0/188
+  deposits (`train.log`, ppo 2581). Resuming the 7×7 hearth there would have tested it under
+  N=2 with no solo bootstrap, confounding geometry with coordination. A stage reached under
+  the old world is not evidence under the new one. A population that genuinely learned
+  re-clears stage 0 in a few updates (floor + 3-update bar), so the reset is cheap when
+  unneeded. Comms re-freeze follows from the stage; the red ramp is untouched. Proven end to end through the
+  real Orbax save/restore (fresh → radius changed → reset and named; same world → restored
+  as-is), and pinned in `tests/test_ecology_fingerprint.py` — including the float32
+  round-trip case, caught in review before landing: training_state stores the vector at
+  float32, so comparing against a fresh float64 vector would have flagged 0.3 → 0.30000001 as a
+  world change on *every* resume, making the safeguard cry wolf permanently.
+- **A gate that cries wolf will eventually be ignored — and the fix for a false positive must
+  not create a false negative.** **Confirmed instance (2026-09-22):** the widened-hearth
+  relaunch resumed at 2591 and halted on its first update; the emergency save re-targeted 2591
+  (it saved at `ui`, not `ui + 1` like the periodic save), Orbax declined — verified on the
+  installed version: `save()` to an existing step returns `False`, no exception, mtime
+  unchanged — and the durability gate called "nothing new appeared" a FATAL. On the volume:
+  `checkpoints_hearth/2591` mtime unchanged at its original 02:49 save, no orphaned
+  `*.orbax-checkpoint-tmp-*`, `_METADATA` downloaded and parses. Nothing was lost. Fixed at
+  three layers: (1) the emergency save targets `ui + 1`; (2) both save sites check `save()`'s
+  own return value instead of printing "saved" unconditionally, and pass it to the gate;
+  (3) the gate (extracted to `scripts/durability_gate.py`, so every branch is tested against a
+  fake volume rather than first exercised on a paid run) treats "no write attempted" as neither
+  FATAL nor verified. **Two traps found in review, both now pinned in
+  `tests/test_durability_gate.py`:** a first draft softened "no new entry and no tmp dir" to a
+  warning — which would have waved through both real historical losses (the 7.5-hour run and
+  instance 6), neither of which left a tmp dir. And writing the tmp test exposed a hole that
+  predated today: the gate counted an orphaned tmp dir as a "new entry," so a write that
+  started and never finished would have been reported as durability VERIFIED. Both closed.
 
 ## Part 3 — Fossils
 

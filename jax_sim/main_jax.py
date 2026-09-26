@@ -236,6 +236,69 @@ def find_fossil_checkpoints(ckpt_mngr, resume_target: int) -> list:
     return [s for s in all_steps if s > resume_target]
 
 
+ECOLOGY_FINGERPRINT_LABELS = (
+    "hearth_radius", "hearth_ramp_n_len",
+    "hearth_ramp_n_0", "hearth_ramp_n_1", "hearth_ramp_n_2", "hearth_ramp_n_3", "hearth_ramp_n_4",
+    "reward_hearth_deposit", "reward_hearth_completion", "hearth_decay_half_life_steps",
+    "red_catch_radius", "coop_threshold_step",
+    "reward_big_green_success", "reward_big_green_solo_penalty", "reward_small_blue", "r_coord",
+)
+
+
+def ecology_fingerprint_vector(config: Dict, hearth_ramp_stage_n) -> np.ndarray:
+    """STRUCTURAL SAFEGUARD (2026-09-22, Cam's instruction): "a streak
+    counter is only meaningful within the regime it accumulated in" --
+    the same class of error as capturing C0 across a regime change. A
+    fixed-order numeric snapshot of the config keys that define the
+    world an agent is actually living in (hearth radius, curriculum N
+    schedule, reward scale, catch params) -- NOT the keys that only
+    describe how fast we're willing to get there (learning rates, batch
+    sizes, etc). Padded to a fixed length (5 curriculum-stage slots, -1
+    sentinel for unused) so the vector shape never depends on how many
+    stages HEARTH_RAMP_STAGE_N happens to have, matching every other
+    fixed-shape convention this training_state already relies on.
+    Compared element-wise on resume (see the restore block below) rather
+    than hashed, so a mismatch can be reported by name, not just "changed".
+    """
+    p16 = config.get("phase16_combinatorial_syntax", {})
+    n_stages = list(hearth_ramp_stage_n)[:5]
+    n_padded = n_stages + [-1] * (5 - len(n_stages))
+    vals = [
+        float(config.get("hearth_radius", 0)),
+        float(len(hearth_ramp_stage_n)),
+        *[float(v) for v in n_padded],
+        float(config.get("reward_hearth_deposit", 0.3)),
+        float(config.get("reward_hearth_completion", 2.4)),
+        float(config.get("hearth_decay_half_life_steps", 200)),
+        float(config.get("red_catch_radius", 1)),
+        float(p16.get("coop_threshold_step", 100000)),
+        float(p16.get("reward_big_green_success", 8.0)),
+        float(p16.get("reward_big_green_solo_penalty", -1.0)),
+        float(p16.get("reward_small_blue", 3.0)),
+        float(p16.get("r_coord", 1.5)),
+    ]
+    assert len(vals) == len(ECOLOGY_FINGERPRINT_LABELS)
+    return np.asarray(vals, dtype=np.float64)
+
+
+def ecology_fingerprint_diff(old: np.ndarray, new: np.ndarray) -> list:
+    """Named (label, old, new) triples for every element that differs.
+    Empty list means the two fingerprints describe the same world.
+
+    Compared at float32 -- the precision training_state stores it at.
+    Comparing a float32 round-trip against a fresh float64 vector would flag
+    any non-dyadic value (0.3 -> 0.30000001192...) as "changed" on every
+    single resume, making the safeguard cry wolf permanently.
+    """
+    old32 = np.asarray(old, dtype=np.float32)
+    new32 = np.asarray(new, dtype=np.float32)
+    out = []
+    for label, o, n in zip(ECOLOGY_FINGERPRINT_LABELS, old32, new32):
+        if o != n:
+            out.append((label, float(o), float(n)))
+    return out
+
+
 # ── Rollout → CPU (free GPU before PPO backward) ───────────────────────────
 
 def _rollout_to_cpu(rollout_data: Dict) -> Dict:
@@ -2085,6 +2148,11 @@ def _run_simulation_impl(
     # ladder, which used a different batch and isn't comparable in
     # absolute scale. All of this persists across resumes so a crash
     # mid-search or mid-stage-0 doesn't restart C0 collection.
+    # 2026-09-22 (Cam): ecology fingerprint -- see ecology_fingerprint_vector's
+    # docstring. Computed once, up front, in THIS function's scope, so the
+    # restore-time comparison below and both training_state saves (periodic +
+    # tripwire-halt) use the exact same snapshot of "what world is this."
+    _ecology_fp_current = ecology_fingerprint_vector(config, HEARTH_RAMP_STAGE_N)
     comms_updates_since_resume = 0   # counts qualifying updates since THIS resume
     comms_sample_history = []        # list of (u0,u1,u2) per-slot codes_active, one per update, index 0 = update 1
     comms_c0_stage0 = None                  # (u0, u1, u2) per-slot median, stage-0 (frozen-channel) baseline
@@ -2183,6 +2251,74 @@ def _run_simulation_impl(
             if _tw_c0_stage1_restored is not None:
                 _tw_c0_stage1_vals = [float(x) for x in np.asarray(_tw_c0_stage1_restored).tolist()]
                 comms_c0_stage1 = None if any(x < 0 for x in _tw_c0_stage1_vals) else tuple(_tw_c0_stage1_vals)
+
+            # STRUCTURAL SAFEGUARD (2026-09-22, Cam's instruction): "a streak
+            # counter is only meaningful within the regime it accumulated
+            # in" -- the same class of error as capturing C0 across a
+            # regime change. The PRESSURE tripwire re-fired on the very
+            # first update of the widened-hearth relaunch because its
+            # counter (11, accumulated entirely under the single-tile
+            # world) carried straight into a run with 49x the hearth area,
+            # where it takes ~1 update to prove nothing about whether the
+            # NEW geometry can bootstrap. A checkpoint saved before this
+            # fix has no "ecology_fingerprint" key at all -- treated as a
+            # mismatch (unknown regime), not silently assumed compatible.
+            _ecology_fp_restored = _restored_training_state.get("ecology_fingerprint", None)
+            _ecology_fp_diff = None
+            if _ecology_fp_restored is None:
+                _ecology_fp_diff = [("(no fingerprint on this checkpoint -- predates this safeguard)", 0.0, 0.0)]
+            else:
+                _ecology_fp_restored_arr = np.asarray(_ecology_fp_restored, dtype=np.float64)
+                _ecology_fp_diff = ecology_fingerprint_diff(_ecology_fp_restored_arr, _ecology_fp_current)
+            if _ecology_fp_diff:
+                print(
+                    f"[ECOLOGY-FINGERPRINT] World changed since this checkpoint was saved -- "
+                    f"resetting every comms-freeze tripwire streak and C0 capture, not "
+                    f"carrying stale measurements across a regime change:",
+                    flush=True,
+                )
+                for _label, _old, _new in _ecology_fp_diff:
+                    print(f"[ECOLOGY-FINGERPRINT]   {_label}: {_old} -> {_new}", flush=True)
+                comms_updates_since_resume = 0
+                comms_sample_history = []
+                comms_c0_stage0 = None
+                comms_c0_stage0_captured_at_update = 0
+                comms_fast_streak = [0, 0, 0]
+                comms_drift_streak = [0, 0, 0]
+                comms_floor_streak = [0, 0, 0]
+                comms_stage1_updates_elapsed = 0
+                comms_stage1_deposit_seen = False
+                comms_stage1_c0_search_active = False
+                comms_stage1_c0_search_updates = 0
+                comms_stage1_sample_history = []
+                comms_c0_stage1 = None
+                comms_c0_stage1_captured_at_update = 0
+                # 2026-09-26: the hearth ramp restarts at stage 0 too. A stage
+                # reached under the old world isn't evidence of anything under
+                # the new one -- checkpoint 2591 sat at stage 1 only because the
+                # stage-0 hard escape fired at 0/188 deposits (train.log, ppo
+                # 2581), so resuming the 7x7 hearth there would have tested it
+                # under N=2 with no solo bootstrap, confounding geometry with
+                # coordination. A population that genuinely learned re-clears
+                # stage 0 in a few updates (floor + 3-update bar), so the reset
+                # is cheap when unneeded. Comms re-freeze follows automatically
+                # (_freeze_comms is derived from the live stage). The red ramp
+                # is untouched: nothing in the fingerprint is red's to relearn
+                # except catch params, and red's clock isn't a hearth measurement.
+                if craft_ramp_enabled:
+                    print(
+                        f"[ECOLOGY-FINGERPRINT] hearth ramp reset: stage {craft_ramp_stage_outer} "
+                        f"(active={craft_ramp_active_outer}, streak={craft_ramp_success_streak}) -> "
+                        f"stage 0, starting now at ppo={start_update} -- a stage reached under the "
+                        f"old world is not evidence under the new one.",
+                        flush=True,
+                    )
+                    craft_ramp_active_outer = True
+                    craft_ramp_stage_outer = 0
+                    craft_ramp_start_step = start_update * T
+                    craft_ramp_success_streak = 0
+            else:
+                print("[ECOLOGY-FINGERPRINT] unchanged since this checkpoint -- tripwire/C0 state restored as-is.", flush=True)
         if red_ramp_enabled:
             red_ramp_active_outer = bool(_restored_training_state.get("red_ramp_active", red_ramp_active_outer))
             red_ramp_start_step = int(_restored_training_state.get("red_ramp_start_step", red_ramp_start_step))
@@ -2640,20 +2776,45 @@ def _run_simulation_impl(
                         "comms_tripwire_c0_stage1": jnp.array(
                             comms_c0_stage1 if comms_c0_stage1 is not None else (-1.0, -1.0, -1.0), dtype=jnp.float32
                         ),
+                        "ecology_fingerprint": jnp.array(_ecology_fp_current, dtype=jnp.float32),
                     }
-                    ckpt_mngr.save(ui, items={
+                    # 2026-09-22 (Cam, self-caught the same day): this used
+                    # to save at `ui`, the update index BEING processed when
+                    # the tripwire fired -- on the very first update after a
+                    # resume, ui == start_update == the step just resumed
+                    # from, so this collided with an already-existing
+                    # checkpoint. Orbax silently declines to overwrite an
+                    # existing step; the durability gate then correctly saw
+                    # "no new entry" and (before its own 2026-09-22 fix)
+                    # incorrectly called that a failure. `ui + 1` matches
+                    # the periodic save's own convention (search
+                    # "ckpt_mngr.save(ui + 1" below) and is never a step
+                    # that could already exist.
+                    _tw_saved = ckpt_mngr.save(ui + 1, items={
                         "b_params": b_params, "r_params": r_params,
                         "training_state": _tw_training_state,
                     })
                     ckpt_mngr.wait_until_finished()
-                    print(f"[TRIPWIRE] Emergency checkpoint saved at step {ui}.", flush=True)
+                    # Orbax's save() returns False (no exception) when it
+                    # declines -- e.g. the step already exists. Printing
+                    # "saved" unconditionally is how the 2026-09-22 false
+                    # durability FATAL started: say which one happened.
+                    if _tw_saved:
+                        print(f"[TRIPWIRE] Emergency checkpoint saved at step {ui + 1}.", flush=True)
+                    else:
+                        print(
+                            f"[TRIPWIRE] Emergency checkpoint NOT written: Orbax declined step {ui + 1} "
+                            f"(already exists: {(ui + 1) in set(int(s) for s in ckpt_mngr.all_steps())}). "
+                            f"No write was attempted -- not a durability failure.",
+                            flush=True,
+                        )
                     if on_checkpoint_saved is not None:
                         # A checkpoint save that isn't committed (Modal
                         # Volumes: writes aren't guaranteed durable/visible
                         # to other containers until Volume.commit()) is
                         # not proof the emergency save survives the
                         # SystemExit about to happen. Commit before exiting.
-                        on_checkpoint_saved()
+                        on_checkpoint_saved(written=bool(_tw_saved))
                     raise SystemExit(1)
 
         # ── Red Curriculum Advancement ────────────────────────────
@@ -4027,15 +4188,24 @@ def _run_simulation_impl(
                 "comms_tripwire_c0_stage1": jnp.array(
                     comms_c0_stage1 if comms_c0_stage1 is not None else (-1.0, -1.0, -1.0), dtype=jnp.float32
                 ),
+                "ecology_fingerprint": jnp.array(_ecology_fp_current, dtype=jnp.float32),
             }
             ckpt_state = {
                 "b_params": b_params,
                 "r_params": r_params,
                 "training_state": training_state,
             }
-            ckpt_mngr.save(ui + 1, items=ckpt_state)
+            _ckpt_saved = ckpt_mngr.save(ui + 1, items=ckpt_state)
             ckpt_mngr.wait_until_finished()
-            print(f"  [CKPT] Saved step {(ui+1)*T}")
+            if _ckpt_saved:
+                print(f"  [CKPT] Saved step {(ui+1)*T}")
+            else:
+                print(
+                    f"  [CKPT] *** NOT written: Orbax declined checkpoint {ui + 1} (step {(ui+1)*T}) -- "
+                    f"save() returned False. A periodic save should always target a new step; "
+                    f"this is a bug to investigate, not a durability failure. ***",
+                    flush=True,
+                )
             if on_checkpoint_saved is not None:
                 # 2026-09-14: ckpt_mngr.save()+wait_until_finished() writes to
                 # the container's local view of the mount; on Modal Volumes
@@ -4048,7 +4218,7 @@ def _run_simulation_impl(
                 # reaches the one commit() call at the very end of
                 # scripts/modal_app.py's train(). Commit on the same cadence
                 # as the checkpoint itself.
-                on_checkpoint_saved()
+                on_checkpoint_saved(written=bool(_ckpt_saved))
                 print(f"  [CKPT] Committed step {(ui+1)*T}", flush=True)
 
         if (ui + 1) % 10 == 0 or ui == 0:

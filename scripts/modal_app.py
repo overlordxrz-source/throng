@@ -395,51 +395,24 @@ def train(n_steps: int = N_STEPS_FULL) -> None:
     except Exception:
         _ckpt_paths_before = set()  # e.g. checkpoint_dir doesn't exist yet on a fresh volume
 
-    _durability_state = {"verified": False}
+    # Gate logic lives in scripts/durability_gate.py (extracted 2026-09-22 so
+    # every branch is tested against a fake volume, not only ever exercised
+    # live on a paid run -- which is how its one false positive shipped).
+    # Loaded by file path, not `from scripts.durability_gate import ...`:
+    # scripts/ has no __init__.py, so it would import as a namespace package
+    # that any installed top-level `scripts` package silently shadows -- and
+    # this gate must not be the thing that fails to start.
+    import importlib.util
+    _dg_spec = importlib.util.spec_from_file_location(
+        "durability_gate", "/root/throng/scripts/durability_gate.py",
+    )
+    _dg = importlib.util.module_from_spec(_dg_spec)
+    _dg_spec.loader.exec_module(_dg)
+    make_durability_gate = _dg.make_durability_gate
 
-    def _commit_and_verify_durability():
-        volume.commit()
-        if _durability_state["verified"]:
-            return
-        # 2026-09-15: NOT volume.reload() -- that refreshes THIS container's
-        # own local FUSE view, and fails outright ("there are open files
-        # preventing the operation: path train.log is open") for the
-        # entire run, since the Tee below holds train.log open the whole
-        # time. volume.listdir() is a separate RPC against the backing
-        # store's committed state, not a read through the local mount --
-        # it doesn't need or want reload() first. Confirmed by the first
-        # real launch on this fix: the FATAL branch below fired for this
-        # reason, not a real durability failure, the first time this ran.
-        try:
-            _ckpt_paths_after = {e.path for e in volume.listdir(_ckpt_subdir)}
-        except Exception as exc:
-            print(
-                f"[DURABILITY-GATE] FATAL: could not list {_ckpt_subdir}/ via the volume "
-                f"RPC after the first commit to verify durability: {exc!r}. Halting "
-                f"before burning more GPU.",
-                flush=True,
-            )
-            raise SystemExit(1)
-        _new_paths = _ckpt_paths_after - _ckpt_paths_before
-        if not _new_paths:
-            print(
-                f"[DURABILITY-GATE] FATAL: no new entry visible under {_ckpt_subdir}/ via "
-                "volume.listdir() after the first commit -- the checkpoint save is not "
-                "durable. This is the exact failure mode that silently lost the "
-                "2026-09-14 19:12 EDT - 2026-09-15 02:51 EDT run (7.5 hours, 44 PPO "
-                "updates): '[CKPT] Committed' printed every time and nothing ever "
-                "reached the volume. Halting now before burning more GPU on a run that "
-                "cannot save its output.",
-                flush=True,
-            )
-            raise SystemExit(1)
-        print(
-            f"[DURABILITY-GATE] OK: {sorted(_new_paths)} confirmed visible under "
-            f"{_ckpt_subdir}/ via volume.listdir() after the first commit -- durability "
-            f"verified externally, not just trusted from the container's own print.",
-            flush=True,
-        )
-        _durability_state["verified"] = True
+    _commit_and_verify_durability = make_durability_gate(
+        volume, _ckpt_subdir, _ckpt_paths_before,
+    )
 
     run_simulation(
         _cfg, seed=42, n_steps=n_steps,
