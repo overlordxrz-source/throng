@@ -11,7 +11,7 @@ to be real rather than decorative.
 import jax
 import jax.numpy as jnp
 
-from jax_sim.ctd_ramp import red_shaping_term, HEARTH_RAMP_STAGE_N
+from jax_sim.ctd_ramp import red_shaping_term, HEARTH_RAMP_STAGE_N, HEARTH_RAMP_ACCEPT_ANY
 
 GRID_SIZE = 128
 GAMMA = 0.999  # must match config.yaml's ppo_gamma
@@ -20,15 +20,26 @@ BETA = 2.5
 
 def test_hearth_ramp_stage_n_is_solo_then_ratcheting_coop():
     """Hearths (2026-09-21) replace pair-adjacency crafting; the ramp now
-    drives a hearth's required deposit count N. Stage 0 (N=1) must be
-    solo-satisfiable -- pure bootstrap, no coordination possible. Later
-    stages strictly increase N, matching the "1 -> 2 -> 3" curriculum
-    Cam specified."""
-    assert HEARTH_RAMP_STAGE_N[0] == 1, "stage 0 must be solo-satisfiable (N=1)"
+    drives a hearth's required deposit count N. The leading stages (A0, A1)
+    must be solo-satisfiable -- pure bootstrap, no coordination possible.
+    Later stages never decrease N, matching the "1 -> 1 -> 2 -> 3" curriculum
+    (A0/A1 split, 2026-09-28, Cam) -- A0/A1 share N=1 by design (the split is
+    in accept_any_material, not N), so non-decreasing is the right
+    invariant, not strictly increasing."""
+    assert HEARTH_RAMP_STAGE_N[0] == 1, "stage 0 (A0) must be solo-satisfiable (N=1)"
     assert list(HEARTH_RAMP_STAGE_N) == sorted(HEARTH_RAMP_STAGE_N), (
-        "N must strictly ratchet up, never down, across stages"
+        "N must never ratchet down across stages"
     )
-    assert len(HEARTH_RAMP_STAGE_N) == 3, "spec: N ramps 1 -> 2 -> 3"
+    assert len(HEARTH_RAMP_STAGE_N) == 4, "spec: N ramps 1 -> 1 -> 2 -> 3 (A0, A1, B, B+)"
+
+
+def test_hearth_ramp_accept_any_is_true_only_for_a0():
+    """A0/A1 split (2026-09-28, Cam): accept_any_material distinguishes A0
+    from A1 even though both have N=1 -- the whole point of the split. Every
+    stage past A0 requires the hearth's actual need."""
+    assert len(HEARTH_RAMP_ACCEPT_ANY) == len(HEARTH_RAMP_STAGE_N)
+    assert HEARTH_RAMP_ACCEPT_ANY[0] is True, "A0 accepts any material"
+    assert not any(HEARTH_RAMP_ACCEPT_ANY[1:]), "every stage past A0 requires the specific need"
 
 
 def test_f_t_is_exactly_zero_on_every_catch_step():
@@ -123,6 +134,7 @@ def test_no_blue_alive_gives_zero_shaping_not_nan():
 
 if __name__ == "__main__":
     test_hearth_ramp_stage_n_is_solo_then_ratcheting_coop()
+    test_hearth_ramp_accept_any_is_true_only_for_a0()
     test_f_t_is_exactly_zero_on_every_catch_step()
     test_f_t_matches_hand_computed_table()
     test_no_blue_alive_gives_zero_shaping_not_nan()

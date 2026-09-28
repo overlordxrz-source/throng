@@ -20,20 +20,61 @@ import jax
 import jax.numpy as jnp
 
 
-HEARTH_RAMP_STAGE_N = (1, 2, 3)  # required deposits to complete a hearth, per stage
+HEARTH_RAMP_STAGE_N = (1, 1, 2, 3)  # required deposits to complete a hearth, per stage
+HEARTH_RAMP_ACCEPT_ANY = (True, False, False, False)  # does ANY material complete it, or only the hearth's own need
+HEARTH_RAMP_STAGE_LABELS = ("A0", "A1", "B", "B+")  # human labels, purely for prints/dashboards
+# Index of the first stage requiring coordination (N>1) -- module-level, not
+# a per-function local, so every place that needs "which stage is the
+# frozen/solo regime vs the live/coordination one" (main_jax.py's
+# _freeze_comms, the C0_stage1 search trigger, the fast/drift baseline
+# selector, and the PRESSURE tripwire) derives it the same way instead of
+# each recomputing or -- worse -- hardcoding the index locally.
+HEARTH_COORD_STAGE_IDX = next(
+    (_i for _i, _n in enumerate(HEARTH_RAMP_STAGE_N) if _n > 1), len(HEARTH_RAMP_STAGE_N)
+)
 # 2026-09-21 (Cam), hearths replace pair-adjacency crafting entirely: the old
 # CRAFT_RAMP_STAGE_UNITS = (1, 2) recipe-unit cap and staged_recipe_counts()
 # are deleted, not kept alongside the new mechanism -- "every parallel
 # mechanism is another place for a silent bug, and we've found eight." The
 # same floor/bar/window/ceiling ratchet in jax_sim/main_jax.py's per-update
 # loop (generic over len(...)) now drives a hearth's required deposit count N
-# instead of a recipe's unit count: stage 0 (N=1) is solo-satisfiable -- one
-# agent's deposit alone completes a hearth, pure bootstrap, no coordination
-# possible or required. Stage 1 (N=2) and stage 2 (N=3) require multiple
-# deposits before the shared decay clock (see grid_jax.resolve_hearth_deposits)
-# erases the earlier ones, at which point coordination becomes the strictly
-# faster path without being the only possible one (a lone agent can still
-# complete a hearth solo via repeated round trips if it beats decay).
+# instead of a recipe's unit count.
+#
+# A0/A1 split (2026-09-28, Cam, after three stage-0 escapes at three
+# different hearth geometries -- single-tile, then 7x7, with the bottleneck
+# never moving): the old stage 0 (N=1) was a CONJUNCTION of "on a hearth" and
+# "holding the hearth's specific need," and only the first conjunct had ever
+# been measured or fixed. Widening the hearth radius made the first nearly
+# free (of all on-hearth-tile agent-steps, 66% were already holding SOME
+# material) but the second still failed ~99% of the time (0.65% held the
+# NEEDED material) -- so arrivals were almost never rewarded, so navigation
+# was never learned, so distance-to-hearth stayed flat at the random-walk
+# expectation for three consecutive stage-0 windows. Splitting isolates the
+# two conjuncts instead of asking the population to solve both at once:
+#   A0 (N=1, accept_any=True):  any material completes it. Pure navigation +
+#     gathering, no recipe knowledge required or rewarded. If a population
+#     that already finds hearths constantly can't clear this, the problem is
+#     in the learner (reward scale, credit assignment, hearth-position
+#     observability) -- not the ecology -- and that's where to look next.
+#   A1 (N=1, accept_any=False): only the needed material completes it --
+#     identical to the old stage 0. Learn to carry the RIGHT thing. This is
+#     the first rung in this project's history where knowing the recipe
+#     (can_see_recipe) is worth something and not everyone has it -- Gate 2
+#     becomes a meaningful measurement here, not before.
+#   B  (N=2, accept_any=False): unchanged from the old stage 1 -- multiple
+#     deposits required before the shared decay clock (see
+#     grid_jax.resolve_hearth_deposits) erases the earlier ones, at which
+#     point coordination becomes the strictly faster path without being the
+#     only possible one.
+#   B+ (N=3, accept_any=False): unchanged from the old stage 2, carried over
+#     as-is; not part of the A0/A1 redesign.
+#
+# Comms freeze/unfreeze and the hard escape are both derived generically from
+# HEARTH_RAMP_STAGE_N/keyed off "is this stage solo-satisfiable" (N==1), not
+# from a hardcoded stage index -- see main_jax.py's _freeze_comms and the
+# per-update ratchet block. That means A0 and A1 both keep comms frozen (no
+# coordination pressure in either), and the hard escape (40 updates, same
+# budget as before) now applies to every rung, not just the first.
 
 
 def _nearest_alive_blue_dist(

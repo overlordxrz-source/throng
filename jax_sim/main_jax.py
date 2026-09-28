@@ -44,7 +44,10 @@ from jax_sim.population_jax import (
     apply_auto_reproduce
 )
 from jax_sim.action_space import MASKED_ACTIONS, mask_disabled_actions, masked_actions_banner
-from jax_sim.ctd_ramp import red_shaping_term, HEARTH_RAMP_STAGE_N
+from jax_sim.ctd_ramp import (
+    red_shaping_term, HEARTH_RAMP_STAGE_N, HEARTH_RAMP_ACCEPT_ANY, HEARTH_RAMP_STAGE_LABELS,
+    HEARTH_COORD_STAGE_IDX,
+)
 from jax_sim.network_jax import (
     AgentNetworkJax,
     AUX_HEAD_KEYS,
@@ -242,10 +245,29 @@ ECOLOGY_FINGERPRINT_LABELS = (
     "reward_hearth_deposit", "reward_hearth_completion", "hearth_decay_half_life_steps",
     "red_catch_radius", "coop_threshold_step",
     "reward_big_green_success", "reward_big_green_solo_penalty", "reward_small_blue", "r_coord",
+    # 2026-09-28 (Cam, A0/A1 split): appended, not inserted -- a checkpoint
+    # saved under the pre-split 16-field schema (e.g. step 2640) has a
+    # SHORTER fingerprint vector, and ecology_fingerprint_diff's zip() over
+    # (labels, old, new) silently truncates to the shorter length. Inserting
+    # new fields in the middle would shift every field after them out of
+    # alignment against an old vector -- e.g. old[7]="reward_hearth_deposit"
+    # would get diffed against new[7]="hearth_ramp_accept_any_0", a real
+    # value comparing against a value that means something completely
+    # different, mislabeled in the printed diff. Appending keeps every
+    # pre-existing field's position stable, so an old-schema resume still
+    # compares each of them correctly (hearth_ramp_n_len alone -- 3 vs 4 --
+    # already guarantees a reset fires); only the truly-new tail fields go
+    # uncompared against an old vector that never had them, which is
+    # unavoidable and does not matter once len() itself is checked
+    # separately (see the explicit length-mismatch check in
+    # ecology_fingerprint_diff below).
+    "hearth_ramp_accept_any_0", "hearth_ramp_accept_any_1", "hearth_ramp_accept_any_2",
+    "hearth_ramp_accept_any_3", "hearth_ramp_accept_any_4",
+    "craft_ramp_success_bar",
 )
 
 
-def ecology_fingerprint_vector(config: Dict, hearth_ramp_stage_n) -> np.ndarray:
+def ecology_fingerprint_vector(config: Dict, hearth_ramp_stage_n, hearth_ramp_accept_any) -> np.ndarray:
     """STRUCTURAL SAFEGUARD (2026-09-22, Cam's instruction): "a streak
     counter is only meaningful within the regime it accumulated in" --
     the same class of error as capturing C0 across a regime change. A
@@ -263,6 +285,14 @@ def ecology_fingerprint_vector(config: Dict, hearth_ramp_stage_n) -> np.ndarray:
     p16 = config.get("phase16_combinatorial_syntax", {})
     n_stages = list(hearth_ramp_stage_n)[:5]
     n_padded = n_stages + [-1] * (5 - len(n_stages))
+    # 2026-09-28 (Cam, A0/A1 split): accept_any_material is exactly as
+    # world-defining as N -- it changes what a stage rewards, not how fast we
+    # get there -- so it gets the same fixed-5-slot padding treatment. -1
+    # sentinel (matching n_padded's convention) for unused slots; 1.0/0.0 for
+    # True/False in used ones.
+    accept_any_stages = list(hearth_ramp_accept_any)[:5]
+    accept_any_padded = [float(v) for v in accept_any_stages] + [-1.0] * (5 - len(accept_any_stages))
+    _ramp_cfg_fp = config.get("ctd_competence_ramp", {})
     vals = [
         float(config.get("hearth_radius", 0)),
         float(len(hearth_ramp_stage_n)),
@@ -276,6 +306,9 @@ def ecology_fingerprint_vector(config: Dict, hearth_ramp_stage_n) -> np.ndarray:
         float(p16.get("reward_big_green_solo_penalty", -1.0)),
         float(p16.get("reward_small_blue", 3.0)),
         float(p16.get("r_coord", 1.5)),
+        # appended, not inserted -- see ECOLOGY_FINGERPRINT_LABELS's comment.
+        *accept_any_padded,
+        float(_ramp_cfg_fp.get("craft_ramp_success_bar", 0.10)),
     ]
     assert len(vals) == len(ECOLOGY_FINGERPRINT_LABELS)
     return np.asarray(vals, dtype=np.float64)
@@ -292,6 +325,20 @@ def ecology_fingerprint_diff(old: np.ndarray, new: np.ndarray) -> list:
     """
     old32 = np.asarray(old, dtype=np.float32)
     new32 = np.asarray(new, dtype=np.float32)
+    # 2026-09-28 (Cam, A0/A1 split): zip() over mismatched lengths silently
+    # truncates to the shorter one -- a checkpoint saved under a schema with
+    # fewer fields would otherwise get its tail fields skipped without any
+    # indication that a comparison was even skipped, rather than named and
+    # flagged like every other change this function exists to catch. Checked
+    # explicitly rather than relied upon incidentally (new fields are always
+    # appended at the end specifically so this case is rare, not because
+    # it's safe to mishandle when it happens).
+    if len(old32) != len(new32):
+        return [(
+            f"(fingerprint schema length changed: {len(old32)} -> {len(new32)} fields -- "
+            f"checkpoint predates one or more fields below)",
+            float(len(old32)), float(len(new32)),
+        )]
     out = []
     for label, o, n in zip(ECOLOGY_FINGERPRINT_LABELS, old32, new32):
         if o != n:
@@ -355,6 +402,7 @@ def make_sim_step(
     _hearth_decay_half_life = float(config.get("hearth_decay_half_life_steps", 200))
     _hearth_decay_factor = jnp.array(0.5 ** (1.0 / max(_hearth_decay_half_life, 1.0)), dtype=jnp.float32)
     _hearth_ramp_n = jnp.array(HEARTH_RAMP_STAGE_N, dtype=jnp.int32)
+    _hearth_ramp_accept_any = jnp.array(HEARTH_RAMP_ACCEPT_ANY, dtype=jnp.bool_)
     # 2026-09-22 (Cam, first real-run data): single-tile hearths (radius=0)
     # measured flat mean-distance-to-nearest-hearth at the random-walk
     # expectation for the entire first run (zero approach learning
@@ -715,6 +763,7 @@ def make_sim_step(
         is_craft = (b_actions == 10) & b_pop.alive
         hearth_key = jax.random.split(key_misc, 4)[3]
         _hearth_n_required = _hearth_ramp_n[grid.craft_ramp_stage]
+        _hearth_accept_any_required = _hearth_ramp_accept_any[grid.craft_ramp_stage]
 
         _hearth_result = resolve_hearth_deposits(
             b_pop.positions, is_craft,
@@ -722,6 +771,7 @@ def make_sim_step(
             grid.hearth_positions, grid.hearth_need, grid.hearth_fill, grid.hearth_credit,
             _hearth_n_required, _hearth_decay_factor, hearth_key,
             grid_size=gs, hearth_radius=_hearth_radius,
+            accept_any_material=_hearth_accept_any_required,
         )
         hearth_deposited = _hearth_result["deposited"]
         hearth_attempted = _hearth_result["attempted"]
@@ -2101,9 +2151,11 @@ def _run_simulation_impl(
     # start (== run start on a fresh resume into stage 0).
     craft_ramp_stage0_max_updates = int(_ramp_cfg_outer.get("craft_ramp_stage0_max_updates", 40))
     craft_ramp_active_outer = craft_ramp_enabled
-    # Three ratcheting stages (2026-09-21, hearths): stage 0 (N=1) is
-    # solo-satisfiable -- pure bootstrap, no coordination possible or
-    # required. Stage index into jax_sim.ctd_ramp.HEARTH_RAMP_STAGE_N = (1, 2, 3).
+    # Four ratcheting stages (2026-09-28, A0/A1 split -- see
+    # jax_sim.ctd_ramp's module docstring for why): A0 (N=1, accept_any=True),
+    # A1 (N=1, accept_any=False), B (N=2), B+ (N=3). Stage index into
+    # jax_sim.ctd_ramp.HEARTH_RAMP_STAGE_N = (1, 1, 2, 3) /
+    # HEARTH_RAMP_ACCEPT_ANY = (True, False, False, False).
     craft_ramp_stage_outer = 0
     craft_ramp_start_step = start_update * T  # start of the CURRENT stage
     craft_ramp_success_streak = 0
@@ -2152,7 +2204,7 @@ def _run_simulation_impl(
     # docstring. Computed once, up front, in THIS function's scope, so the
     # restore-time comparison below and both training_state saves (periodic +
     # tripwire-halt) use the exact same snapshot of "what world is this."
-    _ecology_fp_current = ecology_fingerprint_vector(config, HEARTH_RAMP_STAGE_N)
+    _ecology_fp_current = ecology_fingerprint_vector(config, HEARTH_RAMP_STAGE_N, HEARTH_RAMP_ACCEPT_ANY)
     comms_updates_since_resume = 0   # counts qualifying updates since THIS resume
     comms_sample_history = []        # list of (u0,u1,u2) per-slot codes_active, one per update, index 0 = update 1
     comms_c0_stage0 = None                  # (u0, u1, u2) per-slot median, stage-0 (frozen-channel) baseline
@@ -2342,9 +2394,14 @@ def _run_simulation_impl(
             flush=True,
         )
         _hearth_stage_n = HEARTH_RAMP_STAGE_N[craft_ramp_stage_outer] if craft_ramp_active_outer else "off"
+        _hearth_stage_label = (
+            HEARTH_RAMP_STAGE_LABELS[craft_ramp_stage_outer]
+            if craft_ramp_active_outer and craft_ramp_stage_outer < len(HEARTH_RAMP_STAGE_LABELS) else "off"
+        )
         print(
             f"[CTD-RAMP] hearths={craft_ramp_active_outer} "
-            f"(stage={craft_ramp_stage_outer}/{len(HEARTH_RAMP_STAGE_N) - 1} N={_hearth_stage_n}, "
+            f"(stage={craft_ramp_stage_outer}/{len(HEARTH_RAMP_STAGE_N) - 1} [{_hearth_stage_label}] "
+            f"N={_hearth_stage_n}, "
             f"floor={craft_ramp_min_steps:_}, bar={craft_ramp_success_bar:.0%}/"
             f"{craft_ramp_success_window}upd, ceiling={craft_ramp_max_steps:_}, "
             f"stage0_hard_escape={craft_ramp_stage0_max_updates}upd, "
@@ -2562,7 +2619,7 @@ def _run_simulation_impl(
                 # during warmup, not settled; a "stable window" found there
                 # would measure the ramp schedule, not the channel).
                 if (
-                    craft_ramp_stage_outer == 1
+                    craft_ramp_stage_outer == HEARTH_COORD_STAGE_IDX
                     and _comms_unfreeze_at_update is None
                     and comms_c0_stage1 is None
                 ):
@@ -2649,11 +2706,14 @@ def _run_simulation_impl(
                 _active_c0 = None
                 _active_captured_at = None
                 _active_u = None
-                if craft_ramp_stage_outer == 0 and comms_c0_stage0 is not None:
+                # 2026-09-28: "stage 0" here means the frozen regime (N==1),
+                # which now spans A0 AND A1, not literal index 0 -- see
+                # HEARTH_COORD_STAGE_IDX above.
+                if HEARTH_RAMP_STAGE_N[craft_ramp_stage_outer] == 1 and comms_c0_stage0 is not None:
                     _active_c0 = comms_c0_stage0
                     _active_captured_at = comms_c0_stage0_captured_at_update
                     _active_u = comms_updates_since_resume
-                elif craft_ramp_stage_outer == 1 and comms_c0_stage1 is not None:
+                elif craft_ramp_stage_outer == HEARTH_COORD_STAGE_IDX and comms_c0_stage1 is not None:
                     _active_c0 = comms_c0_stage1
                     _active_captured_at = comms_c0_stage1_captured_at_update
                     _active_u = comms_stage1_c0_search_updates
@@ -2688,7 +2748,7 @@ def _run_simulation_impl(
                         else:
                             comms_drift_streak[_i] = 0
                         if (
-                            craft_ramp_stage_outer == 0
+                            HEARTH_RAMP_STAGE_N[craft_ramp_stage_outer] == 1
                             and comms_c0_stage0 is not None
                             and _now < 0.85 * comms_c0_stage0[_i]
                         ):
@@ -2717,16 +2777,16 @@ def _run_simulation_impl(
                 # this check is about hearth deposits happening at all, not
                 # about codes_active or any C0 baseline, and must not stop
                 # incrementing just because a baseline hasn't captured yet.
-                if craft_ramp_stage_outer == 1:
+                if craft_ramp_stage_outer == HEARTH_COORD_STAGE_IDX:
                     comms_stage1_updates_elapsed += 1
                     if _tw_hearth_deposits_now > 0:
                         comms_stage1_deposit_seen = True
                     if comms_stage1_updates_elapsed > 10 and not comms_stage1_deposit_seen:
                         _tw_halt_reasons.append(
                             f"PRESSURE: hearth_deposited still 0 after "
-                            f"{comms_stage1_updates_elapsed} updates in stage 1 -- "
-                            f"the coordination pressure stage 1 is supposed to apply "
-                            f"is not showing up"
+                            f"{comms_stage1_updates_elapsed} updates in stage "
+                            f"{craft_ramp_stage_outer} -- the coordination pressure this stage "
+                            f"is supposed to apply is not showing up"
                         )
 
                 if _tw_halt_reasons:
@@ -2919,17 +2979,22 @@ def _run_simulation_impl(
             # Phase 18 VQ Reconnection Warmup (0.5x for 20 updates)
             _vq_coef = _base_vq_coef * 0.5 if ui < start_update + 20 else _base_vq_coef
             
-            # 2026-09-14 (Cam, Blocker 2): stage 0 is solo-satisfiable, so it
-            # gives the sender encoder / codebook / receiver read path zero
-            # reward gradient while the VQ commitment loss keeps pulling
-            # unopposed -- a one-way ratchet toward encoder collapse. Freeze
-            # that subtree (grads zeroed pre-optimizer, see
-            # rl_jax.COMMS_SUBTREE_KEYS) for all of stage 0; unfreeze at the
-            # stage-1 transition. b_batch was collected under whatever stage
-            # was active during the rollout just finished, so gate on the
-            # pre-advance craft_ramp_stage_outer (the ratchet decision below
-            # only fires after this update).
-            _freeze_comms = bool(craft_ramp_active_outer and craft_ramp_stage_outer == 0)
+            # 2026-09-14 (Cam, Blocker 2): a solo-satisfiable stage (N=1) gives
+            # the sender encoder / codebook / receiver read path zero reward
+            # gradient while the VQ commitment loss keeps pulling unopposed --
+            # a one-way ratchet toward encoder collapse. Freeze that subtree
+            # (grads zeroed pre-optimizer, see rl_jax.COMMS_SUBTREE_KEYS) for
+            # every N=1 stage; unfreeze at the first transition into a
+            # coordination stage (N>1). 2026-09-28 (Cam, A0/A1 split): derived
+            # from HEARTH_RAMP_STAGE_N itself rather than a hardcoded stage
+            # index, so A0 AND A1 both stay frozen (neither has coordination
+            # pressure) and only the A1->B transition unfreezes -- see the
+            # matching _leaving_solo_stage logic in the ratchet block below.
+            # b_batch was collected under whatever stage was active during the
+            # rollout just finished, so gate on the pre-advance
+            # craft_ramp_stage_outer (the ratchet decision below only fires
+            # after this update).
+            _freeze_comms = bool(craft_ramp_active_outer and HEARTH_RAMP_STAGE_N[craft_ramp_stage_outer] == 1)
             # 2026-09-15 (Cam): linear warmup on the comms subtree's applied
             # update for the 10 PPO updates immediately after unfreeze --
             # 0.0 on the first unfrozen update, 1.0 (no-op) from update 10
@@ -3589,7 +3654,8 @@ def _run_simulation_impl(
             # T=512) -- not just on a print cadence.
             _red_shaping_mean = float(np.asarray(rollout_data["red"]["red_shaping"]).mean())
             _craft_stage_label = (
-                f"stage={craft_ramp_stage_outer}/{len(HEARTH_RAMP_STAGE_N) - 1}"
+                f"stage={craft_ramp_stage_outer}/{len(HEARTH_RAMP_STAGE_N) - 1} "
+                f"[{HEARTH_RAMP_STAGE_LABELS[craft_ramp_stage_outer] if craft_ramp_stage_outer < len(HEARTH_RAMP_STAGE_LABELS) else '?'}]"
                 if craft_ramp_active_outer else "off"
             )
             print(
@@ -3624,19 +3690,27 @@ def _run_simulation_impl(
                         and craft_ramp_success_streak >= craft_ramp_success_window):
                     _craft_advance_now = True
                     _craft_advance_reason = "bar met"
-                elif (craft_ramp_stage_outer == 0
-                        and _updates_since_craft_ramp >= craft_ramp_stage0_max_updates):
+                elif _updates_since_craft_ramp >= craft_ramp_stage0_max_updates:
+                    # 2026-09-28 (Cam, A0/A1 split): "keep the 40-update hard
+                    # escape on every rung," not just the first -- a
+                    # curriculum phase with no exit is a trap regardless of
+                    # which rung it is. Config key name (craft_ramp_stage0_*)
+                    # is unchanged for continuity; the behavior no longer
+                    # restricts to stage 0.
+                    _cur_label = (
+                        HEARTH_RAMP_STAGE_LABELS[craft_ramp_stage_outer]
+                        if craft_ramp_stage_outer < len(HEARTH_RAMP_STAGE_LABELS) else str(craft_ramp_stage_outer)
+                    )
                     _craft_advance_now = True
-                    _craft_advance_reason = "STAGE-0 HARD ESCAPE -- bar never cleared within 40 updates"
+                    _craft_advance_reason = f"STAGE-{_cur_label} HARD ESCAPE -- bar never cleared within 40 updates"
                     print(
-                        f"[CTD-RAMP] *** Stage-0 hard escape fired: {_updates_since_craft_ramp} "
-                        f"updates since stage 0 began, bar ({craft_ramp_success_bar:.0%} of living "
+                        f"[CTD-RAMP] *** Stage-{_cur_label} hard escape fired: {_updates_since_craft_ramp} "
+                        f"updates since this stage began, bar ({craft_ramp_success_bar:.0%} of living "
                         f"population sustained {craft_ramp_success_window} updates) never cleared "
                         f"(current streak={craft_ramp_success_streak}, this update's "
                         f"deposits={_n_hearth_deposits}/{b_alive_now} living blue = "
-                        f"{_hearth_deposit_frac_of_pop:.1%}). Advancing to stage 1 anyway -- a "
-                        f"curriculum phase with no exit is a trap, and stage 0 is the phase "
-                        f"with no communication pressure. This is a finding, not an "
+                        f"{_hearth_deposit_frac_of_pop:.1%}). Advancing anyway -- a curriculum "
+                        f"phase with no exit is a trap. This is a finding, not an "
                         f"inconvenience. ***",
                         flush=True,
                     )
@@ -3652,19 +3726,32 @@ def _run_simulation_impl(
                         flush=True,
                     )
                 if _craft_advance_now:
-                    _leaving_stage0 = (craft_ramp_stage_outer == 0)
                     if craft_ramp_stage_outer < len(HEARTH_RAMP_STAGE_N) - 1:
+                        # 2026-09-28 (Cam, A0/A1 split): derived from N, not a
+                        # hardcoded index -- fires only at the transition OUT
+                        # of the last solo-satisfiable stage (N==1) INTO the
+                        # first coordination stage (N>1). A0->A1 is N=1->N=1,
+                        # so it does NOT fire there; only A1->B does.
+                        _leaving_solo_stage = (
+                            HEARTH_RAMP_STAGE_N[craft_ramp_stage_outer] == 1
+                            and HEARTH_RAMP_STAGE_N[craft_ramp_stage_outer + 1] > 1
+                        )
                         craft_ramp_stage_outer += 1
                         craft_ramp_start_step = (ui + 1) * T
                         craft_ramp_success_streak = 0
                         grid = grid.replace(craft_ramp_stage=jnp.array(craft_ramp_stage_outer, dtype=jnp.int32))
+                        _new_label = (
+                            HEARTH_RAMP_STAGE_LABELS[craft_ramp_stage_outer]
+                            if craft_ramp_stage_outer < len(HEARTH_RAMP_STAGE_LABELS) else str(craft_ramp_stage_outer)
+                        )
                         print(
                             f"[CTD-RAMP] Hearth ramp advanced to stage {craft_ramp_stage_outer} "
-                            f"(N={HEARTH_RAMP_STAGE_N[craft_ramp_stage_outer]}, "
+                            f"({_new_label}, N={HEARTH_RAMP_STAGE_N[craft_ramp_stage_outer]}, "
+                            f"accept_any={HEARTH_RAMP_ACCEPT_ANY[craft_ramp_stage_outer]}, "
                             f"{_craft_advance_reason}) at ppo={ui + 1}, step={(ui + 1) * T:_}",
                             flush=True,
                         )
-                        if _leaving_stage0:
+                        if _leaving_solo_stage:
                             _comms_unfreeze_at_update = ui + 1
                             print(
                                 "  [CTD-RAMP] comms subtree UNFROZEN (stage-1 transition) -- "

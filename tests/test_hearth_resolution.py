@@ -333,6 +333,61 @@ def test_hearth_radius_toroidal_wrap():
     assert bool(out["deposited"][0]), "toroidal wrap must put this agent in range of hearth (0,0)"
 
 
+def test_accept_any_material_lets_the_wrong_material_deposit():
+    """A0 (2026-09-28, Cam's A0/A1 split): accept_any_material=True should
+    deposit regardless of which material the hearth actually wants -- pure
+    navigation-plus-gathering, no recipe knowledge required or rewarded."""
+    hearth_positions, hearth_need, hearth_fill, hearth_credit = _fresh_hearth_state(n := 1)
+    positions = hearth_positions[0:1]
+    is_craft = jnp.array([True])
+    inv_wood, inv_stone, inv_flint, inv_clay, inv_vine = _inv(n, stone=[1])  # hearth wants wood
+
+    out = resolve_hearth_deposits(
+        positions, is_craft, inv_wood, inv_stone, inv_flint, inv_clay, inv_vine,
+        hearth_positions, hearth_need, hearth_fill, hearth_credit,
+        hearth_n_required=jnp.array(1), decay_factor=jnp.array(0.99),
+        reroll_key=jax.random.PRNGKey(0), accept_any_material=jnp.array(True),
+    )
+    assert bool(out["deposited"][0]), "accept_any_material=True must deposit any held material"
+    assert bool(out["completed"][0])
+
+
+def test_accept_any_material_still_requires_holding_something():
+    """A0 doesn't waive the empty-handed exclusion -- attempted (and
+    therefore deposited) still requires held_material >= 0."""
+    hearth_positions, hearth_need, hearth_fill, hearth_credit = _fresh_hearth_state(n := 1)
+    positions = hearth_positions[0:1]
+    is_craft = jnp.array([True])
+    inv_wood, inv_stone, inv_flint, inv_clay, inv_vine = _inv(n)  # empty-handed
+
+    out = resolve_hearth_deposits(
+        positions, is_craft, inv_wood, inv_stone, inv_flint, inv_clay, inv_vine,
+        hearth_positions, hearth_need, hearth_fill, hearth_credit,
+        hearth_n_required=jnp.array(1), decay_factor=jnp.array(0.99),
+        reroll_key=jax.random.PRNGKey(0), accept_any_material=jnp.array(True),
+    )
+    assert not bool(out["attempted"][0])
+    assert not bool(out["deposited"][0])
+
+
+def test_accept_any_material_defaults_to_the_old_needed_only_behavior():
+    """Backward compatibility: every pre-existing call site (main_jax.py's
+    call passes it explicitly, but tests and any other caller that don't)
+    must keep exactly the old needed-material-only semantics."""
+    hearth_positions, hearth_need, hearth_fill, hearth_credit = _fresh_hearth_state(n := 1)
+    positions = hearth_positions[0:1]
+    is_craft = jnp.array([True])
+    inv_wood, inv_stone, inv_flint, inv_clay, inv_vine = _inv(n, stone=[1])  # hearth wants wood
+
+    out = resolve_hearth_deposits(
+        positions, is_craft, inv_wood, inv_stone, inv_flint, inv_clay, inv_vine,
+        hearth_positions, hearth_need, hearth_fill, hearth_credit,
+        hearth_n_required=jnp.array(1), decay_factor=jnp.array(0.99),
+        reroll_key=jax.random.PRNGKey(0),  # accept_any_material omitted
+    )
+    assert not bool(out["deposited"][0]), "omitting accept_any_material must not silently accept any material"
+
+
 if __name__ == "__main__":
     test_hearth_positions_are_one_per_quadrant_and_deterministic()
     test_solo_deposit_completes_a_stage0_n1_hearth()
@@ -347,10 +402,15 @@ if __name__ == "__main__":
     test_max_pop_population_shape_runs_clean()
     test_hearth_radius_widens_the_footprint_without_changing_reward_math()
     test_hearth_radius_toroidal_wrap()
+    test_accept_any_material_lets_the_wrong_material_deposit()
+    test_accept_any_material_still_requires_holding_something()
+    test_accept_any_material_defaults_to_the_old_needed_only_behavior()
     print(
         "OK: resolve_hearth_deposits() -- solo N=1 bootstrap completes alone; N=2 needs two "
         "deposits, same-step or across steps before decay wins; decay can prevent completion; "
         "wrong-material/empty-handed/off-hearth are classified correctly; completion reward "
         "splits proportional to undecayed credit; need re-rolls only for the hearth that "
-        "completed; runs clean at production population size."
+        "completed; runs clean at production population size; accept_any_material (A0) accepts "
+        "any held material but still requires holding something, and defaults to the old "
+        "needed-only behavior when omitted."
     )

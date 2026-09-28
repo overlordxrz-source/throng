@@ -651,6 +651,7 @@ def resolve_hearth_deposits(
     reroll_key: jnp.ndarray,
     grid_size: int = 128,
     hearth_radius: int = 0,
+    accept_any_material: jnp.ndarray = False,  # scalar bool, current curriculum stage's A0/A1 flag
 ) -> Dict[str, jnp.ndarray]:
     """One resolution step for all four hearths at once.
 
@@ -708,7 +709,14 @@ def resolve_hearth_deposits(
 
     attempted = is_craft & any_hearth & (held_material >= 0)  # a real material guess at a hearth
     hearth_need_at_agent = hearth_need[agent_hearth_idx]
-    deposited = attempted & (held_material == hearth_need_at_agent)  # correct-material deposit
+    # A0/A1 split (2026-09-28, Cam): accept_any_material=True (A0) drops the
+    # material-match requirement entirely -- holding ANYTHING at a hearth
+    # deposits. accept_any_material=False (A1 and later) is the original,
+    # unchanged behavior: only the hearth's own current need deposits. Offline
+    # corpus measurement (RESEARCH_PROTOCOL.md Part 2) found 66% of on-hearth
+    # agent-steps already held some material vs 0.65% holding the specific
+    # needed one -- this flag isolates which conjunct a given stage is testing.
+    deposited = attempted & (accept_any_material | (held_material == hearth_need_at_agent))
 
     safe_idx = jnp.where(any_hearth, agent_hearth_idx, 0)
 

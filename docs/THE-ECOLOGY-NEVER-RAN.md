@@ -1002,6 +1002,77 @@ for that branch.
 
 ---
 
+## 13. The hearth's material requirement was a conjunction, and only "on a hearth" had ever been fixed
+
+**Introduced:** with Phase 19 hearths themselves (2026-09-21) — deposit always required both being
+on a hearth tile and holding its specific need, and every fix and measurement since (radius
+widening, Gate 0) targeted only the first half.
+
+**Effect:** the 7×7 hearth relaunch (2026-09-27/28) escaped stage 0 again at exactly the same
+40-update ceiling as the single-tile run before it — three escapes at three geometries. Offline
+corpus measurement found why: of all on-hearth-tile agent-steps, 66.11% already held *some*
+material (arriving is solved) but only 0.65% held the *needed* one (arriving with the right thing
+is 15× rarer). Widening fixed encounter rate completely and it changed nothing about the outcome,
+because encounter rate was never the bottleneck.
+
+**Fix:** stage A split into A0 (any material completes it) and A1 (only the needed one does, the
+old behavior) — see `RESEARCH_PROTOCOL.md` Part 2 for the full measurement (a/b/c) and design.
+
+**How it was found:** Cam, from the pattern across three escapes at three geometries: "the first
+rung of the curriculum is miscalibrated, not the hearth size" — then three pre-registered offline
+measurements from the existing corpus confirmed which half of the conjunction was failing, at zero
+GPU cost.
+
+---
+
+## 14. Inserting a curriculum stage in the middle silently broke three stage-index checks and the fingerprint
+
+**Introduced:** with the A0/A1 split's own scaffolding (2026-09-28) — `HEARTH_RAMP_STAGE_N`
+gained a new leading stage, shifting every existing stage's index up by one.
+
+**Effect:** would have been caught only by watching a live run behave wrong, not by any test that
+existed before this session. The comms-freeze baseline selector, the C0_stage1 search trigger, and
+the PRESSURE tripwire all hardcoded literal stage indices 0 and 1 to mean "frozen regime" and
+"first coordination regime" — both wrong the moment a stage is inserted before them. Separately,
+the ecology fingerprint's new fields were first inserted mid-list rather than appended, which
+would have misaligned every comparison against the real checkpoint (2640) this redesign resumes
+from — not skipped, *mislabeled*, since `zip()` over mismatched lengths degrades silently.
+
+**Fix:** the three stage-index checks now derive "which regime is this" from
+`HEARTH_RAMP_STAGE_N` itself via a module-level `HEARTH_COORD_STAGE_IDX`, not a literal index.
+New fingerprint fields are appended, never inserted, and `ecology_fingerprint_diff` now detects a
+bare length mismatch and names it instead of silently truncating.
+
+**How it was found:** caught in review before any GPU run, while writing the smoke test and the
+fingerprint tests for the A0/A1 split itself — not found live. One of the two fixes (module-level
+`HEARTH_COORD_STAGE_IDX`) crashed the first smoke-test run with a plain `NameError` from being
+defined in the wrong one of two functions that both needed it, caught immediately by running the
+smoke test rather than trusting the diff.
+
+---
+
+## Status as of 2026-09-28 — A0/A1 split landed; resuming from 2640
+
+- **Gate 0 on the 7×7 hearth: failed again, but the failure mode changed.** Attempts far exceeded
+  chance (apparatus check passed decisively); distance-to-hearth still didn't decline within
+  stage 0. Diagnosis and the three offline measurements that led to it: instance 13 above and
+  `RESEARCH_PROTOCOL.md` Part 2.
+- **Instances 13 and 14 fixed.** Stage A split into A0 (any material)/A1 (needed material only);
+  B/B+ unchanged. Two of the three stage-index bugs and the fingerprint-append bug were caught in
+  review, not live — full suite green (136 passed), fresh-start and resume-path behavior both
+  smoke-tested before touching the real checkpoint.
+- **Relaunching from checkpoint 2640** (the widened-hearth run's own endpoint, migrated to
+  `coolerthanyousix` alongside 2591 earlier). Its fingerprint predates the A0/A1 split entirely
+  (16-field schema, no `accept_any`), so the new length-mismatch check fires cleanly on resume and
+  the curriculum resets to stage 0 (A0) as designed — a population that already finds hearths
+  constantly gets a fresh, unconfounded shot at "does holding anything at all get rewarded,"
+  without waiting through an unrelated stage-0-hard-escape replay first.
+- Budget on `coolerthanyousix` not separately verified before this relaunch (no CLI billing
+  query available; user accepted the risk of switching accounts if it runs out mid-run). Capped
+  at Cam's suggested 25–30 updates regardless.
+
+---
+
 *(Log format: mechanism, when it was introduced not-actually-working, when
 it was fixed, how long the gap was, what it plausibly cost, and how it was
 found. Append new confirmed instances below this line — suspicions belong in

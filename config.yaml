@@ -439,7 +439,10 @@ ctd_competence_ramp:
   # itself to complete once, no more) restores the bar as the mechanism
   # that actually decides when stage 0 ends.
   craft_ramp_min_steps: 5120        # floor: an advance never fires before this many steps into the stage
-  craft_ramp_success_bar: 0.10     # successes this update, as a fraction of the LIVING BLUE POPULATION
+  # 2026-09-28 (Cam, A0/A1 split): 10% -> 5%. Registered exit bar for every
+  # rung of the new split (A0/A1/B), not just a retuning of the old single
+  # stage 0 -- same per-capita, sustained-3-updates shape, easier bar.
+  craft_ramp_success_bar: 0.05     # successes this update, as a fraction of the LIVING BLUE POPULATION
   craft_ramp_success_window: 3     # consecutive PPO updates the bar must hold
   craft_ramp_max_steps: 1000000    # hard ceiling per stage: forced advance + loud report if the bar is never met
   # 2026-09-14 (Cam): stage-0-specific hard escape, tighter than

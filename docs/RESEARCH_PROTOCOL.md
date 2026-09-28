@@ -388,6 +388,72 @@ more expensive, because it produces publishable-looking nulls.
   instance 6), neither of which left a tmp dir. And writing the tmp test exposed a hole that
   predated today: the gate counted an orphaned tmp dir as a "new entry," so a write that
   started and never finished would have been reported as durability VERIFIED. Both closed.
+- **Gate 0 on the widened hearth (2026-09-27/28): failed again, unconfounded by the escape
+  landing inside the window (Cam's registration error, corrected) — and this time the failure
+  mode itself changed.** 50-update window, ppo 2591–2641, hearth_radius=3. Apparatus check
+  passed decisively (attempts far above the ≥8.6/rollout bar — 3,063 attempts over 38 stage-0
+  updates alone). Distance-to-hearth stayed flat within stage 0 (21.438 → 21.466 first-5 vs
+  last-5, well inside the update-to-update std) — the literal full-window comparison is
+  confounded by the stage-0 hard escape landing at ppo 2631 (40 updates after the fingerprint
+  reset, same ceiling as the single-tile and 7×7 runs before it — three escapes at three
+  geometries), putting stage-0 data in "first 5" and stage-1 data in "last 5"; the stage-0-only
+  reading is the one that stands. **Diagnosis (Cam): the hearth task is a conjunction — on a
+  hearth AND holding the needed material — and only the first conjunct had been measured or
+  fixed.** Three offline measurements, from the corpus already paid for, before touching code:
+  (a) **per-material satisfiability — clean.** All five materials observed held in the
+  thousands (wood 16,730 / stone 18,761 / flint 8,495 / clay 6,869 / vine 8,588 agent-step
+  observations); spawn code confirmed non-degenerate zones and non-zero regen for all five — the
+  historical `flint_grid`/`clay_grid`/`vine_grid` zero-init bug (instance 4)
+  has not recurred. `hearth_deposited=True` appears zero times in the *entire* corpus across
+  every launch ever recorded, including the single-tile run known to have real deposits — traced
+  to expected sampling sparsity (corpus_every_n_steps=4 × ~0.83% true conversion → expected
+  ≈0.6 sampled deposits in-window), not a broken field; deposits-by-material is unmeasurable at
+  this corpus density, a genuine instrument gap, not a red flag. (b) **corrected conversion —
+  decisive.** Old instrument's denominator was CRAFT-presses (agent-controlled, spammable — the
+  same flaw as the retired success/attempts bar). Rebuilt denominator = actual on-hearth-tile
+  agent-steps (1,071, reconstructed positionally at radius 3 from the four fixed hearths):
+  holding nothing 33.89%, holding *some* material 66.11%, holding the *needed* material 0.65%.
+  Arriving with something is solved; arriving with the right thing is 15× rarer than that.
+  (c) **informed vs uninformed P(holding needed | on hearth) — inconclusive, honestly reported
+  as such.** Informed 4/879 (0.46%), uninformed 3/192 (1.56%) — opposite Cam's hypothesized
+  direction, but 7 total successes is nowhere near enough to distinguish signal from noise
+  either way; not rounded to a conclusion in either direction.
+- **The hearth curriculum's stage-A bootstrap is now split into two rungs, isolating the two
+  conjuncts instead of asking one stage to solve both at once (Cam's design, pre-authorized on
+  (a) coming back clean).** `jax_sim/ctd_ramp.py`: `HEARTH_RAMP_STAGE_N = (1, 1, 2, 3)` and a new
+  parallel `HEARTH_RAMP_ACCEPT_ANY = (True, False, False, False)`. **A0** (N=1, accept_any=True):
+  any material completes it — pure navigation plus gathering, no recipe knowledge required or
+  rewarded; registered prediction: since ~66% of on-hearth agent-steps already hold something,
+  A0 should exit on merit within ~15 updates, and if it instead times out at the 40-update hard
+  escape, that is a finding about the learner (reward scale, credit assignment, hearth-position
+  observability), not the ecology. **A1** (N=1, accept_any=False): identical to the old stage
+  0 — learn to carry the *right* thing; the first rung in this project's history where
+  `can_see_recipe` is worth something and not everyone has it, so Gate 2 becomes a meaningful
+  measurement here and nowhere earlier. **B**/**B+** (N=2/N=3): unchanged from the old stages 1
+  and 2. Exit bar lowered 10%→5% per-capita (still sustained 3 updates) for every rung; the
+  40-update hard escape is now generic over every rung, not hardcoded to the first.
+- **Three stage-index bugs caught in review before landing, from inserting a stage in the
+  middle of an existing schedule instead of appending one.** The comms-freeze tripwire's
+  baseline-selection logic, the C0_stage1 search trigger, and the PRESSURE tripwire all
+  hardcoded `craft_ramp_stage_outer == 0` to mean "the frozen/solo regime" and `== 1` to mean
+  "the first live-coordination regime" — true when N=1 was exactly one stage, silently wrong the
+  moment A0 is inserted before it (A1, now index 1, is still N=1/frozen, not the coordination
+  stage the old index 1 meant). Fixed by deriving both from `HEARTH_RAMP_STAGE_N` itself: the
+  frozen regime is wherever `N==1` (spans A0+A1), and the coordination regime is
+  `HEARTH_COORD_STAGE_IDX` — a module-level constant (first index where N>1), not a per-function
+  local, after an earlier draft of the fix defined it inside the wrong one of two functions and
+  crashed on first execution. **A fourth, independent bug in the same review pass:** the ecology
+  fingerprint's new `accept_any` and `craft_ramp_success_bar` fields were first *inserted* into
+  the middle of `ECOLOGY_FINGERPRINT_LABELS`, between the existing N-schedule and reward fields.
+  `ecology_fingerprint_diff`'s `zip()` over `(labels, old, new)` silently truncates to the
+  shorter array on a length mismatch — a checkpoint saved under the pre-split 16-field schema
+  (every real checkpoint on the volume, including the one this redesign resumes from) would have
+  had its post-insertion fields compared against the wrong labels entirely, not merely skipped.
+  Fixed two ways: new fields are now appended, never inserted, so a shorter old vector's
+  pre-existing fields stay correctly aligned; and `ecology_fingerprint_diff` now detects a bare
+  length mismatch explicitly and reports it by name instead of silently truncating, so the next
+  schema change doesn't have to rely on getting the append-only convention right by memory
+  alone. All four pinned in `tests/test_ecology_fingerprint.py` and `tests/test_ctd_ramp.py`.
 
 ## Part 3 — Fossils
 
