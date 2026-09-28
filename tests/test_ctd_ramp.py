@@ -11,7 +11,9 @@ to be real rather than decorative.
 import jax
 import jax.numpy as jnp
 
-from jax_sim.ctd_ramp import red_shaping_term, HEARTH_RAMP_STAGE_N, HEARTH_RAMP_ACCEPT_ANY
+from jax_sim.ctd_ramp import (
+    red_shaping_term, hearth_shaping_term, HEARTH_RAMP_STAGE_N, HEARTH_RAMP_ACCEPT_ANY,
+)
 
 GRID_SIZE = 128
 GAMMA = 0.999  # must match config.yaml's ppo_gamma
@@ -40,6 +42,72 @@ def test_hearth_ramp_accept_any_is_true_only_for_a0():
     assert len(HEARTH_RAMP_ACCEPT_ANY) == len(HEARTH_RAMP_STAGE_N)
     assert HEARTH_RAMP_ACCEPT_ANY[0] is True, "A0 accepts any material"
     assert not any(HEARTH_RAMP_ACCEPT_ANY[1:]), "every stage past A0 requires the specific need"
+
+
+GS = 128
+HEARTHS = jnp.array([[32, 32], [32, 96], [96, 32], [96, 96]], dtype=jnp.int32)
+
+
+def test_hearth_shaping_rewards_approach_to_the_matching_hearth():
+    """Moving one Chebyshev step closer to the hearth whose need matches your
+    held material should be a positive F_t (gamma close to 1 dominates)."""
+    pos_before = jnp.array([[32, 40]])     # 8 away from hearth 0 (32,32) on y
+    pos_after = jnp.array([[32, 39]])      # 7 away -- closer
+    held = jnp.array([0])                  # holding wood
+    need = jnp.array([0, 1, 2, 3])         # hearth 0 needs wood -- matches
+    made_deposit = jnp.array([False])
+    f_t = hearth_shaping_term(pos_before, pos_after, held, HEARTHS, need, made_deposit,
+                               beta=2.5, gamma=0.999, grid_size=GS)
+    assert float(f_t[0]) > 0, "moving closer to the matching hearth should be rewarded"
+
+
+def test_hearth_shaping_is_zero_when_holding_nothing():
+    pos_before = jnp.array([[32, 40]])
+    pos_after = jnp.array([[32, 39]])
+    held = jnp.array([-1])  # empty-handed
+    need = jnp.array([0, 1, 2, 3])
+    made_deposit = jnp.array([False])
+    f_t = hearth_shaping_term(pos_before, pos_after, held, HEARTHS, need, made_deposit,
+                               beta=2.5, gamma=0.999, grid_size=GS)
+    assert float(f_t[0]) == 0.0, "an empty-handed agent has no well-defined target -- no shaping"
+
+
+def test_hearth_shaping_is_zero_when_held_material_matches_no_hearth():
+    pos_before = jnp.array([[32, 40]])
+    pos_after = jnp.array([[32, 39]])
+    held = jnp.array([4])          # holding vine
+    need = jnp.array([0, 1, 2, 3]) # no hearth currently wants vine
+    made_deposit = jnp.array([False])
+    f_t = hearth_shaping_term(pos_before, pos_after, held, HEARTHS, need, made_deposit,
+                               beta=2.5, gamma=0.999, grid_size=GS)
+    assert float(f_t[0]) == 0.0
+
+
+def test_hearth_shaping_is_exactly_zero_on_every_deposit_step():
+    """Mirrors red's catch-zeroing: hearth_need rerolls on completion, so the
+    nearest matching hearth can teleport to a farther one the instant a
+    deposit lands -- must not claw back reward on the very step it happens."""
+    pos_before = jnp.array([[32, 33]])
+    pos_after = jnp.array([[32, 32]])   # arrived exactly at hearth 0
+    held = jnp.array([0])
+    need = jnp.array([0, 1, 2, 3])
+    made_deposit = jnp.array([True])
+    f_t = hearth_shaping_term(pos_before, pos_after, held, HEARTHS, need, made_deposit,
+                               beta=2.5, gamma=0.999, grid_size=GS)
+    assert float(f_t[0]) == 0.0
+
+
+def test_hearth_shaping_picks_the_nearest_matching_hearth_not_nearest_overall():
+    """Two hearths could match; shaping must use the nearest MATCHING one,
+    not just the nearest hearth regardless of need."""
+    pos_before = jnp.array([[64, 64]])   # equidistant-ish from all 4
+    pos_after = jnp.array([[64, 63]])    # moves toward hearth 2/3 side (row 96), away from 0/1 (row 32)
+    held = jnp.array([1])
+    need = jnp.array([0, 1, 0, 0])  # only hearth 1 (32,96) matches -- far from pos_after's direction
+    made_deposit = jnp.array([False])
+    f_t = hearth_shaping_term(pos_before, pos_after, held, HEARTHS, need, made_deposit,
+                               beta=2.5, gamma=0.999, grid_size=GS)
+    assert float(f_t[0]) < 0, "moved away from the only matching hearth -- should be penalized"
 
 
 def test_f_t_is_exactly_zero_on_every_catch_step():
@@ -135,6 +203,11 @@ def test_no_blue_alive_gives_zero_shaping_not_nan():
 if __name__ == "__main__":
     test_hearth_ramp_stage_n_is_solo_then_ratcheting_coop()
     test_hearth_ramp_accept_any_is_true_only_for_a0()
+    test_hearth_shaping_rewards_approach_to_the_matching_hearth()
+    test_hearth_shaping_is_zero_when_holding_nothing()
+    test_hearth_shaping_is_zero_when_held_material_matches_no_hearth()
+    test_hearth_shaping_is_exactly_zero_on_every_deposit_step()
+    test_hearth_shaping_picks_the_nearest_matching_hearth_not_nearest_overall()
     test_f_t_is_exactly_zero_on_every_catch_step()
     test_f_t_matches_hand_computed_table()
     test_no_blue_alive_gives_zero_shaping_not_nan()

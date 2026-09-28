@@ -45,7 +45,8 @@ from jax_sim.population_jax import (
 )
 from jax_sim.action_space import MASKED_ACTIONS, mask_disabled_actions, masked_actions_banner
 from jax_sim.ctd_ramp import (
-    red_shaping_term, HEARTH_RAMP_STAGE_N, HEARTH_RAMP_ACCEPT_ANY, HEARTH_RAMP_STAGE_LABELS,
+    red_shaping_term, hearth_shaping_term,
+    HEARTH_RAMP_STAGE_N, HEARTH_RAMP_ACCEPT_ANY, HEARTH_RAMP_STAGE_LABELS,
     HEARTH_COORD_STAGE_IDX,
 )
 from jax_sim.network_jax import (
@@ -264,6 +265,13 @@ ECOLOGY_FINGERPRINT_LABELS = (
     "hearth_ramp_accept_any_0", "hearth_ramp_accept_any_1", "hearth_ramp_accept_any_2",
     "hearth_ramp_accept_any_3", "hearth_ramp_accept_any_4",
     "craft_ramp_success_bar",
+    # 2026-09-28 (Cam, vision-check -> shaping): appended for the same
+    # reason as the block above. Turning shaping on changes what every
+    # stage rewards, exactly as world-defining as accept_any -- and doing
+    # so should force the same stage-0/A0 reset, since a tripwire streak or
+    # curriculum stage reached WITHOUT shaping isn't evidence of anything
+    # once shaping is added under its feet.
+    "hearth_shaping_enabled", "hearth_shaping_beta",
 )
 
 
@@ -309,6 +317,8 @@ def ecology_fingerprint_vector(config: Dict, hearth_ramp_stage_n, hearth_ramp_ac
         # appended, not inserted -- see ECOLOGY_FINGERPRINT_LABELS's comment.
         *accept_any_padded,
         float(_ramp_cfg_fp.get("craft_ramp_success_bar", 0.10)),
+        float(bool(_ramp_cfg_fp.get("hearth_shaping_enabled", False))),
+        float(_ramp_cfg_fp.get("hearth_shaping_beta", 2.5)),
     ]
     assert len(vals) == len(ECOLOGY_FINGERPRINT_LABELS)
     return np.asarray(vals, dtype=np.float64)
@@ -419,6 +429,16 @@ def make_sim_step(
     _ramp_cfg = config.get("ctd_competence_ramp", {})
     _red_ramp_beta = float(_ramp_cfg.get("red_ramp_beta", 2.5))
     _ppo_gamma_for_shaping = float(config.get("ppo_gamma", 0.999))
+    # 2026-09-28 (Cam): potential-based shaping toward the nearest hearth
+    # whose need matches the held material -- see hearth_shaping_term's
+    # docstring in ctd_ramp.py for why (emb_own/gwt_comms_1 row norms came
+    # back alive, not dead, so the lever is credit, not vision). Deliberately
+    # NOT gated by the craft ramp's stage/active flags the way comms-freeze
+    # is -- distance-to-hearth has been flat in every stage measured so far
+    # (single-tile, 7x7 stage 0, A0, A1), so shaping should apply whenever
+    # hearths exist at all, not just during a specific curriculum stage.
+    _hearth_shaping_enabled = bool(_ramp_cfg.get("hearth_shaping_enabled", False))
+    _hearth_shaping_beta = float(_ramp_cfg.get("hearth_shaping_beta", 2.5))
 
     # Phase 16 parameters
     p16 = config.get("phase16_combinatorial_syntax", {})
@@ -765,6 +785,26 @@ def make_sim_step(
         _hearth_n_required = _hearth_ramp_n[grid.craft_ramp_stage]
         _hearth_accept_any_required = _hearth_ramp_accept_any[grid.craft_ramp_stage]
 
+        # 2026-09-28 (Cam, Gate 2 apparatus check): captured BEFORE
+        # grid.hearth_need gets reassigned below, specifically so the corpus
+        # can log the need that was actually checked against this step's own
+        # deposits. grid.hearth_need itself gets replaced by
+        # _hearth_result["new_hearth_need"] a few lines down (the rerolled
+        # value, if a completion happened this step) -- the per-step corpus
+        # output dict was reading grid.hearth_need AFTER that reassignment,
+        # so on the rare step a hearth completes, the corpus recorded what
+        # it wants NEXT, not what it just accepted. Confirmed empirically:
+        # 99.17% end-to-end match rate between (inventory==logged need) and
+        # the simulator's own hearth_deposited on real corpus data, with
+        # both mismatches traced to exactly this timing. Never affected the
+        # actual deposit decision (resolve_hearth_deposits below reads
+        # grid.hearth_need before this line touches it) or Gate 2's
+        # informed/uninformed dashboard numbers (computed from
+        # hearth_deposited + can_see_recipe directly, never from this
+        # field) -- only offline corpus reconstructions that compare
+        # inventory against the logged need.
+        _hearth_need_pre_resolution = grid.hearth_need
+
         _hearth_result = resolve_hearth_deposits(
             b_pop.positions, is_craft,
             new_inv_wood, new_inv_stone, new_inv_flint, new_inv_clay, new_inv_vine,
@@ -791,6 +831,31 @@ def make_sim_step(
         _hd_dx = jnp.minimum(_hd_dx, gs - _hd_dx)
         _hd_dy = jnp.minimum(_hd_dy, gs - _hd_dy)
         hearth_dist_nearest = jnp.min(jnp.maximum(_hd_dx, _hd_dy), axis=1).astype(jnp.float32)
+
+        # 2026-09-28 (Cam): potential-based shaping toward the nearest hearth
+        # whose need matches the held material -- see hearth_shaping_term's
+        # docstring. held_material mirrors resolve_hearth_deposits' own
+        # priority order exactly (wood > stone > flint > clay > vine) using
+        # the same post-pickup inventories it judged this step, and
+        # hearth_need uses _hearth_need_pre_resolution (the value actually
+        # checked this step, not the post-reroll one) for the same reason the
+        # corpus logging fix above does. Positions before/after movement only
+        # (_b_pos_before_move, b_new_pos already captured above), mirroring
+        # red_shaping_term's exact before/after-move pattern.
+        _hearth_held_material = jnp.where(
+            new_inv_wood > 0, 0,
+            jnp.where(new_inv_stone > 0, 1,
+            jnp.where(new_inv_flint > 0, 2,
+            jnp.where(new_inv_clay > 0, 3,
+            jnp.where(new_inv_vine > 0, 4, -1)))),
+        )
+        _hearth_shaping_raw = hearth_shaping_term(
+            _b_pos_before_move, b_new_pos,
+            _hearth_held_material, grid.hearth_positions, _hearth_need_pre_resolution,
+            hearth_deposited,
+            _hearth_shaping_beta, _ppo_gamma_for_shaping, gs,
+        )
+        hearth_shaping = jnp.where(_hearth_shaping_enabled, _hearth_shaping_raw, 0.0)
 
         consume_wood = hearth_deposited & (new_inv_wood > 0)
         consume_stone = hearth_deposited & (new_inv_stone > 0)
@@ -1050,6 +1115,7 @@ def make_sim_step(
         # completion additionally pays each credited contributor its
         # proportional share (see resolve_hearth_deposits' completion_share).
         b_rew = b_rew + _reward_hearth_deposit * hearth_deposited.astype(jnp.float32)
+        b_rew = b_rew + hearth_shaping
         b_rew = b_rew + _reward_hearth_completion * jnp.sum(hearth_completion_share, axis=0)
 
         r_rew = _rew_small_blue * r_caught_small
@@ -1127,7 +1193,8 @@ def make_sim_step(
             "hearth_attempted": hearth_attempted.astype(jnp.float32),
             "hearth_completed": hearth_completed.astype(jnp.float32),
             "hearth_dist_nearest": hearth_dist_nearest,
-            "hearth_need": grid.hearth_need,
+            "hearth_need": _hearth_need_pre_resolution,
+            "hearth_shaping": hearth_shaping,
             "can_see_recipe": b_pop.can_see_recipe.astype(jnp.float32),
             "steps_since_informed_nearby": b_pop.steps_since_informed_nearby,
             "steps_since_dropout": b_pop.steps_since_dropout,
@@ -2126,6 +2193,12 @@ def _run_simulation_impl(
     # above if present, defaulted fresh otherwise.
     _ramp_cfg_outer = config.get("ctd_competence_ramp", {})
     craft_ramp_enabled = bool(_ramp_cfg_outer.get("craft_ramp_enabled", False))
+    # Read again here (not shared from make_sim_step's own local of the same
+    # name -- that scope isn't visible from this outer training loop, the
+    # same NameError class the HEARTH_COORD_STAGE_IDX fix hit earlier) purely
+    # for the dashboard print below; make_sim_step's own copy is what
+    # actually gates the traced shaping computation.
+    _hearth_shaping_enabled_outer = bool(_ramp_cfg_outer.get("hearth_shaping_enabled", False))
     # 2026-09-14 (Cam): 5_120 (10 updates), not 50_000 -- the old floor was
     # sized for the retired success/attempts bar and now dominates the
     # per-capita bar entirely (see config.yaml's ctd_competence_ramp comment
@@ -3653,6 +3726,10 @@ def _run_simulation_impl(
             # since step_val % 512 == 0 or T >= 512 is unconditionally true at
             # T=512) -- not just on a print cadence.
             _red_shaping_mean = float(np.asarray(rollout_data["red"]["red_shaping"]).mean())
+            _hearth_shaping_mean = (
+                float(np.asarray(rollout_data["blue"]["hearth_shaping"]).mean())
+                if "hearth_shaping" in rollout_data["blue"] else 0.0
+            )
             _craft_stage_label = (
                 f"stage={craft_ramp_stage_outer}/{len(HEARTH_RAMP_STAGE_N) - 1} "
                 f"[{HEARTH_RAMP_STAGE_LABELS[craft_ramp_stage_outer] if craft_ramp_stage_outer < len(HEARTH_RAMP_STAGE_LABELS) else '?'}]"
@@ -3660,7 +3737,8 @@ def _run_simulation_impl(
             )
             print(
                 f"  CTD-RAMP: hearths_active={craft_ramp_active_outer} ({_craft_stage_label}, "
-                f"streak={craft_ramp_success_streak}/{craft_ramp_success_window}) | "
+                f"streak={craft_ramp_success_streak}/{craft_ramp_success_window}, "
+                f"hearth_shaping_enabled={_hearth_shaping_enabled_outer} shaping_mean={_hearth_shaping_mean:.5f}) | "
                 f"red_active={red_ramp_active_outer} "
                 f"(streak={red_ramp_catch_streak}/{red_ramp_catch_window}, "
                 f"shaping_mean={_red_shaping_mean:.5f})"

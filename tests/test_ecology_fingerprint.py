@@ -71,6 +71,28 @@ def test_accept_any_change_alone_is_detected():
     assert diff == [("hearth_ramp_accept_any_0", 0.0, 1.0)]
 
 
+def test_hearth_shaping_toggle_is_detected_and_named():
+    """2026-09-28: turning shaping on changes what every stage rewards --
+    exactly as world-defining as accept_any -- and must force the same
+    stage-0/A0 reset a tripwire streak reached without shaping isn't
+    evidence of anything once shaping exists."""
+    p16 = dict(_cfg.get("ctd_competence_ramp", {}))
+    p16_off = {**p16, "hearth_shaping_enabled": False}
+    p16_on = {**p16, "hearth_shaping_enabled": True}
+    old = _fp({**_cfg, "ctd_competence_ramp": p16_off})
+    new = _fp({**_cfg, "ctd_competence_ramp": p16_on})
+    diff = ecology_fingerprint_diff(old, new)
+    assert diff == [("hearth_shaping_enabled", 0.0, 1.0)]
+
+
+def test_hearth_shaping_beta_change_is_detected():
+    p16 = dict(_cfg.get("ctd_competence_ramp", {}))
+    old = _fp({**_cfg, "ctd_competence_ramp": {**p16, "hearth_shaping_beta": 2.5}})
+    new = _fp({**_cfg, "ctd_competence_ramp": {**p16, "hearth_shaping_beta": 5.0}})
+    diff = ecology_fingerprint_diff(old, new)
+    assert diff == [("hearth_shaping_beta", 2.5, 5.0)]
+
+
 def test_success_bar_change_is_detected():
     old = _fp(_cfg)
     p16 = dict(_cfg.get("ctd_competence_ramp", {}))
@@ -111,7 +133,7 @@ def test_new_fields_are_appended_not_inserted():
     """A checkpoint saved before the A0/A1 split has a fingerprint whose
     fields are a PREFIX of today's -- appended, not inserted -- so that if
     this check is ever bypassed, the pre-existing fields still line up."""
-    old_len = len(ECOLOGY_FINGERPRINT_LABELS) - 6  # 5 accept_any slots + success_bar
+    old_len = len(ECOLOGY_FINGERPRINT_LABELS) - 8  # 5 accept_any slots + success_bar + 2 shaping fields
     assert ECOLOGY_FINGERPRINT_LABELS[:old_len] == (
         "hearth_radius", "hearth_ramp_n_len",
         "hearth_ramp_n_0", "hearth_ramp_n_1", "hearth_ramp_n_2", "hearth_ramp_n_3", "hearth_ramp_n_4",
@@ -134,6 +156,8 @@ if __name__ == "__main__":
     test_a0_a1_split_is_detected_and_named()
     test_accept_any_change_alone_is_detected()
     test_success_bar_change_is_detected()
+    test_hearth_shaping_toggle_is_detected_and_named()
+    test_hearth_shaping_beta_change_is_detected()
     test_schema_length_change_is_flagged_not_silently_truncated()
     test_new_fields_are_appended_not_inserted()
     test_catch_param_change_is_detected()

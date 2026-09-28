@@ -1073,6 +1073,58 @@ smoke test rather than trusting the diff.
 
 ---
 
+## 15. The corpus logged a hearth's *next* need on the step it completed, not the one it accepted
+
+**Introduced:** with Phase 19 hearths themselves (2026-09-21) — the per-step corpus output dict
+read `grid.hearth_need` after that same step's `grid.replace(hearth_need=...)` reassignment
+already applied a completion's reroll, one line earlier in the same function.
+
+**Effect:** invisible until Gate 2's apparatus was checked end-to-end (2026-09-28). Only shows up
+on the step a hearth actually completes (rare); of 240 sampled attempts pooled across every
+launch, exactly 2 recorded a need that didn't match the deposit the simulator itself confirmed
+happened, both traced by hand to a hearth completing (and rerolling) on that exact step. Never
+affected the real deposit decision (`resolve_hearth_deposits` reads the value before this line
+touches it) or Gate 2's informed/uninformed dashboard numbers (independent traces). Affected only
+offline corpus reconstructions that compare held inventory against the logged need for
+completing-deposit records specifically.
+
+**Fix:** capture `grid.hearth_need` into `_hearth_need_pre_resolution` immediately before the
+reassignment, and log that instead of `grid.hearth_need`.
+
+**How it was found:** Cam's explicit end-to-end request ("compare the need encoded in that
+agent's observation at that step to the need the hearth checks... report the match rate; anything
+less than ~100% is a bug") turned up 99.17%, not 100% — close enough that it would have been easy
+to round to "fine," but the instruction was to trace it, not round it.
+
+---
+
+## Status as of 2026-09-28 (later) — vision confirmed alive; shaping added; running until billing stops
+
+- **Instance 15 fixed** (above) — landed before more data went into the corpus, per Cam's
+  instruction, ahead of relaunching.
+- **Finding (3) (need-rotation vs. delivery time) reconciled, left genuinely open.** Cam's
+  suspicion that the initial n=5 sample was clustered at one hearth was correct (all 5 came from
+  a single slot); Cam's own derived alternative (~1,707 steps, assuming uniform completions
+  across 4 hearths) isn't supported by the data either — completions are visibly not uniform, and
+  corpus sparsity leaves the quiet hearths unmeasured. Not blocking; not re-litigated further this
+  round. Full numbers: `RESEARCH_PROTOCOL.md` Part 2.
+- **Vision check: alive, not dead.** `emb_own`'s hearth rows sit at 69% of the non-hearth median
+  norm; `gwt_comms_1` has no near-zero rows at all. Per Cam's pre-registered rule, this is the
+  shaping branch. Re-initialization was **not** touched, per "change one of those, not both."
+- **Hearth-approach shaping landed** (`hearth_shaping_term`, mirrors `red_shaping_term`),
+  `hearth_shaping_beta=2.5` as a starting point. Two more scope bugs (same class as
+  `HEARTH_COORD_STAGE_IDX`) caught by running the smoke test before touching the real checkpoint,
+  not live. Full suite green (143 passed).
+- **Running continuously from checkpoint 2670, no update cap this time** — M's instruction: keep
+  going until `coolerthanyousix` billing stops it, then start a new account. Durability gate,
+  fossil guard, and every tripwire stay armed exactly as before; reporting only at curriculum
+  transitions and trips, not on a schedule. When it dies from billing: note the last verified
+  checkpoint here and refresh the migration bundle (the same checkpoint/corpus/train.log transfer
+  done for `agictrlone` → `coolerthanyousix`) before anything else, so the next account starts in
+  minutes, not hours.
+
+---
+
 *(Log format: mechanism, when it was introduced not-actually-working, when
 it was fixed, how long the gap was, what it plausibly cost, and how it was
 found. Append new confirmed instances below this line — suspicions belong in

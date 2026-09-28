@@ -96,6 +96,73 @@ def _nearest_alive_blue_dist(
     return jnp.where(any_alive, min_dist, 0.0)
 
 
+def hearth_shaping_term(
+    agent_pos_before: jnp.ndarray,   # (N, 2)
+    agent_pos_after: jnp.ndarray,    # (N, 2)
+    held_material: jnp.ndarray,      # (N,) int, -1 = empty; same snapshot used for both evaluations below
+    hearth_positions: jnp.ndarray,   # (H, 2), fixed
+    hearth_need: jnp.ndarray,        # (H,) int, the need this step actually checks (pre-resolution)
+    made_deposit: jnp.ndarray,       # (N,) bool -- this agent deposited this step
+    beta: float,
+    gamma: float,
+    grid_size: int,
+) -> jnp.ndarray:
+    """Potential-based reward shaping (Ng, Harada & Russell 1999) for approaching
+    the nearest hearth whose CURRENT need matches the material this agent holds.
+
+    2026-09-28 (Cam, after the emb_own/gwt_comms_1 row-norm check came back
+    alive, not dead -- RESEARCH_PROTOCOL.md Part 2): distance-to-hearth has
+    been flat at the random-walk expectation in every configuration measured
+    so far (single-tile, 7x7 stage 0, A0, A1). Vision isn't the problem;
+    credit is -- reward for a deposit only arrives after navigation AND
+    material-matching both already succeeded, which is far too sparse a
+    signal to shape approach behavior on its own. This adds dense gradient on
+    exactly the behavior that has never once been learned, the same way
+    red_shaping_term already does for red approaching blue.
+
+    Mirrors red_shaping_term's exact form: F_t = beta*(gamma*Phi(s')-Phi(s)),
+    Phi(s)=-d(s)/D_max. gamma MUST be the same discount PPO's own GAE uses,
+    for the same policy-invariance reason red's shaping requires it.
+
+    Zeroed on the step a deposit happens, for the identical reason red's is
+    zeroed on a catch: hearth_need re-rolls on completion, so "nearest
+    matching hearth" can teleport to a different, farther hearth the instant
+    a deposit lands -- an artifact of the target changing, not of the agent
+    moving away from it, which would otherwise claw back part of the very
+    reward this term exists to lead into.
+
+    An agent holding nothing, or holding a material no hearth currently
+    wants, has no well-defined target hearth: Phi is 0 for it (no artificial
+    reward or penalty for an undefined state), matching
+    _nearest_alive_blue_dist's any_alive sentinel. held_material is a single
+    snapshot used for both the before- and after-move evaluation (only
+    position differs between them, matching red's pattern) -- deliberately
+    the post-pickup/pre-deposit material, i.e. exactly what
+    resolve_hearth_deposits itself judges this same step, so shaping and the
+    actual deposit decision are never targeting different things.
+    """
+    d_max = grid_size // 2
+
+    def _dist_to_matching_hearth(positions):
+        diff = jnp.abs(positions[:, None, :] - hearth_positions[None, :, :])  # (N, H, 2)
+        diff = jnp.minimum(diff, grid_size - diff)
+        dist = jnp.max(diff, axis=-1)  # (N, H), toroidal Chebyshev
+        return dist
+
+    matches = held_material[:, None] == hearth_need[None, :]  # (N, H)
+    is_valid = jnp.any(matches, axis=1) & (held_material >= 0)  # (N,)
+
+    dist_before = _dist_to_matching_hearth(agent_pos_before)
+    dist_after = _dist_to_matching_hearth(agent_pos_after)
+    min_dist_before = jnp.min(jnp.where(matches, dist_before, 1e9), axis=1)
+    min_dist_after = jnp.min(jnp.where(matches, dist_after, 1e9), axis=1)
+
+    phi_before = jnp.where(is_valid, -min_dist_before / d_max, 0.0)
+    phi_after = jnp.where(is_valid, -min_dist_after / d_max, 0.0)
+    f_t = beta * (gamma * phi_after - phi_before)
+    return jnp.where(made_deposit, 0.0, f_t)
+
+
 def red_shaping_term(
     red_pos_before: jnp.ndarray,   # (R, 2)
     red_pos_after: jnp.ndarray,    # (R, 2)

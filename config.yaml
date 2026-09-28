@@ -453,6 +453,19 @@ ctd_competence_ramp:
   # turn a deliberately short phase into an unbounded one. 40 PPO updates,
   # measured from stage 0's own start.
   craft_ramp_stage0_max_updates: 40
+  # 2026-09-28 (Cam): distance-to-hearth has been flat at the random-walk
+  # expectation in every configuration measured (single-tile, 7x7 stage 0,
+  # A0, A1). emb_own/gwt_comms_1 row-norm check (RESEARCH_PROTOCOL.md Part 2)
+  # came back alive (hearth rows at 69% of the non-hearth median, nowhere
+  # near the 5%-dead threshold) -- vision isn't the problem, so per the
+  # pre-registered decision this is the shaping branch, not re-init. Dense
+  # potential-based gradient toward the nearest hearth whose need matches
+  # the held material, mirroring red_shaping_term exactly (see
+  # jax_sim/ctd_ramp.py's hearth_shaping_term). beta=2.5 matches red's own
+  # value as a starting point, not a derived number -- Cam's to tune once
+  # this run shows results.
+  hearth_shaping_enabled: true
+  hearth_shaping_beta: 2.5
   red_ramp_enabled: true
   red_ramp_beta: 2.5               # shaping coefficient (verified: full 1-cell close ~= reward_red_move)
   red_ramp_min_steps: 200000

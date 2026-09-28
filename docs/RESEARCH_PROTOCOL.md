@@ -454,6 +454,61 @@ more expensive, because it produces publishable-looking nulls.
   length mismatch explicitly and reports it by name instead of silently truncating, so the next
   schema change doesn't have to rely on getting the append-only convention right by memory
   alone. All four pinned in `tests/test_ecology_fingerprint.py` and `tests/test_ctd_ramp.py`.
+- **Three offline checks on A0/A1 (Cam, zero GPU), one confirmed apparatus bug, one confound
+  reconciled, one decisive vision check.** (1) A0's 10-update clearance: pop_frac rose 1.50% →
+  9.00% → settling 5–7%, but mean distance-to-hearth stayed flat (21.00→21.22, no decline) the
+  entire window — what changed was CRAFT-issuance while already on a hearth, not navigation.
+  (2) End-to-end match rate between (inventory==logged need) and the simulator's own
+  `hearth_deposited`, pooled across every launch: 99.17% overall, 99.34% informed — short of the
+  ~100% bar. Root cause found and confirmed by hand on both mismatches: `main_jax.py` recorded
+  `grid.hearth_need` to the corpus **after** that step's own reassignment (the line that applies a
+  completion's reroll), so on the rare step a hearth completes, the corpus logged what it wants
+  *next*, not what it just accepted. Fixed by capturing the pre-resolution value
+  (`_hearth_need_pre_resolution`) before the reassignment and logging that instead. Confirmed to
+  **not** implicate the informed<uninformed finding: `resolve_hearth_deposits` itself reads
+  `grid.hearth_need` before this line touches it (the actual deposit decision was never affected),
+  and Gate 2's dashboard numbers come from `hearth_deposited`/`can_see_recipe` directly, never
+  from this field. (3) Need-rotation vs. delivery time: initial pooled measurement (n=5, median
+  40 steps) was corrected on review — per-hearth breakdown showed all 5 detected rotations came
+  from a single hearth (slot 3), with zero detected at the other three; Cam's suspicion of
+  clustering was right. But the alternative derived from a uniform-across-4-hearths assumption
+  (~1,707 steps) isn't supported by the data either — the true distribution is far from uniform,
+  and corpus sparsity (only ~25% of steps logged) leaves the other three hearths' true rate
+  unmeasured either way. Left unresolved, non-blocking, flagged for a better-powered check later.
+- **Vision check, decisive: `emb_own`'s hearth-dimension rows are alive, not dead.** Real
+  checkpoint (step 2670), restored through the production grafting path. `emb_own` kernel
+  (29, 256): hearth rows (13–24, position + need) median L2 norm 1.159 vs. 1.679 for non-hearth
+  rows — 69% ratio, nowhere near the 5%-of-median dead threshold. `gwt_comms_1` (2738, 256): zero
+  rows below 5% of median across the entire kernel. Per Cam's own pre-registered branching, this
+  selects the shaping lever, not re-initialization.
+- **Potential-based hearth-approach shaping added** (`jax_sim/ctd_ramp.py`'s
+  `hearth_shaping_term`, mirroring `red_shaping_term` exactly): dense gradient toward the nearest
+  hearth whose *current* need matches the material the agent holds, `F_t = beta*(gamma*Phi(s')
+  -Phi(s))`, `Phi(s)=-d(s)/D_max`, zeroed on the step a deposit happens (need rerolls on
+  completion, so the nearest matching hearth can teleport to a farther one the instant a deposit
+  lands — same reason red's is zeroed on catches). An agent holding nothing, or holding a
+  material no hearth currently wants, gets `Phi=0` (no artificial reward for an undefined target).
+  Config: `ctd_competence_ramp.hearth_shaping_enabled` (now `true`), `hearth_shaping_beta` (2.5,
+  matching red's own value as a starting point, not a derived number). Both fields appended to
+  the ecology fingerprint, so enabling shaping forces the same stage-0/A0 reset a tripwire streak
+  reached without shaping isn't evidence of anything once shaping exists. Not gated by curriculum
+  stage — distance-to-hearth has been flat in every stage measured so far (single-tile, 7×7
+  stage 0, A0, A1), so shaping applies whenever hearths exist, not just during one stage.
+  **Pre-registered for the next run:** within 30 updates of A0 starting, mean distance-to-hearth
+  must fall ≥10% below its A0 update-1 value, exceeding update-to-update noise. If not, and this
+  was the re-init branch, add shaping and continue without stopping (moot here — shaping is
+  already the branch taken). If it still doesn't decline after shaping, stop and report: that
+  would mean goal-directed navigation genuinely isn't learnable here, a different conversation
+  from anything this log has covered.
+- **Two scope bugs caught by running the smoke test, not by inspection, both the same class as
+  the `HEARTH_COORD_STAGE_IDX` bug two entries up:** a Python-level helper (`hearth_shaping`'s
+  enable flag for the dashboard print) was first defined inside `make_sim_step`, invisible from
+  `_run_simulation_impl`'s own outer training loop where the print lives — crashed with a plain
+  `NameError` on first execution. Fixed by reading the same config value again in the outer
+  scope specifically for the print, leaving `make_sim_step`'s own copy to gate the traced
+  computation. A reminder that this file's two-function split (JIT-traced step builder vs. outer
+  Python loop) doesn't share locals, and that fact doesn't announce itself until something tries
+  to cross it.
 
 ## Part 3 — Fossils
 
