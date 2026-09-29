@@ -597,6 +597,18 @@ more expensive, because it produces publishable-looking nulls.
   reward (most steps are unshaped: only ~30% of alive-steps have a target, ~40% of those move).
   If 25% of mean|r| was meant as "PPO can feel it", beta ~10 (ratio ~10%, std ratio ~35%) may
   already qualify; his call.
+  **beta=24 relaunch (resumed from 2706, `hearth_shaping_beta: 10.0 -> 24.0` fingerprint reset
+  fired as designed): steady-state dashboards (ppo 2709-2711): mean|F|/mean|r| = 19.3 / 18.3 /
+  15.7%, std(F)/std(r) = 54-60%, mean|r| 0.085-0.096 (rises with beta because r *includes* the
+  shaping, so the ratio saturates below the naive linear scaling).** Not retuned a third time:
+  both yardsticks are now well above the 10% line and the choice between them is Cam's.
+  **Pre-registered window, fixed before any outcome data: 30 updates starting at the first update
+  after this resume (ppo 2707-2736); first-5 = 2707-2711, last-5 = 2732-2736; metric =
+  `AlignedDist holders->matching_hearth` (stage-invariant), decline >= 10% and > 2x SE of the
+  difference of the two 5-update means.** Known bias, stated in advance: the first 1-2 updates
+  after every resume are empty-handed (holder coverage 3-12% of alive-steps vs 25-45% steady
+  state), so the early mean is noisier -- report the literal first-5 AND a version dropping
+  2707-08.
 
 ## Part 3 — Fossils
 
