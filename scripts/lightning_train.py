@@ -133,10 +133,19 @@ def main() -> None:
     sys.stderr = _Tee(sys.stderr, log_file)
 
     n_steps = args.n_steps or N_STEPS_FULL
+    gpu_name = "unknown"
+    try:
+        gpu_name = subprocess.run(
+            ["nvidia-smi", "--query-gpu=name", "--format=csv,noheader"],
+            capture_output=True, text=True, check=True,
+        ).stdout.strip().splitlines()[0]
+    except Exception:
+        pass
     print(
         f"lightning_train.py — THRONG | pinned HEAD {head} | n_steps={n_steps:_} | "
-        "GPU=A100-80GB (Lightning AI Studio, migrated off Modal's coolerthanyousix "
-        "after its workspace was paused mid-run 2026-09-28)",
+        f"GPU={gpu_name} (Lightning AI Studio, migrated off Modal's coolerthanyousix "
+        "after its workspace was paused mid-run 2026-09-28 -- whatever GPU type is "
+        "actually attached, detected live rather than assumed from the machine request)",
         flush=True,
     )
 
