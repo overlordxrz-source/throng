@@ -584,6 +584,19 @@ more expensive, because it produces publishable-looking nulls.
   flat: stop and report -- the "can this learner do goal-directed navigation" conversation.
   Caveat carried forward: SEs from update-level means overstate independence when needs are
   static; prefer to read the A0 (rotating-needs) stretch and the position-conditioned excess.
+  **Measured on the first relaunch dashboards (beta=10, resumed from 2700, stage-0/A0 reset as
+  designed):** update 1 after resume is not representative (agents restart empty-handed: only 6%
+  of alive-steps had a holder with a matching hearth, vs 26-34% by update 3-5; the same dip is
+  visible in the corpus at 2671 and 2674). Steady state (ppo 2704-2706): mean|F| 0.0068-0.0081,
+  mean|r| 0.069-0.075 (first direct measurement of mean|r|: ~0.07), **ratio 9.9-10.8%**,
+  std(F)/std(r) 33-36%. The offline estimate (mean|F| ~0.0136) was ~2x high -- measured beats
+  estimated, per Cam's "verify on the dashboard". Retuned beta 10 -> 24 (25/10.2 x 10) to reach
+  the ~25% target, resetting the pre-registered 30-update clock to the second relaunch. **Flagged
+  for Cam:** the two yardsticks disagree by ~3x -- at beta=24 std(F)/std(r) will be roughly 80%,
+  i.e. shaping would dominate advantage variance even though its *mean magnitude* is 25% of
+  reward (most steps are unshaped: only ~30% of alive-steps have a target, ~40% of those move).
+  If 25% of mean|r| was meant as "PPO can feel it", beta ~10 (ratio ~10%, std ratio ~35%) may
+  already qualify; his call.
 
 ## Part 3 — Fossils
 

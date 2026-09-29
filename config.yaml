@@ -474,7 +474,13 @@ ctd_competence_ramp:
   # reports the exact ratio -- retune from THAT, not from this estimate.
   # Potential-based, so policy-invariant at any beta (with gamma matching PPO's).
   hearth_shaping_enabled: true
-  hearth_shaping_beta: 10.0
+  # 2026-09-29 retune (same pre-authorization): beta=10 measured on the live
+  # dashboard at steady state (updates 2704-2706, after the post-resume
+  # empty-handed transient): mean|F|/mean|r| = 9.3-10.8% (mean|F| ~0.007-0.008,
+  # mean|r| ~0.07), std(F)/std(r) ~33-36%. My offline estimate (0.0136) was ~2x
+  # high -- measured beats estimated. Scaled 25/10.2 -> 24 to land the
+  # mean|F|/mean|r| target (~25%). Re-verify on the next steady-state dashboards.
+  hearth_shaping_beta: 24.0
   red_ramp_enabled: true
   red_ramp_beta: 2.5               # shaping coefficient (verified: full 1-cell close ~= reward_red_move)
   red_ramp_min_steps: 200000
