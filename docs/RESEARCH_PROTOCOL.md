@@ -610,6 +610,43 @@ more expensive, because it produces publishable-looking nulls.
   state), so the early mean is noisier -- report the literal first-5 AND a version dropping
   2707-08.
 
+- **Registration (Cam, timestamped 2026-09-29T13:55Z, run at ppo 2712, before the window closes
+  at 2736) -- supersedes the window stated in the entry above.**
+  * **Primary:** first-5 = ppo 2709-2713, last-5 = ppo 2732-2736. **Secondary:** the literal
+    2707-2711 first-5 (same last-5). Metric: `AlignedDist holders->matching_hearth`. Pass = decline
+    >= 10% AND > 2x SE of the difference. **SE is computed from update-level means (five against
+    five), never from individual records** -- records within an update are correlated and needs sit
+    in one geometry for long stretches, so a per-record SE badly overstates certainty.
+  * **Why excluding 2707-08 is a registration and not a moved bar:** the reason is holder coverage
+    (3-12% of alive-steps at 2707-08 vs 25-45% steady state), which is independent of the distance
+    outcome, decided before any last-5 outcome data exists. Disclosure: the per-update
+    `AlignedDist` values for 2707-2711 had already been printed to the log/report when this was
+    registered; the last-5 window (2732-2736) is entirely unseen.
+  * **Shaping-strength yardstick, settled by Cam: variance.** PPO normalizes advantages, so mean
+    shifts are absorbed by the value baseline and the gradient feels variance. Shaping is
+    ~55-60% of per-step reward variance at beta=24 (std(F)/std(r)) -- very much felt. The
+    mean/variance gap is structural for potential-based shaping (signed +/-beta steps cancel in
+    mean, not in variance); the "25% of mean|r|" target used the wrong yardstick. Both readings
+    clear the 10% line. **beta=24 stands; nothing changes until the window closes.**
+  * **A0 mismatch (shaping toward matching hearth vs. A0's accept-any deposit): left as is, noted
+    as a later refinement.** It doesn't invalidate the test: shaping and the aligned metric both
+    use `need == held`, and the question is whether shaping toward the matching hearth produces
+    approach to it, on which A0's deposit rule has no bearing.
+  * **Stage record:** the beta change (10 -> 24) reset the fingerprint as designed: at ppo 2706
+    the ramp went "stage 0 -> stage 0, starting now at ppo=2706" (the first beta change, 2.5 -> 10
+    at ppo 2700, had taken it A1 -> A0). Stage at 2707 = A0; at ppo 2712, stage 0/3 [A0],
+    streak 1/3, no transition inside the window so far. Any transition will be logged here.
+  * **For the record:** (1) blindness is falsified -- `emb_own` hearth rows alive at ~70% of the
+    non-hearth median at both 2670 and 2700; (2) the beta=2.5 shaping was effectively zero, so
+    **navigation had never actually been tested before this run**.
+  * **Decision tree:** pass -> navigation is learnable with a real gradient; next question is
+    whether informed agents approach the matching hearth more than uninformed ones (where the
+    channel finally has a job). Fail with shaping this strong -> the genuine "can this learner do
+    goal-directed navigation" conversation, earned. Report at 2736, at any transition, or on a trip.
+  * **Ops:** Lightning Studio `auto_shutdown`/`auto_sleep` disabled 2026-09-29T13:55Z with the
+    user's explicit permission (the earlier auto-mode block had been on unauthorized settings
+    changes).
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
