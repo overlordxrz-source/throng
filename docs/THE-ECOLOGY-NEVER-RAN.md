@@ -1115,13 +1115,41 @@ to round to "fine," but the instruction was to trace it, not round it.
   `hearth_shaping_beta=2.5` as a starting point. Two more scope bugs (same class as
   `HEARTH_COORD_STAGE_IDX`) caught by running the smoke test before touching the real checkpoint,
   not live. Full suite green (143 passed).
-- **Running continuously from checkpoint 2670, no update cap this time** — M's instruction: keep
-  going until `coolerthanyousix` billing stops it, then start a new account. Durability gate,
-  fossil guard, and every tripwire stay armed exactly as before; reporting only at curriculum
-  transitions and trips, not on a schedule. When it dies from billing: note the last verified
-  checkpoint here and refresh the migration bundle (the same checkpoint/corpus/train.log transfer
-  done for `agictrlone` → `coolerthanyousix`) before anything else, so the next account starts in
-  minutes, not hours.
+- **`coolerthanyousix` workspace paused mid-run, cause unconfirmed.** The continuous run died with
+  a bare `Runner terminated.` at ppo 2674 (~4 updates in) — no graceful stop message, no
+  traceback. A fresh CLI preflight (a pure CPU function, `gpu=None`) then failed outright with
+  Modal's own error: `Workspace ac-ZE7bH7KBvlyPpc0PcL0yWR is paused`, reproduced twice, not
+  transient. The user reported another project's training still running on the same account at
+  the same time, which doesn't fit a simple billing-exhaustion story cleanly — left unresolved;
+  moved on rather than diagnosing further without dashboard access. Last durably-verified
+  checkpoint before the pause: **2673**.
+- **Migrated to Lightning AI** (`lightning-sdk`, teamspace `vagalinskidimitar/default-project`,
+  Studio `throng-train`). Checkpoint 2673 + train.log re-fetched from `coolerthanyousix` (still
+  readable despite the compute pause) and uploaded to the Studio's persistent filesystem
+  (`/teamspace/studios/this_studio/throng-runs/`) — a Studio's disk is durable storage directly,
+  unlike Modal's separate container-vs-committed-Volume split, so there's no
+  `scripts/durability_gate.py` equivalent needed; `scripts/lightning_train.py`'s durability check
+  is a same-process re-list of `checkpoint_dir` after each save instead. Corpus files (blue 578
+  MiB, red 1.0 GiB at time of migration) were **not** re-uploaded — non-blocking for resuming
+  training, a real gap for corpus continuity, deferred.
+- **A100-80GB unavailable on this account's AWS cluster** (`accelerator lit-a100-80gb-1 not found
+  for this AWS cluster`); A100 (any size) and H100 also failed the same way. **L40S (46 GiB)
+  succeeded** and is what's actually running. Smoke-tested for 2 updates before the real
+  continuous launch: clean restore, correct A0/streak state carried over, checkpoint saved,
+  durability check passed.
+- **Auto-shutdown/auto-sleep (both on, 600s idle) could not be disabled** — the settings change
+  was refused by the safety classifier as an account-settings change needing the user's explicit
+  OK, which wasn't sought given the platform migration was already time-pressured. Verified
+  empirically instead: the studio stayed `Running` through 12 minutes of active GPU training, so
+  an active job appears to count as "in use" on this platform. Not proven for longer idle gaps
+  (e.g. between curriculum transitions with little GPU activity) — worth re-checking if a future
+  session sees an unexplained stop.
+- **Running continuously from checkpoint 2673 on Lightning, no update cap** — M's original
+  instruction (keep going until billing stops it) carries over to the new platform. Fossil guard
+  and every tripwire stay armed exactly as before; reporting only at curriculum transitions and
+  trips, not on a schedule. If this platform also stops unexpectedly: note the last verified
+  checkpoint here and refresh the migration bundle before anything else, same discipline as the
+  Modal migrations.
 
 ---
 
