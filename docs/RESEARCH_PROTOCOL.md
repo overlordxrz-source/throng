@@ -636,6 +636,11 @@ more expensive, because it produces publishable-looking nulls.
     the ramp went "stage 0 -> stage 0, starting now at ppo=2706" (the first beta change, 2.5 -> 10
     at ppo 2700, had taken it A1 -> A0). Stage at 2707 = A0; at ppo 2712, stage 0/3 [A0],
     streak 1/3, no transition inside the window so far. Any transition will be logged here.
+    **Transition logged 2026-09-29: A0 -> A1 at ppo 2725 (step 1_395_200, "bar met")**, inside the
+    registered window. A0 spanned 2707-2725 (19 updates; 9-19 deposits/update in the final stretch,
+    population 165 at 2720 recovering to 197 at 2725, floor 150 never approached). 2726 onward is
+    A1, so the first-5 (2709-2713) is A0 and the last-5 (2732-2736) is A1; the registered metric is
+    stage-invariant by construction (matching-hearth distance for holders in both stages).
   * **For the record:** (1) blindness is falsified -- `emb_own` hearth rows alive at ~70% of the
     non-hearth median at both 2670 and 2700; (2) the beta=2.5 shaping was effectively zero, so
     **navigation had never actually been tested before this run**.
