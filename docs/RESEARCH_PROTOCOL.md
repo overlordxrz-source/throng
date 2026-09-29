@@ -524,6 +524,67 @@ more expensive, because it produces publishable-looking nulls.
   awaiting Cam's read rather than continuing on an unmet threshold. Last verified checkpoint: 2700
   (Lightning AI Studio `throng-train`, `/teamspace/studios/this_studio/throng-runs/`).
 
+- **Cam's follow-up on the shaping run (2026-09-29): the -3.39% "first real directional signal"
+  above is retracted as evidence; the offline checks (zero GPU) say the shaping was too weak to
+  test anything.** All numbers from the Lightning corpus + Modal corpus tail (updates 2669-2700,
+  ~3,700 uniformly-sampled alive agents/update; `hearth_dist` reproduced from the corpus tracks the
+  dashboard's own `mean_dist_to_hearth` at r=0.96, mean difference -0.02, so the instrument is
+  sound). Scripts were scratchpad-only; the definitions are in the bullets.
+  1. **Baseline was a single draw (third time this session).** 21.600 (ppo 2671) is the highest
+     value in the window; window mean 21.07, update-to-update sd 0.39, range 20.33-21.98. First-5
+     mean (2671-75) 21.386 vs last-5 (2696-2700) 20.868: -2.4%, |diff|/SE = 3.6 on update-level SE
+     -- but that is the all-agent metric (includes ~30% empty-handed agents and the A0->A1 stage
+     switch inside the window), it sits inside the earlier "flat" range (20.47-21.44), and it does
+     **not** appear where the shaping acts (below). Not evidence of learned approach.
+  2. **Aligned instrument (holders only; nearest hearth wanting the carried material -- exactly
+     the shaping target).** No approach in either stage. Within A0 (2671-75 vs 2677-81): 39.5 ->
+     38.3 (-3.0%, 0.5 SE); against a position-conditioned null (same positions, random matching
+     hearth): excess +0.85 -> -0.16, 0.6 SE. Within A1 (2682-86 vs 2696-2700): 37.0 -> 49.9
+     (+34.8%) -- *farther*, not closer -- excess vs the null +0.27 -> +8.28. **That A1 rise is not
+     interpretable as avoidance:** hearth needs sat on essentially one configuration from 2684 on
+     (one hearth changing at a time: [4,4,4,3] -> [4,4,3,3] -> [4,4,3,0] -> [4,4,2,0]), so ~17
+     "updates" are one geometry; the update-level SEs there badly overstate independence. Stated
+     narrowly: no evidence of approach anywhere, and the only stage with enough need-rotation to
+     average over geometry (A0) is flat. Holders-only nearest-ANY (A0's rule) is also flat:
+     21.31 -> 21.09 (-1.0%, 0.7 SE). Stage-aware literal metric (A0-any vs A1-matching) is
+     meaningless across the switch (21.3 vs 49.9 is definition change, +134%) -- use the
+     stage-invariant matching-hearth metric for cross-stage comparison.
+  3. **Shaping strength -- it was effectively off.** Real `hearth_shaping_term` driven with each
+     sampled holder's actual position/holding/needs and the measured action mix (A0 move-fraction
+     0.43, A1 0.41), 20 draws/record: at beta=2.5 mean|F| = 0.0030 (A0) / 0.0034 (A1) over all
+     agent-steps, std(F) ~0.0105, only 32-37% of agent-steps have a defined target. Blue reward
+     over the last 30 updates: mean 0.024, std 0.096 (rms 0.102). So mean|F| is ~3-14% of the
+     |mean reward| lower bound and a few percent of any realistic mean|r| (mean|r| itself is not
+     logged -- the new dashboard line reports it); the logged signed `shaping_mean`
+     (0.0007-0.0011) is 2-4% of reward and is fully explained by potential-based shaping's
+     (1-gamma) drift for holders (MC no-navigation mean: 0.0005 A0 / 0.0008 A1, matching the log)
+     -- i.e. zero net approach, consistent with item 2. **Under Cam's pre-authorized rule (<10%):
+     shaping was configured but never really on.**
+  4. **Row norms, on the record (were in this log but not in the chat report).** Branch decision,
+     ckpt 2670: `emb_own` (29,256) hearth rows 13-24 median L2 1.159 vs 1.679 non-hearth (69%);
+     `gwt_comms_1` (2738,256): 0 rows under 5% of median. Re-measured ckpt 2700 (post-shaping,
+     raw restore): `emb_own` 1.225 vs 1.721 (71%), `gwt_comms_1` blue 0 rows <5% (min 0.088) --
+     alive before and after, barely moved. (Red's own `gwt_comms_1` has 95 near-zero rows; red's
+     comms are decoupled, unrelated to hearths.)
+  5. **Discrepancy flagged, NOT changed:** `hearth_shaping_term` targets the nearest hearth whose
+     need matches the held material in *every* stage, but A0's deposit rule accepts ANY hearth
+     (`accept_any_material`). In A0 shaping therefore pulls toward a matching hearth even when a
+     nearer one would score, and gives holders with no matching hearth (~40% of A0 holders) no
+     signal at all. Harmless in A1 (rule and shaping agree); in A0 it weakens shaping. Left as is:
+     changing it would be a second variable alongside beta.
+  **Decision (pre-authorized): scale beta.** 2.5 -> 10.0 (mean|F| ~0.0136, i.e. 17-34% of any
+  plausible mean|r|, bracketing the 25% target), plus log-only instrumentation:
+  `ShapingStrength` (mean|F|, mean|r|, ratio, std ratio -- same (T,N) arrays PPO averages) and
+  `AlignedDist` (holders->matching hearth, holders->any hearth) on every dashboard. Retune beta
+  from the first dashboard's measured ratio, not from the estimate above. `hearth_shaping_beta`
+  is in the ecology fingerprint, so this resumes from 2700 with the designed stage-0/A0 reset.
+  **Pre-registered for the relaunch:** aligned metric (holders -> matching hearth; stage-invariant),
+  first-5 mean vs last-5 mean over 30 updates, decline >= 10% AND exceeding twice the SE of the
+  difference. If shaping is meaningful (first-dashboard ratio in range) and the aligned metric is
+  flat: stop and report -- the "can this learner do goal-directed navigation" conversation.
+  Caveat carried forward: SEs from update-level means overstate independence when needs are
+  static; prefer to read the A0 (rotating-needs) stretch and the position-conditioned excess.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
@@ -575,6 +636,12 @@ changed. That collapse, or its absence, is the tell.
   it.
 - **Never adjust an ecological parameter to make a gate open.** That destroys the only clean
   test available.
+- **No threshold is ever registered against a single-update baseline.** First-5 mean, minimum,
+  and the SE of the difference between two 5-update means (or better) sets the noise bar. A high
+  first draw followed by an ordinary mean is regression to the mean and reproduces a "decline"
+  with nothing learned. Confirmed instance (2026-09-29): the shaping-run check was registered
+  against ppo 2671's 21.600, the highest value in the whole record (third time this session:
+  twice with C0, once here).
 - **Kill the class, not the instance.** Four hand-written mask sites produced two bugs; one
   shared constant and one shared function produced none.
 

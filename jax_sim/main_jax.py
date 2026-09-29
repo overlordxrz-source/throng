@@ -857,6 +857,22 @@ def make_sim_step(
         )
         hearth_shaping = jnp.where(_hearth_shaping_enabled, _hearth_shaping_raw, 0.0)
 
+        # 2026-09-29 (Cam): the all-agent nearest-hearth distance above is not
+        # what the shaping rewards -- it includes agents holding nothing (pure
+        # noise) and agents whose matching hearth isn't their nearest. Aligned
+        # instruments, same held-material/need snapshot the shaping itself
+        # uses, -1 where undefined (dashboard averages only the valid ones):
+        #   hearth_dist_matching: holders, nearest hearth wanting what they hold
+        #   hearth_dist_held_any: holders, nearest hearth of any kind (A0's rule)
+        _hd_all = jnp.maximum(_hd_dx, _hd_dy)  # (N, H) toroidal Chebyshev, already computed above
+        _hd_match = (_hearth_held_material[:, None] == _hearth_need_pre_resolution[None, :]) & (_hearth_held_material[:, None] >= 0)
+        hearth_dist_matching = jnp.where(
+            jnp.any(_hd_match, axis=1),
+            jnp.min(jnp.where(_hd_match, _hd_all, 1e9), axis=1),
+            -1.0,
+        ).astype(jnp.float32)
+        hearth_dist_held_any = jnp.where(_hearth_held_material >= 0, hearth_dist_nearest, -1.0).astype(jnp.float32)
+
         consume_wood = hearth_deposited & (new_inv_wood > 0)
         consume_stone = hearth_deposited & (new_inv_stone > 0)
         consume_flint = hearth_deposited & (new_inv_flint > 0)
@@ -1193,6 +1209,8 @@ def make_sim_step(
             "hearth_attempted": hearth_attempted.astype(jnp.float32),
             "hearth_completed": hearth_completed.astype(jnp.float32),
             "hearth_dist_nearest": hearth_dist_nearest,
+            "hearth_dist_matching": hearth_dist_matching,
+            "hearth_dist_held_any": hearth_dist_held_any,
             "hearth_need": _hearth_need_pre_resolution,
             "hearth_shaping": hearth_shaping,
             "can_see_recipe": b_pop.can_see_recipe.astype(jnp.float32),
@@ -2199,6 +2217,7 @@ def _run_simulation_impl(
     # for the dashboard print below; make_sim_step's own copy is what
     # actually gates the traced shaping computation.
     _hearth_shaping_enabled_outer = bool(_ramp_cfg_outer.get("hearth_shaping_enabled", False))
+    _hearth_shaping_beta_outer = float(_ramp_cfg_outer.get("hearth_shaping_beta", 2.5))
     # 2026-09-14 (Cam): 5_120 (10 updates), not 50_000 -- the old floor was
     # sized for the retired success/attempts bar and now dominates the
     # per-capita bar entirely (see config.yaml's ctd_competence_ramp comment
@@ -3743,6 +3762,33 @@ def _run_simulation_impl(
                 f"(streak={red_ramp_catch_streak}/{red_ramp_catch_window}, "
                 f"shaping_mean={_red_shaping_mean:.5f})"
             )
+            # 2026-09-29 (Cam): shaping_mean above is a SIGNED mean -- potential-based
+            # shaping telescopes, so for agents making no net progress it is ~0 (plus
+            # the small (1-gamma) drift) however large the per-step signal is. What PPO
+            # feels is per-step magnitude relative to the reward it is added to. Same
+            # (T, N) arrays PPO's own "[DEBUG] rewards" line averages, so ratios are
+            # directly comparable to it. Target for the shaping lever: mean|F| about
+            # 25% of mean|r| (under 10% = configured but effectively not applied).
+            if "hearth_shaping" in rollout_data["blue"]:
+                _sh = np.asarray(rollout_data["blue"]["hearth_shaping"])
+                _rw = np.asarray(rollout_data["blue"]["rewards"])
+                _sh_abs, _rw_abs = float(np.abs(_sh).mean()), float(np.abs(_rw).mean())
+                _sh_std, _rw_std = float(_sh.std()), float(_rw.std())
+                _dm = np.asarray(rollout_data["blue"]["hearth_dist_matching"])
+                _dh = np.asarray(rollout_data["blue"]["hearth_dist_held_any"])
+                _al = np.asarray(rollout_data["blue"]["alive"]).astype(bool)
+                _dm_ok, _dh_ok = _al & (_dm >= 0), _al & (_dh >= 0)
+                _dm_str = f"{float(_dm[_dm_ok].mean()):.2f}" if _dm_ok.any() else "n/a"
+                _dh_str = f"{float(_dh[_dh_ok].mean()):.2f}" if _dh_ok.any() else "n/a"
+                print(
+                    f"  ShapingStrength: mean|F|={_sh_abs:.5f} mean|r|={_rw_abs:.5f} "
+                    f"ratio={_sh_abs / max(_rw_abs, 1e-9):.1%} (target ~25%; <10% = not really on) | "
+                    f"std(F)/std(r)={_sh_std / max(_rw_std, 1e-9):.1%} | beta={_hearth_shaping_beta_outer}"
+                )
+                print(
+                    f"  AlignedDist: holders->matching_hearth={_dm_str} (n={float(_dm_ok.sum()) / max(1, float(_al.sum())):.1%} of alive-steps) | "
+                    f"holders->any_hearth={_dh_str} (n={float(_dh_ok.sum()) / max(1, float(_al.sum())):.1%})"
+                )
 
             if craft_ramp_active_outer:
                 # Three ratcheting stages (2026-09-21, hearths): the same

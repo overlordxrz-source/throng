@@ -464,8 +464,17 @@ ctd_competence_ramp:
   # jax_sim/ctd_ramp.py's hearth_shaping_term). beta=2.5 matches red's own
   # value as a starting point, not a derived number -- Cam's to tune once
   # this run shows results.
+  #
+  # 2026-09-29 (Cam's pre-authorized decision): beta=2.5 was never really on.
+  # Real per-step strength at 2.5 (real hearth_shaping_term driven with the
+  # corpus positions/holdings/needs + measured action mix, RESEARCH_PROTOCOL.md
+  # Part 2): mean|F| ~0.0034 vs blue reward mean 0.024 / std 0.096 -- a few
+  # percent of |reward|, under Cam's 10% line. Scaled 4x so mean|F| lands near
+  # 25% of mean|r|; the run's own first dashboard line ("ShapingStrength")
+  # reports the exact ratio -- retune from THAT, not from this estimate.
+  # Potential-based, so policy-invariant at any beta (with gamma matching PPO's).
   hearth_shaping_enabled: true
-  hearth_shaping_beta: 2.5
+  hearth_shaping_beta: 10.0
   red_ramp_enabled: true
   red_ramp_beta: 2.5               # shaping coefficient (verified: full 1-cell close ~= reward_red_move)
   red_ramp_min_steps: 200000
