@@ -509,6 +509,20 @@ more expensive, because it produces publishable-looking nulls.
   computation. A reminder that this file's two-function split (JIT-traced step builder vs. outer
   Python loop) doesn't share locals, and that fact doesn't announce itself until something tries
   to cross it.
+- **Shaping run's pre-registered check: failed the threshold, but not flat — the first real
+  directional signal this investigation has measured.** A0 update-1 (ppo 2671) mean
+  distance-to-hearth 21.600; last-5 of the 30-update window (ppo 2696–2700) mean 20.868 — **-3.39%**,
+  short of the required -10%. But the decline itself (0.732) **does** exceed the update-to-update
+  std (0.385) — a real decline, not noise, unlike single-tile, 7×7 stage 0, and A0's own first
+  clearance, all of which were flat within noise. A0 itself re-cleared via `bar met` at ppo 2681 (11
+  updates, inheriting a streak of 2 from before the Modal pause); A1 then showed the familiar
+  pattern sharpened further — attempts jumped from ~10–20/update in A0 to 84–377/update in A1,
+  while deposits collapsed to 0–2/update, the conjunction's second half still the bottleneck.
+  Population dipped to 151 at ppo 2696 (never crossed the 150 floor); energy never below 0.419. No
+  halt trigger fired. **Per the pre-registered rule, this is a stop-and-report point** (shaping was
+  the branch already taken, so "add shaping and continue" doesn't apply): run stopped, reported,
+  awaiting Cam's read rather than continuing on an unmet threshold. Last verified checkpoint: 2700
+  (Lightning AI Studio `throng-train`, `/teamspace/studios/this_studio/throng-runs/`).
 
 ## Part 3 — Fossils
 
