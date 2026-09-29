@@ -652,6 +652,39 @@ more expensive, because it produces publishable-looking nulls.
     user's explicit permission (the earlier auto-mode block had been on unauthorized settings
     changes).
 
+- **Window result (beta=24, ppo 2707-2735): registered check FAILED -- no approach to the matching
+  hearth -- and the run crashed at 2736, one update before the window closed. Stop-and-report
+  per the registered decision tree ("fail with shaping this strong").**
+  * **Crash:** 2026-09-29 ~15:16Z during the red PPO update of ppo 2736,
+    `XlaRuntimeError: INTERNAL: Failed to launch ptxas`, raised inside a small diagnostic
+    reduction (`_head_grad_norm`, `jnp.sum(g**2)`) that had run every update before; disk was fine
+    (355 GB free) and the Studio was found Stopped afterwards with `auto_sleep`/`auto_shutdown`
+    both False. **Cause unconfirmed** -- looks host-level (process spawn failed on an
+    already-compiled op), not code; not investigated further. Last committed checkpoint **2733**
+    (2734-35 dashboards exist in the log but have no checkpoint; 2736 never printed). Artifacts
+    saved locally: `~/throng-migration-bundle/` (ckpt 2700, nohup_2735.out, train.log, corpus).
+  * **Registered comparison, last window 4 of 5 (2732-2735), update-level means, SE from
+    five-vs-four update means:** primary first-5 (2709-13) 38.63 -> last-4 45.54, **+17.9%**
+    (farther), SE 3.11, 2.2 SE the *wrong way*. Secondary literal first-5 (2707-11) 36.64 -> 45.54,
+    +24.3%. **A pass is arithmetically impossible even without 2736:** the five-update last mean
+    cannot fall below 4*45.54/5 = 36.4 while the pass line is 34.8 (distance cannot be negative).
+    So the missing update does not change the verdict.
+  * **Position-conditioned null (same positions, randomised matching hearth; corpus reproduces the
+    dashboard: 38.75 / 45.47):** A0, 2709-2725, needs rotating through 17 configurations: mean
+    excess **-0.56** (about zero; A0-late 2721-25 vs first-5: +0.46, 0.2 SE) -- no approach in the
+    only stretch with enough need-rotation to average geometry. A1, 2726-2735: excess +3.9 (up to
+    +6), but needs sat on two configurations ([4,4,3,4], then [4,4,1,4]) -- the single-geometry
+    confound again, so "farther" is not interpretable as avoidance. Stated narrowly: **with shaping at
+    ~55-75% of per-step reward variance (std(F)/std(r); mean|F|/mean|r| 20-30% steady state),
+    holders showed no movement toward the hearth wanting what they carry.**
+  * **Context, not evidence of learning:** A0 cleared its bar at 2725 (deposits 4-19/update),
+    A1 then collapsed to 0-2 deposits/update with 3-83 attempts (wrong material), holder coverage
+    dipped to 13-18% at 2726-31 then recovered to ~37%; population minimum 165 (2720, floor 150
+    never approached).
+  * **Status:** run stopped (crash), not relaunched -- the pre-registered branch says this is the
+    genuine "can this learner do goal-directed navigation" conversation and needs Cam's read
+    before any more compute. Studio stopped 2026-09-29 to avoid idle spend (files persist).
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
