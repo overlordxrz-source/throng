@@ -685,6 +685,57 @@ more expensive, because it produces publishable-looking nulls.
     genuine "can this learner do goal-directed navigation" conversation and needs Cam's read
     before any more compute. Studio stopped 2026-09-29 to avoid idle spend (files persist).
 
+- **Cam's three offline checks after the failed window (2026-09-30, zero GPU): (a) shaping direction
+  PASSES; (b) positive control shows almost no directional movement; (c) not run, gated off by
+  (b) per his decision tree.** Hypothesis under test: a direction/position error in the shaping
+  would produce exactly the observed pattern (A0 flat as the target rotates, A1 rising as a frozen
+  target is pushed *away* from); the earlier Monte Carlo validated magnitude, not sign.
+  * **(a) Direction test -- pass, and the test is non-vacuous.** `tests/test_hearth_shaping_direction.py`
+    (6 tests, production shapes: grid 128, N=200, beta=24, gamma=0.999; positions from the REAL
+    `apply_moves`, so the torus wrap comes from the environment, not my arithmetic): toward the
+    matching hearth -> F>0, away -> F<0, across the x and y wrap boundaries, 1,500 random
+    (position, action, material, needs) draws vs an independent numpy torus-Chebyshev, batch of 200
+    == one-at-a-time, empty-handed and deposit steps -> 0. **Mutation-checked:** replacing the
+    function with a sign-flipped, s'==s (Cam's exact hypothesis), or s/s'-swapped version makes 4
+    of the 6 fail. **Real call site:** a recording wrapper around `hearth_shaping_term` inside the
+    real training loop (`jax.debug.callback`, 160 real steps, grid 32 / 24 agents on CPU -- a
+    production-size CPU rollout was not attempted; the code path is shape-agnostic and production
+    shapes are covered by the unit tests): s != s' for 38.3% of agent-steps (so not the same
+    position); pre-move position at t+1 equals post-move position at t for 97.5% of agent-steps
+    (s really is pre-move; the rest are deaths/respawns); every F equals an independent recompute
+    from the loop's own arguments; closer to the matching hearth -> F>0 16/16, farther -> F<0
+    13/13; 48 torus-wrapping moves in the sample. Source check agrees: `_b_pos_before_move` is
+    captured before `apply_moves`, `b_pop` is replaced with the post-move positions after it.
+    **The shaping sign is correct; the 'F collapses to (gamma-1)Phi(s)' failure mode is ruled out.**
+    So the failed window stands as run (`registration` above); no fix, no re-run triggered by (a).
+  * **(b) Positive control -- blue barely moves directionally even relative to its predator.**
+    Corpus 2673-2735 (221,885 records, launch 8711 duplicate excluded). Being caught costs blue
+    -2 and its life (`b_penalty = -1*caught`, times |reward_blue_caught|=2 -- checked, sign right),
+    so fleeing red is the natural directional behavior. Statistic: for records whose action is a
+    move, m.u where u is the unit vector to the nearest red (bearing = atan2(axis0 offset, axis1
+    offset), action deltas from `apply_moves`); +1 straight toward, -1 straight away; update-level
+    SE. Baseline (red >20 away, unsensed): -0.003. Adjacent (d<=1): **-0.071** (SE 0.011; shift vs
+    baseline -0.068, z=3.7; 54% of moves have an away component vs 48-49% baseline) -- a real but
+    tiny flee. d=2 (edge of the 5x5 patch, the last distance red is visible at): +0.020 (no flee).
+    d=3-20 ~0 (expected: blue is blind beyond the patch). Caveats stated: nearest-red only;
+    possible one-step misalignment between action and the bearing's position snapshot (a real fleer
+    would then appear at d=2 with negative m.u -- it doesn't); "toward food when energy is low"
+    could not be run (corpus has local resource amount, not direction). **Read:** nothing
+    approaching robust goal-directed movement is visible even for the strongest, longest-trained
+    signal in the world; this is weak-to-moderate evidence, not proof, that the learner as built
+    does not navigate directionally.
+  * **(c) Not run:** gated on (a) passing AND (b) showing navigation; (b) did not. Checkpoint 2733
+    is staged locally for it if Cam wants the hearth_rel-vs-red-position sensitivity comparison
+    anyway (it would also help interpret (b)).
+  * **Decision-tree position:** (a) passes, (b) no directional behavior -> the branch Cam described
+    as "the learner can't do goal-directed movement in this architecture ... the real
+    conversation", pending his concrete proposal. Nothing relaunched.
+  * **Migration status:** the new Lightning account's key authenticates but is forbidden (403) on
+    the teamspace (`overlordxrz-org/default-project`), so the Studio could not be created; the old
+    account is out of balance ("insufficient balance", explains the stop after the ptxas crash).
+    Bundle staged locally at `~/throng-migration-bundle/` (checkpoint 2700 + **2733**, corpora
+    through 2735, logs). The Mac's disk is ~98% full (520 MB free).
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
