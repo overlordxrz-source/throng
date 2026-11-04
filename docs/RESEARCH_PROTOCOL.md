@@ -888,6 +888,20 @@ more expensive, because it produces publishable-looking nulls.
     multi-red catches lift the per-caught-blue slope above 6. Not a bug against the ruling; whether 6.0 is the
     intended magnitude is Cam's call.
 
+- **Amendment to the entry above (same day, before reporting to Cam) -- two claims stated more strongly than the
+  data supports.**
+  * **The exploratory flee note is narrowed.** The flee vanishing at the resume is *consistent with* the flee living
+    in the executed imagined actions, but other things changed at that same resume and are not separated from it:
+    the fingerprint reset A1 -> A0 (accept-any material; holder coverage rose, so hearth pull may override flee),
+    the imagination metabolic tax stopped being charged, and the platform changed (L40S/jax 0.10.0 -> A100/0.10.2).
+    And gate-off d<=1 = +0.037 (SE 0.013, z ~2.8) is movement *toward* adjacent red, not an absent flee -- a separate
+    effect, **unexplained** (candidates, untested: hearth attraction where reds sit near hearths; action/position
+    snapshot misalignment). "The reactive policy carries no flee" is withdrawn.
+  * **Red-catch: explained from source, not fitted.** 3.0 + 3.0 = 6.0 per credited red is read from the code; the
+    multi-red credit factor needed to reach ~6.5 (~1.08 credited reds per caught blue) was not measured, and the
+    units of the original slope (per-catch totals vs per-red means) were not re-checked. Status: likely explained,
+    not closed.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
