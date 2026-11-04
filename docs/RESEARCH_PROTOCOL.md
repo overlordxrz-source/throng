@@ -824,6 +824,27 @@ more expensive, because it produces publishable-looking nulls.
     a third time for RAM before its first dashboard); update 1 on the real run is the end-to-end
     test, enforced by the in-code apparatus halt.
 
+- **Cam's approval + interpretation, fixed before results (2026-11-04T05:58Z).** Approved as registered,
+  thresholds included. Read of check 2: carry-forward MSE ~0.0002 makes the 4 action-dependent
+  terms differences of near-identical values -> deterministic noise; and a 77% gate picking Stay
+  39-55% of the time freezes about a third of executed moves. Both mechanisms predict a navigation
+  null and the ablation removes both, so a pass will not say which mattered (accepted; separate
+  later only if it matters). Disclosure 2 (no metabolic tax) left as is: better-fed creatures
+  weaken the pull toward hearths, so it biases toward FAIL, making a pass more credible.
+  **Interpretation:**
+  * clip <= 0.20 AND primary passes -> the gate was the blocker; keep force_reactive on, next run
+    resumes the A0->A1 progression.
+  * clip <= 0.20 AND primary fails -> estimator fixed, navigation still absent: the honest learner
+    question; Cam brings a proposal.
+  * clip stays high -> the mechanism story is wrong whatever distance does; stop and find what
+    else produces off-policy-looking updates BEFORE reading the primary.
+  **Operational changes before update 1 (no outcome data existed):** the first launch
+  (ap-1KfT8fhCEO6GwFHfFc9T7F) confirmed the fingerprint reset (schema 24 -> 26 fields) and A1 ->
+  A0, then was stopped while still compiling -- no update completed, volume still held only
+  checkpoint 2733. `checkpoint_interval` 2000 -> 512 (every update instead of every 3; durability
+  only, not in the fingerprint), re-pinned to `bcaf1ce`, relaunched. Reporting cadence per Cam:
+  update-1 apparatus line, then updates 2-5 clip, then nothing until 2763.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
