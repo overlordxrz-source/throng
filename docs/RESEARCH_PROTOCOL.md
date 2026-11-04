@@ -859,6 +859,35 @@ more expensive, because it produces publishable-looking nulls.
     mean) read 0.078; 2739-2740 read 0.044 / 0.046. The off-policy story predicted exactly this.
   * Per Cam: nothing further reported until the window closes at ppo 2763.
 
+- **Gate-off ablation -- window closed (ppo 2734-2763, `launch_id=d6efb75d25c5`).** No tripwire, halt or apparatus
+  failure on any update; `executed==reactive` 100.0% and curriculum HELD at A0 throughout; blue 194-200, red 250.
+  App stopped at ppo 2764 (checkpoints 2734-2764 on the volume); Modal metered $4.98, all credits.
+  * **Primary: FAIL.** `AlignedDist holders->matching_hearth`, update-level means: first-5 (2736-2740) 39.12
+    (sd 1.87), last-5 (2759-2763) 40.07 (sd 2.03); diff -0.95, SE 1.23 -- a 2.4% *increase*, z -0.77. Secondary
+    literal first-5 (2734-2738) 39.95 -> 40.07, -0.3%, z -0.09. Not registered, read for context only:
+    `holders->any_hearth` 21.91 -> 21.53 (1.7% decline, z 4.2) -- far below the 10% bar; holder coverage rose
+    ~41% -> ~55% of alive-steps.
+  * **Secondary red-flee: FAIL, and weaker than baseline.** Corpus records with this launch_id, updates 2749-2763
+    (55,854 records; update u = steps [(u-1)*512, u*512)): d<=1 mean m.u **+0.009** (SE 0.016, 15 updates) against
+    the <= -0.14 bar and the -0.071 baseline; d=2 -0.021 (SE 0.013) vs far>20 -0.012 (SE 0.023), z -0.36 (bar |z|>2).
+    Off-by-one update assignment (u = step//512) gives the same read (d<=1 +0.012, d=2 z +0.40).
+    **Instrument check:** the analysis script was rebuilt (the original was lost with the scratchpad; now
+    `~/throng-smoke/scripts/red_flee.py`) and run on the old corpus 2673-2735 excluding `8711e4a20e62`: 221,885
+    records (same count), d<=1 -0.0707 SE 0.0106, d=2 +0.0205 SE 0.0081 -- reproduces the published baseline.
+  * **Exploratory, not registered: the old flee came from the executed imagined actions.** Last gate-on launch
+    (`3475709db423`, 2700-2735): d<=1 -0.075 (SE 0.013). First gate-off stretch (2736-2748): d<=1 **+0.037**
+    (SE 0.013). The flee vanished the moment imagination stopped being executed, before 13 updates of training could
+    plausibly erase a learned behaviour. Read: the reactive policy carries no adjacent-red flee at all; the weak
+    -0.07 "positive control" was the imagination path's carry-dynamics argmax, not the learner.
+  * **Interpretation (Cam's tree, fixed 05:58Z):** clip <= 0.20 (0.060) AND primary fails -> "estimator fixed,
+    navigation still absent: the honest learner question; Cam brings a proposal." Nothing relaunched.
+  * **OPEN item closed -- red catch ~6.5 per caught blue.** Source: a caught small blue pays each red in
+    Chebyshev range `phase16.reward_small_blue: 3.0` (`r_caught_small`, a count) **plus** `reward_red_catch: 3.0`
+    (`r_caught_any`), wired additively alongside the phase16 terms per Cam's earlier ruling (comment at
+    `main_jax.py` ~1155) = 6.0 per credited red; every red within radius 1 of the caught blue is credited, so
+    multi-red catches lift the per-caught-blue slope above 6. Not a bug against the ruling; whether 6.0 is the
+    intended magnitude is Cam's call.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
