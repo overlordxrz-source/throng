@@ -1008,6 +1008,46 @@ more expensive, because it produces publishable-looking nulls.
     (2734) -> 45% (2740) -> 35% (2749) -> 26% (2763); other moves flat ~7-10%. Supports, without testing, the
     reading that a gate-on-era "drift East" bias (blind drift on a torus, not navigation) is relaxing.
 
+- **Derivation (Cam, 2026-11-04), logged as a derivation, not a result -- with one correction.** Under truncated MC
+  (lambda=1, no bootstrap) potential shaping telescopes: shaping's part of G_t = gamma^(T-t)*Phi(s_T) - Phi(s_t).
+  The action's effect on Phi(s_(t+1)) cancels inside the sum; Phi(s_t) is fixed before the action (absorbed by V).
+  **Correction:** Cam's last step, "gamma^512 makes the end term negligible", does not hold numerically:
+  0.999^512 = 0.599 (0.774 at 256 steps left, 0.938 at 64). And the action's displacement is not cancelled in
+  s_T: under a continuation that does not depend strongly on position, a one-cell move shifts the whole remaining
+  path, so it reaches Phi(s_T) with weight 0.6-1.0 of the immediate shaping. So per-action credit survives *in
+  expectation* under MC; what it loses is precision (it carries the variance of the rest of the rollout). Existing
+  evidence (`mc_snr_deposit.py`, random-walk policy): adding shaping raised production-MC per-sample SNR from
+  0.015-0.031 to 0.14-0.16. Both readings are registered below; arm B decides between them.
+  Also corrected: `ppo_value_coef` is **0.1** (Step 1 entries above say 0.25 -- wrong; the config value is 0.1).
+
+- **REGISTRATION -- learner testbed, Step 2 (2026-11-04, before any learning metric from it was read; one timing
+  smoke ran with metrics suppressed).** Script `scripts/learner_testbed.py`.
+  * **Setup:** real `AgentNetworkJax` (production dims, fresh init), real `ppo_update` / `_minibatch_step` /
+    `ppo_loss` (production coefficients from config via `_normalize_config`: lr 3e-4, clip 0.2, vf 0.1, ent 0.02,
+    vq 0.1, minibatch 512, 1 pass), production sampling (masked logits + alarm head, joint log-prob), T=512,
+    gamma 0.999. World: 15x15 torus, one hearth at the centre (all four `hearth_rel` slots point at it),
+    hearth_radius 1 (production is 3; on 15x15 that would cover 22% of cells and leave no distance range),
+    agents always hold wood and are informed; deposit = Craft within radius -> reward 2.7 (0.3 deposit + 2.4 solo
+    completion), respawn at a random cell outside the hearth, still holding, no done. 32 independent copies of
+    the one-agent world per batch. No reds, comms, neighbours, food, energy or aux losses (separate optimizer,
+    not part of `ppo_loss`). Comms subtree frozen as at stage 0.
+  * **Arms:** A production MC, deposit only. B A + shaping (beta 24). C GAE lambda 0.95 + bootstrap gamma*V(s_T),
+    deposit only (production function swapped for the update only; jax_sim/ unchanged). D C + shaping.
+    3 seeds per arm (0, 1, 2), same N updates for every run.
+  * **Metric (per run):** mean toroidal Chebyshev distance to the hearth centre over all agent-steps of an
+    update. **Decline** = mean of updates 1-3 minus mean of the last 3 updates. Secondary: deposits per env
+    per update (same windows).
+  * **An arm learns** if all 3 seeds show decline >= 0.5 cells (~10% of the ~5.0 random-walk expectation).
+  * **"X faster than Y"** = every seed of X has a larger decline than every seed of Y (min_X > max_Y: outside
+    seed spread). "X ~ Y" = the seed ranges overlap.
+  * **Predictions:** C faster than A; D faster than C (Cam). B vs A: Cam predicts B ~ A; the correction above
+    predicts B faster than A. Whichever holds is the read on the derivation.
+  * **Critic bar (C and D):** explained variance of V against that arm's own targets, mean over the last third
+    of updates, >= 0.2 in every seed. If C or D fails it, C/D are not read: the +/-0.2 raw value clip is fixed
+    first and C/D re-run.
+  * **N** is fixed at launch, before any metric is read, by the platform: the timing smoke measured ~9.6 min per
+    update on the operator's CPU (72-107 s rollout + 32 minibatch backward passes at ~15 s each; ~1 GB RSS).
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
