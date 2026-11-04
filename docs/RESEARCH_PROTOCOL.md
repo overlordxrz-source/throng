@@ -736,6 +736,73 @@ more expensive, because it produces publishable-looking nulls.
     Bundle staged locally at `~/throng-migration-bundle/` (checkpoint 2700 + **2733**, corpora
     through 2735, logs). The Mac's disk is ~98% full (520 MB free).
 
+- **RETRACTED HYPOTHESIS (Cam, 2026-09-30): "a direction/position error in the hearth shaping."**
+  Withdrawn, cleanly falsified. Evidence: 6 direction tests at production shapes (toward->F>0,
+  away->F<0, both torus wrap edges, 1,500 random draws vs an independent numpy torus-Chebyshev);
+  mutation-checked (sign-flip, s'==s, swapped s/s' each fail 4 of 6); real-loop call-site capture
+  (s != s' for 38.3% of agent-steps, pre-move position at t+1 == post-move at t for 97.5%, every F
+  equals an independent recompute, 16/16 closer->F>0, 13/13 farther->F<0). The "F collapses to
+  (gamma-1)Phi(s)" variant is ruled out by the same capture. The failed beta=24 window stands as run.
+- **Cam's proposal: the Phase 11.3 epistemic gate executes imagined actions that are trained as
+  if the reactive policy sampled them. Code checks (2026-09-30), both done before any spend.**
+  * **Check 1 -- CONFIRMED.** `jax_sim/main_jax.py`: `b_actions = where(b_gate_imagine,
+    b_a_imagined, b_actions_reactive)` -- the ENVIRONMENT executes the imagined action on gated
+    steps. The stored PPO action is that executed `b_actions`; the stored log-prob is
+    `log_softmax(b_action_logits)[b_actions]`, i.e. log pi_reactive of the executed action.
+    `rl_jax.py`'s ratio is `exp(logpi_new(a_exec) - logpi_old(a_exec))`: no imagination mask, no
+    gate flag, no behaviour-policy (mu/pi) correction anywhere in the update. So on gated steps
+    (mean 77.3% of alive-steps over 2707-2735; range 72.3-80.7%) the gradient is fed actions from
+    a behaviour policy mu != pi, with ratios relative only to pi_old -- the samples are trained as
+    if on-policy. (Note the honest limit of this finding: it establishes the estimator is biased
+    for on-policy PG, not that the bias is what suppressed navigation -- the ablation tests that.)
+  * **Check 2 -- what the imagination selects on.** `jax_sim/imagination_jax.py`: for each of the
+    12 actions, hold that ONE action constant for K=5 steps through the learned
+    `carry_forward_dynamics`, sum gamma-discounted `value_from_carry` along the rolled carry, take
+    argmax (disabled actions masked). Two structural notes: (i) the k=0 term is
+    `value(carry_0)`, identical for every action, so only the k=1..4 terms can differ across
+    actions; (ii) the score is only as informative as the carry-dynamics model's action
+    conditioning (carry_fwd MSE ~0.0002 on the dashboard, i.e. next carry ~ current carry).
+    Observed: imagination_agree averaged **8.0%** over 2707-2735 (chance for 12 actions = 8.3%)
+    -- indistinguishable from chance, and the imagined-action histogram is Stay-heavy (39-55%).
+    The gate itself is batch-relative (`conf < mean(conf)*1.0`), so ~half+ of agents imagine by
+    construction, independent of absolute confidence. **Read: the imagined action is a
+    near-deterministic but uninformative function of state.**
+  * **Baselines for the mechanism test (window 2707-2735, beta=24, gate on):** PPO clip fraction
+    mean **0.384** (min 0.277, max 0.642, sd 0.100); conf_gate_imagine_frac 77.3%.
+- **REGISTRATION -- gate-off ablation (timestamped 2026-09-30T16:34Z, before launch; resume from ckpt 2733, so
+  update 1 = ppo 2734).** One variable: `phase9_canvas.imagination_force_reactive: true` -- the
+  reactive action is always executed; imagination and the gate are still computed for telemetry
+  (`imagination_agree`, `would_imagine`), never override the action, never charge the
+  metabolic tax. Everything else identical: beta=24, same config, same code otherwise.
+  * **Fingerprint:** `imagination_force_reactive` appended (and `hearth_ramp_hold_stage`, below),
+    so resuming from 2733 resets tripwires and the curriculum by the designed mechanism (the
+    fingerprint length changes -> flagged as a schema change -> reset).
+  * **Curriculum held at A0 for the whole window** (`ctd_competence_ramp.hearth_ramp_hold_stage: 0`,
+    a new key; -1 = off is the default): stage advance is suppressed (logged as HELD with the reason
+    it would have fired). A0 is the like-for-like regime where the clean null was measured
+    (17 need-configurations, excess -0.56). Disclosure: this second appended field goes beyond
+    Cam's "add the gate setting" -- same run, same reset semantics, so appended together.
+  * **Apparatus (update 1):** `conf_gate_imagine_frac` must read 0.0% AND executed==reactive must
+    read 100%. **Enforced in code:** the loop raises `SystemExit(1)` with an `[APPARATUS] FATAL`
+    line on the first dashboard if either fails, when the flag is on.
+  * **Mechanism (updates 2-5 = ppo 2735-2738):** mean PPO clip fraction <= 0.20 (baseline 0.384). If
+    it stays ~0.33+ with the gate off, the off-policy mechanism is wrong even if something else
+    improves.
+  * **Primary:** the registered hearth test. Metric `AlignedDist holders->matching_hearth`.
+    Window 30 updates = ppo 2734-2763. **First-5 (post-transient) = 2736-2740** (drops the first two
+    empty-handed post-resume updates 2734-35, same rule as before, decided before any data);
+    **last-5 = 2759-2763.** Pass = decline >= 10% AND > 2x SE of the difference of the two
+    5-update means (SE from update-level means, never records). Secondary literal first-5 = 2734-2738.
+  * **Secondary (red-flee positive control, from the corpus, last 15 updates 2749-2763):** the
+    d<=1 mean m.u (baseline -0.071, SE 0.011) should strengthen well past baseline -- operationalised
+    here as <= -0.14 (2x); and a nonzero effect at d=2 (baseline +0.020, SE 0.008) -- operationalised
+    as < 0 with |z| > 2 against the far-red baseline. These two thresholds are my operationalisation
+    of "well past" and "nonzero", fixed now, before data; Cam may tighten them before results.
+  * **Known side effect, not a second variable in intent:** with imagination not executed, the
+    imagination metabolic tax (mean ~0.0019/step) is no longer charged, so the energy economy shifts
+    slightly; energy and population will be watched for a knock-on. Halt rules and tripwires stay armed.
+  * **(c) skipped** per Cam: the ablation answers the same question more decisively.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under

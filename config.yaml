@@ -325,6 +325,10 @@ phase9_canvas:
                               # for a dead 8-action architecture.
   # Phase 11.3 — epistemic imagination gating (feature/phase11-3-epistemic-gate)
   imagination_gating_enabled: true
+  # 2026-09-30 (Cam, pre-authorized ablation after check 1 confirmed imagined actions are
+  # executed AND trained as if sampled from the reactive policy -- no behaviour-policy
+  # correction in rl_jax.py): execute the reactive action always. Telemetry still runs.
+  imagination_force_reactive: true
   confidence_multiplier: 1.0   # batch-relative gate: imagine if conf < mean(conf|alive)*mult
   imagination_k: 5
   imagination_gamma: 0.999
@@ -481,6 +485,9 @@ ctd_competence_ramp:
   # high -- measured beats estimated. Scaled 25/10.2 -> 24 to land the
   # mean|F|/mean|r| target (~25%). Re-verify on the next steady-state dashboards.
   hearth_shaping_beta: 24.0
+  # 2026-09-30 (Cam): hold the hearth ramp at A0 (stage 0) for the full ablation window --
+  # like-for-like with the clean-null A0 regime. -1 = never hold (default behaviour).
+  hearth_ramp_hold_stage: 0
   red_ramp_enabled: true
   red_ramp_beta: 2.5               # shaping coefficient (verified: full 1-cell close ~= reward_red_move)
   red_ramp_min_steps: 200000

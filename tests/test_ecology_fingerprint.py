@@ -133,7 +133,7 @@ def test_new_fields_are_appended_not_inserted():
     """A checkpoint saved before the A0/A1 split has a fingerprint whose
     fields are a PREFIX of today's -- appended, not inserted -- so that if
     this check is ever bypassed, the pre-existing fields still line up."""
-    old_len = len(ECOLOGY_FINGERPRINT_LABELS) - 8  # 5 accept_any slots + success_bar + 2 shaping fields
+    old_len = len(ECOLOGY_FINGERPRINT_LABELS) - 10  # 5 accept_any slots + success_bar + 2 shaping fields + 2 ablation fields (2026-09-30)
     assert ECOLOGY_FINGERPRINT_LABELS[:old_len] == (
         "hearth_radius", "hearth_ramp_n_len",
         "hearth_ramp_n_0", "hearth_ramp_n_1", "hearth_ramp_n_2", "hearth_ramp_n_3", "hearth_ramp_n_4",
@@ -166,3 +166,20 @@ if __name__ == "__main__":
     print("OK: ecology fingerprint detects and names world changes (including the A0/A1 split "
           "and its accept_any flags), ignores non-world keys, and does not cry wolf across the "
           "float32 storage round-trip.")
+
+
+def test_epistemic_gate_ablation_and_stage_hold_are_detected_and_named():
+    """2026-09-30 (Cam): forcing the gate reactive changes how actions are chosen,
+    and holding the ramp changes the curriculum -- resuming across either must reset
+    tripwires/stage, and the diff must NAME the field. Baseline built with both OFF
+    explicitly (the live config.yaml now has them ON)."""
+    ramp = {**_cfg.get("ctd_competence_ramp", {}), "hearth_ramp_hold_stage": -1}
+    p9 = {**(_cfg.get("phase9_canvas") or {}), "imagination_force_reactive": False}
+    base = {**_cfg, "phase9_canvas": p9, "ctd_competence_ramp": ramp}
+    old = _fp(base)
+    new_gate = _fp({**base, "phase9_canvas": {**p9, "imagination_force_reactive": True}})
+    assert [d[0] for d in ecology_fingerprint_diff(old, new_gate)] == ["imagination_force_reactive"]
+    new_hold = _fp({**base, "ctd_competence_ramp": {**ramp, "hearth_ramp_hold_stage": 0}})
+    assert [d[0] for d in ecology_fingerprint_diff(old, new_hold)] == ["hearth_ramp_hold_stage"]
+    # the two new fields are the LAST two labels (append-only invariant)
+    assert ECOLOGY_FINGERPRINT_LABELS[-2:] == ("imagination_force_reactive", "hearth_ramp_hold_stage")

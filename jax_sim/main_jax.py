@@ -272,6 +272,11 @@ ECOLOGY_FINGERPRINT_LABELS = (
     # curriculum stage reached WITHOUT shaping isn't evidence of anything
     # once shaping is added under its feet.
     "hearth_shaping_enabled", "hearth_shaping_beta",
+    # 2026-09-30 (Cam, epistemic-gate ablation): how actions are CHOSEN is as
+    # world-defining as what is rewarded -- forcing the gate reactive must reset
+    # tripwires/curriculum on resume. hold_stage is a curriculum setting appended
+    # alongside it (same run, same reset semantics).
+    "imagination_force_reactive", "hearth_ramp_hold_stage",
 )
 
 
@@ -319,6 +324,8 @@ def ecology_fingerprint_vector(config: Dict, hearth_ramp_stage_n, hearth_ramp_ac
         float(_ramp_cfg_fp.get("craft_ramp_success_bar", 0.10)),
         float(bool(_ramp_cfg_fp.get("hearth_shaping_enabled", False))),
         float(_ramp_cfg_fp.get("hearth_shaping_beta", 2.5)),
+        float(bool((config.get("phase9_canvas") or {}).get("imagination_force_reactive", False))),
+        float(_ramp_cfg_fp.get("hearth_ramp_hold_stage", -1)),
     ]
     assert len(vals) == len(ECOLOGY_FINGERPRINT_LABELS)
     return np.asarray(vals, dtype=np.float64)
@@ -482,6 +489,10 @@ def make_sim_step(
     _n_layers = config["n_layers"]
     _p9 = config.get("phase9_canvas") or {}
     _img_gate_enabled = bool(_p9.get("imagination_gating_enabled", False))
+    # 2026-09-30 (Cam, ablation): execute the reactive action always. The
+    # imagination and the gate are still computed (telemetry: imagination_agree,
+    # would-imagine fraction) but never override the action, never cost energy.
+    _imagine_force_reactive = bool(_p9.get("imagination_force_reactive", False))
     _conf_multiplier = float(_p9.get("confidence_multiplier", 1.0))
     _imagination_k = int(_p9.get("imagination_k", 5))
     _imagination_metabolic_delta = float(
@@ -658,14 +669,17 @@ def make_sim_step(
             b_alive_f = b_pop.alive.astype(jnp.float32)
             mean_conf = jnp.sum(b_conf_pred * b_alive_f) / (jnp.sum(b_alive_f) + 1e-8)
             dynamic_tau = mean_conf * _conf_multiplier
-            b_gate_imagine = b_conf_pred < dynamic_tau
+            b_gate_would_imagine = b_conf_pred < dynamic_tau
+            b_gate_imagine = b_gate_would_imagine & jnp.asarray(not _imagine_force_reactive)
             b_actions = jnp.where(b_gate_imagine, b_a_imagined, b_actions_reactive)
             b_imagination_agree = (
                 (b_a_imagined == b_actions_reactive).astype(jnp.float32) * b_alive_f
             )
             b_conf_gate_frac = b_gate_imagine.astype(jnp.float32) * b_alive_f
+            b_gate_would_frac = b_gate_would_imagine.astype(jnp.float32) * b_alive_f
             b_used_imagination = b_gate_imagine
         else:
+            b_gate_would_frac = jnp.zeros((b_pop.max_pop,), dtype=jnp.float32)
             b_actions = b_actions_reactive
             b_a_imagined = jnp.zeros((b_pop.max_pop,), dtype=jnp.int32)
             b_im_gain = jnp.zeros((b_pop.max_pop,), dtype=jnp.float32)
@@ -1201,6 +1215,8 @@ def make_sim_step(
             "imagination_gain": b_im_gain,
             "imagination_agree": b_imagination_agree,
             "conf_gate_imagine_frac": b_conf_gate_frac,
+            "conf_gate_would_imagine": b_gate_would_frac,
+            "reactive_action": b_actions_reactive,
             "imagination_metabolic_cost": cog_cost,
             "ignition": ignition,
             "barrier_sum": jnp.sum(grid.barrier_hp_map),
@@ -3849,6 +3865,16 @@ def _run_simulation_impl(
                         f"inconvenience. ***",
                         flush=True,
                     )
+                # 2026-09-30 (Cam, ablation): hold the ramp at a stage for a like-for-like
+                # test (hearth_ramp_hold_stage: 0 = stay in A0). -1 (default) = never hold.
+                _hold_stage = int(_ramp_cfg_outer.get("hearth_ramp_hold_stage", -1))
+                if _craft_advance_now and _hold_stage >= 0 and craft_ramp_stage_outer <= _hold_stage:
+                    print(
+                        f"[CTD-RAMP] stage advance HELD at stage {craft_ramp_stage_outer} "
+                        f"(hearth_ramp_hold_stage={_hold_stage}); would have advanced: {_craft_advance_reason}",
+                        flush=True,
+                    )
+                    _craft_advance_now = False
                 if _craft_advance_now:
                     if craft_ramp_stage_outer < len(HEARTH_RAMP_STAGE_N) - 1:
                         # 2026-09-28 (Cam, A0/A1 split): derived from N, not a
@@ -3938,11 +3964,28 @@ def _run_simulation_impl(
                         im_agree_val = float(_im_a[_alive_roll].mean()) * 100.0
                         conf_gate_val = float(_cg[_alive_roll].mean()) * 100.0
                 _mult = float((_p9 or {}).get("confidence_multiplier", 1.0))
+                _force_reactive_outer = bool((_p9 or {}).get("imagination_force_reactive", False))
+                _would_val = float("nan"); _exec_eq_react = float("nan")
+                if "conf_gate_would_imagine" in rollout_data["blue"] and _alive_roll.any():
+                    _would_val = float(np.asarray(rollout_data["blue"]["conf_gate_would_imagine"])[_alive_roll].mean()) * 100.0
+                    _exec = np.asarray(rollout_data["blue"]["actions"]); _react = np.asarray(rollout_data["blue"]["reactive_action"])
+                    _exec_eq_react = float((_exec == _react)[_alive_roll].mean()) * 100.0
                 print(
                     f"  EpistemicGate: imagination_agree={im_agree_val:.1f}% "
                     f"| conf_gate_imagine_frac={conf_gate_val:.1f}% "
-                    f"(mult={_mult} batch-relative; K={int((_p9 or {}).get('imagination_k', 5))})"
+                    f"(mult={_mult} batch-relative; K={int((_p9 or {}).get('imagination_k', 5))}) "
+                    f"| force_reactive={_force_reactive_outer} would_imagine={_would_val:.1f}% executed==reactive={_exec_eq_react:.1f}%"
                 )
+                # 2026-09-30 (Cam's pre-registered apparatus check): with the gate forced
+                # reactive, the executed-imagination fraction MUST be exactly 0 and every
+                # executed action MUST equal the reactive one. If not, stop.
+                if _force_reactive_outer and (conf_gate_val > 0.0 or not (_exec_eq_react >= 100.0)):
+                    print(
+                        f"[APPARATUS] FATAL: imagination_force_reactive=True but conf_gate_imagine_frac={conf_gate_val:.3f}% "
+                        f"and executed==reactive={_exec_eq_react:.3f}% -- the ablation is not applied. Halting.",
+                        flush=True,
+                    )
+                    raise SystemExit(1)
                 if "imagination_metabolic_cost" in rollout_data["blue"]:
                     _mc = np.asarray(rollout_data["blue"]["imagination_metabolic_cost"])
                     _alive_mc = np.asarray(rollout_data["blue"]["alive"]).astype(bool)
