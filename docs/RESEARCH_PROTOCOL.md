@@ -977,6 +977,37 @@ more expensive, because it produces publishable-looking nulls.
     Natural design: run it twice, production estimator vs bootstrapped GAE (needs V(s_T) at the rollout
     boundary), same bar -- both free on CPU.
 
+- **Amendment to Step 1 results (same day, before reporting to Cam).**
+  * **The first synthetic measured a setup artifact.** Shaping-only reward is policy-invariant (every policy's
+    value is -beta*Phi(s0); config comment ~line 479), so its "credit" came from the truncation term and from
+    discounting at gamma*lambda vs gamma -- not from any task signal; and its lambda=.95 "mutant" had V=0, i.e. no
+    bootstrap. Replaced by `~/throng-smoke/scripts/mc_snr_deposit.py`: a deposit reward on reaching the hearth
+    (respawn after), with and without shaping; the mutant is GAE lambda=.95 **with** bootstrap, critic = mean MC
+    return per distance bin, gamma*V(s_T) at the boundary. Per-sample toward-vs-away SNR:
+    deposit only: real MC 0.015 (V=0) / 0.031 (fitted V) vs bootstrapped **0.133** (~4-9x);
+    deposit + shaping: real 0.159 / 0.139 vs bootstrapped 0.97-0.98 (~6-7x) -- the shaping part of this comparison
+    exists only because the fitted critic does not exactly absorb the potential, so it is illustrative, not clean.
+    Deposit-only is the artifact-free row, and it agrees in direction: the production estimator costs roughly
+    4-9x in SNR (~16-80x in samples). Deposit magnitude does not change SNR (scale-invariant; 0.3 and 2.7 identical).
+    Single cell on a 128 torus: random walkers almost never deposit, so absolute values are small by design.
+  * **Step 2 as specified ("shaping only") is degenerate:** with a correct estimator and a converged critic there
+    is nothing to learn. The testbed needs the deposit reward (shaping optional on top), and should compare the
+    production `compute_gae` against lambda + bootstrap.
+  * **Exploratory -- the critic looks poorly fit, which matters for any bootstrap fix.** Value mean trails return
+    mean all window (4.6 vs 9.4 at 2734; 5.0 vs 6.4 at 2763); values std ~2.5 vs returns std 6-7.5; critic grad norm
+    ~0.01; value clip +/-0.2 in raw (unnormalised) return units, Huber delta 0.5, vf_coef 0.25. GAE with a bad V
+    trades noise for bias, so the deferred EV check rises in priority and Step 2 needs a value-tracking bar.
+  * **Corrections:** clipping -- only the last of ~200 minibatches per update is logged, so "ruled out" becomes
+    **very unlikely**. Holder definition -- corpus `inventory>0` (60% holders) is not the shaping's held material
+    (dashboard held_any n ~87-96%); cite the overall informed fraction **0.567** (`can_see_recipe` is independent
+    of holding). Matching n ~55% vs any n ~95% of alive-steps: ~40% of alive-steps hold a material no hearth
+    currently wants and get no shaping.
+  * **What pushes entropy up, concretely:** the entropy bonus (`ppo_entropy_coef` 0.02) and the L2 logit penalty
+    (0.01 * mean logit^2) in `ppo_loss`. `action_entropy_coef: 0.05` in config is **not wired** anywhere (grep:
+    no reader in jax_sim/ or scripts/). **The starting peakedness was one direction:** executed East share 60%
+    (2734) -> 45% (2740) -> 35% (2749) -> 26% (2763); other moves flat ~7-10%. Supports, without testing, the
+    reading that a gate-on-era "drift East" bias (blind drift on a torus, not navigation) is relaxing.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
