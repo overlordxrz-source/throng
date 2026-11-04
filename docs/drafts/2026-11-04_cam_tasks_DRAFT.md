@@ -83,3 +83,66 @@ startup; A100-80GB $2.50/h plus CPU/memory, ~$3.2/h observed so far, billing may
 - Modal CPU smoke and preflight: ~$1
 - **total ~$11-15**, leaving ~$15 of margin for one crash/restart. To be re-estimated from this window's final billed
   cost before launch.
+
+## Cam's rulings (2026-11-04) and the channel-learnability check
+
+Rulings: (1) the comm experiment does not launch until the channel can learn; (2) freeze the informed fraction for the
+test window; (3) causal swap stays primary; (4) red-catch slope ~6.5 vs 3.0 logged as OPEN, checked after 2763,
+running pin untouched. Budget: ~$8 this window + ~$15 comm run leaves ~$15 for one fix-or-replicate run.
+
+### (a) Does the token's log-prob enter the PPO loss? -- NO.
+- The token is not sampled: `vector_quantize_signals` (`network_jax.py:64-100`) takes `token_ids = argmin(dist_sq)`,
+  the deterministic nearest code. (The comment says "Gumbel Softmax", but no Gumbel noise is drawn; `y_soft` is a
+  plain softmax used only as the straight-through surrogate.)
+- `rl_jax.ppo_loss` builds the ratio from `log pi(action) + log pi(alarm)` only (`rl_jax.py:126-133`); no token
+  log-prob exists anywhere.
+- The token heads (`head_signal_slot0/1/2` on the `gwt_comms_1` branch, `network_jax.py:509-516`) are trained by
+  exactly two losses: the VQ codebook/commitment loss (`vq_coef * loss_vq`), and the VQEL reconstruction loss, where
+  `z_q` (straight-through) must reconstruct the sender's OWN egocentric spatial patch (`head_vqel_recon_1/2`,
+  `network_jax.py:590-591`, `recon_coef` 1.0). Neither target contains the active hearth, which sits in the own-state
+  block. **So under the current design the tokens have no pressure at all to carry T: a null would be guaranteed,
+  as Cam said.**
+- The listener side is already trainable: incoming neighbour signals enter through `emb_nb` into the policy trunk
+  (`network_jax.py:319, 464`), which PPO trains.
+
+### (b) Does any sender reward depend on what a listener does? -- NO.
+Blue's reward (`main_jax.py:1112-1149`) is alive + energy + catch penalty + resource + move + puzzle + contested +
+alarm penalty + futile-craft + **own** hearth deposit + **own** shaping + completion share. The completion share
+goes only to agents who themselves deposited (`hearth_completion_share`, proportional to contribution). Nothing pays
+an agent for another agent's arrival or deposit.
+
+### Smallest fix (Cam's default, made concrete) -- DRAFT, lands after 2763 on a fresh pin
+1. **Token as a policy action.** Per slot s in {0,1,2}: logits_s = -dist_sq_s / tau (tau a fixed config value, e.g.
+   chosen so the initial token entropy is about half its maximum; `dist_sq` is unbounded, so tau=1 could be
+   degenerate either way). Sample `tok_s ~ Categorical(logits_s)` in the rollout; broadcast `codebook_s[tok_s]` exactly
+   as now. Store `token_log_prob = sum_s log softmax(logits_s)[tok_s]` and add it to the joint log-prob, the same way
+   the alarm action is added (rollout `b_joint_log_probs_taken`, `ppo_loss` ratio). Small entropy bonus on the token
+   distribution (`token_ent_coef`), like `alarm_ent_coef`. The VQ commitment loss stays; the VQEL recon coefficient
+   is held as is (one change).
+2. **Shared reward when a listener reaches the active hearth.** On each step a listener (`~can_see_recipe`) deposits
+   at the active hearth, add `reward_listener_reach` (e.g. equal to `reward_hearth_deposit`) split equally among all
+   living senders (informed agents). Global sharing is the smallest version; a locality-credited version (only
+   senders who were among that listener's K signal-neighbours in the last L steps) needs a neighbour ring buffer and is
+   deferred unless the global one fails.
+3. **Fingerprint:** append `token_policy_enabled`, `token_tau`, `reward_listener_reach` (how actions are chosen and
+   what is rewarded -> designed reset).
+4. **Freeze the informed fraction (ruling 2):** `can_see_recipe_fraction_fixed` (e.g. 0.25), assigned at birth by a
+   fixed Bernoulli instead of inheritance+mutation for the test window; appended to the fingerprint. Dashboard prints
+   the live informed fraction every update, and the run halts if it leaves 0.25 +/- 0.03.
+
+### Regression test (the proof the channel can now learn) + mutant
+`tests/test_token_policy_gradient.py`, CPU, tiny shapes (not the full smoke -- that exhausted the Mac's RAM):
+- Build a minimal batch: a sender emits a token at t; at t+1 a listener's only reward is `reward_listener_reach`,
+  credited to the sender per item 2; all other rewards zero. Run the real `ppo_loss` (not a hand-built one) and take
+  `jax.grad` with respect to the `head_signal_slot*` parameters.
+- **Assert:** that gradient is nonzero (L2 norm > 1e-6) and its sign raises the log-prob of the rewarded token.
+- **Mutant 1** (token log-prob dropped from the ratio, i.e. today's design): the same gradient is ~0 apart from the
+  VQ term; the test is run against it and must FAIL. Hold the VQ/recon coefficients at 0 in the test so the only
+  possible gradient source is the reward path.
+- **Mutant 2** (shared reward zeroed): the gradient from the reward path vanishes; the test must FAIL.
+- Plus an apparatus check in the loop: with token_policy on, the logged token entropy is > 0 and the stored token
+  equals the broadcast code index on 100% of alive-steps (halt otherwise), mirroring the gate guard.
+
+### Cost (unchanged envelope)
+The fix itself is CPU work. It replaces nothing in the comm-run budget (~$15). If the channel-learnability fix needs
+its own verification run before the comm run, that uses the remaining ~$15 fix-or-replicate slot.

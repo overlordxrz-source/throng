@@ -845,6 +845,11 @@ more expensive, because it produces publishable-looking nulls.
   only, not in the fingerprint), re-pinned to `bcaf1ce`, relaunched. Reporting cadence per Cam:
   update-1 apparatus line, then updates 2-5 clip, then nothing until 2763.
 
+- **OPEN (logged 2026-11-04, Cam ruling 4): red catch reward reads ~6.5 per caught blue against `reward_red_catch:
+  3.0`.** Over 2707-2735, red's per-update reward mean tracks blue_caught at r=0.95 with slope ~6.5. Likely more than
+  one red credited per caught blue (`r_caught_any` is per red), not yet separated. Does not touch blue navigation;
+  running pin left alone; to be checked after ppo 2763.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
