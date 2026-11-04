@@ -1048,6 +1048,20 @@ more expensive, because it produces publishable-looking nulls.
   * **N** is fixed at launch, before any metric is read, by the platform: the timing smoke measured ~9.6 min per
     update on the operator's CPU (72-107 s rollout + 32 minibatch backward passes at ~15 s each; ~1 GB RSS).
 
+- **Registration addendum -- Step 2, before launch (Cam's approval + addition, 2026-11-04).**
+  * **Platform and spend:** Modal GPU (L4, A10G fallback), app `throng-testbed` (`scripts/modal_testbed.py`),
+    pinned `a2d910b`. Cam approved spend under a **$10 cap** (operator approved first). Billing summary before
+    launch: metered $4.87.
+  * **Arm E -- frozen-policy control,** 3 seeds (0, 1, 2): A's reward and estimator, lr=0. Adam at lr=0 applies an
+    exactly-zero update, so E skips the PPO step (identical parameters, cheaper). Measures the distance-change
+    noise floor from deposit/respawn dynamics and starting-weight biases.
+  * **Revised "learns" rule:** an arm learns only if **all 3 seeds** show decline >= 0.5 cells **and** every one of
+    its seeds has a larger decline than **every E seed**. "Faster than" and the critic bar are unchanged.
+  * **N = 80 updates per run, all 15 runs** (fixed from the GPU timing probe: ~18 s/update warm, 35 s for the first;
+    metrics suppressed). Windows: first = updates 1-3, last = updates 78-80. Estimated cost ~$6-7.
+  * **Config audit:** the testbed is exempt (Cam). Production launches stay blocked until the allowlist is
+    settled; triage sent as `docs/drafts/2026-11-04_config_audit_triage.md`.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
