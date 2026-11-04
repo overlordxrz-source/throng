@@ -803,6 +803,27 @@ more expensive, because it produces publishable-looking nulls.
     slightly; energy and population will be watched for a knock-on. Halt rules and tripwires stay armed.
   * **(c) skipped** per Cam: the ablation answers the same question more decisively.
 
+- **Pre-launch disclosures for the gate-off ablation (2026-11-04T05:54Z, before any outcome data).**
+  * **Platform moved back to Modal** (profile `christopherchungus`, fresh workspace). Lightning's
+    API has returned Cloudflare 521 for over a day on both accounts (plain curl to
+    `lightning.ai/v1/...` too) -- a Lightning-side outage, not ours. Volume `throng-runs` created
+    fresh; checkpoint 2733 + both corpora + train.log uploaded from `~/throng-migration-bundle/`
+    (29/29 files, byte-identical). CPU preflight passed: clone at `385527d`, latest step 2733,
+    fossil guard clean, restore-through-grafting OK for both teams (emb_own (29,256)).
+  * **Not a treatment, disclosed anyway:** the Modal image installs `jax[cuda12]` unpinned and
+    resolved the 0.10.2 CUDA plugin; Lightning ran jax 0.10.0. First thing to check if the ptxas
+    crash recurs. GPU is A100-80GB (Lightning ran L40S).
+  * **Duplicate ppo numbers on the volume:** the uploaded corpora/train.log run through 2735 (the
+    crashed gate-on run), but this resumes from 2733, so ppo 2734-2735 will exist twice -- gate-on
+    (old) and gate-off (new). Every corpus/log analysis of this window must filter on the new
+    run's `launch_id` (printed at launch) or start after the new launch banner; "last occurrence
+    wins" protects only the dashboard parse. Same trap as the `8711e4a20e62` duplicate.
+  * **Guard false-halt risk checked:** only the gate line and its else-branch assign `b_actions`
+    (grep), so `executed==reactive` must be exactly 100% under the ablation.
+  * **Ablation not run end-to-end locally** (the CPU smoke was killed twice by session restarts and
+    a third time for RAM before its first dashboard); update 1 on the real run is the end-to-end
+    test, enforced by the in-code apparatus halt.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
