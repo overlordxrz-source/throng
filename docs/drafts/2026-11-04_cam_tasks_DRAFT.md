@@ -146,3 +146,10 @@ an agent for another agent's arrival or deposit.
 ### Cost (unchanged envelope)
 The fix itself is CPU work. It replaces nothing in the comm-run budget (~$15). If the channel-learnability fix needs
 its own verification run before the comm run, that uses the remaining ~$15 fix-or-replicate slot.
+
+### Added after the 2763 window (2026-11-04)
+- **Stage-0 comms freeze:** `COMMS_SUBTREE_KEYS` gradients are zeroed for all of CtD stage 0, and the gate-off
+  window was held at stage 0, so the comms subtree did not train at all in 2734-2763. The comm run must not launch
+  at stage 0 (or must lift the freeze explicitly, as a registered change), or the channel fix cannot act.
+- **Held behind the learner:** the primary needs listener navigation; Step 1 of Cam's learner diagnostic points
+  at the advantage estimator (truncated MC, no bootstrap). The comm run waits on that.

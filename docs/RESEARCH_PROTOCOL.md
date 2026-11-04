@@ -947,6 +947,36 @@ more expensive, because it produces publishable-looking nulls.
     deferred advantage check; facts 1-2 make "optimizer path" readable only partially from the logs; fact 3
     answers "visibility" -- positions yes, target identity only for informed agents.
 
+- **Learner diagnostic Step 1 -- free-read results (launch `d6efb75d25c5`, 2734-2763; bars as registered above).**
+  * **Entropy: not near ceiling, and rising.** Logged (action+alarm) first-5 1.452 -> last-5 1.992, diff +0.540,
+    SE 0.032; monotone-ish climb 1.11 (2734) -> 2.03 (2763). First-5 < 1.977 -> action head **clearly below
+    ceiling** at the start; last-5 is in the indeterminate band. Executed-action marginal entropy 1.47 -> 2.08
+    (upper bound, of 2.197). Read: the policy is *not* frozen near uniform with tiny updates -- it moves every
+    update, toward more randomness. Exploratory reading, not tested: relaxation of a policy that was peaked
+    under gate-on training (77% of executed actions came from imagination), with no strong task gradient
+    opposing the entropy bonus (`ppo_entropy_coef` 0.02).
+  * **Clip firing: never.** Post-clip last-mb norms never reach 1.99 in any group on any update (means: trunk
+    0.229, actor 0.067, critic 0.011), so post-clip = pre-clip here and clipping dilutes nothing. Cam's "clipping
+    share" branch is ruled out for this window. (Adam normalises step size, so small raw norms do not by
+    themselves mean small steps.)
+  * **Target identifiability:** informed fraction among holders **0.562** (112,153 records; per-update range
+    0.376-0.806) -> above the 0.5 bar: the matching hearth is observable for a majority of holder-steps.
+    Overall informed fraction 0.567 -- far from the 0.25 the comm draft assumes (mutation drift; the draft's
+    freeze is needed).
+  * **Synthetic, real `compute_gae` (`~/throng-smoke/scripts/mc_snr.py`; 4000 random walkers, 128 torus, one
+    hearth, shaping only, V=0 for both estimators):** per-sample SNR of toward-vs-away credit **0.161** (t<128:
+    0.132; t>=448: 0.549) vs **1.038** for bootstrapped GAE lambda=0.95 (mutant differs, as required) and 134 for
+    TD(0). ~6.5x lower SNR = ~40x more samples for the same gradient signal, before adding the noise of every
+    other reward stream in production. Confirms code fact 4 as a large effect.
+  * **Read against Cam's branches:** optimizer path -- no clipping problem; entropy not stuck at ceiling (the
+    policy moves, but toward uniform). Visibility -- not the blocker. Reward/GAE path -- **the lead suspect**: the
+    estimator throws away the bootstrap, so shaping's dense credit is buried under 512 steps of return noise.
+    Still deferred: KL, EV, per-loss trunk split, per-move advantages (need a checkpoint recompute).
+  * **Constraint for Step 2:** the testbed only tests this path if it uses the production `compute_gae` with
+    T=512, gamma 0.999; a short rollout or a bootstrapped estimator could pass and say nothing about production.
+    Natural design: run it twice, production estimator vs bootstrapped GAE (needs V(s_T) at the rollout
+    boundary), same bar -- both free on CPU.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
