@@ -902,6 +902,51 @@ more expensive, because it produces publishable-looking nulls.
     units of the original slope (per-catch totals vs per-red means) were not re-checked. Status: likely explained,
     not closed.
 
+- **REGISTRATION -- Cam's learner diagnostic, Step 1 (2026-11-04, before any entropy / grad-norm / informed-fraction
+  value from 2734-2763 was looked at).**
+  * **Already seen, disclosed:** per-update AlignedDist (both), holder coverage, Clip, the red-flee reads, and
+    VF_loss / value means for 2734-2736 (dashboard lines read earlier). **Not yet seen:** Entropy, `ppo ent=`,
+    `grad_norms`, `adv`/`returns` stats, action counts, and the corpus informed fraction among holders.
+  * **Code facts (read from source, not results) that change the premises of Step 1:**
+    1. **No global clip.** `_minibatch_step` clips three groups independently to norm 2.0: `head_action`,
+       `head_value`, and everything else ("trunk"). Logged `grad_norms (last mb)` are **post-clip**, last minibatch
+       only; pre-clip size is not logged. Aux losses use a separate optimizer. Within `ppo_loss`, the trunk gradient is
+       pg + 0.25*vf (Huber, delta 0.5, value-clipped at +/-0.2; `detach_value=False`, so the value loss reaches the
+       trunk) + entropy + logit penalty + vq. Comms subtree is zeroed before the clip at stage 0 (held all window).
+       `ppo_epochs: 1`.
+    2. **Entropy ceiling is not ln 12.** Actions 6/7/8 (Push/Guard/Build) are logit-masked -> 9 live actions,
+       ceiling ln 9 = 2.197. Logged `Entropy` = action entropy + alarm entropy (2-way head, live for blue except
+       feral agents, forced silent). So action entropy lies in [logged - 0.693, logged].
+    3. **Hearth position is visible 100% by construction; which hearth matches is not.** `hearth_rel` gives the
+       relative vector to all 4 hearths globally. `hearth_need` is masked by `can_see_recipe`, and
+       `hearth_shaping_term` targets the nearest *matching* hearth with no A0 accept-any branch -- so for an
+       uninformed holder both the shaping target and the registered primary metric are unobservable.
+    4. **Advantages are truncated Monte Carlo, no bootstrap.** `compute_gae` discards lambda ("no value
+       bootstrapping"); returns are discounted sums (gamma 0.999) to the end of the 512-step rollout, carry starts at
+       0, nothing injects gamma*V(s_T) before the call (checked: rl_jax 388, main_jax 3133/3302, rollout -> batch
+       unchanged); advantage = return - V, normalised, clipped +/-10. Prediction: under pure MC, potential shaping
+       telescopes to beta*(gamma^(T-t)*Phi(s_T) - Phi(s_t)); a move's credit carries the variance of every later step
+       in the rollout, so shaping gives no variance reduction, and the return scales with steps remaining.
+  * **Free reads now, bars fixed here:**
+    - **Entropy** per update; first-5 (2736-2740) vs last-5 (2759-2763), update-level SE. Action head called
+      **near ceiling** if logged >= 2.670 (lower bound 1.977 = 0.9 * ln 9); **clearly below** if logged < 1.977;
+      in between = indeterminate from logs. Executed-action marginal entropy from `Actions (blue)` counts, labelled
+      an *upper bound* on mean conditional entropy (only "far below ceiling" is informative).
+    - **Clip firing:** fraction of updates on which each group (actor/critic/trunk) reads >= 1.99 post-clip.
+    - **Informed fraction among holders** (corpus, this launch_id, 2734-2763): records with inventory > 0 and
+      `can_see_recipe=True`. If < 0.5, the matching-hearth task as shaped and measured is unobservable for most
+      holder-steps.
+    - **Synthetic, real `compute_gae`:** signal-to-noise of a one-cell toward-vs-away move under shaping only
+      (beta 24, gamma 0.999, T 512, random-walk continuation), against a bootstrapped-GAE (lambda 0.95) mutant that
+      must differ. No network, seconds on CPU.
+  * **Deferred (needs an offline recompute from a checkpoint):** approx KL, explained variance, per-loss trunk
+    gradient split, per-move advantages (toward vs away hearth; flee vs toward-red at d<=1), advantage vs
+    time-in-rollout. Not built yet: a production-population CPU rollout has the memory profile that overloaded the
+    operator's machine, and Modal spend is frozen until the Step-2 testbed passes. Sent to Cam first.
+  * **Interpretation mapping to Cam's branches:** fact 4 is the "reward/GAE path" branch independently of the
+    deferred advantage check; facts 1-2 make "optimizer path" readable only partially from the logs; fact 3
+    answers "visibility" -- positions yes, target identity only for informed agents.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
