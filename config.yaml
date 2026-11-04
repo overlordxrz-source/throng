@@ -254,7 +254,7 @@ target_fps: 60
 dashboard_update_interval: 20.0
 
 log_dir: runs_large
-checkpoint_interval: 2000
+checkpoint_interval: 512           # 2026-11-04 (Cam): one update (T=512) -> checkpoint EVERY update, so a crash costs one update, not the window (was 2000 = every 3 updates). Durability, not ecology: not in the fingerprint.
 log_interval: 200
 
 # 2026-09-14 (Cam): resume_from_step: 2541 lived here as a deliberate
