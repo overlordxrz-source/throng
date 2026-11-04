@@ -850,6 +850,15 @@ more expensive, because it produces publishable-looking nulls.
   one red credited per caught blue (`r_caught_any` is per red), not yet separated. Does not touch blue navigation;
   running pin left alone; to be checked after ppo 2763.
 
+- **Gate-off ablation -- apparatus and mechanism results (Modal `ap-R21DLvT8DELG11wxilbRam`, pin `bcaf1ce`,
+  `launch_id=d6efb75d25c5`; every corpus/log analysis of 2734-2763 filters on this id).**
+  * **Apparatus (update 1, ppo 2734): PASS.** `conf_gate_imagine_frac=0.0%`, `executed==reactive=100.0%`, stage
+    0/3 [A0], beta=24. Held on every update through 2740.
+  * **Mechanism (updates 2-5 = ppo 2735-2738): PASS.** PPO clip fraction 0.067 / 0.060 / 0.052 / 0.059, **mean
+    0.060** against the <= 0.20 bar (baseline 0.384 over 2707-2735, gate on). Update 1 (excluded from the registered
+    mean) read 0.078; 2739-2740 read 0.044 / 0.046. The off-policy story predicted exactly this.
+  * Per Cam: nothing further reported until the window closes at ppo 2763.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
