@@ -12,6 +12,9 @@ Arms (Cam):
   B  production MC + potential shaping (beta 24, gamma .999)
   C  GAE lambda .95 + bootstrap gamma*V(s_T) at the rollout boundary, deposit only
   D  C + shaping
+  E  frozen-policy control (lr=0): A's reward and estimator, no parameter update -- the noise floor for
+     distance change from deposit/respawn dynamics and starting-weight biases (Cam, 2026-11-04). Adam with
+     lr=0 applies an exactly-zero update, so E skips the PPO step instead of running it (same parameters).
 Arms C/D monkeypatch rl_jax.compute_gae for the duration of ppo_update; nothing in jax_sim/ changes.
 
 Usage: python scripts/learner_testbed.py --arm A --seed 0 --updates 20 --out runs.jsonl
@@ -69,7 +72,7 @@ def gae_bootstrap(rewards, values, dones, last_values, gamma, lam):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--arm", required=True, choices=list("ABCD"))
+    ap.add_argument("--arm", required=True, choices=list("ABCDE"))
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--updates", type=int, default=20)
     ap.add_argument("--envs", type=int, default=32)
@@ -206,13 +209,16 @@ def main():
         ev = 1.0 - np.var(targets - values_np) / (np.var(targets) + 1e-8)
 
         key, k_up = jax.random.split(key)
-        params, opt_state, mets = ppo_update(
-            params, opt_state, opt, apply_fn, batch, n_layers, k_up,
-            clip_eps=float(cfg.get("ppo_clip_eps", 0.2)), vf_coef=float(cfg.get("ppo_value_coef", 0.25)),
-            ent_coef=float(cfg.get("ppo_entropy_coef", 0.02)), vq_coef=float(cfg.get("vq_loss_coef", 0.1)),
-            minibatch_size=int(cfg["ppo_minibatch_size"]), gamma=gamma, lam=lam, team="blue",
-            alarm_ent_coef=float(cfg.get("alarm_ent_coef", 0.0)), freeze_comms=True,
-        )
+        if a.arm == "E":
+            mets = {}
+        else:
+            params, opt_state, mets = ppo_update(
+                params, opt_state, opt, apply_fn, batch, n_layers, k_up,
+                clip_eps=float(cfg.get("ppo_clip_eps", 0.2)), vf_coef=float(cfg.get("ppo_value_coef", 0.25)),
+                ent_coef=float(cfg.get("ppo_entropy_coef", 0.02)), vq_coef=float(cfg.get("vq_loss_coef", 0.1)),
+                minibatch_size=int(cfg["ppo_minibatch_size"]), gamma=gamma, lam=lam, team="blue",
+                alarm_ent_coef=float(cfg.get("alarm_ent_coef", 0.0)), freeze_comms=True,
+            )
         rl_jax.compute_gae = _production_compute_gae
         rec = dict(arm=a.arm, seed=a.seed, update=u, mean_dist=dist_sum / (T * E), deposits_per_env=deps / E,
                    frac_moves_toward=moves_toward / max(moves, 1), ev=float(ev),
