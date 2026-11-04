@@ -18,11 +18,11 @@ import modal
 
 _REQUIREMENTS = str(Path(__file__).resolve().parents[1] / "requirements.txt")
 
-PINNED_SHA = "20d064a7e64316646e2ba27b5156552ff422d2c8"
+PINNED_SHA = "a2d910bdd0ee6a49eabd478dc498676d30fd29a7"
 REPO_URL = "https://github.com/overlordxrz-source/throng.git"
 VOLUME_NAME = "throng-runs"
 VOLUME_MOUNT = "/mnt/throng-runs"
-GPU = "L4"
+GPU = ["L4", "A10G"]  # fallback order: capacity for L4 alone queued >10 min
 
 app = modal.App("throng-testbed")
 volume = modal.Volume.from_name(VOLUME_NAME, create_if_missing=False)
@@ -75,7 +75,7 @@ def main(timing: bool = False, updates: int = 0):
             print(json.dumps(r))
         return
     assert updates > 0, "--updates N is required (fixed from the timing probe, before any result)"
-    jobs = [(arm, seed, updates) for arm in "ABCD" for seed in (0, 1, 2)]
+    jobs = [(arm, seed, updates) for arm in "ABCDE" for seed in (0, 1, 2)]
     with open("testbed_results.jsonl", "a") as fh:
         for recs in run_arm.starmap(jobs):
             for r in recs:
