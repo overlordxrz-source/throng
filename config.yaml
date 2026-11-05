@@ -8,10 +8,8 @@
 # USE: python main.py --config config_phase7.yaml --fresh
 
 grid_size: 128
-window_size: 1200
 
 population_size: 200           # P10.5 Hard-Ceiling: cap blues (no 500-agent entropy explosion)
-max_population: 200
 max_pop: 200
 min_population: 150              # P10.5 Goldilocks: 150–200 high-stress band
 red_population_size: 250         # P10.4 Safety Bubble: full red ecology pressure
@@ -38,19 +36,14 @@ is_big_green_mutation_rate: 0.03
 can_see_recipe_mutation_rate: 0.03
 
 # Curriculum
-curriculum_red_count: 6
-curriculum_blue_threshold: 80
-curriculum_sustain_steps: 2000
 curriculum_survival_threshold: 0.80   # blue survival rate to advance red floor
 curriculum_sustain_updates: 5         # consecutive PPO updates above threshold
 
 max_age: 1000                 # P10.4 Safety Bubble: above JAX default 500; room for mean age 150+
-base_maturation_steps: 200
 
 # Brain architecture — 4L from birth
 n_layers: 4
 brain_max_layers: 6
-brain_token_dim: 128
 brain_n_heads: 4
 agent_hidden_dim: 256
 signal_dim: 40
@@ -68,11 +61,6 @@ n_actions: 12                    # Phase 18: N,S,E,W,Stay,Strike,Push,Guard,Buil
                                  #  — README quickstart, decode/test tools — don't default to 8 and crash
                                  #  the aux one-hot on actions 8–11)
 
-# Theory of mind head
-tom_enabled: true
-tom_lr: 1.0e-4
-tom_reward_coef: 0.0            # ZERO artificial rewards in Phase 7
-tom_head_independent: true
 
 # Signal gate
 signal_gate_enabled: true
@@ -81,7 +69,6 @@ signal_gate_mask_frac: 0.5
 symbol_decay: 0.993
 
 red_starvation_steps: 400
-red_spawn_step: 2000
 red_catch_radius: 1          # P4: adjacent reds catch blues (Chebyshev ≤ 1)
 red_catch_prob: 0.8          # P10.4: 20% predator jitter on in-range catches
 
@@ -103,19 +90,23 @@ vq_dead_code_reset: true
 vq_dead_code_window: 5
 vq_dead_code_min_pool_frac: 0.25
 vq_dead_code_ema_decay: 0.8
-gumbel_tau: 0.5
+gumbel_tau: 0.0                  # PENDING WIRING (config_audit): tokens are a deterministic nearest-code argmin -- no
+                                 # sampling, so tau is effectively 0. Whoever wires it: 0.0 here is a divide-by-zero
+                                 # in logits/tau; set a real temperature in the same commit.
 
 # ── Anneal: diversity → crystallization ───────────────────────────────────────
-gumbel_tau_start: 0.5
-gumbel_tau_end: 0.5
-gumbel_tau_anneal_start: 20000
-gumbel_tau_anneal_end: 50000
+# PENDING WIRING (config_audit): no anneal exists; values set to what the code does (none).
+gumbel_tau_start: 0.0
+gumbel_tau_end: 0.0
+gumbel_tau_anneal_start: 0
+gumbel_tau_anneal_end: 0
 
 # ZERO signal entropy bonus — structure must arise from survival gradient
 signal_entropy_coef_start: 0.0
 signal_entropy_coef_end: 0.0
-signal_entropy_anneal_start: 20000
-signal_entropy_anneal_end: 50000
+# PENDING WIRING (config_audit): no token entropy bonus or anneal exists; coefficients are 0 = what the code does.
+signal_entropy_anneal_start: 0
+signal_entropy_anneal_end: 0
 
 # ── Procedural environment ────────────────────────────────────────────────────
 wall_density: 0.08
@@ -134,16 +125,14 @@ scent_intensity: 0.8          # initial scent strength when red passes
 
 # ── Phase 7: Episodic memory ─────────────────────────────────────────────────
 memory_buffer_size: 20          # slots per agent (0 = disabled)
-memory_buffer_enabled: true
+memory_buffer_enabled: true     # PENDING WIRING (config_audit): update_memory_buffer runs unconditionally; not a switch
 
 # ── Phase 7: Red co-evolution ────────────────────────────────────────────────
-red_policy: true
 red_hidden_dim: 128             # half the blues' capacity (256→128)
 
 # ── Phase 7.5: Dual cultural memory grids ───────────────────────────────────
 culture_fast_decay: 0.90         # fast-decay layer: recent danger / coordination
 culture_slow_decay: 0.995        # slow-decay layer: stable landmarks / long-term memory
-culture_intensity: 0.3           # how strongly agents write to shared memory
 
 # ── Phase 7.5b: Mind-Melding (live knowledge transfer) ─────────────────────
 mind_meld_enabled: true
@@ -158,7 +147,8 @@ distill_keep_frac: 0.05          # top 5% survive
 distill_noise_std: 0.1           # Gaussian noise on cloned carries
 
 # ── Phase 7.5d: Cooperative Puzzle (Lock-and-Key) ──────────────────────────
-puzzle_enabled: true
+puzzle_enabled: true             # PENDING WIRING (config_audit): puzzle runs unconditionally; values below match the
+                                 # hardcoded generate_puzzle_nodes(n_nodes=3) / check_puzzle_solved(switch_dist=2, cooldown_time=100)
 puzzle_n_nodes: 3                # number of lock-key pairs
 puzzle_switch_distance: 2        # how close to stand on switch
 puzzle_reward: 5.0               # massive reward for solving
@@ -210,9 +200,8 @@ hearth_channel_ablation_enabled: false  # Gate 2 control: zero the wire, see if 
 
 # ── MAPPO ──────────────────────────────────────────────────────────────────────
 ppo_rollout_steps: 512
-ppo_epochs: 1
+ppo_epochs: 1                   # PENDING WIRING (config_audit): ppo_update always does exactly one pass
 ppo_minibatch_size: 512   # 500 agents × 512 steps; 2048 minibatch OOMs backward on A100
-ppo_warmup_steps: 15
 ppo_clip: 0.2
 ppo_clip_eps: 0.2
 ppo_lr: 3.0e-4
@@ -221,7 +210,7 @@ ppo_gae_lam: 0.95
 ppo_value_coef: 0.1
 ppo_entropy_coef: 0.02
 alarm_ent_coef: 0.0
-action_entropy_coef: 0.05      # Explicit action diversity bonus
+action_entropy_coef: 0.0       # PENDING WIRING (config_audit): never applied; ppo_loss uses ppo_entropy_coef only
 ppo_max_grad_norm: 2.0
 
 # Rewards
@@ -246,16 +235,10 @@ resource_obs_noise: 0.2         # 20% Gaussian noise on resource observations
 
 brain_vote_interval: 5000
 brain_vote_survival_threshold: 0.55
-force_brain_layers: 4
 
 # ── Misc ──────────────────────────────────────────────────────────────────────
-steps_per_render: 32
-target_fps: 60
-dashboard_update_interval: 20.0
 
-log_dir: runs_large
 checkpoint_interval: 512           # 2026-11-04 (Cam): one update (T=512) -> checkpoint EVERY update, so a crash costs one update, not the window (was 2000 = every 3 updates). Durability, not ecology: not in the fingerprint.
-log_interval: 200
 
 # 2026-09-14 (Cam): resume_from_step: 2541 lived here as a deliberate
 # rollback. The calibration ladder's codes_active rule ("latest checkpoint
@@ -284,20 +267,14 @@ log_interval: 200
 # the volume) and removed again before the next restart -- a temporary,
 # one-time override, never a standing config value.
 
-mi_analysis_interval: 1000
-mi_window: 1000
-signal_cluster_k: 12
 
 # Signal corpus (offline language analysis) — P10.6 tight causal lag (~4 env steps)
 corpus_sample_frac: 0.15
 corpus_every_n_steps: 4
 
-# Within-lifetime Hebbian learning
-hebb_lr: 0.001
 
 # Alarm call analysis
 alarm_scout_range: 8
-alarm_min_group: 20
 
 # Phase 11 staging (feature/phase11-imagination only — not on master P10.6 run)
 carry_fwd_coef: 0.05   # MSE on carry_{t+1}; target always stop_gradient
@@ -371,7 +348,6 @@ phase14_transcendental:
   simvq_out_scale: 2.0       # tanh projection × scale → signal in [-2, 2]
   reset_red_vq_on_resume: false # SAFEGUARD: Phase 15 codebook is healed, do not nuke it again
 
-exit_on_graduation: false
 
 # Phase 15.0 — Cumulative Culture (MEDAL-ADR Expert Dropout)
 phase15_cumulative_culture:
@@ -386,7 +362,6 @@ phase16_combinatorial_syntax:
   reward_big_green_solo_catchable: 2.0  # Used during 0-100k step scaffold
   r_coord: 1.5
   coop_threshold_step: 100000
-  num_actions: 8
 
 # CtD competence ramp (2026-09-14, Cam's sign-off -- see RESEARCH_PROTOCOL.md
 # Part 3 and jax_sim/ctd_ramp.py). Modelled on the Phase 16 CtD gate directly

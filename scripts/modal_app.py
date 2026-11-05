@@ -421,8 +421,21 @@ def train(n_steps: int = N_STEPS_FULL) -> None:
     volume.commit()
 
 
+def _config_audit_gate() -> None:
+    """Launch gate (Cam, 2026-11-04): refuse to launch while any config key is unread and not allowlisted.
+    Runs locally, against the working tree's config.yaml -- re-pin so the box runs the same config."""
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("config_audit", Path(__file__).resolve().parent / "config_audit.py")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    if mod.main() != 0:
+        raise SystemExit("[launch gate] config_audit failed: wire, delete, or allowlist the keys above before launching")
+
+
 @app.local_entrypoint()
 def main(test: bool = False, n_steps: int = 0):
+    _config_audit_gate()
     if test:
         print("[preflight] running CPU smoke test (SHA/volume/config/checkpoint-restore/fossil-guard only)")
         head = _tiny_cpu_smoke.remote()

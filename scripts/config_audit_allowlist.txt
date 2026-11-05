@@ -1,0 +1,18 @@
+# config_audit allowlist (Cam's rule, 2026-11-04): only keys whose value states what the code does today and
+# whose wiring is pending. Wire one at a time, each with its own test, only when an experiment calls for it.
+ppo_epochs                   # pending wiring: ppo_update makes exactly 1 pass; first in line after the estimator fix
+action_entropy_coef          # pending wiring: set 0.0 = not applied; ppo_loss uses ppo_entropy_coef only
+gumbel_tau                   # pending wiring (channel fix): tokens are a deterministic argmin; 0.0 = no sampling
+gumbel_tau_start             # pending wiring (channel fix): no temperature anneal exists
+gumbel_tau_end               # pending wiring (channel fix): no temperature anneal exists
+gumbel_tau_anneal_start      # pending wiring (channel fix): no temperature anneal exists
+gumbel_tau_anneal_end        # pending wiring (channel fix): no temperature anneal exists
+signal_entropy_coef_start    # pending wiring (channel fix): no token entropy bonus; 0.0 = what the code does
+signal_entropy_coef_end      # pending wiring (channel fix): no token entropy bonus; 0.0 = what the code does
+signal_entropy_anneal_start  # pending wiring (channel fix): no anneal exists
+signal_entropy_anneal_end    # pending wiring (channel fix): no anneal exists
+memory_buffer_enabled        # pending wiring: buffer always runs; true = what the code does
+puzzle_enabled               # pending wiring: puzzle always runs; true = what the code does
+puzzle_n_nodes               # pending wiring: hardcoded n_nodes=3 in generate_puzzle_nodes; value matches
+puzzle_switch_distance       # pending wiring: hardcoded switch_dist=2 in check_puzzle_solved; value matches
+puzzle_timeout               # pending wiring: hardcoded cooldown_time=100 in check_puzzle_solved; value matches
