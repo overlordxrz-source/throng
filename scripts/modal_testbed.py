@@ -129,12 +129,12 @@ def ladder_jobs(vf: float):
     return jobs
 
 
-@app.local_entrypoint()
 COMM_PLANS = {
     "comm_timing": [("COMM", 0, 2, 0.08, True)],
 }
 
 
+@app.local_entrypoint()
 def main(timing: bool = False, plan: str = "", vf: float = 0.0):
     import json
 
