@@ -1,0 +1,17 @@
+== C'@32 (critic fix, vf 0.5) re-run with saving -- training sanity
+  C'0 [NVIDIA A10]: rate 22.025 = 149.9x ladder E -> valid
+  C'1 [NVIDIA A10]: rate 23.078 = 157.1x ladder E -> valid
+== Transfer (frozen C'@32 policy)
+  seed 0 @ 64: 1.6687/env-rollout = 66.75x ladder E
+  seed 1 @ 64: 1.1625/env-rollout = 46.50x ladder E
+  TRANSFERS at 64: True
+  seed 0 @ 128: 0.3438/env-rollout = 36.57x ladder E
+  seed 1 @ 128: 0.1906/env-rollout = 20.28x ladder E
+  TRANSFERS at 128: True
+== PopArt (C', vf 0.5)
+  PopArt0 @32 [NVIDIA A10]: Var(resid) x4.44, Var(target) x4.27, EV(71-80) +0.434, rate 27.097 = 184.5x E
+  PopArt1 @32 [NVIDIA A10]: Var(resid) x20.52, Var(target) x34.52, EV(71-80) +0.422, rate 26.703 = 181.8x E
+  CRITIC FIXED (both 32 seeds Var(resid) <= 2x): False
+  PopArt0 @64 [NVIDIA A10]: rate 0.0875 = 3.50x ladder E, EV(71-80) +0.012
+  PopArt1 @64 [NVIDIA A10]: rate 11.9219 = 476.88x ladder E, EV(71-80) +0.737
+  EXTENDS REACH to 64 (both seeds >= 2x E): True

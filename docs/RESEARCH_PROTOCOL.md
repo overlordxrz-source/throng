@@ -1276,6 +1276,29 @@ more expensive, because it produces publishable-looking nulls.
   * **How it reads (Cam):** transfer passes -> the path to the full world is a size curriculum (32 -> 64 -> 128),
     not learner surgery. Either way the communication experiment moves into the testbed at 32x32 (draft only).
 
+- **Stage 3 -- results (pin `b8d6627`; raw `docs/data/testbed_stage3_2026-11-05.jsonl`, analysis `..._analysis.txt`;
+  final params on the volume under `testbed/params/`).** All 6 runs on "NVIDIA A10". Spend **$3.38** (metered
+  $22.20 -> $25.58) of the $5 sub-cap.
+  * **Re-run sanity:** C'@32 learned again in both seeds (22.0 / 23.1 deposits per env-update = 150x / 157x the
+    ladder E) -> both transfer readings valid.
+  * **(1) Transfer: PASSES at 64 and at 128.** Frozen C'@32 policies: 64 -> 1.67 / 1.16 deposits per env-rollout =
+    **66.8x / 46.5x** the ladder E; 128 -> 0.34 / 0.19 = **36.6x / 20.3x**. Cam's prediction (64 yes, 128 probably)
+    held at both. The compass-following policy learned at 32 generalises to maps the learner cannot learn on
+    directly (C' fails at 64/128 from scratch). Per Cam's reading: **the path to the full world is a size curriculum
+    (32 -> 64 -> 128), not learner surgery.** (Absolute rates fall with size, as they must: longer walks between
+    deposits.)
+  * **(2a) PopArt critic: FAIL as registered** -- Var(target - V) grew x4.44 and x20.52 from ramp to plateau at 32
+    (bar <= 2x). **But the registered rule was mis-specified for this outcome (disclosed, verdict unchanged):** it
+    assumed the artifact branch, where Var(target) falls; here Var(target) itself grew x4.27 and x34.52, so the
+    residual grew *with* the target. Relative residual Var(resid)/Var(target): PopArt 0.88 -> 0.51 -> 0.58 and
+    0.98 -> 0.53 -> 0.49 (updates 15 / 40 / 80), against the critic-fix re-run's 0.98 -> 0.37 -> **2.18 / 2.28** in
+    the same stage. EV at plateau: PopArt **+0.43 / +0.42** (stable 0.26-0.51 from update 20 on) vs the fix's
+    **-1.18 / -1.28**. Read, not registered: PopArt stops the divergence; the fix variant diverges.
+  * **(2b) PopArt reach: EXTENDS to 64 as registered** (3.50x / 476.9x the ladder E). Disclosure: seed 0 barely
+    clears (0.0875 per env-update, ~28 deposits in its window, EV ~0 -- it did not visibly learn); seed 1 learned
+    (deposits 0 -> 6.1 -> 12.5 by updates 40 / 60 / 80, EV +0.73). One clear learner, one marginal.
+  * Exploratory: PopArt at 32 delivered more than the fix variant (27.1 / 26.7 vs 22.0 / 23.1 per env-update).
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
