@@ -1353,6 +1353,15 @@ more expensive, because it produces publishable-looking nulls.
     secondary only (high MI does not show the listener uses the token). NOSIG correct > 0.25 is logged as memory /
     search order (a listener that remembers its last deposit hearth can reach 1/3 with no information), not the
     channel.
+  * **Attempt 1 cancelled -- infrastructure, not the experiment (app `ap-yIyojumc8GkNZuOBkQRNYJ`).** All 5 runs
+    received a client-side cancellation at 19:48:39Z, at update 34 of 120 (~21 s/update, faster than the probe). No
+    error, apparatus halt or traceback in any container; the spend guard had not fired (metered $27.05 vs $35.36);
+    the Mac's sleep was blocked (caffeinate). Cause: with `modal run --detach`, only the last-triggered call survives
+    a local disconnect, and the launcher's `starmap` ran from the local process. **The partial results were not
+    analysed** (line counts only); they stay on the volume as `testbed/comm/comm_*_run_b88fe7f.jsonl`. Spend ~$1.7.
+  * **Attempt 2 = the same registered run, unchanged design**, launched through `orchestrate_comm` -- a CPU
+    function inside Modal that runs the starmap, so a local disconnect cannot cancel it. Output files carry an
+    `_a2` suffix; combined results at `testbed/comm/comm_a2_results.jsonl`.
 
 ## Part 3 — Fossils
 

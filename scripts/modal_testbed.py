@@ -76,7 +76,8 @@ def run_arm(arm: str, seed: int, updates: int, grid: int = 15, timing_only: bool
 
 
 @app.function(image=image, gpu=GPU, timeout=6 * 60 * 60, retries=0, volumes={VOLUME_MOUNT: volume})
-def run_comm(arm: str, seed: int, updates: int, tau: float, timing_only: bool = False) -> list[dict]:
+def run_comm(arm: str, seed: int, updates: int, tau: float, timing_only: bool = False,
+             attempt: str = "a1") -> list[dict]:
     """Comm experiment (scripts/comm_testbed.py on the comm-testbed branch). Warm start from the stage-3 PopArt@32
     policy of the same seed."""
     import json
@@ -87,7 +88,7 @@ def run_comm(arm: str, seed: int, updates: int, tau: float, timing_only: bool = 
     os.chdir("/root/throng")
     head = subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True, text=True, check=True).stdout.strip()
     assert head == PINNED_SHA, f"box did not clone the pinned SHA (got {head})"
-    tag = f"comm_{arm}{seed}_{'timing' if timing_only else 'run'}_{head[:7]}"
+    tag = f"comm_{arm}{seed}_{'timing' if timing_only else 'run'}_{head[:7]}" + ("" if attempt == "a1" else f"_{attempt}")
     print(f"[testbed] {tag} updates={updates} tau={tau}", flush=True)
     os.makedirs(f"{VOLUME_MOUNT}/testbed/comm", exist_ok=True)
     warm = f"{VOLUME_MOUNT}/testbed/params/C{seed}_g32_popart_vf0.5_b8d6627.msgpack"
@@ -129,10 +130,33 @@ def ladder_jobs(vf: float):
     return jobs
 
 
+@app.function(image=image, gpu=None, timeout=8 * 60 * 60, retries=0, volumes={VOLUME_MOUNT: volume})
+def orchestrate_comm(plan: str) -> int:
+    """Runs a comm plan's starmap INSIDE Modal (CPU container), so a dropped local client cannot cancel it: with
+    `modal run --detach` only the last-triggered call survives a disconnect, and attempt 1 of the comm run was
+    cancelled at update 34/120 that way (2026-11-05). Results go to the volume (testbed/comm/<plan>_results.jsonl)."""
+    import json
+
+    path = f"{VOLUME_MOUNT}/testbed/comm/{plan}_results.jsonl"
+    n = 0
+    with open(path, "a") as fh:
+        for recs in run_comm.starmap(COMM_PLANS[plan], order_outputs=False):
+            for r in recs:
+                fh.write(json.dumps(r) + "\n")
+            fh.flush()
+            volume.commit()
+            n += 1
+            print(f"[orchestrate] done {recs[-1]['arm']}{recs[-1]['seed']} ({n}/{len(COMM_PLANS[plan])})", flush=True)
+    return n
+
+
 COMM_PLANS = {
     "comm_timing": [("COMM", 0, 2, 0.08, True)],
     # Registered comm run: COMM x2, NOSIG x2 (primary arms), ORACLE x1 (apparatus; cut first per Cam), N=120, tau 0.08
     "comm": [(arm, seed, 120, 0.08) for arm, seed in (("COMM", 0), ("COMM", 1), ("NOSIG", 0), ("NOSIG", 1), ("ORACLE", 0))],
+    # attempt 2 of the same registered run (attempt 1 cancelled by a client disconnect at update 34; not analysed)
+    "comm_a2": [(arm, seed, 120, 0.08, False, "a2") for arm, seed in (("COMM", 0), ("COMM", 1), ("NOSIG", 0),
+                                                                       ("NOSIG", 1), ("ORACLE", 0))],
 }
 
 
@@ -143,6 +167,10 @@ def main(timing: bool = False, plan: str = "", vf: float = 0.0):
     if timing:
         for r in run_arm.remote("C", 0, 2, 15, True):
             print(json.dumps(r))
+        return
+    if plan in COMM_PLANS and plan != "comm_timing":
+        n = orchestrate_comm.remote(plan)   # the starmap runs inside Modal; survives a local disconnect
+        print(f"[testbed] orchestrator finished {n} runs; results on the volume: testbed/comm/{plan}_results.jsonl")
         return
     if plan in COMM_PLANS:
         with open(f"testbed_{plan}_results.jsonl", "a") as fh:
