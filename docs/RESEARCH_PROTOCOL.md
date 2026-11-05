@@ -1095,6 +1095,42 @@ more expensive, because it produces publishable-looking nulls.
     would have to be registered for the re-run, disclosing that the A/B and C/D curves have now been seen.
     (2) Cost: ~$3.9 of the cap remains; 6 C/D runs at 80 updates are ~$4.3.
 
+- **Cam's ruling after Step 2 (2026-11-04).** Budget: the $3.90 was the testbed sub-cap's remainder; the overall cap
+  has ~$29 left; **new $10 sub-cap** for Step 0 + Step 1. Order: config cleanup (done, `71eb97c`: 28 dead keys
+  deleted, 16 pending keys set to what the code does and allowlisted, fingerprint byte-identical, tests unchanged,
+  audit now a launch gate in `modal_app.py`), then Step 0, then Step 1. Report when the ladder is complete.
+  Config note for Cam: `gumbel_tau` and `action_entropy_coef` are still read by the legacy PyTorch path in
+  `agents/` (unreachable from every current launcher); `gumbel_tau: 0.0` would divide by zero there if revived.
+
+- **REGISTRATION -- Step 0, critic fix (before any run of it).** Change (`jax_sim/rl_jax.py`): the value loss no
+  longer clips predictions to old_values +/- 0.2 in raw return units; the Huber error is measured in units of a
+  running return std (`RunningReturnStd`, parallel Welford over each update's targets, one per team, updated
+  before use, not checkpointed). Value head stays in raw units, so GAE/bootstrap/imagination see unchanged value
+  semantics. Test `tests/test_value_target_normalization.py` (3 tests; the old production code fails 2 of them --
+  mutation-checked by restoring the old block in `ppo_loss`); full suite 153 passed / 56 skipped.
+  * **Verification:** 2 seeds (0, 1) of arm A at 15x15, N=80, testbed now passing `return_rms` exactly as
+    production does. **Bar (both seeds):** EV, mean over updates 36-40, >= 0.2; **and** learning no worse than the
+    old A seeds = registered decline (updates 1-3 vs 78-80) >= 0.966 (the smallest old-A decline). Pass -> the fix
+    lands in production. Also in this plan: a one-update timing probe at 128x128 (metrics suppressed) for the
+    ladder's cost.
+
+- **REGISTRATION -- Step 1, map-size ladder (a SCAN; runs only if Step 0 passes; break point to be confirmed later
+  with 3 seeds).** Disclosure: the 15x15 curves of arms A-E (Step 2) have been seen.
+  * **Design:** sizes 15, 32, 64, 128; one hearth at the centre, hearth_radius 1, deposit reward only (2.7), no
+    shaping; 32 envs; N=80; T=512, gamma 0.999. Arms: **A** production MC (with the Step 0 critic fix), **C'**
+    GAE lambda 0.95 + bootstrap with the fixed critic (testbed arm C at the new pin), **E** frozen (lr=0). Seeds
+    0, 1. 24 runs, `scripts/modal_testbed.py --plan ladder`.
+  * **Metric:** deposit rate = mean deposits per env per update over updates 71-80. Ratio = a run's rate / E's rate
+    at the same size (mean over both E seeds). Floor if E's pooled window has zero deposits: 0.5 deposits over the
+    pooled window (2 seeds x 10 updates x 32 envs). **An arm learns at a size if both seeds reach >= 2x E.**
+    Reference (random walk, 1/G^2 per step): expected E rate ~2.3 / 0.50 / 0.12 / 0.03 deposits per env-update at
+    15 / 32 / 64 / 128.
+  * **Prediction (Cam):** A breaks once typical start distance exceeds the ~sqrt(512) ~ 22-cell random-walk reach
+    -> fails at 64 and 128; C' holds further out. Typical start distance (mean toroidal Chebyshev to the hearth,
+    uniform respawn outside radius 1): 5.1 / 10.8 / 21.4 / 42.7 at 15 / 32 / 64 / 128 -- so 64 sits right at the
+    predicted boundary.
+  * EV is reported per run, descriptive only (not a gate). Spend baseline before Step 0: metered $10.99.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under

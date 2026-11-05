@@ -21,6 +21,39 @@ from typing import Dict, Tuple, Any
 from jax_sim.action_space import MASKED_ACTIONS, mask_disabled_actions
 
 
+class RunningReturnStd:
+    """Running variance of value targets across PPO updates (parallel-Welford over batches).
+
+    2026-11-04 (Cam, learner testbed): the value loss used to clip predictions to old_values +/- clip_eps
+    (0.2) in RAW return units, so V could move at most 0.2 per update while returns grew by far more --
+    explained variance sat at ~0 in every testbed arm and went to -2 when returns grew. The clip is gone;
+    the value error is measured in units of this running std instead, so the Huber regime means the same
+    thing at any return scale. Not checkpointed: it re-estimates from the first batch after a (re)start,
+    because update() runs before std is read.
+    """
+
+    def __init__(self, eps: float = 1e-4):
+        self.mean = 0.0
+        self.var = 1.0
+        self.count = eps
+
+    def update(self, x) -> None:
+        x = np.asarray(x, dtype=np.float64).ravel()
+        if x.size == 0:
+            return
+        b_mean, b_var, b_n = float(x.mean()), float(x.var()), x.size
+        delta = b_mean - self.mean
+        tot = self.count + b_n
+        m2 = self.var * self.count + b_var * b_n + delta ** 2 * self.count * b_n / tot
+        self.mean = self.mean + delta * b_n / tot
+        self.var = m2 / tot
+        self.count = tot
+
+    @property
+    def std(self) -> float:
+        return float(max(np.sqrt(self.var), 1e-4))
+
+
 def compute_gae(
     rewards,   # (T, N) — numpy or JAX
     values,    # (T, N)
@@ -84,6 +117,7 @@ def ppo_loss(
     ignition: jnp.ndarray = None, # (M,) bool
     ignition_discount: float = 0.1,
     alarm_ent_coef: float = 0.0,
+    value_scale: float = 1.0,  # running return std (RunningReturnStd); value error is measured in these units
 ) -> Tuple[jnp.ndarray, Dict]:
     """
     PPO loss evaluated with exact historical carries per timestep.
@@ -145,16 +179,15 @@ def ppo_loss(
     surr2 = clipped_ratio * advantages
     pg_loss = -jnp.minimum(surr1, surr2)
 
-    # Value loss with PPO clipping to safely allow backbone learning
-    v_clipped = old_values + jnp.clip(values_pred - old_values, -clip_eps, clip_eps)
-    err = jnp.abs(values_pred - returns)
-    err_clipped = jnp.abs(v_clipped - returns)
-    
+    # Value loss: Huber on the error in running-return-std units, no clip (see RunningReturnStd --
+    # the old +/-clip_eps clip was in raw return units and froze V far behind its targets).
+    err = jnp.abs(values_pred - returns) / value_scale
+
     delta = 0.5
     def vf_huber(e):
         return jnp.where(e < delta, 0.5 * jnp.square(e), delta * (e - 0.5 * delta))
-        
-    vf_loss = jnp.maximum(vf_huber(err), vf_huber(err_clipped))
+
+    vf_loss = vf_huber(err)
     
     if ignition is not None:
         vf_weight = jnp.where(ignition, 1.0 - ignition_discount, 1.0)
@@ -261,7 +294,7 @@ def _minibatch_step(
     obs, actions, alarm_actions, old_log_probs, advantages, returns, carries,
     n_layers, old_values, clip_eps, vf_coef, ent_coef, vq_coef, loss_vq, alive, rng_key,
     ignition, ignition_discount, alarm_ent_coef, freeze_comms=False,
-    comms_lr_warmup=1.0,
+    comms_lr_warmup=1.0, value_scale=1.0,
 ):
     grad_fn = jax.value_and_grad(ppo_loss, has_aux=True)
     (loss, metrics), grads = grad_fn(
@@ -269,6 +302,7 @@ def _minibatch_step(
         advantages, returns, carries, n_layers,
         old_values, clip_eps, vf_coef, ent_coef, vq_coef, loss_vq, alive=alive, rng_key=rng_key,
         ignition=ignition, ignition_discount=ignition_discount, alarm_ent_coef=alarm_ent_coef,
+        value_scale=value_scale,
     )
 
     # Phase 18: Per-Group Gradient Clipping
@@ -366,6 +400,7 @@ def ppo_update(
     alarm_ent_coef: float = 0.0,
     freeze_comms: bool = False,
     comms_lr_warmup: float = 1.0,
+    return_rms: "RunningReturnStd | None" = None,
 ) -> Tuple[Dict, Any, Dict]:
     """
     Single gradient update step using minibatches.
@@ -386,6 +421,9 @@ def ppo_update(
     ignition = batch.get("ignition")
 
     advantages, returns = compute_gae(rewards, values, dones, gamma=gamma, lam=lam, ignition=ignition, ignition_discount=ignition_discount)
+    if return_rms is not None:
+        return_rms.update(returns)
+    value_scale = return_rms.std if return_rms is not None else 1.0
 
     # Debug
     print(f"  [DEBUG] rewards mean={float(rewards.mean()):.4f} std={float(rewards.std()):.4f}")
@@ -474,7 +512,7 @@ def ppo_update(
             mb_obs, mb_act, mb_alarm_act, mb_lp, mb_adv, mb_ret, mb_c,
             n_layers, mb_v, clip_eps, vf_coef, ent_coef, vq_coef, mb_vq, mb_al, mb_key,
             mb_ig, ignition_discount, alarm_ent_coef, freeze_comms,
-            comms_lr_warmup,
+            comms_lr_warmup, value_scale,
         )
 
         # Accumulate as Python floats to avoid holding 500 JAX arrays

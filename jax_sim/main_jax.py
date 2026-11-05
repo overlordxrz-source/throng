@@ -68,6 +68,7 @@ from jax_sim.network_jax import (
 )
 from jax_sim.rl_jax import (
     compute_gae,
+    RunningReturnStd,
     ppo_loss,
     create_optimizer,
     ppo_update,
@@ -2091,6 +2092,10 @@ def _run_simulation_impl(
     b_optimizer = create_optimizer(config["ppo_lr"], config["ppo_max_grad_norm"])
     r_optimizer = create_optimizer(config["ppo_lr"], config["ppo_max_grad_norm"])
     b_opt_state = b_optimizer.init(b_params)
+    # Running value-target std per team (rl_jax.RunningReturnStd, 2026-11-04): replaces the raw-units
+    # value clip. Not checkpointed -- re-estimated from the first batch after every (re)start.
+    b_return_rms = RunningReturnStd()
+    r_return_rms = RunningReturnStd()
     
     b_aux_optimizer = create_optimizer(config["ppo_lr"], config["ppo_max_grad_norm"])
     r_aux_optimizer = create_optimizer(config["ppo_lr"], config["ppo_max_grad_norm"])
@@ -3137,6 +3142,7 @@ def _run_simulation_impl(
                 alarm_ent_coef=float(config.get("alarm_ent_coef", 0.0)),
                 freeze_comms=_freeze_comms,
                 comms_lr_warmup=_comms_lr_warmup,
+                return_rms=b_return_rms,
             )
             if _freeze_comms and ui == start_update:
                 print("  [CTD-RAMP] comms subtree FROZEN for stage 0 (gwt_comms_1, "
@@ -3303,6 +3309,7 @@ def _run_simulation_impl(
             lam=float(config.get("ppo_gae_lam", 0.95)),
             team="red",
             alarm_ent_coef=float(config.get("alarm_ent_coef", 0.0)),
+            return_rms=r_return_rms,
         )
         if ui == start_update:
             print(
