@@ -1152,6 +1152,30 @@ more expensive, because it produces publishable-looking nulls.
   * **Cost data for the ladder:** the 128x128 probe ran 18.5 s/update warm (34.7 s first) -- the same as 15x15
     (the testbed env cost does not grow with grid size), so ~$0.41 per 80-update run at every size.
 
+- **Cam's ruling after Step 0 (2026-11-05).** The EV bar on arm A was his design error too; the ceiling script
+  stands. Named precisely: **production treats rollout truncation as termination, with no bootstrap at the cut.**
+  (1) Re-test the critic fix on C'. (2) **Master reverted** (`3cbf1b7`, jax_sim/ byte-identical to `71eb97c`); the
+  fix lives on branch **`critic-fix`** (`71a8d37`) as an opt-in path (`value_clip=False` + `RunningReturnStd`);
+  its default path is the production formula exactly (tested: `test_default_path_is_the_unchanged_production_
+  formula`; suite 154 passed / 56 skipped). The worse same-seed arm-A runs under the fix are disclosed as
+  unexplained. (3) The ladder waits for C'; A stays production (old critic); E trimmed to 1 seed per size.
+  Stage sub-cap raised to **$15** (metered baseline $10.99 -> guard at $25.99), with M's knowledge.
+
+- **REGISTRATION -- Step 0 re-test on C' (before launch).** Pin `71a8d37` (critic-fix branch), plan `cretest`.
+  15x15, N=80, 32 envs, deposit only; arm C (GAE lambda 0.95 + bootstrap) with `--critic-fix`, at **vf_coef 0.1**
+  and **vf_coef 0.5**, seeds 0 and 1 (4 runs, ~$1.60).
+  * **Bar, per vf, every seed:** EV mean over updates 36-40 >= 0.2; **and** decline (updates 1-3 vs 78-80) >= 0.966
+    (lowest Step 2 arm-A seed, production critic) **and** > every Step 2 E seed (max -0.006).
+  * **Decision:** both vf pass -> take 0.1 (smaller change); one passes -> that one; **neither -> stop and report**
+    (the critic problem is then something else -- trunk sharing, lr -- Cam rules).
+  * Analysis: `scripts/analyze_ladder.py cretest`, committed before results.
+
+- **REGISTRATION -- Step 1 ladder, as trimmed (supersedes the arm/seed list above; metric and bars unchanged).**
+  Runs only if the C' re-test passes, at the same pin. Sizes 15/32/64/128; **A** = production critic, seeds 0, 1;
+  **C'** = critic fix at the vf chosen by the re-test, seeds 0, 1; **E** = frozen, **seed 0 only**. 20 runs,
+  ~$8.20. E's rate at a size is its one seed; floor 0.5 deposits over its window (1 x 10 x 32). Learns at a size if
+  both seeds >= 2x E. Prediction (Cam) stands: A breaks beyond ~22 cells (64 and 128); C' holds further out.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
