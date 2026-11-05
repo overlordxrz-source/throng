@@ -1,0 +1,69 @@
+"""Registered analyses for Step 0 (critic fix) and Step 1 (map-size ladder) -- docs/RESEARCH_PROTOCOL.md.
+
+    python scripts/analyze_ladder.py step0  testbed_step0_results.jsonl
+    python scripts/analyze_ladder.py ladder testbed_ladder_results.jsonl
+"""
+from __future__ import annotations
+
+import collections
+import json
+import sys
+
+import numpy as np
+
+OLD_A_MIN_DECLINE = 0.966  # smallest Step 2 arm-A decline (docs/data/testbed_2026-11-04_analysis.txt)
+
+
+def load(path):
+    runs = collections.defaultdict(dict)
+    for line in open(path):
+        r = json.loads(line)
+        if "mean_dist" not in r:      # timing-probe records carry no metrics
+            continue
+        runs[(r["arm"], r["seed"], r["grid"])][r["update"]] = r
+    for k, us in runs.items():
+        missing = [u for u in range(1, 81) if u not in us]
+        assert not missing, f"{k} missing updates {missing[:5]}"
+    return runs
+
+
+def win(us, ws, key):
+    return float(np.mean([us[u][key] for u in ws]))
+
+
+def step0(path):
+    runs = load(path)
+    ok_all = True
+    for (arm, seed, grid), us in sorted(runs.items()):
+        ev = win(us, range(36, 41), "ev")
+        dec = win(us, (1, 2, 3), "mean_dist") - win(us, (78, 79, 80), "mean_dist")
+        ok = ev >= 0.2 and dec >= OLD_A_MIN_DECLINE
+        ok_all &= ok
+        print(f"{arm}{seed} g{grid} [{us[80]['gpu']}]: EV(36-40) {ev:+.3f} (bar 0.2) | decline {dec:+.3f} "
+              f"(bar {OLD_A_MIN_DECLINE}) | deposits/env last3 {win(us, (78, 79, 80), 'deposits_per_env'):.2f} "
+              f"| EV(78-80) {win(us, (78, 79, 80), 'ev'):+.3f} -> {'PASS' if ok else 'FAIL'}")
+    print(f"\nStep 0: {'PASS -> fix lands in production' if ok_all else 'FAIL'}")
+
+
+def ladder(path):
+    runs = load(path)
+    W = range(71, 81)
+    floor = 0.5 / (2 * 10 * 32)
+    for grid in sorted({k[2] for k in runs}):
+        e_rates = [win(us, W, "deposits_per_env") for (a, s, g), us in runs.items() if a == "E" and g == grid]
+        e = max(float(np.mean(e_rates)), floor) if e_rates else float("nan")
+        print(f"\n== {grid}x{grid}: E rate {e:.4f} (seeds {[round(x, 4) for x in e_rates]})")
+        for arm in "AC":
+            rows = sorted(((s, us) for (a, s, g), us in runs.items() if a == arm and g == grid), key=lambda t: t[0])
+            ratios = []
+            for s, us in rows:
+                r = win(us, W, "deposits_per_env")
+                ratios.append(r / e)
+                print(f"  {arm}{s} [{us[80]['gpu']}]: rate {r:.4f} = {r / e:.2f}x E | EV(71-80) {win(us, W, 'ev'):+.3f}"
+                      f" | dist {win(us, (1, 2, 3), 'mean_dist'):.2f} -> {win(us, (78, 79, 80), 'mean_dist'):.2f}")
+            learns = len(ratios) == 2 and all(x >= 2.0 for x in ratios)
+            print(f"  {arm}{chr(39) if arm == 'C' else ''} LEARNS at {grid}: {learns}")
+
+
+if __name__ == "__main__":
+    {"step0": step0, "ladder": ladder}[sys.argv[1]](sys.argv[2])
