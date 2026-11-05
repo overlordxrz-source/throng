@@ -1363,6 +1363,34 @@ more expensive, because it produces publishable-looking nulls.
     function inside Modal that runs the starmap, so a local disconnect cannot cancel it. Output files carry an
     `_a2` suffix; combined results at `testbed/comm/comm_a2_results.jsonl`.
 
+- **Testbed communication experiment -- results (attempt 2, app `ap-lFdp8aDMbEuGhU2bK7mD7s`, pin `b88fe7f`; raw
+  `docs/data/testbed_comm_a2_2026-11-05.jsonl`, analysis `..._analysis.txt`).** All 5 runs on "NVIDIA A10G"; no
+  apparatus halt. Stage spend ~**$7.8 of $10** (metered $25.36 -> $33.11-33.30; the summary moves between reads),
+  incl. attempt 1's ~$1.7. About $6 remains under the overall cap.
+  * **APPARATUS (ORACLE): PASS.** Listener correct-hearth fraction **0.771** (4,350 attempts) over updates 111-120,
+    against chance 0.25; listener deposits 10.5 per world-update. A listener that is told the active hearth learns to
+    pick it, so the comm null below is interpretable by the registered rule.
+  * **PRIMARY (token swap): FAIL.** Delta = **-0.0026** (SE 0.0026) and **+0.0001** (SE 0.0001); bar >= 0.05 and
+    > 2 SE in both seeds. Mirror toward the true T: +0.0021 / -0.0000. The swapped token differed from the true
+    one on 15.8% / 9.4% of sender steps (31% at the warm start), so the sender's token depends on T a little, and
+    the listener's movement does not respond to it.
+  * **SECONDARY.** Listener correct fraction COMM 0.022 / 0.035 vs NOSIG 0.056 / 0.021 -- COMM not above NOSIG;
+    listener deposits per world-update COMM 0.88 / 0.93 vs NOSIG 1.93 / 0.95. **MI(token; active): above the
+    block-permutation null's p99 in every slot of both COMM seeds, but tiny** -- 0.0075 / 0.0071 / 0.0008 bits (seed
+    0) and 0.0026 / 0.0017 / 0.0006 (seed 1), of a 2-bit ceiling. Tokens carry a trace of T that listeners do not use.
+  * **Not registered -- the comm arms never produced a competent informed sender.** Informed senders, who see T in
+    every arm, delivered 0.8 / 1.7 (COMM) and 6.6 / 0.5 (NOSIG) per world-update by update 120, against **11.0** for
+    the ORACLE world (where both agents are informed); NOSIG0's sender was still climbing steeply (1.6 at 90 -> 6.6 at
+    120). Uninformed listeners settled into **camping** -- parking at one hearth and spamming Craft until it becomes
+    active (attempts grew to 1,100-1,700 per update, vs 449 for the ORACLE listener), which is why the per-attempt
+    correct fraction sits far *below* 0.25 in COMM/NOSIG: that chance level does not apply to camping. Reading: the
+    ORACLE check shows a listener *can* use T; it does not show that senders here ever became competent enough, or
+    that listener deposits were frequent enough, for the shared reward to shape the token. With half of the shared
+    network's experience uninformed, 120 updates from a non-transferring warm start was not enough for that. **The
+    null is about this regime (weak senders, rare shared reward), not evidence that the channel cannot work.**
+  * Interpretation per the registration: apparatus passes, primary fails, MI passes as secondary -> "information is
+    (barely) in the tokens but listeners don't use it". Next step is Cam's call.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under

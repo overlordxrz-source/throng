@@ -1,0 +1,22 @@
+== last 10 updates (111-120)
+  COMM0 [NVIDIA A10G]: listener correct 0.022 (12539 attempts) | listener dep/world 0.88 | sender dep/world 0.87 | token entropy 6.03 | EV +0.65
+  COMM1 [NVIDIA A10G]: listener correct 0.035 (8416 attempts) | listener dep/world 0.93 | sender dep/world 1.97 | token entropy 4.82 | EV +0.91
+  NOSIG0 [NVIDIA A10G]: listener correct 0.056 (10941 attempts) | listener dep/world 1.93 | sender dep/world 4.84 | token entropy 5.87 | EV +0.96
+  NOSIG1 [NVIDIA A10G]: listener correct 0.021 (14237 attempts) | listener dep/world 0.95 | sender dep/world 0.81 | token entropy 5.19 | EV +0.73
+  ORACLE0 [NVIDIA A10G]: listener correct 0.771 (4350 attempts) | listener dep/world 10.48 | sender dep/world 10.28 | token entropy 5.33 | EV +0.38
+
+== APPARATUS (ORACLE)
+  ORACLE listener correct >= 0.50 with >= 50 attempts: True ([(0.771, 4350)])
+
+== PRIMARY (token swap, COMM seeds)
+  COMM0: Delta -0.0026 (SE 0.0026, n=10) -> FAIL | mirror (toward true T) +0.0021 | swapped token differs on 15.8% of sender steps
+  COMM1: Delta +0.0001 (SE 0.0001, n=10) -> FAIL | mirror (toward true T) -0.0000 | swapped token differs on 9.4% of sender steps
+  PRIMARY: FAIL
+
+== SECONDARY
+  COMM: listener correct [0.022, 0.035] | listener dep/world [0.88, 0.93]
+  NOSIG: listener correct [0.056, 0.021] | listener dep/world [1.93, 0.95]
+  COMM correct > NOSIG outside seed spread: False
+  NOSIG correct > 0.25 (logged, memory/search, not the channel): [False, False]
+  MI COMM0: slot0 0.0075 bits vs null p99 0.0004 * | slot1 0.0071 bits vs null p99 0.0004 * | slot2 0.0008 bits vs null p99 0.0003 *
+  MI COMM1: slot0 0.0026 bits vs null p99 0.0003 * | slot1 0.0017 bits vs null p99 0.0004 * | slot2 0.0006 bits vs null p99 0.0002 *
