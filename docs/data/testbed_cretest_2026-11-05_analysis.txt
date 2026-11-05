@@ -1,0 +1,7 @@
+C'0 vf=0.1 [NVIDIA A10]: EV(36-40) -1.933 | EV(78-80) -7.223 | decline +1.119 | deposits/env last3 47.52 -> FAIL
+C'1 vf=0.1 [NVIDIA A10]: EV(36-40) -1.229 | EV(78-80) -4.458 | decline +1.134 | deposits/env last3 52.28 -> FAIL
+C'0 vf=0.5 [NVIDIA A10]: EV(36-40) -0.750 | EV(78-80) -2.111 | decline +1.332 | deposits/env last3 59.14 -> FAIL
+C'1 vf=0.5 [NVIDIA A10]: EV(36-40) -0.721 | EV(78-80) -2.499 | decline +1.277 | deposits/env last3 56.27 -> FAIL
+
+per-vf pass: {0.1: False, 0.5: False}
+cretest: FAIL -> stop and report

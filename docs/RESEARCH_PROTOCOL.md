@@ -1176,6 +1176,22 @@ more expensive, because it produces publishable-looking nulls.
   ~$8.20. E's rate at a size is its one seed; floor 0.5 deposits over its window (1 x 10 x 32). Learns at a size if
   both seeds >= 2x E. Prediction (Cam) stands: A breaks beyond ~22 cells (64 and 128); C' holds further out.
 
+- **C' re-test -- result: FAIL for both vf (pin `71a8d37`; raw `docs/data/testbed_cretest_2026-11-05.jsonl`).**
+  All 4 runs on "NVIDIA A10". Spend $2.33 (metered $12.20 -> $14.53; ~$0.58/run incl. a fresh image build);
+  stage total $3.54 of $15. **Stopped per the ruling; the ladder is not launched.**
+  * EV(36-40): vf 0.1 -1.933 / -1.229; vf 0.5 -0.750 / -0.721 (bar 0.2). Learning bars pass everywhere: declines
+    1.119 / 1.134 / 1.332 / 1.277; deposits/env (78-80) 47.5 / 52.3 / 59.1 / 56.3 (A in Step 2: 5.6-13.6).
+  * **Shape (descriptive, not registered):** EV rises to 0.13-0.39 by updates 15-20, while deposits ramp from ~1
+    to ~50 per rollout, then collapses once deposits plateau: updates 30/40/60/80 = -0.04/-2.38/-3.28/-8.40 (vf 0.1,
+    seed 0); vf 0.5 degrades slower (-2.22 / -2.71 at 80). Step 2's C (old clip) also ended at -1.4 to -1.9.
+  * **Candidates, for Cam's ruling (none tested):** (a) bootstrap feedback -- C's targets are built from V itself,
+    and with the clip off V can chase its own targets; (b) shared trunk -- the policy sharpens (entropy ~1.2-1.7)
+    and reshapes the features V reads, consistent with vf 0.5 holding up longer than 0.1; (c) the running std is
+    pooled over all history (plain Welford, no decay) while the return scale grows ~50x, so it lags the current
+    scale; (d) instrument: EV is measured against the arm's own bootstrapped targets, which move with V -- an EV
+    against independent targets (e.g. the MC returns of the same rollout) would separate "V is wrong" from
+    "the target moved".
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
