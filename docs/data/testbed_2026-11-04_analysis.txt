@@ -1,0 +1,25 @@
+A0: dist 5.025 -> 3.059  decline +1.966 | deposits/env 0.78 -> 13.59 | EV(last third) +0.001 | toward-frac 0.725 | entropy 2.777
+A1: dist 5.189 -> 4.223  decline +0.966 | deposits/env 0.66 -> 5.60 | EV(last third) +0.009 | toward-frac 0.605 | entropy 2.818
+A2: dist 5.241 -> 3.292  decline +1.949 | deposits/env 1.51 -> 11.67 | EV(last third) +0.001 | toward-frac 0.702 | entropy 2.789
+B0: dist 5.039 -> 4.286  decline +0.753 | deposits/env 0.89 -> 3.03 | EV(last third) +0.001 | toward-frac 0.560 | entropy 2.832
+B1: dist 5.179 -> 3.367  decline +1.813 | deposits/env 0.47 -> 8.79 | EV(last third) -0.000 | toward-frac 0.688 | entropy 2.784
+B2: dist 5.208 -> 4.166  decline +1.042 | deposits/env 1.33 -> 5.67 | EV(last third) +0.000 | toward-frac 0.585 | entropy 2.796
+C0: dist 5.067 -> 3.738  decline +1.328 | deposits/env 0.98 -> 59.76 | EV(last third) -1.925 | toward-frac 0.967 | entropy 1.695
+C1: dist 5.133 -> 3.696  decline +1.437 | deposits/env 0.83 -> 58.04 | EV(last third) -1.380 | toward-frac 0.968 | entropy 1.661
+C2: dist 5.232 -> 3.684  decline +1.549 | deposits/env 1.58 -> 60.04 | EV(last third) -1.470 | toward-frac 0.964 | entropy 1.672
+D0: dist 5.024 -> 3.186  decline +1.839 | deposits/env 0.96 -> 65.56 | EV(last third) -0.069 | toward-frac 0.989 | entropy 1.231
+D1: dist 5.035 -> 3.350  decline +1.684 | deposits/env 0.76 -> 70.32 | EV(last third) -0.050 | toward-frac 0.989 | entropy 1.194
+D2: dist 5.193 -> 3.388  decline +1.806 | deposits/env 1.48 -> 71.21 | EV(last third) -0.056 | toward-frac 0.991 | entropy 1.197
+E0: dist 5.080 -> 5.086  decline -0.006 | deposits/env 0.81 -> 1.00 | EV(last third) +0.000 | toward-frac 0.520 | entropy nan
+E1: dist 5.069 -> 5.116  decline -0.046 | deposits/env 0.71 -> 0.69 | EV(last third) -0.000 | toward-frac 0.519 | entropy nan
+E2: dist 5.183 -> 5.202  decline -0.018 | deposits/env 1.52 -> 1.56 | EV(last third) -0.000 | toward-frac 0.534 | entropy nan
+
+E (frozen) declines: [-0.006, -0.046, -0.018]  max -0.006
+A: declines [1.966, 0.966, 1.949] -> LEARNS=True
+B: declines [0.753, 1.813, 1.042] -> LEARNS=True
+C: declines [1.328, 1.437, 1.549] -> LEARNS=True | critic bar FAIL -> not read (EV [-1.925, -1.38, -1.47])
+D: declines [1.839, 1.684, 1.806] -> LEARNS=True | critic bar FAIL -> not read (EV [-0.069, -0.05, -0.056])
+
+B vs A: B ~ A (seed ranges overlap)   [Cam: B ~ A; correction: B faster]
+C vs A: C ~ A (seed ranges overlap)   [predicted C faster]
+D vs C: D faster than C   [predicted D faster]
