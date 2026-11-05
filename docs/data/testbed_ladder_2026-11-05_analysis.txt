@@ -1,0 +1,42 @@
+
+== 15x15: E rate 0.8469 (seeds [0.8469])
+  A0 [NVIDIA A10]: rate 13.2781 = 15.68x E | EV(71-80) +0.001 | dist 5.03 -> 3.06
+  A1 [NVIDIA A10]: rate 5.6969 = 6.73x E | EV(71-80) +0.014 | dist 5.19 -> 4.22
+  A LEARNS at 15: True
+  C0 [NVIDIA A10]: rate 59.0750 = 69.76x E | EV(71-80) -2.018 | dist 5.13 -> 3.80
+  C1 [NVIDIA A10]: rate 57.3531 = 67.72x E | EV(71-80) -2.150 | dist 5.13 -> 3.85
+  C' LEARNS at 15: True
+
+== 32x32: E rate 0.1469 (seeds [0.1469])
+  A0 [NVIDIA A10G]: rate 0.2375 = 1.62x E | EV(71-80) +0.001 | dist 10.44 -> 11.09
+  A1 [NVIDIA A10G]: rate 0.1719 = 1.17x E | EV(71-80) -0.000 | dist 10.82 -> 11.15
+  A LEARNS at 32: False
+  C0 [NVIDIA A10G]: rate 21.6875 = 147.66x E | EV(71-80) -1.790 | dist 11.11 -> 7.40
+  C1 [NVIDIA A10G]: rate 22.0719 = 150.28x E | EV(71-80) -0.718 | dist 11.00 -> 7.48
+  C' LEARNS at 32: True
+
+== 64x64: E rate 0.0250 (seeds [0.025])
+  A0 [NVIDIA A10]: rate 0.0406 = 1.62x E | EV(71-80) -2.686 | dist 21.26 -> 20.75
+  A1 [NVIDIA A10G]: rate 0.0344 = 1.38x E | EV(71-80) -42.614 | dist 21.49 -> 21.54
+  A LEARNS at 64: False
+  C0 [NVIDIA A10G]: rate 0.0219 = 0.87x E | EV(71-80) +0.018 | dist 21.66 -> 21.78
+  C1 [NVIDIA A10G]: rate 0.0906 = 3.62x E | EV(71-80) +0.174 | dist 21.58 -> 20.80
+  C' LEARNS at 64: False
+
+== 128x128: E rate 0.0094 (seeds [0.0094])
+  A0 [NVIDIA A10G]: rate 0.0063 = 0.67x E | EV(71-80) -1.028 | dist 44.06 -> 38.05
+  A1 [NVIDIA A10]: rate 0.0187 = 2.00x E | EV(71-80) +0.544 | dist 41.26 -> 39.53
+  A LEARNS at 128: False
+  C0 [NVIDIA A10]: rate 0.0031 = 0.33x E | EV(71-80) +0.110 | dist 42.56 -> 44.25
+  C1 [NVIDIA A10]: rate 0.0000 = 0.00x E | EV(71-80) +0.147 | dist 41.13 -> 42.58
+  C' LEARNS at 128: False
+
+== critic check (C' runs): Var(target), Var(target - V), ramp 11-20 vs plateau 71-80
+  C'0 g15: Var(target) 1.459 -> 2.577 (x1.77) | Var(resid) 1.109 -> 7.731 (x6.97) | mean V 95.881 vs target 99.954 -> diverging
+  C'0 g32: Var(target) 0.03467 -> 1.193 (x34.40) | Var(resid) 0.03388 -> 3.3 (x97.43) | mean V 46.865 vs target 48.147 -> diverging
+  C'0 g64: Var(target) 0.004898 -> 0.003106 (x0.63) | Var(resid) 0.004898 -> 0.003106 (x0.63) | mean V -0.157 vs target -0.152 -> neither
+  C'0 g128: Var(target) 0.001333 -> 0.000446 (x0.33) | Var(resid) 0.001334 -> 0.000446 (x0.33) | mean V -0.106 vs target -0.103 -> artifact
+  C'1 g15: Var(target) 1.356 -> 2.51 (x1.85) | Var(resid) 0.982 -> 7.868 (x8.01) | mean V 90.303 vs target 94.311 -> diverging
+  C'1 g32: Var(target) 0.05321 -> 1.335 (x25.08) | Var(resid) 0.0517 -> 2.289 (x44.28) | mean V 46.211 vs target 47.538 -> diverging
+  C'1 g64: Var(target) 0.002678 -> 0.01281 (x4.78) | Var(resid) 0.002678 -> 0.01276 (x4.77) | mean V -0.130 vs target -0.118 -> diverging
+  C'1 g128: Var(target) 0.002231 -> 5.861e-08 (x0.00) | Var(resid) 0.002231 -> 5.855e-08 (x0.00) | mean V -0.096 vs target -0.094 -> artifact

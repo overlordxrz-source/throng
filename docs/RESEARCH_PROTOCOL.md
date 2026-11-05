@@ -1218,6 +1218,36 @@ more expensive, because it produces publishable-looking nulls.
     Var(resid) plateau/ramp <= 2. **Diverging** = Var(resid) plateau/ramp > 2 (then PopArt comes first). Otherwise
     neither. Cam's prediction: artifact.
 
+- **Ladder -- results (app `ap-gtURfJtI9gaApfKnS6sttf`, pin `d0d74ef`, 20 runs x 80 updates; raw
+  `docs/data/testbed_ladder_2026-11-05.jsonl`, analysis `..._analysis.txt`).** Spend $8.27 (metered $14.53 ->
+  $22.80); stage total **$11.81 of $15**. GPUs: 15 all A10; 32 all A10G; 64 and 128 mixed (per run in the data).
+  * **Deposit rate over updates 71-80 as a multiple of E (bar: both seeds >= 2x):**
+
+    | size (typical start) | E rate | A (production critic) | A learns | C' (bootstrap + fix, vf 0.5) | C' learns |
+    |---|---|---|---|---|---|
+    | 15 (5.1) | 0.847 | 15.7x / 6.7x | **yes** | 69.8x / 67.7x | **yes** |
+    | 32 (10.8) | 0.147 | 1.62x / 1.17x | **no** | 147.7x / 150.3x | **yes** |
+    | 64 (21.4) | 0.025 | 1.62x / 1.38x | no | 0.87x / 3.62x | no (ambiguous: critic or size) |
+    | 128 (42.7) | 0.0094 | 0.67x / 2.00x | no | 0.33x / 0.00x | no (ambiguous) |
+
+  * **Cam's prediction (A breaks beyond ~22 cells, fails at 64 and 128): wrong in the direction that matters --
+    A already fails at 32**, where typical start distance is ~11 cells, half the random-walk reach. **C' holds
+    further out: it learns at 32** (deposits ~0.2 -> ~21 per env-update, both seeds), breaks at 64.
+  * At 64, C'1's 3.62x rests on ~29 deposits in its window vs E's ~8 (E is one seed, and its rate at 64/128 is a
+    handful of deposits) -- with C'0 at 0.87x, the both-seeds rule fails it. Cam's planned 3-seed confirmation of
+    the break point applies here.
+  * **Largest size where navigation learns: 15 with the production learner; 32 with C'** (but C's critic -- below).
+  * **Free check (registered reading): DIVERGING where C' learned, so Cam's "artifact" prediction fails.** At 15
+    and 32 Var(target) did **not** collapse -- it rose (x1.8 at 15, x25-34 at 32) -- and Var(target - V) rose more
+    (x7-8 at 15, x44-97 at 32). At 64/128, where nothing was learned, Var(resid) = Var(target) (V explains nothing;
+    both shrink with no deposits), so those "artifact"/"neither" labels are degenerate, not evidence.
+    Context for the reading: at 15 the plateau target is ~100 (mean V 96 vs target 100) with Var(target) ~2.5, so
+    the state-dependent part *is* small relative to the level (Cam's mechanism, in spirit), but V's per-state error
+    grew to ~3x the target spread instead of staying flat. Untested candidate, matching his (c): `RunningReturnStd`
+    pools all history, and the target mean climbs 0 -> ~100 during learning, so the pooled std is dominated by that
+    climb and an error of a few units reads as a small fraction of a std -- a weak value gradient exactly when V needs
+    to resolve fine structure. Per the ruling, **PopArt comes first**; nothing lands in production.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
