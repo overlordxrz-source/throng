@@ -211,7 +211,9 @@ def main():
         else:
             rl_jax.compute_gae = _production_compute_gae
             _, targets = _production_compute_gae(rewards_np, values_np, np.zeros_like(rewards_np), gamma=gamma, lam=lam)
-        ev = 1.0 - np.var(targets - values_np) / (np.var(targets) + 1e-8)
+        var_target = float(np.var(targets))
+        var_resid = float(np.var(targets - values_np))
+        ev = 1.0 - var_resid / (var_target + 1e-8)
 
         key, k_up = jax.random.split(key)
         if a.arm == "E":
@@ -227,7 +229,8 @@ def main():
             )
         rl_jax.compute_gae = _production_compute_gae
         rec = dict(arm=a.arm, seed=a.seed, grid=G, gpu=gpu, critic_fix=a.critic_fix, vf_coef=vf_coef, update=u, mean_dist=dist_sum / (T * E), deposits_per_env=deps / E,
-                   frac_moves_toward=moves_toward / max(moves, 1), ev=float(ev),
+                   frac_moves_toward=moves_toward / max(moves, 1), ev=float(ev), var_target=var_target, var_resid=var_resid,
+                   v_mean=float(values_np.mean()), target_mean=float(np.mean(targets)),
                    entropy=float(mets.get("ppo_entropy", np.nan)), clip=float(mets.get("ppo_clip_frac", np.nan)),
                    t_rollout=round(t_roll, 1), t_update=round(time.time() - t0, 1))
         if a.timing_only:
