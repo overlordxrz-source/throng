@@ -18,7 +18,7 @@ import modal
 
 _REQUIREMENTS = str(Path(__file__).resolve().parents[1] / "requirements.txt")
 
-PINNED_SHA = "a2d910bdd0ee6a49eabd478dc498676d30fd29a7"
+PINNED_SHA = "f7b0392a89f61ffe6a9c76425280b93e09b68f6c"
 REPO_URL = "https://github.com/overlordxrz-source/throng.git"
 VOLUME_NAME = "throng-runs"
 VOLUME_MOUNT = "/mnt/throng-runs"
