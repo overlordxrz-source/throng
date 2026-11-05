@@ -1248,6 +1248,34 @@ more expensive, because it produces publishable-looking nulls.
     climb and an error of a few units reads as a small fraction of a std -- a weak value gradient exactly when V needs
     to resolve fine structure. Per the ruling, **PopArt comes first**; nothing lands in production.
 
+- **Cam's ruling after the ladder (2026-11-05).** Logged: **random-walk reach (sqrt(512) ~ 22) was the wrong
+  threshold for MC** -- A breaks at 32 (~11-cell starts) because credit SNR collapses well before reach runs out.
+  Suggestive only, not a finding: C' breaks at ~21 cells, about where he had predicted A would. PopArt first, as
+  ruled. 3-seed confirmation at 64 skipped (superseded by the PopArt arm). Production untouched. Stage sub-cap $5.
+
+- **REGISTRATION -- Stage 3 (before launch).** Pin `b8d6627` (critic-fix branch), plan `stage3`, 6 runs, one
+  launch; analysis `scripts/analyze_ladder.py stage3` committed before results. Spend baseline: metered $22.20
+  (the billing summary moved down from $22.80 between reads -- reported as read); guard at $27.20.
+  * **Checkpoints were not saved** by the ladder (the testbed never wrote params), so per the ruling C'@32 is re-run
+    with saving: same config as the ladder's C' (critic fix, vf 0.5, 80 updates), seeds 0, 1; final params written
+    to the volume (`testbed/params/`).
+  * **Observation check (done):** `tests/test_testbed_obs_matches_production.py` builds the production observation
+    with `build_observations_jax` and asserts the testbed's 8-dim `hearth_rel` block is identical at 15/32/64/128
+    (mutant without the toroidal wrap is caught). Difference from production, by design: the testbed's one hearth
+    fills all four slots; production has four distinct hearths.
+  * **(1) Transfer test, eval only:** each run's FROZEN final C'@32 policy, fresh world and carries, 10 rollouts
+    (512 steps x 32 envs) at 64 and at 128. Rate = mean deposits/env per rollout over the 10. Floor = the ladder's
+    E rate at that size (64: 0.0250, 128: 0.0094). **Transfers at a size iff both seeds >= 2x E.** A seed whose
+    re-run did not itself learn at 32 (>= 2x the ladder E rate 0.1469 over updates 71-80) voids its transfer
+    reading. Prediction (Cam): transfers at 64, probably at 128.
+  * **(2) PopArt on C'** (`PopArt`, EMA beta 0.1 per update, initialised from the first batch, output layer rescaled
+    to preserve predictions; tested in `tests/test_popart.py`, mutation-checked), at 32 and 64, seeds 0, 1, vf 0.5,
+    N=80. **Critic fixed iff Var(target - V) grows <= 2x from ramp (11-20) to plateau (71-80) at 32, both seeds.**
+    **Extends reach iff both 64 seeds reach >= 2x the ladder E rate at 64.** Prediction (Cam): critic fixed; 64
+    uncertain.
+  * **How it reads (Cam):** transfer passes -> the path to the full world is a size curriculum (32 -> 64 -> 128),
+    not learner surgery. Either way the communication experiment moves into the testbed at 32x32 (draft only).
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under

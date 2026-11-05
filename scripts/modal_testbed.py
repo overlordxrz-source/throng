@@ -18,7 +18,7 @@ import modal
 
 _REQUIREMENTS = str(Path(__file__).resolve().parents[1] / "requirements.txt")
 
-PINNED_SHA = "d0d74ef9b50973e14a924d62b8263645044c1dd1"  # critic-fix branch: production default + opt-in fix
+PINNED_SHA = "b8d6627dcb1a600d59fa037417759926ee636dfa"  # critic-fix branch: production default + opt-in fix
 REPO_URL = "https://github.com/overlordxrz-source/throng.git"
 VOLUME_NAME = "throng-runs"
 VOLUME_MOUNT = "/mnt/throng-runs"
@@ -42,7 +42,8 @@ image = (
 
 @app.function(image=image, gpu=GPU, timeout=4 * 60 * 60, retries=0, volumes={VOLUME_MOUNT: volume})
 def run_arm(arm: str, seed: int, updates: int, grid: int = 15, timing_only: bool = False,
-            critic_fix: bool = False, vf_coef: float = 0.0) -> list[dict]:
+            critic_fix: bool = False, vf_coef: float = 0.0, popart: bool = False,
+            eval_grids: str = "", save: bool = False) -> list[dict]:
     import json
     import os
     import subprocess
@@ -53,13 +54,17 @@ def run_arm(arm: str, seed: int, updates: int, grid: int = 15, timing_only: bool
     assert head == PINNED_SHA, f"box did not clone the pinned SHA (got {head})"
     import jax
 
-    tag = f"{arm}{seed}_g{grid}" + (f"_fix_vf{vf_coef:g}" if critic_fix else "")
+    tag = (f"{arm}{seed}_g{grid}" + (f"_fix_vf{vf_coef:g}" if critic_fix else "")
+           + (f"_popart_vf{vf_coef:g}" if popart else "") + (f"_eval{eval_grids.replace(',', '-')}" if eval_grids else ""))
     print(f"[testbed] {tag} updates={updates} sha={head} devices={jax.devices()}", flush=True)
     os.makedirs(f"{VOLUME_MOUNT}/testbed", exist_ok=True)
     out = f"{VOLUME_MOUNT}/testbed/{'timing' if timing_only else 'runs'}_{tag}_{head[:7]}.jsonl"
     cmd = ["python", "scripts/learner_testbed.py", "--arm", arm, "--seed", str(seed), "--updates", str(updates),
            "--grid", str(grid)]
     cmd += ["--critic-fix", "--vf-coef", str(vf_coef)] if critic_fix else []
+    cmd += ["--popart", "--vf-coef", str(vf_coef)] if popart else []
+    cmd += ["--eval-grids", eval_grids, "--eval-updates", "10"] if eval_grids else []
+    cmd += ["--save-params", f"{VOLUME_MOUNT}/testbed/params/{tag}_{head[:7]}.msgpack"] if save else []
     cmd += ["--timing-only"] if timing_only else ["--out", out]
     proc = subprocess.run(cmd, capture_output=True, text=True)
     recs = [json.loads(l) for l in proc.stdout.splitlines() if l.startswith("{")]
@@ -74,6 +79,10 @@ def run_arm(arm: str, seed: int, updates: int, grid: int = 15, timing_only: bool
 PLANS = {
     # Step 0 re-test on C' (Cam, 2026-11-05): C' + critic fix at vf_coef 0.1 and 0.5, 2 seeds each
     "cretest": [("C", seed, 80, 15, False, True, vf) for vf in (0.1, 0.5) for seed in (0, 1)],
+    # Stage 3 (Cam, 2026-11-05): (1) C'@32 re-run with saving (same config as the ladder's C'), then its FROZEN final
+    # policy evaluated at 64 and 128; (2) PopArt on C' at 32 and 64. vf 0.5 throughout.
+    "stage3": [("C", seed, 80, 32, False, True, 0.5, False, "64,128", True) for seed in (0, 1)]
+              + [("C", seed, 80, grid, False, False, 0.5, True, "", True) for grid in (32, 64) for seed in (0, 1)],
     "step2": [(arm, seed, 80, 15, False) for arm in "ABCDE" for seed in (0, 1, 2)],
     "step0": [("A", 0, 80, 15, False), ("A", 1, 80, 15, False), ("C", 0, 2, 128, True)],
 }
@@ -109,4 +118,5 @@ def main(timing: bool = False, plan: str = "", vf: float = 0.0):
                 fh.write(json.dumps(r) + "\n")
             fh.flush()
             r = recs[-1]
-            print(f"[testbed] done {r['arm']}{r['seed']} g{r['grid']} fix={r.get('critic_fix')} vf={r.get('vf_coef')}", flush=True)
+            print(f"[testbed] done {r['arm']}{r['seed']} g{r.get('trained_grid', r['grid'])} fix={r.get('critic_fix')}"
+                  f" popart={r.get('popart')} vf={r.get('vf_coef')}", flush=True)

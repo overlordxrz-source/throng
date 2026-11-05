@@ -3,6 +3,7 @@
     python scripts/analyze_ladder.py step0  testbed_step0_results.jsonl
     python scripts/analyze_ladder.py cretest testbed_cretest_results.jsonl
     python scripts/analyze_ladder.py ladder testbed_ladder_results.jsonl
+    python scripts/analyze_ladder.py stage3 testbed_stage3_results.jsonl
 """
 from __future__ import annotations
 
@@ -111,5 +112,65 @@ def critic_check(runs):
               f"{win(us, range(71, 81), 'target_mean'):.3f} -> {verdict}")
 
 
+LADDER_E = {32: 0.1469, 64: 0.0250, 128: 0.0094}  # ladder E rates, updates 71-80 (testbed_ladder_2026-11-05)
+
+
+def stage3(path):
+    """Cam's stage 3. Transfer: the frozen final C'@32 policy, 10 eval rollouts at 64 and 128; rate = mean
+    deposits/env over all 10; transfers at a size iff both seeds >= 2x the ladder's E rate there. A seed whose
+    C'@32 training run did not itself reach >= 2x the ladder E rate at 32 (updates 71-80) voids its transfer
+    reading. PopArt: critic fixed iff Var(resid) plateau(71-80)/ramp(11-20) <= 2 in both 32 seeds; extends reach
+    iff both 64 seeds reach >= 2x the ladder E rate at 64."""
+    train, ev = collections.defaultdict(dict), collections.defaultdict(list)
+    for line in open(path):
+        r = json.loads(line)
+        if "mean_dist" not in r:
+            continue
+        if r.get("phase") == "eval":
+            ev[(r["seed"], r["grid"])].append(r["deposits_per_env"])
+        else:
+            train[("popart" if r.get("popart") else "fix", r["seed"], r["grid"])][r["update"]] = r
+    for k, us in train.items():
+        assert all(u in us for u in range(1, 81)), f"{k} incomplete"
+
+    print("== C'@32 (critic fix, vf 0.5) re-run with saving -- training sanity")
+    valid = {}
+    for seed in (0, 1):
+        us = train[("fix", seed, 32)]
+        r = win(us, range(71, 81), "deposits_per_env")
+        valid[seed] = r >= 2 * LADDER_E[32]
+        print(f"  C'{seed} [{us[80]['gpu']}]: rate {r:.3f} = {r / LADDER_E[32]:.1f}x ladder E -> "
+              f"{'valid' if valid[seed] else 'VOID (did not learn at 32)'}")
+    print("== Transfer (frozen C'@32 policy)")
+    for G in (64, 128):
+        ratios = []
+        for seed in (0, 1):
+            xs = ev[(seed, G)]
+            assert len(xs) == 10, (seed, G, len(xs))
+            ratios.append(float(np.mean(xs)) / LADDER_E[G])
+            print(f"  seed {seed} @ {G}: {float(np.mean(xs)):.4f}/env-rollout = {ratios[-1]:.2f}x ladder E")
+        ok = all(valid.values()) and all(x >= 2 for x in ratios)
+        print(f"  TRANSFERS at {G}: {ok}" + ("" if all(valid.values()) else " (void seed present)"))
+    print("== PopArt (C', vf 0.5)")
+    fixed = []
+    for seed in (0, 1):
+        us = train[("popart", seed, 32)]
+        vr = win(us, range(71, 81), "var_resid") / max(win(us, range(11, 21), "var_resid"), 1e-12)
+        vt = win(us, range(71, 81), "var_target") / max(win(us, range(11, 21), "var_target"), 1e-12)
+        fixed.append(vr <= 2)
+        print(f"  PopArt{seed} @32 [{us[80]['gpu']}]: Var(resid) x{vr:.2f}, Var(target) x{vt:.2f}, EV(71-80) "
+              f"{win(us, range(71, 81), 'ev'):+.3f}, rate {win(us, range(71, 81), 'deposits_per_env'):.3f} = "
+              f"{win(us, range(71, 81), 'deposits_per_env') / LADDER_E[32]:.1f}x E")
+    print(f"  CRITIC FIXED (both 32 seeds Var(resid) <= 2x): {all(fixed)}")
+    reach = []
+    for seed in (0, 1):
+        us = train[("popart", seed, 64)]
+        r = win(us, range(71, 81), "deposits_per_env")
+        reach.append(r >= 2 * LADDER_E[64])
+        print(f"  PopArt{seed} @64 [{us[80]['gpu']}]: rate {r:.4f} = {r / LADDER_E[64]:.2f}x ladder E, EV(71-80) "
+              f"{win(us, range(71, 81), 'ev'):+.3f}")
+    print(f"  EXTENDS REACH to 64 (both seeds >= 2x E): {all(reach)}")
+
+
 if __name__ == "__main__":
-    {"step0": step0, "cretest": cretest, "ladder": ladder}[sys.argv[1]](sys.argv[2])
+    {"step0": step0, "cretest": cretest, "ladder": ladder, "stage3": stage3}[sys.argv[1]](sys.argv[2])
