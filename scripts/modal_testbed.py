@@ -131,6 +131,8 @@ def ladder_jobs(vf: float):
 
 COMM_PLANS = {
     "comm_timing": [("COMM", 0, 2, 0.08, True)],
+    # Registered comm run: COMM x2, NOSIG x2 (primary arms), ORACLE x1 (apparatus; cut first per Cam), N=120, tau 0.08
+    "comm": [(arm, seed, 120, 0.08) for arm, seed in (("COMM", 0), ("COMM", 1), ("NOSIG", 0), ("NOSIG", 1), ("ORACLE", 0))],
 }
 
 

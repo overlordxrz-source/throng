@@ -1299,6 +1299,61 @@ more expensive, because it produces publishable-looking nulls.
     (deposits 0 -> 6.1 -> 12.5 by updates 40 / 60 / 80, EV +0.73). One clear learner, one marginal.
   * Exploratory: PopArt at 32 delivered more than the fix variant (27.1 / 26.7 vs 22.0 / 23.1 per env-update).
 
+- **Cam's ruling after stage 3 (2026-11-05).** Transfer at both sizes is "the result of the project so far":
+  navigation is a general skill; the route to the full world is a size curriculum. **Critic:** the ramp-to-plateau
+  residual rule is **retired on the record** (his mis-specification: it assumed target variance would shrink).
+  PopArt is **accepted for testbed use** on the bar registered before that rule, EV >= 0.2 at updates 36-40:
+  **0.549 / 0.472** at 32x32 (pass); plateau EV +0.42 / +0.43. **Disclosure:** the critic-fix variant ALSO passes
+  that earlier bar at 32 in the same stage (0.558 / 0.591 at 36-40) before collapsing to -1.18 / -1.28 by update 80,
+  so the 36-40 window alone does not separate the two critics; PopArt's stability through the plateau does. Both
+  bars and both outcomes stated. Production landing waits for the curriculum work. **Order:** communication first
+  (the thesis test, at 32x32 where navigation works), curriculum after. Stage sub-cap **$10** with M's knowledge.
+
+- **REGISTRATION -- testbed communication experiment (before launch).** Code on branch `comm-testbed` (`b88fe7f`):
+  `scripts/comm_testbed.py`; token policy in `rl_jax` (`token_logits`, token log-prob in the PPO ratio, token entropy
+  bonus); analysis `scripts/analyze_comm.py` committed before results. Launcher plan `comm`.
+  * **Launch gates (met):** `tests/test_token_policy_gradient.py` passes -- the shared, listener-dependent reward
+    reaches `head_signal_slot*` through the real `ppo_loss` and raises the taken token's log-prob; mutant 1 (no token
+    log-prob = today's design) and mutant 2 (shared reward zeroed) give exactly zero gradient; with the token
+    log-prob removed from the real `ppo_loss` the main test fails. Suite 162 passed / 56 skipped on the branch.
+  * **World:** 32x32, the four production hearths (8,8) (8,24) (24,8) (24,24), one active; Craft within radius 1
+    of it = deposit (2.7 to the depositor, depositor respawns, active re-rolls uniformly among the other three; also
+    every 256 steps without a deposit). Two agents per world, one shared network: sender (one-hot of the active
+    hearth in its 4 need dims, `can_see_recipe` 1) and listener (those dims 0). All see the four `hearth_rel`
+    vectors. Listener deposit also pays the sender 2.7 (shared reward). 32 worlds = 64 agents. **No local patch, so
+    agents cannot see each other: spatial following is impossible by construction** (disclosed; the only route for
+    information is the wire, or the listener's own memory of where it last deposited).
+  * **Learner:** C' (GAE 0.95 + bootstrap), PopArt (beta 0.1, stats fitted from the first rollout), vf 0.5,
+    production lr/clip/entropy coefficients, `freeze_comms=False`; token tau **0.08** (registered calibration rule:
+    mean per-slot token entropy ~ half of ln 64 at the warm-start params -> 2.12 / 1.93 nats at tau 0.08), token
+    entropy coefficient 0.01. **Warm start** from the stage-3 PopArt@32 policy of the same seed (all params;
+    comms subtree there was never trained -- frozen at init). **Disclosure: the warm start does not transfer to the
+    four-hearth observation** -- in a local 8-world smoke the warm-started agents made **0** craft attempts in 512
+    steps (that policy was trained with one hearth in all four `hearth_rel` slots). It is a weak initialisation, not
+    a ready compass; the ORACLE arm is what guards against an uninterpretable null.
+  * **Arms and seeds:** COMM (wire live) seeds 0, 1; NOSIG (wire zeroed both ways) seeds 0, 1; ORACLE (wire zeroed,
+    listener also gets the one-hot) **seed 0 only** -- cut from 2 per Cam's rule (oracle seeds first, never the
+    primary), because the GPU timing probe measured **~44 s/update** (66 s first), so 6 runs x 150 updates would
+    exceed $10. **N = 120 updates** per run. Estimated ~$8-8.5 incl. MI and swap eval. Spend baseline: metered
+    $25.36; guard at $35.36.
+  * **Apparatus (enforced in code, halts the run):** every 64 steps -- sender one-hot == active index; listener need
+    dims exactly 0 (ORACLE: one-hot); broadcast == codebook[token] per slot; NOSIG/ORACLE wire input exactly 0; in the
+    swap eval, the listener receives exactly the sender's T' broadcast.
+  * **PRIMARY -- token swap (frozen final COMM params, per COMM seed):** 10 paired eval rollouts (same initial world
+    and keys); in the swap arm the listener receives the token its sender would emit with the active index replaced
+    by T' = (T + 1) mod 4 (sampled with the same key; the sender still acts on the true T). Delta_k = mean m.u toward
+    hearth T' over listener moves (swap) - (control). **A seed passes iff mean Delta >= 0.05 and > 2 x SE across the
+    10 pairs; the primary passes iff both COMM seeds pass.** Mirror (reported): m.u toward the true T falls under swap.
+  * **APPARATUS ARM -- ORACLE:** listener correct-hearth fraction (deposits at the active hearth / Craft attempts
+    within radius 1 of any hearth) over updates 111-120 **>= 0.50 with >= 50 attempts**; chance is 0.25. If it fails,
+    a COMM null is uninterpretable.
+  * **SECONDARY:** listener correct fraction and deposits per world, COMM vs NOSIG, last 10 updates (COMM > NOSIG
+    outside seed spread); MI(token; active) per slot over the last 10 updates' sender steps, Miller-Madow corrected,
+    vs a block-permutation null over rotation epochs (1,000 shuffles), pass = above the null's p99 in >= 1 slot --
+    secondary only (high MI does not show the listener uses the token). NOSIG correct > 0.25 is logged as memory /
+    search order (a listener that remembers its last deposit hearth can reach 1/3 with no information), not the
+    channel.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
