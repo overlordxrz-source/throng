@@ -1,0 +1,4 @@
+A0 g15 [NVIDIA A10]: EV(36-40) +0.004 (bar 0.2) | decline +1.859 (bar 0.966) | deposits/env last3 10.64 | EV(78-80) -0.001 -> FAIL
+A1 g15 [NVIDIA A10]: EV(36-40) +0.001 (bar 0.2) | decline +0.679 (bar 0.966) | deposits/env last3 3.61 | EV(78-80) +0.003 -> FAIL
+
+Step 0: FAIL

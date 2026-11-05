@@ -1,0 +1,4 @@
+  1.0 deposits/rollout: EV(knows t only) 0.121 | EV(t-blind, knows next 20 steps) 0.091
+  3.6 deposits/rollout: EV(knows t only) 0.334 | EV(t-blind, knows next 20 steps) 0.073
+ 10.6 deposits/rollout: EV(knows t only) 0.601 | EV(t-blind, knows next 20 steps) 0.047
+ 60.0 deposits/rollout: EV(knows t only) 0.904 | EV(t-blind, knows next 20 steps) 0.020

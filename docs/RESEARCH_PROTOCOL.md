@@ -1131,6 +1131,27 @@ more expensive, because it produces publishable-looking nulls.
     predicted boundary.
   * EV is reported per run, descriptive only (not a gate). Spend baseline before Step 0: metered $10.99.
 
+- **Step 0 -- result: FAIL as registered (pin `f7b0392`; raw `docs/data/testbed_step0_2026-11-05.jsonl`).**
+  Spend $1.21 (metered $10.99 -> $12.20; 2 runs + the 128x128 probe). All on "NVIDIA A10".
+  * A0: EV(36-40) +0.004, decline 1.859, deposits/env (78-80) 10.64. A1: EV(36-40) +0.001, decline **0.679**
+    (< 0.966), deposits 3.61. Both fail the EV bar; A1 also fails the learning bar. **The fix does not land; the
+    ladder (conditional on Step 0) is not launched.** Nothing is in production: `modal_app.py` is still pinned to
+    `bcaf1ce`, but master now carries the unvalidated value-loss change -- Cam to rule (keep pending vs revert).
+  * Same seeds as Step 2's A0/A1 (same init seed; GPU runs are not bitwise deterministic, so the pairing is
+    weak): decline 1.966 -> 1.859 and 0.966 -> 0.679; deposits 13.59 -> 10.64 and 5.60 -> 3.61 -- both seeds
+    somewhat worse with the fix. Reported, not explained.
+  * **The EV bar was mis-specified for an MC arm (my registration error).** Against truncated-MC targets the
+    return at step t sums the rewards left in the rollout, so it scales with steps remaining, which the critic
+    cannot observe. `scripts/ev_ceiling_truncated_mc.py` (Bernoulli deposits at the observed rates, gamma .999,
+    T 512): a critic that knows only t reaches EV 0.12 / 0.33 / 0.60 / 0.90 at 1 / 3.6 / 10.6 / 60 deposits per
+    rollout, while a t-blind critic that knows the next 20 steps' rewards *exactly* is capped at 0.09 / 0.07 /
+    0.05 / 0.02. So EV >= 0.2 is unreachable for arm A by construction, whatever the critic; EV ~0 in every MC arm
+    (Step 2 and here) says nothing about the clip. The fix can only be tested on bootstrapped targets (arm C'),
+    where this time dependence is mostly absent -- which also means C's EV of -1.4 to -1.9 in Step 2 *was* a real
+    critic failure.
+  * **Cost data for the ladder:** the 128x128 probe ran 18.5 s/update warm (34.7 s first) -- the same as 15x15
+    (the testbed env cost does not grow with grid size), so ~$0.41 per 80-update run at every size.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
