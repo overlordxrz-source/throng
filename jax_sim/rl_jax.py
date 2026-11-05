@@ -54,6 +54,56 @@ class RunningReturnStd:
         return float(max(np.sqrt(self.var), 1e-4))
 
 
+class PopArt:
+    """PopArt value normalisation (van Hasselt et al. 2016), opt-in on the critic-fix branch.
+
+    2026-11-05 (Cam, ladder free check): with RunningReturnStd the residual Var(target - V) grew 7-97x from ramp to
+    plateau where C' learned. Two defects PopArt addresses: the pooled (non-decaying) std lagged a target mean
+    that climbs 0 -> ~100, and rescaling a normaliser without rescaling the output layer shifts every prediction.
+    Here the value head's raw output is the NORMALISED value v_hat; V = sigma * v_hat + mu. Statistics are an EMA
+    over PPO updates (beta per update; initialised from the first batch). `update_and_preserve` rescales the
+    head's kernel/bias so sigma_new * v_hat_new + mu_new == sigma_old * v_hat_old + mu_old for every input.
+    """
+
+    def __init__(self, beta: float = 0.1, head_key: str = "head_value"):
+        self.beta = beta
+        self.head_key = head_key
+        self.mu = 0.0
+        self.nu = 1.0          # second moment
+        self.initialised = False
+
+    @property
+    def sigma(self) -> float:
+        return float(max(np.sqrt(max(self.nu - self.mu ** 2, 0.0)), 1e-4))
+
+    def denormalise(self, v_hat):
+        return v_hat * self.sigma + self.mu
+
+    def update_and_preserve(self, targets, params):
+        x = np.asarray(targets, dtype=np.float64).ravel()
+        mu_old, sigma_old = self.mu, self.sigma
+        if not self.initialised:
+            self.mu, self.nu, self.initialised = float(x.mean()), float((x ** 2).mean()), True
+        else:
+            b = self.beta
+            self.mu = (1 - b) * self.mu + b * float(x.mean())
+            self.nu = (1 - b) * self.nu + b * float((x ** 2).mean())
+        mu_new, sigma_new = self.mu, self.sigma
+        import flax.core
+        frozen = isinstance(params, flax.core.FrozenDict)
+        d = params.unfreeze() if frozen else dict(params)
+        if "params" in d:                      # copy the level we edit -- never mutate the caller's tree
+            d["params"] = dict(d["params"])
+            tgt = d["params"]
+        else:
+            tgt = d
+        head = dict(tgt[self.head_key])
+        head["kernel"] = head["kernel"] * (sigma_old / sigma_new)
+        head["bias"] = (head["bias"] * sigma_old + mu_old - mu_new) / sigma_new
+        tgt[self.head_key] = head
+        return flax.core.freeze(d) if frozen else d
+
+
 def compute_gae(
     rewards,   # (T, N) — numpy or JAX
     values,    # (T, N)
@@ -119,6 +169,8 @@ def ppo_loss(
     alarm_ent_coef: float = 0.0,
     value_scale: float = 1.0,  # running return std (RunningReturnStd); value error is measured in these units
     value_clip: bool = True,   # True = production (raw-units clip to old_values +/- clip_eps); False = critic fix
+    value_shift: float = 0.0,  # PopArt mu (popart_mode only)
+    popart_mode: bool = False, # True: values_pred is the NORMALISED head output; target = (returns - mu) / sigma
 ) -> Tuple[jnp.ndarray, Dict]:
     """
     PPO loss evaluated with exact historical carries per timestep.
@@ -190,6 +242,10 @@ def ppo_loss(
         err = jnp.abs(values_pred - returns)
         err_clipped = jnp.abs(v_clipped - returns)
         vf_loss = jnp.maximum(vf_huber(err), vf_huber(err_clipped))
+    elif popart_mode:
+        # PopArt (critic-fix branch): the head predicts the normalised value; no clip.
+        err = jnp.abs(values_pred - (returns - value_shift) / value_scale)
+        vf_loss = vf_huber(err)
     else:
         # Critic fix (critic-fix branch, opt-in until it passes its registered test): Huber on the error in
         # running-return-std units, no clip (see RunningReturnStd).
@@ -295,13 +351,14 @@ COMMS_SUBTREE_KEYS = (
 )
 
 
-@functools.partial(jax.jit, static_argnames=("apply_fn", "optimizer", "n_layers", "freeze_comms", "value_clip"))
+@functools.partial(jax.jit, static_argnames=("apply_fn", "optimizer", "n_layers", "freeze_comms", "value_clip",
+                                             "popart_mode"))
 def _minibatch_step(
     params, opt_state, apply_fn, optimizer,
     obs, actions, alarm_actions, old_log_probs, advantages, returns, carries,
     n_layers, old_values, clip_eps, vf_coef, ent_coef, vq_coef, loss_vq, alive, rng_key,
     ignition, ignition_discount, alarm_ent_coef, freeze_comms=False,
-    comms_lr_warmup=1.0, value_scale=1.0, value_clip=True,
+    comms_lr_warmup=1.0, value_scale=1.0, value_clip=True, value_shift=0.0, popart_mode=False,
 ):
     grad_fn = jax.value_and_grad(ppo_loss, has_aux=True)
     (loss, metrics), grads = grad_fn(
@@ -309,7 +366,7 @@ def _minibatch_step(
         advantages, returns, carries, n_layers,
         old_values, clip_eps, vf_coef, ent_coef, vq_coef, loss_vq, alive=alive, rng_key=rng_key,
         ignition=ignition, ignition_discount=ignition_discount, alarm_ent_coef=alarm_ent_coef,
-        value_scale=value_scale, value_clip=value_clip,
+        value_scale=value_scale, value_clip=value_clip, value_shift=value_shift, popart_mode=popart_mode,
     )
 
     # Phase 18: Per-Group Gradient Clipping
@@ -409,6 +466,7 @@ def ppo_update(
     comms_lr_warmup: float = 1.0,
     return_rms: "RunningReturnStd | None" = None,
     value_clip: bool = True,
+    popart: "PopArt | None" = None,
 ) -> Tuple[Dict, Any, Dict]:
     """
     Single gradient update step using minibatches.
@@ -432,6 +490,10 @@ def ppo_update(
     if return_rms is not None:
         return_rms.update(returns)
     value_scale = return_rms.std if return_rms is not None else 1.0
+    value_shift, popart_mode = 0.0, False
+    if popart is not None:  # batch["values"] must already be denormalised (V = sigma * v_hat + mu)
+        params = popart.update_and_preserve(returns, params)
+        value_scale, value_shift, popart_mode, value_clip = popart.sigma, popart.mu, True, False
 
     # Debug
     print(f"  [DEBUG] rewards mean={float(rewards.mean()):.4f} std={float(rewards.std()):.4f}")
@@ -520,7 +582,7 @@ def ppo_update(
             mb_obs, mb_act, mb_alarm_act, mb_lp, mb_adv, mb_ret, mb_c,
             n_layers, mb_v, clip_eps, vf_coef, ent_coef, vq_coef, mb_vq, mb_al, mb_key,
             mb_ig, ignition_discount, alarm_ent_coef, freeze_comms,
-            comms_lr_warmup, value_scale, value_clip,
+            comms_lr_warmup, value_scale, value_clip, value_shift, popart_mode,
         )
 
         # Accumulate as Python floats to avoid holding 500 JAX arrays

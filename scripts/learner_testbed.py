@@ -41,7 +41,7 @@ from jax_sim.action_space import mask_disabled_actions  # noqa: E402
 from jax_sim.network_jax import AgentNetworkJax, init_agent_params, make_model_apply  # noqa: E402
 from jax_sim.obs_layout import make_obs_layout  # noqa: E402
 from jax_sim.main_jax import _normalize_config  # noqa: E402
-from jax_sim.rl_jax import RunningReturnStd, create_optimizer, ppo_update  # noqa: E402
+from jax_sim.rl_jax import PopArt, RunningReturnStd, create_optimizer, ppo_update  # noqa: E402
 
 ACTION_CRAFT = 10
 DELTAS = np.array([[0, 0], [-1, 0], [1, 0], [0, 1], [0, -1]] + [[0, 0]] * 7)  # apply_moves order
@@ -70,6 +70,15 @@ def gae_bootstrap(rewards, values, dones, last_values, gamma, lam):
     return np.clip(adv, -10.0, 10.0), returns
 
 
+def testbed_hearth_rel(pos, hearth, G):
+    """The 8-dim hearth_rel block, built as observations_jax builds it (toroidal signed diff / (G/2), 4 hearths x
+    (axis0, axis1)); the testbed's single hearth fills all four slots. Checked against build_observations_jax in
+    tests/test_testbed_obs_matches_production.py."""
+    diff = (np.asarray(hearth)[None, :] - pos + G / 2) % G - G / 2
+    rel = (diff / (G / 2.0)).astype(np.float32)
+    return np.tile(rel, (1, 4))
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--arm", required=True, choices=list("ABCDE"))
@@ -80,6 +89,10 @@ def main():
     ap.add_argument("--hearth-radius", type=int, default=1)
     ap.add_argument("--critic-fix", action="store_true", help="value_clip=False + running return std (critic-fix branch)")
     ap.add_argument("--vf-coef", type=float, default=None, help="override ppo_value_coef (default: config, 0.1)")
+    ap.add_argument("--popart", action="store_true", help="PopArt value normalisation (critic-fix branch); implies no clip")
+    ap.add_argument("--save-params", default=None, help="write the final params (flax msgpack) here")
+    ap.add_argument("--eval-grids", default="", help="comma list: evaluate the frozen final policy at these sizes")
+    ap.add_argument("--eval-updates", type=int, default=10, help="rollouts per eval size")
     ap.add_argument("--out", default=None)
     ap.add_argument("--timing-only", action="store_true", help="print timing, suppress learning metrics")
     a = ap.parse_args()
@@ -93,8 +106,6 @@ def main():
     n_layers = int(cfg["n_layers"])
     hidden = int(cfg.get("hidden_dim", cfg.get("agent_hidden_dim", 256)))
     G, E, hr = a.grid, a.envs, a.hearth_radius
-    H = np.array([G // 2, G // 2])
-    d_max = G // 2
 
     layout = make_obs_layout(
         signal_dim=cfg["signal_dim"], symbol_dim=cfg.get("symbol_dim", 8), memory_slots=cfg.get("memory_slots", 0),
@@ -135,65 +146,86 @@ def main():
         return new_c, act, alarm, lp, outs.values, lvq
 
     rng = np.random.default_rng(a.seed)
+    popart = PopArt(beta=0.1) if a.popart else None
 
-    def cheb(p):
-        d = np.abs(p - H)
-        d = np.minimum(d, G - d)
-        return d.max(-1)
+    def to_value(v):  # PopArt: the head's output is the normalised value
+        v = np.asarray(v)
+        return popart.denormalise(v) if popart is not None else v
 
-    def respawn(n):
-        while True:
-            p = rng.integers(0, G, (n, 2))
-            if (cheb(p) > hr).all():
-                return p
-            bad = cheb(p) <= hr
-            p[bad] = respawn(int(bad.sum()))
+    class World:
+        """E independent copies of the one-agent, one-hearth G x G torus."""
+
+        def __init__(self, G):
+            self.G, self.H, self.d_max = G, np.array([G // 2, G // 2]), G // 2
+            self.pos = self.respawn(E)
+
+        def cheb(self, p):
+            d = np.abs(p - self.H)
+            d = np.minimum(d, self.G - d)
+            return d.max(-1)
+
+        def respawn(self, n):
+            p = rng.integers(0, self.G, (n, 2))
+            bad = self.cheb(p) <= hr
+            if bad.any():
+                p[bad] = self.respawn(int(bad.sum()))
             return p
 
-    def build_obs(pos, k):
-        obs = np.zeros((E, layout.total_dim), np.float32)
-        s = layout.own_state_start
-        obs[:, s + 2] = 1.0                                  # energy (keeps the feral alarm mask off)
-        obs[:, s + 3] = n_layers / 6.0                       # nl_norm
-        obs[:, s + 4] = pos[:, 0] / G
-        obs[:, s + 5] = pos[:, 1] / G
-        obs[:, s + 6] = 1.0                                  # inv_wood: always holding
-        obs[:, s + 12] = 1.0                                 # can_see_recipe
-        diff = (H[None, :] - pos + G / 2) % G - G / 2         # toroidal signed diff, as observations_jax
-        rel = (diff / (G / 2.0)).astype(np.float32)
-        for h in range(4):                                   # one hearth: all four slots point at it
-            obs[:, s + 13 + 2 * h: s + 15 + 2 * h] = rel
-        obs[:, s + 21: s + 25] = 0.0                          # hearth_need(wood=0)/4 * informed = 0
-        obs[:, s + 25: s + 29] = np.asarray(jax.random.normal(k, (E, 4)))  # intrinsic entropy, as production
-        return obs
+        def build_obs(self, k):
+            pos, G = self.pos, self.G
+            obs = np.zeros((E, layout.total_dim), np.float32)
+            s = layout.own_state_start
+            obs[:, s + 2] = 1.0                                  # energy (keeps the feral alarm mask off)
+            obs[:, s + 3] = n_layers / 6.0                       # nl_norm
+            obs[:, s + 4] = pos[:, 0] / G
+            obs[:, s + 5] = pos[:, 1] / G
+            obs[:, s + 6] = 1.0                                  # inv_wood: always holding
+            obs[:, s + 12] = 1.0                                 # can_see_recipe
+            obs[:, s + 13: s + 21] = testbed_hearth_rel(pos, self.H, G)  # same block as production (tested)
+            obs[:, s + 21: s + 25] = 0.0                          # hearth_need(wood=0)/4 * informed = 0
+            obs[:, s + 25: s + 29] = np.asarray(jax.random.normal(k, (E, 4)))  # intrinsic entropy, as production
+            return obs
 
-    pos = respawn(E)
-    carries = jnp.zeros((E, hidden))
-    for u in range(1, a.updates + 1):
-        t0 = time.time()
+    def rollout(world, params, carries, key, shaping_beta):
         B = {k: [] for k in ("obs", "actions", "alarm_actions", "log_probs", "rewards", "values", "carries", "loss_vq")}
-        dist_sum, deps, moves_toward, moves = 0.0, 0, 0, 0
+        st = dict(dist=0.0, deps=0, toward=0, moves=0)
         for t in range(T):
             key, k_obs, k_act = jax.random.split(key, 3)
-            obs = build_obs(pos, k_obs)
+            obs = world.build_obs(k_obs)
             B["carries"].append(np.asarray(carries))
             carries, act, alarm, lp, val, lvq = policy_step(params, carries, jnp.asarray(obs), k_act)
             act = np.asarray(act)
-            d0 = cheb(pos)
-            new = (pos + DELTAS[act]) % G
-            d1 = cheb(new)
-            dep = (act == ACTION_CRAFT) & (cheb(pos) <= hr)
-            r = np.where(dep, R_dep, beta * (gamma * (-d1 / d_max) + d0 / d_max)).astype(np.float32)
-            moved = d1 != d0
-            moves += int(moved.sum())
-            moves_toward += int((d1 < d0).sum())
-            dist_sum += float(d0.sum())
-            deps += int(dep.sum())
-            pos = np.where(dep[:, None], respawn(E), new)
+            d0 = world.cheb(world.pos)
+            new = (world.pos + DELTAS[act]) % world.G
+            d1 = world.cheb(new)
+            dep = (act == ACTION_CRAFT) & (d0 <= hr)
+            r = np.where(dep, R_dep, shaping_beta * (gamma * (-d1 / world.d_max) + d0 / world.d_max)).astype(np.float32)
+            st["moves"] += int((d1 != d0).sum())
+            st["toward"] += int((d1 < d0).sum())
+            st["dist"] += float(d0.sum())
+            st["deps"] += int(dep.sum())
+            world.pos = np.where(dep[:, None], world.respawn(E), new)
             for k_, v_ in (("obs", obs), ("actions", act), ("alarm_actions", np.asarray(alarm)),
-                           ("log_probs", np.asarray(lp)), ("rewards", r), ("values", np.asarray(val)),
+                           ("log_probs", np.asarray(lp)), ("rewards", r), ("values", to_value(val)),
                            ("loss_vq", np.asarray(lvq))):
                 B[k_].append(v_)
+        return B, st, carries, key
+
+    def emit(rec):
+        if a.timing_only:
+            print(json.dumps({k: rec[k] for k in ("arm", "seed", "grid", "gpu", "update", "t_rollout", "t_update")}), flush=True)
+            return
+        print(json.dumps(rec), flush=True)
+        if a.out:
+            with open(a.out, "a") as fh:
+                fh.write(json.dumps(rec) + "\n")
+
+    base = dict(arm=a.arm, seed=a.seed, gpu=gpu, critic_fix=a.critic_fix, popart=a.popart, vf_coef=vf_coef)
+    world = World(G)
+    carries = jnp.zeros((E, hidden))
+    for u in range(1, a.updates + 1):
+        t0 = time.time()
+        B, st, carries, key = rollout(world, params, carries, key, beta)
         t_roll = time.time() - t0
         batch = {k: jnp.asarray(np.stack(v)) for k, v in B.items()}
         batch["dones"] = jnp.zeros((T, E), jnp.float32)
@@ -203,8 +235,8 @@ def main():
 
         # value of s_T, for the bootstrap arms and for logging
         key, k_obs, k_act = jax.random.split(key, 3)
-        _, _, _, _, v_last, _ = policy_step(params, carries, jnp.asarray(build_obs(pos, k_obs)), k_act)
-        v_last = np.asarray(v_last)
+        _, _, _, _, v_last, _ = policy_step(params, carries, jnp.asarray(world.build_obs(k_obs)), k_act)
+        v_last = to_value(v_last)
         if a.arm in "CD":
             rl_jax.compute_gae = lambda r_, v_, d_, gamma, lam, **kw: gae_bootstrap(r_, v_, d_, v_last, gamma, lam)
             _, targets = gae_bootstrap(rewards_np, values_np, np.zeros_like(rewards_np), v_last, gamma, lam)
@@ -225,21 +257,30 @@ def main():
                 ent_coef=float(cfg.get("ppo_entropy_coef", 0.02)), vq_coef=float(cfg.get("vq_loss_coef", 0.1)),
                 minibatch_size=int(cfg["ppo_minibatch_size"]), gamma=gamma, lam=lam, team="blue",
                 alarm_ent_coef=float(cfg.get("alarm_ent_coef", 0.0)), freeze_comms=True,
-                return_rms=return_rms, value_clip=not a.critic_fix,
+                return_rms=return_rms, value_clip=not (a.critic_fix or a.popart), popart=popart,
             )
         rl_jax.compute_gae = _production_compute_gae
-        rec = dict(arm=a.arm, seed=a.seed, grid=G, gpu=gpu, critic_fix=a.critic_fix, vf_coef=vf_coef, update=u, mean_dist=dist_sum / (T * E), deposits_per_env=deps / E,
-                   frac_moves_toward=moves_toward / max(moves, 1), ev=float(ev), var_target=var_target, var_resid=var_resid,
-                   v_mean=float(values_np.mean()), target_mean=float(np.mean(targets)),
-                   entropy=float(mets.get("ppo_entropy", np.nan)), clip=float(mets.get("ppo_clip_frac", np.nan)),
-                   t_rollout=round(t_roll, 1), t_update=round(time.time() - t0, 1))
-        if a.timing_only:
-            print(json.dumps({k: rec[k] for k in ("arm", "seed", "grid", "gpu", "update", "t_rollout", "t_update")}), flush=True)
-        else:
-            print(json.dumps(rec), flush=True)
-            if a.out:
-                with open(a.out, "a") as fh:
-                    fh.write(json.dumps(rec) + "\n")
+        emit(dict(base, phase="train", grid=G, update=u, mean_dist=st["dist"] / (T * E), deposits_per_env=st["deps"] / E,
+                  frac_moves_toward=st["toward"] / max(st["moves"], 1), ev=float(ev), var_target=var_target,
+                  var_resid=var_resid, v_mean=float(values_np.mean()), target_mean=float(np.mean(targets)),
+                  entropy=float(mets.get("ppo_entropy", np.nan)), clip=float(mets.get("ppo_clip_frac", np.nan)),
+                  t_rollout=round(t_roll, 1), t_update=round(time.time() - t0, 1)))
+
+    if a.save_params:
+        import flax.serialization
+        Path(a.save_params).parent.mkdir(parents=True, exist_ok=True)
+        Path(a.save_params).write_bytes(flax.serialization.to_bytes(params))
+        print(f"[testbed] saved final params -> {a.save_params}", flush=True)
+
+    # Transfer evaluation: the FROZEN final policy at other map sizes (no update, fresh world and carries).
+    for G_eval in [int(x) for x in a.eval_grids.split(",") if x]:
+        ew, ec = World(G_eval), jnp.zeros((E, hidden))
+        for u in range(1, a.eval_updates + 1):
+            t0 = time.time()
+            _, st, ec, key = rollout(ew, params, ec, key, 0.0)
+            emit(dict(base, phase="eval", trained_grid=G, grid=G_eval, update=u, mean_dist=st["dist"] / (T * E),
+                      deposits_per_env=st["deps"] / E, frac_moves_toward=st["toward"] / max(st["moves"], 1),
+                      t_rollout=round(time.time() - t0, 1), t_update=round(time.time() - t0, 1)))
 
 
 if __name__ == "__main__":
