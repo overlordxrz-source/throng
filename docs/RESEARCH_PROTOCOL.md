@@ -1192,6 +1192,32 @@ more expensive, because it produces publishable-looking nulls.
     against independent targets (e.g. the MC returns of the same rollout) would separate "V is wrong" from
     "the target moved".
 
+- **Cam's ruling after the C' re-test (2026-11-05).** Headline is behaviour: C' made 47-59 deposits/env against A's
+  6-14, every seed above the A floor -- **logged as exploratory** (the deposit comparison was not registered),
+  pointing at the estimator as the brake. His read of the EV collapse: mostly the metric, partly real -- at plateau
+  the agent is ~10 steps from a deposit everywhere against a ~1000-step horizon (gamma 0.999), so the
+  state-dependent part of V^pi nearly vanishes, Var(target) collapses and EV blows up on small V jitter; (c) is a
+  real defect either way (rescaling the normaliser without rescaling the output layer shifts every prediction when
+  the stats move -- what PopArt solves). On (d): MC returns from the same truncated rollout hit the steps-remaining
+  ceiling, so they are not independent; the independent check, if needed later, is long-rollout V^pi from a saved
+  checkpoint. **Nothing lands in production** until the critic is understood. **gamma 0.999 parked** as the next
+  lever (not mixed in now).
+  * **Free check:** the 4 re-test runs logged only EV, not Var(target) / Var(target - V), so it cannot be done from
+    them. Both are now logged per update (critic-fix `d0d74ef`), with mean V and mean target.
+
+- **REGISTRATION AMENDMENT -- ladder (prospective, before any ladder data; follows the 15x15 C' curves, disclosed).**
+  * **Critic quality is a diagnostic, not a gate, for behavioural claims.** The ladder's verdicts rest on deposits
+    >= 2x E, which a biased critic cannot fake.
+  * **C' runs at vf_coef 0.5,** chosen on EV stability and deposits; **neither vf variant passed its registered
+    critic bar** (disclosed). A C' failure at a size reads as **ambiguous** between critic and size; a C' success
+    does not.
+  * A stays on the production critic. Pin `d0d74ef`; `--plan ladder --vf 0.5`; 20 runs; stage cap $15 (guard at
+    metered $25.99; now $14.53).
+  * **Free check, reading fixed now** (`scripts/analyze_ladder.py`, `critic_check`): per C' run, Var(target) and
+    Var(target - V), ramp window updates 11-20 vs plateau 71-80. **Artifact** = Var(target) plateau/ramp < 0.5 and
+    Var(resid) plateau/ramp <= 2. **Diverging** = Var(resid) plateau/ramp > 2 (then PopArt comes first). Otherwise
+    neither. Cam's prediction: artifact.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under

@@ -88,6 +88,27 @@ def ladder(path):
                       f" | dist {win(us, (1, 2, 3), 'mean_dist'):.2f} -> {win(us, (78, 79, 80), 'mean_dist'):.2f}")
             learns = len(ratios) == 2 and all(x >= 2.0 for x in ratios)
             print(f"  {arm}{chr(39) if arm == 'C' else ''} LEARNS at {grid}: {learns}")
+    critic_check(runs)
+
+
+def critic_check(runs):
+    """Cam's free check on the EV collapse (registered with the ladder amendment). Per C' run: Var(target) and
+    Var(target - V), ramp window (updates 11-20) vs plateau window (71-80).
+    artifact   : Var(target) plateau/ramp < 0.5 AND Var(resid) plateau/ramp <= 2  (target variance collapses,
+                 residual flat -- EV blows up on small V jitter)
+    diverging  : Var(resid) plateau/ramp > 2                                         (V really drifts -> PopArt first)
+    otherwise  : neither"""
+    print("\n== critic check (C' runs): Var(target), Var(target - V), ramp 11-20 vs plateau 71-80")
+    for (arm, seed, grid, _v), us in sorted(runs.items()):
+        if arm != "C" or "var_target" not in us[80]:
+            continue
+        vt_r, vt_p = win(us, range(11, 21), "var_target"), win(us, range(71, 81), "var_target")
+        vr_r, vr_p = win(us, range(11, 21), "var_resid"), win(us, range(71, 81), "var_resid")
+        t_ratio, r_ratio = vt_p / max(vt_r, 1e-12), vr_p / max(vr_r, 1e-12)
+        verdict = "diverging" if r_ratio > 2 else ("artifact" if t_ratio < 0.5 else "neither")
+        print(f"  C'{seed} g{grid}: Var(target) {vt_r:.4g} -> {vt_p:.4g} (x{t_ratio:.2f}) | Var(resid) {vr_r:.4g} -> "
+              f"{vr_p:.4g} (x{r_ratio:.2f}) | mean V {win(us, range(71, 81), 'v_mean'):.3f} vs target "
+              f"{win(us, range(71, 81), 'target_mean'):.3f} -> {verdict}")
 
 
 if __name__ == "__main__":
