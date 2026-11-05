@@ -1062,6 +1062,39 @@ more expensive, because it produces publishable-looking nulls.
   * **Config audit:** the testbed is exempt (Cam). Production launches stay blocked until the allowlist is
     settled; triage sent as `docs/drafts/2026-11-04_config_audit_triage.md`.
 
+- **Learner testbed Step 2 -- results (app `ap-JsKvgr4kSzMRdqDJ0oYOa0`, pin `a2d910b`, 15 runs x 80 updates;
+  raw `docs/data/testbed_2026-11-04.jsonl`, registered analysis `docs/data/testbed_2026-11-04_analysis.txt`).**
+  Spend: metered $4.87 -> $10.99 = **$6.12** (includes the timing probe), under the $10 cap.
+  * **GPU types:** no run landed on L4. All A and B seeds and C0 reported "NVIDIA A10"; C1, C2, D0 reported "NVIDIA
+    A10G". D1, D2, E0-E2 ran in reused containers (Modal reuses warm containers for later inputs), which can only be
+    narrowed to those same two types (`docs/data/testbed_2026-11-04_gpu_map.txt`).
+  * **E (frozen, noise floor):** declines -0.006 / -0.046 / -0.018; deposits flat (~0.7-1.6/env). The control works:
+    deposit/respawn dynamics and starting-weight bias move distance by ~0.
+  * **A (production MC, deposit only): LEARNS.** Declines 1.966 / 0.966 / 1.949 (all >= 0.5, all > max E);
+    deposits/env 0.7-1.5 -> 5.6-13.6.
+  * **B (MC + shaping): LEARNS.** Declines 0.753 / 1.813 / 1.042.
+  * **B vs A: B ~ A** (seed ranges overlap). **Cam's prediction held; my correction's prediction (B faster) failed.**
+    Caveat: testbed D_max = 7, so one cell of shaping = 24/7 ~ 3.4 vs production 24/64 ~ 0.375, with deposit 2.7 in
+    both -- B ran at ~9x production's shaping-to-deposit ratio, which limits what B says about production beta. Open,
+    not explained: under MC, shaping raised per-sample SNR in the random-walk synthetic but showed no benefit here.
+  * **C and D: critic bar FAIL -> not read**, per the registration. EV over the last third: C -1.925 / -1.380 /
+    -1.470; D -0.069 / -0.050 / -0.056 (bar >= 0.2). The script's LEARNS column for C/D is not a verdict.
+  * **The critic is broken in every arm, not only C/D (exploratory).** EV against each arm's own targets is ~0.00
+    throughout A and B; C0's EV went 0.18 (update 20) -> -2.15 (update 80) as returns grew. Consistent with the
+    +/-0.2 raw-units value clip: V can move at most 0.2 per update while returns grow by far more. A learned with
+    essentially no working baseline -- a production fix in its own right, not only a C/D prerequisite.
+  * **Headline:** the production estimator, real network and real `ppo_loss` learn one-body navigation in the
+    testbed. Truncated MC costs signal-to-noise but is not by itself fatal at this scale, so it does not alone explain
+    production's flat distance. Cam's branch: "passes -> add one ecology factor at a time until it breaks." Obvious
+    differences from production, listed for Cam (not a sequence): grid 15 vs 128 (D_max 7 vs 64), matching-hearth
+    identity (informed fraction, rerolling needs), the other reward streams (red catches, food, energy), population
+    and neighbours, the comms freeze.
+  * **Two problems for any C/D re-run (Cam's call; nothing launched):** (1) the registered metric cannot see speed --
+    deposits respawn agents at random cells, so distance saturates near ~3 and end-of-run decline can read "~" even
+    when one arm learns far sooner. A speed metric (cumulative deposits, or first update below a distance threshold)
+    would have to be registered for the re-run, disclosing that the A/B and C/D curves have now been seen.
+    (2) Cost: ~$3.9 of the cap remains; 6 C/D runs at 80 updates are ~$4.3.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
