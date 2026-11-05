@@ -41,7 +41,7 @@ from jax_sim.action_space import mask_disabled_actions  # noqa: E402
 from jax_sim.network_jax import AgentNetworkJax, init_agent_params, make_model_apply  # noqa: E402
 from jax_sim.obs_layout import make_obs_layout  # noqa: E402
 from jax_sim.main_jax import _normalize_config  # noqa: E402
-from jax_sim.rl_jax import RunningReturnStd, create_optimizer, ppo_update  # noqa: E402
+from jax_sim.rl_jax import create_optimizer, ppo_update  # noqa: E402
 
 ACTION_CRAFT = 10
 DELTAS = np.array([[0, 0], [-1, 0], [1, 0], [0, 1], [0, -1]] + [[0, 0]] * 7)  # apply_moves order
@@ -116,7 +116,6 @@ def main():
     params = init_agent_params(model, k_init, jnp.zeros((1, hidden)), jnp.zeros((1, layout.total_dim)), n_layers)
     opt = create_optimizer(float(cfg["ppo_lr"]), float(cfg["ppo_max_grad_norm"]))
     opt_state = opt.init(params)
-    return_rms = RunningReturnStd()  # as production (main_jax), one per run
     gpu = jax.devices()[0].device_kind
 
     @jax.jit
@@ -220,7 +219,6 @@ def main():
                 ent_coef=float(cfg.get("ppo_entropy_coef", 0.02)), vq_coef=float(cfg.get("vq_loss_coef", 0.1)),
                 minibatch_size=int(cfg["ppo_minibatch_size"]), gamma=gamma, lam=lam, team="blue",
                 alarm_ent_coef=float(cfg.get("alarm_ent_coef", 0.0)), freeze_comms=True,
-                return_rms=return_rms,
             )
         rl_jax.compute_gae = _production_compute_gae
         rec = dict(arm=a.arm, seed=a.seed, grid=G, gpu=gpu, update=u, mean_dist=dist_sum / (T * E), deposits_per_env=deps / E,
