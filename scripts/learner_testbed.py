@@ -41,7 +41,7 @@ from jax_sim.action_space import mask_disabled_actions  # noqa: E402
 from jax_sim.network_jax import AgentNetworkJax, init_agent_params, make_model_apply  # noqa: E402
 from jax_sim.obs_layout import make_obs_layout  # noqa: E402
 from jax_sim.main_jax import _normalize_config  # noqa: E402
-from jax_sim.rl_jax import create_optimizer, ppo_update  # noqa: E402
+from jax_sim.rl_jax import RunningReturnStd, create_optimizer, ppo_update  # noqa: E402
 
 ACTION_CRAFT = 10
 DELTAS = np.array([[0, 0], [-1, 0], [1, 0], [0, 1], [0, -1]] + [[0, 0]] * 7)  # apply_moves order
@@ -78,6 +78,8 @@ def main():
     ap.add_argument("--envs", type=int, default=32)
     ap.add_argument("--grid", type=int, default=15)
     ap.add_argument("--hearth-radius", type=int, default=1)
+    ap.add_argument("--critic-fix", action="store_true", help="value_clip=False + running return std (critic-fix branch)")
+    ap.add_argument("--vf-coef", type=float, default=None, help="override ppo_value_coef (default: config, 0.1)")
     ap.add_argument("--out", default=None)
     ap.add_argument("--timing-only", action="store_true", help="print timing, suppress learning metrics")
     a = ap.parse_args()
@@ -116,6 +118,8 @@ def main():
     params = init_agent_params(model, k_init, jnp.zeros((1, hidden)), jnp.zeros((1, layout.total_dim)), n_layers)
     opt = create_optimizer(float(cfg["ppo_lr"]), float(cfg["ppo_max_grad_norm"]))
     opt_state = opt.init(params)
+    return_rms = RunningReturnStd() if a.critic_fix else None
+    vf_coef = a.vf_coef if a.vf_coef is not None else float(cfg.get("ppo_value_coef", 0.25))
     gpu = jax.devices()[0].device_kind
 
     @jax.jit
@@ -215,13 +219,14 @@ def main():
         else:
             params, opt_state, mets = ppo_update(
                 params, opt_state, opt, apply_fn, batch, n_layers, k_up,
-                clip_eps=float(cfg.get("ppo_clip_eps", 0.2)), vf_coef=float(cfg.get("ppo_value_coef", 0.25)),
+                clip_eps=float(cfg.get("ppo_clip_eps", 0.2)), vf_coef=vf_coef,
                 ent_coef=float(cfg.get("ppo_entropy_coef", 0.02)), vq_coef=float(cfg.get("vq_loss_coef", 0.1)),
                 minibatch_size=int(cfg["ppo_minibatch_size"]), gamma=gamma, lam=lam, team="blue",
                 alarm_ent_coef=float(cfg.get("alarm_ent_coef", 0.0)), freeze_comms=True,
+                return_rms=return_rms, value_clip=not a.critic_fix,
             )
         rl_jax.compute_gae = _production_compute_gae
-        rec = dict(arm=a.arm, seed=a.seed, grid=G, gpu=gpu, update=u, mean_dist=dist_sum / (T * E), deposits_per_env=deps / E,
+        rec = dict(arm=a.arm, seed=a.seed, grid=G, gpu=gpu, critic_fix=a.critic_fix, vf_coef=vf_coef, update=u, mean_dist=dist_sum / (T * E), deposits_per_env=deps / E,
                    frac_moves_toward=moves_toward / max(moves, 1), ev=float(ev),
                    entropy=float(mets.get("ppo_entropy", np.nan)), clip=float(mets.get("ppo_clip_frac", np.nan)),
                    t_rollout=round(t_roll, 1), t_update=round(time.time() - t0, 1))
