@@ -104,6 +104,23 @@ class PopArt:
         return flax.core.freeze(d) if frozen else d
 
 
+TOKEN_SLOTS = ((8, 20, "codebook_0"), (20, 28, "codebook_1"), (28, 40, "codebook_2"))  # obs_layout.SIGNAL_SLOTS
+
+
+def token_logits(params, z_e, tau):
+    """Channel fix (comm-testbed branch): the token as a POLICY ACTION. Per slot s, logits_s = -||z_e_s - c||^2 / tau
+    over that slot's codebook (codebook stop-gradiented, as in vector_quantize_signals -- the codebook stays trained
+    by the VQ loss only). Returns three (N, vocab) arrays. The network forward is unchanged; production quantises
+    with the deterministic argmin of the same distances."""
+    p = params["params"] if "params" in params else params
+    out = []
+    for lo, hi, cb_key in TOKEN_SLOTS:
+        cb = jax.lax.stop_gradient(p[cb_key]["embedding"])
+        d = z_e[:, None, lo:hi] - cb[None, :, :]
+        out.append(-jnp.sum(d * d, axis=-1) / tau)
+    return out
+
+
 def compute_gae(
     rewards,   # (T, N) — numpy or JAX
     values,    # (T, N)
@@ -171,6 +188,9 @@ def ppo_loss(
     value_clip: bool = True,   # True = production (raw-units clip to old_values +/- clip_eps); False = critic fix
     value_shift: float = 0.0,  # PopArt mu (popart_mode only)
     popart_mode: bool = False, # True: values_pred is the NORMALISED head output; target = (returns - mu) / sigma
+    token_actions: jnp.ndarray = None,  # (M, 3) int: sampled tokens (channel fix); None = production (no token policy)
+    token_tau: float = 1.0,
+    token_ent_coef: float = 0.0,
 ) -> Tuple[jnp.ndarray, Dict]:
     """
     PPO loss evaluated with exact historical carries per timestep.
@@ -222,6 +242,14 @@ def ppo_loss(
         alarm_probs = jax.nn.softmax(alarm_logits, axis=-1)
         alarm_entropy = -jnp.sum(alarm_probs * jnp.log(alarm_probs + 1e-10), axis=-1)
 
+    token_entropy = 0.0
+    if token_actions is not None:
+        # Channel fix: the token's log-prob joins the joint log-prob, exactly like the alarm action's.
+        for i, lg in enumerate(token_logits(params, outs.z_e, token_tau)):
+            lsm = jax.nn.log_softmax(lg, axis=-1)
+            log_probs_taken = log_probs_taken + jnp.take_along_axis(lsm, token_actions[:, i:i + 1], axis=-1)[:, 0]
+            token_entropy = token_entropy - jnp.sum(jnp.exp(lsm) * lsm, axis=-1)
+
     # Probability ratio
     ratio = jnp.exp(log_probs_taken - old_log_probs)
     ratio = jnp.clip(ratio, 0.0, 10.0)
@@ -272,6 +300,8 @@ def ppo_loss(
         if alarm_actions is not None:
             alarm_entropy = alarm_entropy * mask
         logit_penalty = logit_penalty * mask
+        if token_actions is not None:
+            token_entropy = token_entropy * mask
         denom = mask.sum() + 1e-8
     else:
         denom = float(M)
@@ -288,6 +318,10 @@ def ppo_loss(
         total_entropy_val += alarm_entropy.sum() / denom
         
     loss_ent = loss_spatial_ent + loss_alarm_ent
+    token_entropy_val = jnp.array(0.0)
+    if token_actions is not None:
+        token_entropy_val = jnp.sum(token_entropy) / denom
+        loss_ent = loss_ent - token_ent_coef * token_entropy_val
     loss_logit_penalty = logit_penalty.sum() / denom
     
     total_loss = loss_pg + vf_coef * loss_vf + loss_ent + loss_logit_penalty
@@ -317,6 +351,7 @@ def ppo_loss(
         "ppo_pg_loss":  loss_pg,
         "ppo_vf_loss":  loss_vf,
         "ppo_entropy":  total_entropy_val,
+        "ppo_token_entropy": token_entropy_val,
         "ppo_logit_pen": loss_logit_penalty,
         "ppo_clip_frac": jnp.mean(jnp.abs(ratio - 1.0) > clip_eps),
         "ppo_vq_loss": loss_vq_mean,
@@ -359,6 +394,7 @@ def _minibatch_step(
     n_layers, old_values, clip_eps, vf_coef, ent_coef, vq_coef, loss_vq, alive, rng_key,
     ignition, ignition_discount, alarm_ent_coef, freeze_comms=False,
     comms_lr_warmup=1.0, value_scale=1.0, value_clip=True, value_shift=0.0, popart_mode=False,
+    token_actions=None, token_tau=1.0, token_ent_coef=0.0,
 ):
     grad_fn = jax.value_and_grad(ppo_loss, has_aux=True)
     (loss, metrics), grads = grad_fn(
@@ -367,6 +403,7 @@ def _minibatch_step(
         old_values, clip_eps, vf_coef, ent_coef, vq_coef, loss_vq, alive=alive, rng_key=rng_key,
         ignition=ignition, ignition_discount=ignition_discount, alarm_ent_coef=alarm_ent_coef,
         value_scale=value_scale, value_clip=value_clip, value_shift=value_shift, popart_mode=popart_mode,
+        token_actions=token_actions, token_tau=token_tau, token_ent_coef=token_ent_coef,
     )
 
     # Phase 18: Per-Group Gradient Clipping
@@ -467,6 +504,8 @@ def ppo_update(
     return_rms: "RunningReturnStd | None" = None,
     value_clip: bool = True,
     popart: "PopArt | None" = None,
+    token_tau: float = 1.0,
+    token_ent_coef: float = 0.0,
 ) -> Tuple[Dict, Any, Dict]:
     """
     Single gradient update step using minibatches.
@@ -485,6 +524,7 @@ def ppo_update(
     alive = batch.get("alive")
     loss_vq = batch.get("loss_vq")
     ignition = batch.get("ignition")
+    token_actions = batch.get("token_actions")  # (T, N, 3) or None (production: no token policy)
 
     advantages, returns = compute_gae(rewards, values, dones, gamma=gamma, lam=lam, ignition=ignition, ignition_discount=ignition_discount)
     if return_rms is not None:
@@ -521,9 +561,10 @@ def ppo_update(
     flat_alive = flatten_to_cpu(alive)
     flat_loss_vq = flatten_to_cpu(loss_vq)
     flat_ignition = flatten_to_cpu(ignition)
+    flat_tokens = flatten_to_cpu(token_actions) if token_actions is not None else None
 
     # Delete GPU references so XLA can reclaim VRAM
-    del obs, actions, alarm_actions, old_log_probs, advantages, returns, carries, values, alive, loss_vq, ignition
+    del obs, actions, alarm_actions, old_log_probs, advantages, returns, carries, values, alive, loss_vq, ignition, token_actions
     del batch
 
     # Shuffle on CPU (no GPU allocation for permutation array)
@@ -575,6 +616,7 @@ def ppo_update(
         mb_al = jnp.array(flat_alive[idx]) if flat_alive is not None else None
         mb_vq = jnp.array(flat_loss_vq[idx]) if flat_loss_vq is not None else None
         mb_ig = jnp.array(flat_ignition[idx]) if flat_ignition is not None else None
+        mb_tok = jnp.array(flat_tokens[idx]) if flat_tokens is not None else None
 
         key, mb_key = jax.random.split(key)
         params, opt_state, mb_mets, grads = _minibatch_step(
@@ -583,6 +625,7 @@ def ppo_update(
             n_layers, mb_v, clip_eps, vf_coef, ent_coef, vq_coef, mb_vq, mb_al, mb_key,
             mb_ig, ignition_discount, alarm_ent_coef, freeze_comms,
             comms_lr_warmup, value_scale, value_clip, value_shift, popart_mode,
+            mb_tok, token_tau, token_ent_coef,
         )
 
         # Accumulate as Python floats to avoid holding 500 JAX arrays
