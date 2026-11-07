@@ -1429,6 +1429,42 @@ more expensive, because it produces publishable-looking nulls.
   * Cost ~$3.7 (3 runs at ~$1.2). Spend baseline at launch recorded below; guard stops all testbed apps at baseline
     + $5.00 (~$1 of the overall cap left).
 
+- **RESULTS -- final comm run (2026-11-07).** App `ap-EZ9CS4UzLQooSI96isTbsA`, all three runs completed (A10, ~74
+  min each); data `docs/data/testbed_comm_final_2026-11-07.jsonl`, analysis output
+  `docs/data/testbed_comm_final_2026-11-07_analysis.txt` (registered script, unmodified). Spend: metered $32.94 ->
+  $37.78 (**$4.84, vs the $3.7 estimate** -- runs took ~74 min, not ~55); ~$2.2 of the $40 cap left; guard ($37.94)
+  did not trip.
+  * **Auto-halt: passed, run continued** (MEASURED from the train records; the halt record is written only on HALT):
+    mean sender deposits/world over updates 1-2 = 14.6 (COMM0) / 14.5 (COMM1) / 15.0 (NOSIG0) vs the 7.2 bar; token
+    entropy at update 2 = 5.37 / 5.36 / 5.37 vs the 3.0 floor.
+  * **PRIMARY (token swap): FAIL.** Delta +0.0043 (SE 0.0026) COMM0, -0.0040 (SE 0.0026) COMM1; bar 0.05 and > 2 SE.
+  * **Camping check: OPEN.** NOSIG0 listener attempts/update 941 (bar <= 870); COMM0 1,140, COMM1 1,057.
+  * **Apparatus:** attempt 2's ORACLE0, 0.771 (registered; not re-run).
+  * **Secondaries:** COMM listener correct 0.095 / 0.146 vs NOSIG 0.145 -- no COMM advantage. MI above the null in
+    most slots but tiny: max 0.0038 bits (COMM1 slot 1).
+  * **Not registered -- what the three changes did (MEASURED):**
+    - *Competent senders: fixed.* Sender deposits/world 15.7 / 23.4 (COMM), 22.9 (NOSIG), updates 111-120, vs
+      ORACLE0's 10.28 and attempt 2's 0.5-6.6.
+    - *Shared-reward frequency: up ~5x but still a third of ORACLE.* Listener deposits 3.4-4.8 per world-update
+      (~110-155 per update) vs attempt 2's ~20-40 and ORACLE0's ~335.
+    - *Camping: changed form, not closed.* Attempts per listener deposit fell from attempt 2's 18-47 to **6.9-10.6**.
+      Listeners now search the four hearths rather than park at one. At ~0.145 success per attempt the expected
+      return is ~0.39 per Craft against the 0.1 cost, so searching pays. **Registration error (mine):** the 0.1 cost
+      was sized against the sender camping rates (18-58 attempts per deposit) and never checked against a searching
+      listener. The cost that makes blind search unprofitable is ~0.4.
+    - *Senders' tokens stopped depending on T.* The swap changed the sender's token on only **3.2% (COMM0) / 7.5%
+      (COMM1)** of sender steps, vs 9-16% in attempt 2 and 31% early in attempt 2. So the primary tested whether
+      listeners react to a token that almost never changes; it is close to a no-op on the sender side.
+    - *Token entropy collapsed only where the wire is live.* COMM0 5.6 -> 2.0 -> 0.6 (updates 60 / 80 / 120); COMM1
+      5.1 -> 2.6 (100 / 120); NOSIG0 rose 5.4 -> 6.05. The 0.01 bonus did not hold it; the floor was checked only at
+      update 2. Cause CONJECTURED, not tested: with the wire live, tokens change what the partner does, so PPO has a
+      gradient on them -- here it sharpened them toward a constant, not toward T.
+  * **Reading, per the registration:** apparatus passes, primary fails, camping still open. In this testbed a
+    language did not form even with competent senders. The sender side never put T into the tokens: the swap was
+    near a no-op, MI is under 0.004 bits, and in the live-wire arms the tokens collapsed. MEASURED. The cause is
+    CONJECTURED: blind search at ~7 attempts per deposit is good enough that the channel's marginal value per
+    listener is small, and the sender's credit for it is diluted. Budget for this line is spent; next step is Cam's.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
