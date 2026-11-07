@@ -1432,7 +1432,8 @@ more expensive, because it produces publishable-looking nulls.
 - **RESULTS -- final comm run (2026-11-07).** App `ap-EZ9CS4UzLQooSI96isTbsA`, all three runs completed (A10, ~74
   min each); data `docs/data/testbed_comm_final_2026-11-07.jsonl`, analysis output
   `docs/data/testbed_comm_final_2026-11-07_analysis.txt` (registered script, unmodified). Spend: metered $32.94 ->
-  $37.78 (**$4.84, vs the $3.7 estimate** -- runs took ~74 min, not ~55); ~$2.2 of the $40 cap left; guard ($37.94)
+  $37.61-37.78 (the figure moved between reads; **~$4.7-4.8, vs the $3.7 estimate** -- runs took ~74 min each); ~$2.2-2.4 of
+  the $40 cap left; guard ($37.94)
   did not trip.
   * **Auto-halt: passed, run continued** (MEASURED from the train records; the halt record is written only on HALT):
     mean sender deposits/world over updates 1-2 = 14.6 (COMM0) / 14.5 (COMM1) / 15.0 (NOSIG0) vs the 7.2 bar; token
@@ -1448,14 +1449,16 @@ more expensive, because it produces publishable-looking nulls.
     - *Shared-reward frequency: up ~5x but still a third of ORACLE.* Listener deposits 3.4-4.8 per world-update
       (~110-155 per update) vs attempt 2's ~20-40 and ORACLE0's ~335.
     - *Camping: changed form, not closed.* Attempts per listener deposit fell from attempt 2's 18-47 to **6.9-10.6**.
-      Listeners now search the four hearths rather than park at one. At ~0.145 success per attempt the expected
-      return is ~0.39 per Craft against the 0.1 cost, so searching pays. **Registration error (mine):** the 0.1 cost
+      Listeners now search the four hearths rather than park at one. At ~0.145 success per attempt a Craft returns ~0.39 gross against
+      an expected cost of 0.085 (0.1 on the 85.5% that miss), so searching pays. **Registration error (mine):** the 0.1 cost
       was sized against the sender camping rates (18-58 attempts per deposit) and never checked against a searching
-      listener. The cost that makes blind search unprofitable is ~0.4.
+      listener. Break-even for blind search is p x 2.7 / (1 - p) ~ **0.45** at p = 0.145 (it would also tax the senders' misses).
     - *Senders' tokens stopped depending on T.* The swap changed the sender's token on only **3.2% (COMM0) / 7.5%
-      (COMM1)** of sender steps, vs 9-16% in attempt 2 and 31% early in attempt 2. So the primary tested whether
+      (COMM1)** of sender steps at update 120. **Start point measured afterwards ($0, local CPU, `ceadaf8`, COMM seed 0, ORACLE0
+      warm start + 1 update, 3 swap pairs): 16.0-16.4%.** So the tokens carried some T at the start and lost most of
+      it under training with the live wire (one local seed; the swap there moved the listener by <= 0.0006). So the primary tested whether
       listeners react to a token that almost never changes; it is close to a no-op on the sender side.
-    - *Token entropy collapsed only where the wire is live.* COMM0 5.6 -> 2.0 -> 0.6 (updates 60 / 80 / 120); COMM1
+    - *Token entropy collapsed only where the wire is live (n = 1 NOSIG control; COMM1's drop is in its last 20 updates).* COMM0 5.6 -> 2.0 -> 0.6 (updates 60 / 80 / 120); COMM1
       5.1 -> 2.6 (100 / 120); NOSIG0 rose 5.4 -> 6.05. The 0.01 bonus did not hold it; the floor was checked only at
       update 2. Cause CONJECTURED, not tested: with the wire live, tokens change what the partner does, so PPO has a
       gradient on them -- here it sharpened them toward a constant, not toward T.
