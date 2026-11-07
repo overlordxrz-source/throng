@@ -82,6 +82,13 @@ def main():
     ap.add_argument("--token-ent-coef", type=float, default=0.01)
     ap.add_argument("--warm-start", default=None, help="flax msgpack params from a 32x32 PopArt testbed run")
     ap.add_argument("--swap-pairs", type=int, default=10)
+    ap.add_argument("--craft-cost", type=float, default=0.0,
+                    help="cost of a Craft that is not a deposit (closes the camping loophole; final run)")
+    ap.add_argument("--halt-update", type=int, default=0, help="auto-halt check after this update (0 = off)")
+    ap.add_argument("--halt-sender-dep", type=float, default=0.0,
+                    help="halt unless mean sender deposits/world over updates 1..halt-update >= this")
+    ap.add_argument("--halt-token-entropy", type=float, default=0.0,
+                    help="halt unless token entropy (3 slots summed) at halt-update >= this")
     ap.add_argument("--save-params", default=None)
     ap.add_argument("--out", default=None)
     ap.add_argument("--timing-only", action="store_true")
@@ -271,7 +278,7 @@ def main():
             st["l_att"] += int((att & is_listener).sum()); st["l_att_ok"] += int((dep & is_listener).sum())
             st["s_att"] += int((att & ~is_listener).sum())
             st["l_dep"] += int((dep & is_listener).sum()); st["s_dep"] += int((dep & ~is_listener).sum())
-            r = np.where(dep, R_DEP, 0.0)
+            r = np.where(dep, R_DEP, 0.0) - a.craft_cost * (craft & ~dep)
             ldep_w = dep[is_listener]                                                # shared reward to sender
             r[~is_listener] += R_DEP * ldep_w
             world.pos = np.where(dep[:, None], world.respawn(N), new)
@@ -300,7 +307,9 @@ def main():
             with open(a.out, "a") as fh:
                 fh.write(json.dumps(rec) + "\n")
 
-    base = dict(arm=a.arm, seed=a.seed, grid=G, gpu=gpu, tau=a.tau, warm_start=bool(a.warm_start))
+    base = dict(arm=a.arm, seed=a.seed, grid=G, gpu=gpu, tau=a.tau, warm_start=bool(a.warm_start),
+                craft_cost=a.craft_cost)
+    halt_sdep = []
     world, carries = World(rng), jnp.zeros((N, hidden))
     mi_tok, mi_T, mi_ep = [], [], []
     for u in range(1, a.updates + 1):
@@ -326,6 +335,15 @@ def main():
             mi_tok.append(np.concatenate(st["snd_tok"])); mi_T.append(np.concatenate(st["snd_T"]))
             mi_ep.append(np.concatenate(st["epoch"]) + u * 10 ** 7)
         ev = 1 - np.var(targets - values_np) / (np.var(targets) + 1e-8)
+        halt_sdep.append(st["s_dep"] / W)
+        if a.halt_update and u == a.halt_update:
+            sdep, tent = float(np.mean(halt_sdep)), st["tent"] / T
+            ok = sdep >= a.halt_sender_dep and tent >= a.halt_token_entropy
+            print(f"[AUTO-HALT CHECK] update {u}: sender dep/world {sdep:.2f} (need >= {a.halt_sender_dep}) | token "
+                  f"entropy {tent:.2f} (need >= {a.halt_token_entropy}) -> {'continue' if ok else 'HALT'}", flush=True)
+            if not ok:
+                emit(dict(base, phase="halt", update=u, sender_dep=sdep, token_entropy=tent))
+                raise SystemExit(3)
         emit(dict(base, phase="train", update=u, listener_dep_per_world=st["l_dep"] / W,
                   sender_dep_per_world=st["s_dep"] / W, listener_attempts=st["l_att"], sender_attempts=st["s_att"],
                   listener_correct_frac=st["l_att_ok"] / max(st["l_att"], 1),
