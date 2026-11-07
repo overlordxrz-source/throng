@@ -1391,6 +1391,44 @@ more expensive, because it produces publishable-looking nulls.
   * Interpretation per the registration: apparatus passes, primary fails, MI passes as secondary -> "information is
     (barely) in the tokens but listeners don't use it". Next step is Cam's call.
 
+- **Cam's ruling (2026-11-07).** Record the null as **"this regime", not "channel impossible"**. His warm-start
+  choice (the PopArt@32 policy) was wrong for the four-hearth world -- logged as his. Free analysis first; then one
+  final run on the last ~$5, guard stopping at ~$1 remaining.
+- **Free analysis ($0, attempt-2 logs) -- confirms the diagnosis, so the plan stands:**
+  * **Senders camp too.** Craft attempts per sender deposit, updates 111-120: COMM 46.3 / 18.5, NOSIG 5.5 / 58.2,
+    vs **ORACLE 1.3**. Camping bleeds through the shared network into the role that holds the answer.
+  * **The shared reward fired rarely:** listener deposits per update across all 32 worlds, COMM0 0 / 7 / 28 / 31 / 19
+    and COMM1 0 / 9 / 30 / 40 / 26 at updates 10 / 30 / 60 / 90 / 120 (~0.9 per world per rollout), vs ~335 for the
+    ORACLE listener.
+  * **Token entropy did not collapse** (3 slots summed; max 12.48): dips from ~6.4 to ~4 by updates 10-20, then
+    recovers to 4.8-6.0 by 120, with the same shape in NOSIG and ORACLE, where tokens are unused. The 31% -> 9-16%
+    fall in swap difference is the sender's tokens depending less on T, not tokens going constant. Per-slot entropy
+    was not logged (sum only). The 0.01 token entropy bonus was already on and is kept (disclosed).
+
+- **REGISTRATION -- final comm run (before launch).** Branch `comm-testbed` `ceadaf8`; plan `comm_final` via the
+  in-Modal orchestrator; analysis `scripts/analyze_comm.py <final> <attempt-2 file>` committed before results.
+  * **Unchanged from the registered comm design:** world, wire, shared reward, token policy (tau 0.08, entropy coef
+    0.01), C' + PopArt, vf 0.5, apparatus halts, N = 120, primary (token swap, both COMM seeds, Delta >= 0.05 and
+    > 2 SE over 10 pairs), secondaries (COMM vs NOSIG; MI vs its null).
+  * **Changes (three, all Cam's):** (1) **everyone warm-started from ORACLE0's final params**
+    (`comm_ORACLE0_run_b88fe7f_a2.msgpack`); local smoke: informed senders delivered 17 per world in update 1
+    (ORACLE0's end rate 10.28) -- competent from the start. (2) **Camping closed** by a cost of **0.1 per Craft that
+    is not a deposit** (any agent, anywhere): camping at the observed 18-58 attempts per deposit costs 1.8-5.8
+    against the 2.7 deposit; ORACLE-style 1.3 attempts per deposit costs ~0.03. (3) **Auto-halt after update 2**
+    (enforced in code, the run exits and the orchestrator stops the app): mean sender deposits per world over
+    updates 1-2 **>= 7.2** (70% of ORACLE0's 10.28) **and** token entropy (summed) at update 2 **>= 3.0** (lowest
+    seen in any run: 3.9).
+  * **Camping check, registered:** NOSIG listener attempts per update over updates 111-120 **<= 870** (2x ORACLE0's
+    435) -- "loophole closed". Attempts per listener deposit reported alongside.
+  * **Arms:** COMM seeds 0, 1 (primary); NOSIG seed 0. ORACLE is not re-run: the apparatus result is attempt 2's
+    ORACLE0 (0.771), whose final params are now everyone's starting point. Testbed agents still cannot see each other,
+    so "following the sender" is impossible by construction; NOSIG measures what a listener gets with no channel.
+  * **Wire check done before launch:** at ORACLE0's params, changing the received signal moves the listener's action
+    logits by up to 0.23 (mean action-distribution TV 0.012; policy entropy 2.13) -- the channel input reaches the
+    policy; the effect is small at the start.
+  * Cost ~$3.7 (3 runs at ~$1.2). Spend baseline at launch recorded below; guard stops all testbed apps at baseline
+    + $5.00 (~$1 of the overall cap left).
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under

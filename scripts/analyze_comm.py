@@ -1,6 +1,7 @@
 """Registered analysis for the testbed communication experiment (docs/RESEARCH_PROTOCOL.md, comm registration).
 
-    python scripts/analyze_comm.py testbed_comm_results.jsonl
+    python scripts/analyze_comm.py testbed_comm_results.jsonl [oracle_source.jsonl]
+    (final run: ORACLE is not re-run; its apparatus result comes from attempt 2's file, the warm-start source)
 
 PRIMARY (per COMM seed): 10 paired eval rollouts; Delta_k = m.u toward T' (swap) - (control), listener moves only.
   A seed passes iff mean Delta >= 0.05 AND mean Delta > 2 x SE (SE = sd(Delta_k) / sqrt(n_pairs)).
@@ -19,11 +20,24 @@ import sys
 import numpy as np
 
 
-def main(path):
+ORACLE0_LISTENER_ATTEMPTS = 435.0  # attempt 2 ORACLE0, mean listener attempts per update over 111-120
+CAMPING_BAR = 2 * ORACLE0_LISTENER_ATTEMPTS
+
+
+def main(path, oracle_path=None):
+    halts = [json.loads(l) for l in open(path) if '"phase": "halt"' in l]
+    if halts:
+        print("== AUTO-HALT fired:")
+        for h in halts:
+            print(f"  {h['arm']}{h['seed']} at update {h['update']}: sender dep/world {h['sender_dep']:.2f}, "
+                  f"token entropy {h['token_entropy']:.2f}")
     train = collections.defaultdict(dict)
     mi, swap = collections.defaultdict(list), collections.defaultdict(list)
-    for line in open(path):
+    lines = list(open(path)) + ([l for l in open(oracle_path) if '"arm": "ORACLE"' in l] if oracle_path else [])
+    for line in lines:
         r = json.loads(line)
+        if r.get("phase") == "halt":
+            continue
         k = (r["arm"], r["seed"])
         if r.get("phase") == "train":
             train[k][r["update"]] = r
@@ -48,6 +62,15 @@ def main(path):
         summ[k] = (frac, att, ldep)
         print(f"  {k[0]}{k[1]} [{us[N]['gpu']}]: listener correct {frac:.3f} ({att} attempts) | listener dep/world "
               f"{ldep:.2f} | sender dep/world {sdep:.2f} | token entropy {us[N]['token_entropy']:.2f} | EV {us[N]['ev']:+.2f}")
+
+    print("\n== CAMPING CHECK (NOSIG listener attempts/update, last 10, <= 2x ORACLE0's 435)")
+    for k in sorted(train):
+        if k[0] in ("NOSIG", "COMM"):
+            us = train[k]
+            att = float(np.mean([us[u]["listener_attempts"] for u in W]))
+            dep = float(np.mean([us[u]["listener_dep_per_world"] for u in W])) * 32
+            flag = f" -> {'CLOSED' if att <= CAMPING_BAR else 'OPEN'}" if k[0] == "NOSIG" else ""
+            print(f"  {k[0]}{k[1]}: {att:.0f} attempts/update, {att / max(dep, 1e-9):.1f} per listener deposit{flag}")
 
     print("\n== APPARATUS (ORACLE)")
     oracle = [v for k, v in summ.items() if k[0] == "ORACLE"]
@@ -88,4 +111,4 @@ def main(path):
 
 
 if __name__ == "__main__":
-    main(sys.argv[1])
+    main(sys.argv[1], sys.argv[2] if len(sys.argv) > 2 else None)

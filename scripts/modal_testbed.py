@@ -18,7 +18,7 @@ import modal
 
 _REQUIREMENTS = str(Path(__file__).resolve().parents[1] / "requirements.txt")
 
-PINNED_SHA = "b88fe7f3a8b6dc75705c5eeaae11f6cc9a064cdf"  # comm-testbed branch (critic-fix + PopArt + token policy)
+PINNED_SHA = "ceadaf8303f482f04f286dd4d31c7d225ba9afe4"  # comm-testbed branch (critic-fix + PopArt + token policy)
 REPO_URL = "https://github.com/overlordxrz-source/throng.git"
 VOLUME_NAME = "throng-runs"
 VOLUME_MOUNT = "/mnt/throng-runs"
@@ -77,7 +77,7 @@ def run_arm(arm: str, seed: int, updates: int, grid: int = 15, timing_only: bool
 
 @app.function(image=image, gpu=GPU, timeout=6 * 60 * 60, retries=0, volumes={VOLUME_MOUNT: volume})
 def run_comm(arm: str, seed: int, updates: int, tau: float, timing_only: bool = False,
-             attempt: str = "a1") -> list[dict]:
+             attempt: str = "a1", warm: str = "", extra: tuple = ()) -> list[dict]:
     """Comm experiment (scripts/comm_testbed.py on the comm-testbed branch). Warm start from the stage-3 PopArt@32
     policy of the same seed."""
     import json
@@ -91,9 +91,9 @@ def run_comm(arm: str, seed: int, updates: int, tau: float, timing_only: bool = 
     tag = f"comm_{arm}{seed}_{'timing' if timing_only else 'run'}_{head[:7]}" + ("" if attempt == "a1" else f"_{attempt}")
     print(f"[testbed] {tag} updates={updates} tau={tau}", flush=True)
     os.makedirs(f"{VOLUME_MOUNT}/testbed/comm", exist_ok=True)
-    warm = f"{VOLUME_MOUNT}/testbed/params/C{seed}_g32_popart_vf0.5_b8d6627.msgpack"
+    warm = f"{VOLUME_MOUNT}/testbed/params/{warm}" if warm else         f"{VOLUME_MOUNT}/testbed/params/C{seed}_g32_popart_vf0.5_b8d6627.msgpack"
     cmd = ["python", "scripts/comm_testbed.py", "--arm", arm, "--seed", str(seed), "--updates", str(updates),
-           "--tau", str(tau), "--warm-start", warm]
+           "--tau", str(tau), "--warm-start", warm, *extra]
     cmd += ["--timing-only"] if timing_only else [
         "--out", f"{VOLUME_MOUNT}/testbed/comm/{tag}.jsonl",
         "--save-params", f"{VOLUME_MOUNT}/testbed/params/{tag}.msgpack"]
@@ -154,6 +154,12 @@ COMM_PLANS = {
     "comm_timing": [("COMM", 0, 2, 0.08, True)],
     # Registered comm run: COMM x2, NOSIG x2 (primary arms), ORACLE x1 (apparatus; cut first per Cam), N=120, tau 0.08
     "comm": [(arm, seed, 120, 0.08) for arm, seed in (("COMM", 0), ("COMM", 1), ("NOSIG", 0), ("NOSIG", 1), ("ORACLE", 0))],
+    # Final run (Cam, 2026-11-07): everyone warm-started from ORACLE0's final params; camping closed by a 0.1 cost per
+    # non-deposit Craft; auto-halt after update 2 unless sender deposits/world >= 7.2 (70% of ORACLE0's 10.28) and
+    # token entropy >= 3.0. COMM x2 (primary), NOSIG x1.
+    "comm_final": [(arm, seed, 120, 0.08, False, "final", "comm_ORACLE0_run_b88fe7f_a2.msgpack",
+                    ("--craft-cost", "0.1", "--halt-update", "2", "--halt-sender-dep", "7.2",
+                     "--halt-token-entropy", "3.0")) for arm, seed in (("COMM", 0), ("COMM", 1), ("NOSIG", 0))],
     # attempt 2 of the same registered run (attempt 1 cancelled by a client disconnect at update 34; not analysed)
     "comm_a2": [(arm, seed, 120, 0.08, False, "a2") for arm, seed in (("COMM", 0), ("COMM", 1), ("NOSIG", 0),
                                                                        ("NOSIG", 1), ("ORACLE", 0))],
