@@ -2821,6 +2821,13 @@ more expensive, because it produces publishable-looking nulls.
     item 3 if approved (~$0.4-1.4). That leaves < $1-2 of slack under $41. The real limit is still unverified, so
     the guard stays where it is until it is.
 
+- **Backup pass 1 (Cam's rule before any account switch), 2026-11-08 ~18:00.**
+  - The whole `throng-runs` volume on `rapidcrisp` is copied to `~/throng-backup/rapidcrisp_throng-runs/testbed/`:
+    895 MB, 285 files. Verified against the volume listing by name and size, 0 mismatches:
+    - `comm_jit` 11, `params` 3 (including the real-net ORACLE0 warm start), `toy` 106, `toy/params` 162, `toy/snap` 3.
+  - Egress within the free allowance.
+  - **Pass 2 is required after the last run on this account** (c1rep snapshots, s3b params, real-net checkpoints).
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
