@@ -1872,6 +1872,21 @@ more expensive, because it produces publishable-looking nulls.
       counts as simultaneous.
   * The wire-off run is the reference for all of the above (no listener, so no use-gradient).
 
+- **RESULTS -- scanned-PPO check (2026-11-08): FAIL on the bar and on speed -> confirmation runs at current speed
+  (loop path), per Cam's rule.** `comm-jit` `24678d3`, Modal (one A10G container: 3 checks + scan timing; one L4
+  container: loop + scan timing).
+  * **Bar, seeds 40/41/42: candidate fails (a), (b) and (c) on all three.** Max per-minibatch loss diff 3.0e-3 /
+    6.4e-3 / 1.2e-3 relative; gradients exceed the allclose tolerance (worst excess 0.011-0.031); params after
+    the update differ by **11 / 23 / 19 x lr**. The minibatch permutation is identical. All three mutants fail
+    (the bar discriminates). On GPU the scanned path diverges far beyond float noise, while the laptop dev check
+    differed by ~0.01 lr. Not investigated: whether the loop path is even deterministic run-to-run on GPU
+    (nondeterministic reductions amplified over 64 Adam steps would look like this). The scanned path is not
+    used.
+  * **Speed: no gain anyway.** A10G: scan 33.9-34.3 s/update (PPO 25.0) vs loop 34.6 (PPO 25.5). L4: loop
+    43.5-43.8 s, scan 42.3-42.6 s.
+  * **GPU choice (cheaper per update at list price, ~$1.10/h A10G, ~$0.80/h L4):** loop path ~$0.0106/update
+    on A10G vs ~**$0.0097 on L4** (about 9% cheaper, 26% slower wall-clock) -> **L4** for the confirmation.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
