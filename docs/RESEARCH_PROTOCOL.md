@@ -1753,6 +1753,27 @@ more expensive, because it produces publishable-looking nulls.
   500 updates is 3e-4** (per minibatch step, decoupled, on `gwt_comms_1` + `head_signal_slot*`). Senders' own
   deposits are unaffected (18.6-21.2 per world), so it erodes the code, not the agents.
 
+- **Cam's rulings (2026-11-08, third set; replaces the second set's open items).**
+  1. **Laptop:** M needs it. Only code, unit tests and checks under ~10 min run there; everything else on Modal.
+  2. **Equivalence accepted** (`1d3b951`; the candidate was fixed, the bar was unchanged).
+  3. **Speed, option 1 first:** scan the minibatches in one jitted call, with the batch on the GPU and the same
+     minibatch permutation. The bar is registered first. Check and timing on Modal GPU (<= $0.30), on A10 and L4;
+     use whichever is cheaper per update. Under 1.3x, or failing the bar -> stop and run at current speed.
+  4. **Smoke on Modal GPU** (cheaper per update than CPU for the real network): PS arm, 2 fresh seeds the
+     confirmation won't use, <= 120 updates each, spend guard $4. It sets K, the MI floor (as ruled) and N = 2x
+     the update where MI levels off. If MI hasn't risen or levelled off by 120: send the curve; Cam sets N. All
+     three are registered before the paid launch.
+  5. **Confirmation:** PS x2 + a fresh NOSIG at matched length N; cap $15; spend guard; apparatus halt at update
+     2; MI halt at K.
+  6. **Erosion: weight decay 3e-4 on the message head approved.** Registered as proposed, plus never-used seeds
+     and a manipulation check: if wire-off is not below 0.5 bit at update 2,000 in >= 2 of 3 seeds, the test is
+     uninformative (reported; neither pass nor fail). The 6 runs go on Modal CPU.
+  7. **Modal CPU sizing:** list ~$0.047 per core-hour + ~$0.008 per GiB-hour, so 2 cores / 4 GiB is ~$0.13/h.
+     cpu and memory are set explicitly; one container is probed for 2 min; fan out only if it costs < $0.01/min
+     per container. **The toy/CPU allowance is now $4 total, including the ~$0.9 spent.**
+  * Roadmap re-saved (`docs/THRONG_North_Star_Roadmap.md`). Its item 4 still says the smoke is an "overnight CPU
+    smoke run"; ruling 4 (Modal GPU) is newer and is followed.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under

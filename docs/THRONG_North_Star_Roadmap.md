@@ -117,15 +117,15 @@ Work in this order. A step starts only when the one before it passes, report at 
    - Reliance passed in 5 of 5 seeds, meaning in 4 of 5, and redirection in 5 of 5.
    - Persistence with the nudge off passed as registered, but it measured inertia: the code persisted just as well with the wire off. Self-maintenance is still open.
 2. **Erosion test (CPU toy, $0, runs alongside step 3).**
-   - Add a force that erodes unused codes. Calibrate its strength on separate seeds so a wire-off code falls below 0.5 bits within 500 updates.
+   - Add a force that erodes unused codes: weight decay on the sender's message head. A token-entropy bonus failed calibration, because senders added synonyms within each fire's set and the code stayed informative. Calibrate its strength on separate seeds so a wire-off code falls below 0.5 bits within 500 updates.
    - Then run the registered comparison: anneal the nudge with the wire on versus off.
    - Pass: with the wire on, MI stays ≥1 bit and reliance holds in ≥2 of 3 seeds, while the wire-off code decays.
-3. **Jitted rollout for the real testbed ($0, plus \~$0.10 timing).** Port the Python-loop rollout (\~37 s per update) to a jitted scan. Prove exact equivalence against the old path on fixed seeds, then do one timing run.
+3. **Jitted rollout for the real testbed ($0, plus \~$0.10 timing).** Done (comm-jit 1d3b951). The jitted rollout matches the old one bit for bit on 3 seeds, but an update only fell from \~37 s to 34.6 s (1.07×), because the learning step takes 25.5 s of it. Next, free: keep the batch on the GPU and scan the minibatches inside one jitted call, against a tolerance bar registered first.
 4. **Real-network confirmation (cap $15).**
    - Setup: the production network at 32×32, PopArt critic, vf 0.5, and warm start from ORACLE0.
    - Craft cost stays at 0.1, so the last run's COMM and NOSIG arms are direct baselines and PS is the only change.
    - Primary: redirection at the swapped fire, with movement reported alongside.
-   - Arms: PS ×3 plus a fresh NOSIG control if the speed-up allows, otherwise PS ×2. Halt at update 2 on an MI floor. *[Superseded by Cam's ruling, Nov 8: update 2 is an apparatus check only (PS gradient reaches the message head, messages not constant, listener wire input nonzero); the MI floor is set from a CPU smoke at a registered check update K <= 25% of the run. See docs/RESEARCH_PROTOCOL.md. The updated roadmap file had not arrived when this copy was saved.]*
+   - Arms: PS ×2 plus a fresh NOSIG at matched length. The run length and the MI check update come from an overnight CPU smoke run. Halt at update 2 only on apparatus checks. The MI floor moves to a later update, set from a free CPU smoke run and registered before launch.
 5. **Replication (cap $20, only on a pass).** Rerun the winning arm with 3 fresh seeds. Nothing is called a result before this passes.
 6. **Compositionality pilot (CPU toy, $0).**
    - Make the target a pair, for example fire × material, so meanings outnumber one slot's codes. Hold 2 pairs out of training.
