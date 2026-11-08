@@ -1712,6 +1712,18 @@ more expensive, because it produces publishable-looking nulls.
   5. The roadmap is the reference: saved as `docs/THRONG_North_Star_Roadmap.md`. The copy received still says
      "halt at update 2 on an MI floor"; that line is marked superseded by ruling 1 until the updated file arrives.
 
+- **Erosion calibration, force 1: token-entropy bonus -- FAILED to calibrate (reported per ruling 3; the window is
+  not extended).** `comm-toy` `75323c4`, wire off (NOSIG), PS 1.99 annealed over 1,000-1,500, the bonus switched on
+  from 1,500, one calibration seed per strength (50-53). Wire-off MI at update 2,000 (plug-in, mean over slots):
+  0.03 -> 1.84 bits, 0.1 -> 1.42, 0.3 -> 1.44, **1.0 -> 1.49** (it plateaued at ~1.5 from update ~1,600). None got
+  below 0.5 bit. Sender token entropy rose to ~5 at the strong settings while MI held at ~1.5: senders spread over
+  more tokens *within* each hearth's own set, so the code stays informative. A token-entropy bonus does not erode
+  the mapping.
+  * **Exploratory, not registered: force 2, decoupled weight decay on the message head** (`gwt_comms_1`,
+    `head_signal_slot*`; the other force Cam named), the same schedule, 4 strengths (1e-4, 3e-4, 1e-3, 3e-3 per
+    minibatch step) x 2 calibration seeds (60, 61), on Modal CPU within the $2 toy allowance. Reported to Cam with
+    the step-0 timing. Nothing is registered with it until he rules.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
