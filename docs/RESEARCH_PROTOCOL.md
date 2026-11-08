@@ -1561,7 +1561,8 @@ more expensive, because it produces publishable-looking nulls.
     - *PS made the tokens a code for T, and listeners came to use it.* MI(token; T) 1.96-1.99 bits per slot of a
       2-bit ceiling, in every PS seed (BASE <= 0.024). The swap changed the sender's token on 100% of steps.
       **PS listeners delivered 4.8 / 5.2 / 7.0 per world-update vs NOSIG 1.5-2.9 (BASE 0.3-2.1).**
-    - *Not registered -- listener deposits under the swap* (same pairs): PS 4.53 -> 1.30, 4.97 -> 1.63,
+    - *Not registered -- listener deposits under the swap* (same pairs; `scripts/swap_detail.py` on the run data
+      committed at `comm-toy` `451e6f1`, `toy_out/*.jsonl.gz`): PS 4.53 -> 1.30, 4.97 -> 1.63,
       6.77 -> 2.33; BOTH 2.21 -> 0.83, 0.06 -> 0.04, 2.06 -> 0.74; **BASE0 1.94 -> 1.95**. A wrong token costs PS
       listeners 65-71% of their deposits in all three seeds, including PS0, whose registered movement metric was
       negative (Delta -0.029; it also moves *away* from the true hearth under the swap, mu(T) -0.09 -> -0.15). So PS0's
