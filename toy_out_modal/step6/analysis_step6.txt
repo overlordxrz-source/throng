@@ -1,0 +1,29 @@
+   s210 u1000: topsim rho 0.366 (null p95 0.173; 5 distinct messages / 14 meanings) | held-out success real 0.0000 (0/595) vs shuffled 0.0000 | training-pair success 0.0667
+   s210 u2000: topsim rho 0.366 (null p95 0.195; 5 distinct messages / 14 meanings) | held-out success real 0.0124 (19/1530) vs shuffled 0.0113 | training-pair success 0.1005
+   s210 u3000: topsim rho 0.366 (null p95 0.179; 5 distinct messages / 14 meanings) | held-out success real 0.0000 (0/3073) vs shuffled 0.0000 | training-pair success 0.3411
+   s210 @3000: gate 1 ok | gate 2 x (binomial vs 1/16 p 1; vs shuffled p 0.5)
+   s211 u1000: topsim rho 0.318 (null p95 0.173; 7 distinct messages / 14 meanings) | held-out success real 0.0000 (0/3529) vs shuffled 0.0000 | training-pair success 0.2312
+   s211 u2000: topsim rho 0.318 (null p95 0.175; 7 distinct messages / 14 meanings) | held-out success real 0.0003 (1/2995) vs shuffled 0.0003 | training-pair success 0.3018
+   s211 u3000: topsim rho 0.318 (null p95 0.172; 7 distinct messages / 14 meanings) | held-out success real 0.0000 (0/3419) vs shuffled 0.0000 | training-pair success 0.3163
+   s211 @3000: gate 1 ok | gate 2 x (binomial vs 1/16 p 1; vs shuffled p 0.5)
+   s212 u1000: topsim rho 0.442 (null p95 0.187; 4 distinct messages / 14 meanings) | held-out success real 0.1069 (96/898) vs shuffled 0.1039 | training-pair success 0.0206
+   s212 u2000: topsim rho 0.442 (null p95 0.165; 4 distinct messages / 14 meanings) | held-out success real 0.0016 (7/4295) vs shuffled 0.0015 | training-pair success 0.0741
+   s212 u3000: topsim rho 0.442 (null p95 0.182; 4 distinct messages / 14 meanings) | held-out success real 0.0247 (17/689) vs shuffled 0.0221 | training-pair success 0.1077
+   s212 @3000: gate 1 ok | gate 2 x (binomial vs 1/16 p 1; vs shuffled p 0.37)
+   s213 u1000: topsim rho 0.442 (null p95 0.187; 4 distinct messages / 14 meanings) | held-out success real 0.0812 (219/2696) vs shuffled 0.0828 | training-pair success 0.0517
+   s213 u2000: topsim rho 0.442 (null p95 0.197; 4 distinct messages / 14 meanings) | held-out success real 0.0019 (4/2069) vs shuffled 0.0035 | training-pair success 0.1722
+   s213 u3000: topsim rho 0.442 (null p95 0.175; 4 distinct messages / 14 meanings) | held-out success real 0.0000 (0/3663) vs shuffled 0.0000 | training-pair success 0.2142
+   s213 @3000: gate 1 ok | gate 2 x (binomial vs 1/16 p 1; vs shuffled p 0.5)
+   s214 u1000: topsim rho 0.334 (null p95 0.170; 4 distinct messages / 14 meanings) | held-out success real 0.0117 (421/35911) vs shuffled 0.0106 | training-pair success 0.2051
+   s214 u2000: topsim rho 0.334 (null p95 0.158; 4 distinct messages / 14 meanings) | held-out success real 0.0156 (347/22198) vs shuffled 0.0148 | training-pair success 0.2473
+   s214 u3000: topsim rho 0.334 (null p95 0.160; 4 distinct messages / 14 meanings) | held-out success real 0.0144 (518/36049) vs shuffled 0.0106 | training-pair success 0.2640
+   s214 @3000: gate 1 ok | gate 2 x (binomial vs 1/16 p 1; vs shuffled p 2.7e-06)
+
+== STEP 6: gate 1 (topsim) PASS (5/5) | gate 2 (held-out) FAIL (0/5) -> FAIL
+
+-- diagnostic (not registered): sender token-entropy collapse
+   s210: sender token entropy < 0.01 nats from update 10; plug-in MI(token; pair) at collapse 0.659, at 3000 1.233 bits (log2 14 = 3.81); listener correct/attempt last 100 0.337
+   s211: sender token entropy < 0.01 nats from update 11; plug-in MI(token; pair) at collapse 0.648, at 3000 1.404 bits (log2 14 = 3.81); listener correct/attempt last 100 0.338
+   s212: sender token entropy < 0.01 nats from update 10; plug-in MI(token; pair) at collapse 0.662, at 3000 1.292 bits (log2 14 = 3.81); listener correct/attempt last 100 0.069
+   s213: sender token entropy < 0.01 nats from update 10; plug-in MI(token; pair) at collapse 0.655, at 3000 1.280 bits (log2 14 = 3.81); listener correct/attempt last 100 0.225
+   s214: sender token entropy < 0.01 nats from update 15; plug-in MI(token; pair) at collapse 0.913, at 3000 1.223 bits (log2 14 = 3.81); listener correct/attempt last 100 0.268

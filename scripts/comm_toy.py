@@ -183,6 +183,10 @@ def main():
     ap.add_argument("--tag", default="")
     ap.add_argument("--selftest", action="store_true")
     ap.add_argument("--eval-only", action="store_true")
+    ap.add_argument("--speak-test", action="store_true",
+                    help="north star (Cam, 2026-11-08): build a dictionary (fire -> modal sender triple) from frozen control "
+                         "rollouts, then 'speak to them': replace the sender's broadcast by the dictionary word for fire "
+                         "X = T + s and count listener Crafts at X, vs the control and vs the sender's own words for X")
     ap.add_argument("--calibrate", action="store_true")
     ap.add_argument("--wire-init-scale", type=float, default=1.0,
                     help="after warm start, scale the (never-trained) wire-input rows of enc_0 and gwt_comms_1 (fidelity calibration)")
@@ -307,8 +311,8 @@ def main():
 
     branch_hold = {"pL": None}
 
-    @functools.partial(jax.jit, static_argnames=("swap",))
-    def rollout(params, state, key, swap=False, table=None, pool=None):
+    @functools.partial(jax.jit, static_argnames=("swap", "shift"))
+    def rollout(params, state, key, swap=False, table=None, pool=None, shift=1):
         """lax.scan over T steps. swap=True (eval): the listener hears what its sender WOULD broadcast for
         T' = (T + 1) % 4 (same pre-step carry, same key); the sender's own action/reward come from the true T."""
         cb = [params["params"][k]["embedding"] for _, _, k in rl_jax.TOKEN_SLOTS]
@@ -331,7 +335,7 @@ def main():
                 sum(jnp.take_along_axis(o_pol.q_slots[i], toks[:, i:i + 1], -1)[:, 0] for i in range(3))
                 if a.credit == "B" else jnp.zeros(N))
             # sender's counterfactual broadcast for T' (paired key) -- used by the swap eval and the swap-diff metric
-            obs_sw = build_obs(pos, (active + 1) % 4, wire, k_obs)
+            obs_sw = build_obs(pos, (active + shift) % 4, wire, k_obs)
             _, _, _, _, _, _, toks_sw, bc_sw, _, _ = policy(params, carries, obs_sw, k_act)
             swap_diff = jnp.any(toks_sw != toks, -1) & ~is_listener
             # listener sensitivity: received wire replaced by a uniform random token triple (diagnostic only)
@@ -346,7 +350,7 @@ def main():
             if swap == "empirical":
                 k_tab = jax.random.fold_in(k_rand, 7)          # fold_in: leaves every training RNG stream unchanged
                 idx = jax.random.randint(k_tab, (N,), 0, table.shape[1])
-                trip = table[jnp.repeat((active + 1) % 4, 2), idx]
+                trip = table[jnp.repeat((active + shift) % 4, 2), idx]
                 bc_emp = jnp.concatenate([jnp.zeros((N, 8))] + [cb[i][trip[:, i]] for i in range(3)], -1)
                 bc_used, trip_used = bc_emp, trip
             else:
@@ -368,7 +372,7 @@ def main():
                 m = is_listener & (act >= 1) & (act <= 4) & (nr > 0)
                 return jnp.where(m, (mv * dv).sum(1) / jnp.maximum(nr, 1e-6), 0.0), m
             fire = fire_of(active)
-            mu_sw, m_sw = mu((fire + 1) % 4)
+            mu_sw, m_sw = mu((fire + shift) % 4)
             mu_tr, m_tr = mu(fire)
             nr_ = near(pos)
             craft = jnp.isin(act, CRAFT_ACTS) if COMP else act == ACTION_CRAFT
@@ -377,7 +381,7 @@ def main():
             if COMP:   # step 6: the delivery also needs the target material's Craft action
                 dep = dep & (act == CRAFT_ACTS[jnp.repeat(active % 4, 2)])
             att = craft & nr_.any(1)
-            att_Tp = craft & nr_[jnp.arange(N), jnp.repeat((fire + 1) % 4, 2)]     # Craft at the T' hearth
+            att_Tp = craft & nr_[jnp.arange(N), jnp.repeat((fire + shift) % 4, 2)]     # Craft at the T' hearth
             r = jnp.where(dep, R_DEP, 0.0) - a.craft_cost * (craft & ~dep)
             ldep_w = dep[is_listener]
             if a.prox is not None:   # step 3: symmetric shared reward -- either agent's delivery also pays its partner
@@ -1286,6 +1290,56 @@ def main():
         raise SystemExit(0 if ok else 1)
 
     np_rng = np.random.default_rng(a.seed)
+    if a.speak_test:           # exploratory, frozen params, its own keys (70_000+ / 80_000+)
+        lis = np.asarray(is_listener)
+        from comm_testbed import mi_miller_madow
+        toks, labs = [], []
+        for k in range(4):
+            _, Rc = rollout(params, init_state(jax.random.PRNGKey(70_000 + k)), jax.random.PRNGKey(71_000 + k))
+            Rc = jax.tree_util.tree_map(np.asarray, Rc)
+            toks.append(Rc["token_actions"][:, ~lis].reshape(-1, 3)); labs.append(Rc["active"].reshape(-1))
+        tok, lab = np.concatenate(toks), np.concatenate(labs)
+        enc = (tok[:, 0] * V + tok[:, 1]) * V + tok[:, 2]
+        dic, purity = np.zeros((4, 3), np.int32), []
+        for t in range(4):
+            vals, cnts = np.unique(tok[lab == t], axis=0, return_counts=True)
+            dic[t] = vals[cnts.argmax()]; purity.append(float(cnts.max() / cnts.sum()))
+        # per-slot dictionary: each slot's modal token for fire t (the triples are diverse even when every slot is pure)
+        dslot = np.array([[np.bincount(tok[lab == t, i], minlength=V).argmax() for i in range(3)] for t in range(4)], np.int32)
+        spur = [[float(np.mean(tok[lab == t, i] == dslot[t, i])) for i in range(3)] for t in range(4)]
+        emit(dict(phase="dictionary", words=dic.tolist(), purity=purity, distinct=int(len(np.unique(dic, axis=0))),
+                  slot_words=dslot.tolist(), slot_purity=spur,
+                  mi_slot=[float(mi_miller_madow(tok[:, i], lab, V, NCLS)) for i in range(3)], n=int(len(lab))))
+        # joint-triple MI (plug-in; the triple alphabet is V^3, so Miller-Madow is reported alongside)
+        _, ei = np.unique(enc, return_inverse=True)
+        J = np.zeros((ei.max() + 1, 4)); np.add.at(J, (ei, lab), 1); P = J / J.sum()
+        px, py = P.sum(1, keepdims=True), P.sum(0, keepdims=True); nz = P > 0
+        mi_j = float((P[nz] * np.log2(P[nz] / (px @ py)[nz])).sum())
+        emit(dict(phase="triple_mi", mi_triple_plugin=mi_j,
+                  mi_triple_mm=mi_j - ((nz.sum() - (px > 0).sum() - (py > 0).sum() + 1) / (2 * len(lab) * np.log(2))),
+                  distinct_triples=int(ei.max() + 1)))
+        for k in range(a.swap_pairs):
+            st0, kk = init_state(jax.random.PRNGKey(80_000 + k)), jax.random.PRNGKey(81_000 + k)
+            _, Rc = rollout(params, st0, kk)
+            Rc = jax.tree_util.tree_map(np.asarray, Rc)
+            trip_c, labc = Rc["token_actions"][:, ~lis], Rc["active"]
+            own = np.zeros((4, 512, 3), np.int32)
+            for t in range(4):
+                tt = trip_c[labc == t]
+                own[t] = tt[np.random.default_rng(k).integers(0, len(tt), 512)] if len(tt) else dic[t]
+            word = np.repeat(dic[:, None, :], 512, 1); wslot = np.repeat(dslot[:, None, :], 512, 1)
+            babble = np.random.default_rng(90_000 + k).integers(0, V, (4, 512, 3)).astype(np.int32)
+            for sh in range(4):     # say X = T + sh (sh = 0: the truth)
+                row = dict(phase="speak", pair=k, shift=sh)
+                for name, sw, tab in (("control", False, None), ("own_words", "empirical", own), ("dictionary", "empirical", word),
+                                       ("slot_dictionary", "empirical", wslot), ("babble", "empirical", babble)):
+                    _, Rk = rollout(params, st0, kk, swap=sw, table=None if tab is None else jnp.asarray(tab), shift=sh)
+                    Rk = jax.tree_util.tree_map(np.asarray, Rk)
+                    row[f"crafts_at_X_{name}"] = float(Rk["att_Tp"][:, lis].sum() / W)
+                    row[f"dep_{name}"] = float(Rk["dep"][:, lis].sum() / W)
+                    row[f"crafts_any_{name}"] = float(Rk["att"][:, lis].sum() / W)   # listener Crafts at any fire
+                emit(row)
+        return
     if a.eval_only:            # exploratory: evaluate the loaded params (no training, no MI)
         lis = np.asarray(is_listener); mi_buf_tok, mi_buf_T = deque(), deque()
         evaluate(params, 0); return
