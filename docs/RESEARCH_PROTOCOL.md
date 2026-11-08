@@ -2400,6 +2400,35 @@ more expensive, because it produces publishable-looking nulls.
     absorb: a sender crash-and-recover cycle that landed on the primary window. Per the roadmap, nothing is called
     a result before a replication passes. Next step is Cam's.
 
+- **Cam's rulings (2026-11-08 evening).**
+  1. Accepted as registered: step B (the sender's own learning drives the drift; both predictions failed), step 3
+     FAIL 0/5, the T4 check (neither H1 nor H2), and the confirmation primary FAIL 1/2. Restart and regeneration
+     disclosures accepted. Bit-identity across Modal hosts is no longer required (rule-6 snapshots remove the need
+     to regenerate).
+  2. **T5 dropped** (T4b's wire-off survival did not replicate).
+  3. **C1, the wire-blind message head from the start** (the leading suspect is step A's forward coupling). Fresh
+     seeds, cap $2.5, price probe first. Wire-blind = the sender's tokens cannot depend on what it hears by any path,
+     including a shared trunk. Apparatus check before launch: token TV under random heard input is exactly 0; a
+     mutant with one live wire row must fail it. **C1-T3** (T3 protocol, wire-on x3 / wire-off x2): the coupling is
+     the destabiliser if, in >= 2 of 3 wire-on seeds, continuity across the first reset is >= 0.5 **and**
+     exact-triple copy accuracy on the elder's inputs at 2,000 keeps >= half its post-imitation value. **C1-E**
+     (erosion protocol, same counts): the rung-3 bar, unchanged. **Formation gate:** at 1,500 the wire-blind head
+     must meet the P1 reliance bar in >= 2 of 3 wire-on seeds in each protocol; otherwise stop and report.
+     Predictions first; Cam's (~55%): C1-T3 passes its reading, and C1-E still fails the rung-3 bar (erosion also
+     tests credit).
+  4. **Step 2: option 2.** It launches when C1 reads out: the wire-blind head in both arms if C1-T3 confirms the
+     coupling, the normal head otherwise. Step 6 follows step 2.
+  5. **Step 3:** follow-up waits for C1. A free check: how often the uninformed partner finds the lit fire on its
+     own before a swap could matter, and how often the informed agent just delivers itself.
+  6. **Confirmation:** seed 51 is recorded as the strongest positive evidence yet, not as a result. Free checks
+     before any replication: a seed-50 post-mortem (does the 250-300 fade start with sender MI or listener
+     reliance; before the 350-400 crash, the PS loss's share of the gradient, grad norm, KL, clip fraction, policy
+     entropy, value loss and EV), and step A's random-heard-input test on the real net (seed 51 final; seed 50 near
+     update 200). The replication (PS x3 + matched NOSIG, ~$24) waits for C1 and these checks, and for M to top up;
+     no paid GPU launch until then.
+  7. Spend: ~$8.4 left in the toy allowance; C1 ($2.5) + step 2 ($2.4) + step 6 ($1.7) = $6.6. Guard stays at
+     $33.40.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
