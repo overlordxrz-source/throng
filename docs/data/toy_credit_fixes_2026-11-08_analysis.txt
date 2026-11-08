@@ -1,0 +1,18 @@
+== fix A
+   wire-off s103: MI@1500 1.990 -> MI@2000 0.404 | L dep 3.46
+   wire-off s104: MI@1500 1.995 -> MI@2000 0.056 | L dep 4.46
+   wire-off still erodes (both < 0.5): True
+   wire-on s100: MI@1500 1.963 -> MI@2000 0.107 | reliance@1500 +70% -> @2000 +1% (paired 0.04 SE 0.06) | L dep 2.35 vs off 3.96 -> fail
+   wire-on s101: MI@1500 1.990 -> MI@2000 0.619 | reliance@1500 +70% -> @2000 +69% (paired 5.30 SE 0.06) | L dep 7.71 vs off 3.96 -> fail
+   wire-on s102: MI@1500 1.984 -> MI@2000 0.318 | reliance@1500 +76% -> @2000 +3% (paired 0.02 SE 0.04) | L dep 3.56 vs off 3.96 -> fail
+   FIX A: FAIL (wire-on passing 0/3)
+
+== fix B
+   wire-off s113: MI@1500 2.000 -> MI@2000 0.255 | L dep 3.82
+   wire-off s114: MI@1500 2.000 -> MI@2000 0.193 | L dep 3.01
+   wire-off still erodes (both < 0.5): True
+   wire-on s110: MI@1500 1.979 -> MI@2000 0.679 | reliance@1500 +66% -> @2000 +60% (paired 3.63 SE 0.08) | L dep 6.28 vs off 3.41 -> fail
+   wire-on s111: MI@1500 1.951 -> MI@2000 0.487 | reliance@1500 +60% -> @2000 -14% (paired -0.30 SE 0.07) | L dep 4.51 vs off 3.41 -> fail
+   wire-on s112: MI@1500 2.000 -> MI@2000 0.270 | reliance@1500 +72% -> @2000 +35% (paired 1.00 SE 0.07) | L dep 3.87 vs off 3.41 -> fail
+   FIX B: FAIL (wire-on passing 0/3)
+

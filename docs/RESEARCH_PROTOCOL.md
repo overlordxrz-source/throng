@@ -2018,6 +2018,25 @@ more expensive, because it produces publishable-looking nulls.
   commits after `1d3b951` add opt-in code only (PS in `ppo_loss`, the unmerged scan path, check modes, halts);
   the training rollout is unchanged. Nothing from the probes had been read when this was checked.
 
+- **RESULTS -- credit fixes under the erosion protocol (2026-11-08): A FAIL, B FAIL as registered (0/3 wire-on
+  each).** Modal CPU, data `comm-toy` `16d6807`, output `docs/data/toy_credit_fixes_2026-11-08_analysis.txt` (registered
+  script, unmodified). *Disclosed:* B wire-on seed 111's container restarted at update 133 and re-ran from update 1
+  on the same seed. The partial attempt is identical to the complete run over updates 1-133 (deterministic) and
+  was dropped (`credit_B_on_s111.clean.jsonl`); the raw file is kept.
+  * **Wire-off still erodes, both fixes:** A 0.404 / 0.056, B 0.255 / 0.193 bit at 2,000.
+  * **Wire-on, MI at 2,000 / reliance (deposit drop) at 2,000:** A 0.107 / +1%, **0.619 / +69%** (listener 7.7
+    deposits per world), 0.318 / +3%. B **0.679 / +60%** (6.3), 0.487 / -14%, 0.270 / +35%. Every seed had 60-76%
+    reliance at 1,500. No seed met MI >= 1.0.
+  * **Not registered (descriptive):** relative to the joint baseline (wire-on MI at 2,000 ~0.000, reliance ~0%),
+    both fixes slow erosion, and 2 of 6 wire-on seeds still had a working channel at 2,000 (A s101, B s110) with
+    MI below the 1-bit bar. But wire-off also eroded more slowly than under the joint baseline (0.10 / 0.01 /
+    0.002), so part of the slowing is not use-dependent. CONJECTURED: removing the noisy token gradient slows
+    drift for everyone. The use-dependent gap is modest: mean wire-on vs wire-off MI at 2,000 is 0.35 vs 0.23
+    (A) and 0.48 vs 0.22 (B).
+  * **Reading:** neither fix gives the code a protection that meets the registered bar. Per Cam's plan, the next
+    step is his call (a stronger fix, COMA-style per-message credit with a better critic, a longer or weaker
+    erosion window, or accepting that rung 3 needs a different pressure).
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
