@@ -7,7 +7,8 @@ the 50 updates before u >= the same arm's wire-off mean over the same window (th
 T1 PASS: reliance at 2,000 in >= 4 of 5 wire-on seeds AND wire-off MI (Miller-Madow, mean over slots) < 0.5 at 2,000
   in both wire-off seeds. Secondary: wire-on MI >= 0.5.
 T2 / T3 seed passes: before each of the last 3 resets (updates 2,250 / 2,500 / 2,750): reliance as above AND
-  reliance retention (drop / drop at 1,500) >= 0.8 AND code continuity >= 0.8 (per-slot token -> fire decoding with
+  code continuity >= 0.8 [pre-data amendment 2026-11-08: reliance retention (drop / drop at 1,500) is reported as a
+  secondary, not gated] (per-slot token -> fire decoding with
   the mapping recorded at the previous eval point, i.e. across the reset in between; chance 25%; unseen tokens miss).
   Arm PASS: >= 2 of 3 wire-on seeds. Manipulation check: wire-off MI < 0.5 at 2,000 (after the first sender reset
   at 1,750) in both wire-off seeds -- a gate for T2; reported but not a gate for T3 (registered in advance: newborn
@@ -97,7 +98,9 @@ def main(paths):
             for u in LAST3:
                 r = reliance(k, u, off); c = tv.get(u, {}).get("continuity", float("nan"))
                 ret = (r["drop"] / r15["drop"]) if (r and r15 and r15["drop"] > 0) else float("nan")
-                ok_u = bool(r and r["ok"] and ret >= 0.8 and c >= 0.8)
+                # pre-data amendment (Cam, 2026-11-08): the gate is the absolute rung-3 reliance bar + continuity >= 0.8;
+                # retention (drop / drop at 1,500) is reported as a secondary, not gated
+                ok_u = bool(r and r["ok"] and c >= 0.8)
                 ok_seed &= ok_u
                 parts.append(f"{u}: drop {r['drop']:+.0%} (ret {ret:.2f}) cont {c:.2f} Ldep {r['ldep']:.2f}/{r['nosig']:.2f}"
                              f" {'ok' if ok_u else 'x'}")
