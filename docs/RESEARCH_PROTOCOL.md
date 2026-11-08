@@ -1917,6 +1917,30 @@ more expensive, because it produces publishable-looking nulls.
   * **Budget arithmetic for Cam's N:** measured ~$1.31/GPU-h, so ~$0.013 per update per arm. Three arms (PS x2 +
     NOSIG) at N updates cost ~$0.039 N, so under the $15 cap with a 30% margin N <= ~300.
 
+- **RESULTS -- erosion diagnostic (2026-11-08).** Modal CPU, data/output `comm-toy` `55dcb22`,
+  `docs/data/toy_erosion_diag_2026-11-08.txt`. *Disclosed: the analysis script (`scripts/analyze_diag.py`) was
+  committed after the runs finished but before their data were read; the metrics and predictions were registered
+  before the runs.* Means over updates 1,501-1,800, wire ON (seed 90) / wire OFF (seed 91, reference):
+  * (a) raw ||g|| 1.26 / 0.47 vs wd·||theta|| 0.0017 / 0.0011 (raw units; Adam rescales). **Realised per-update
+    displacement on the message head:** optimizer 0.053 / 0.053 vs decay 0.055 / 0.035. The optimizer's component
+    toward theta_1500 is **+0.056 x** the decay displacement on / -0.005 x off.
+  * (b) cos(-g, theta_1500 - theta) **+0.0013** / +0.0002; cos(Delta_opt, back) +0.063 / -0.003.
+  * (c) shared-reward share of the token advantage variance **0.34** / 0.09.
+  * (d) wire on: reliance (deposit drop) held at ~0.70 through update ~1,750 while MI fell 2.0 -> 0.29; MI < 50%
+    at **1,712**, reliance < 50% at **1,790** (MI first). Wire off: MI < 50% at 1,631, plateau ~0.34.
+  * **Predictions:** dilution **not supported** (cos > 0 marginally and the pull-back < 0.1 x decay, but the
+    shared share is 0.34, not < 0.2); live-wire collapse **not supported** (cos ~ 0, not < 0); listener-first
+    **not supported** (MI fell first; listeners kept relying on the code until MI was ~0.3 bit).
+  * **Reading (MEASURED, n = 1 per arm):** with the wire on, the PPO gradient on the message head is essentially
+    orthogonal to the direction that would restore the code. The optimizer moves the head as much as the decay
+    does, but only ~6% of that goes toward the old code. The shared reward is a third of the token's advantage
+    variance, so its *share* is not tiny. The problem is that the token-credit gradient carries almost no
+    restoring direction: it acts like noise relative to "keep this mapping". CONJECTURED: per-token credit is
+    too noisy (low SNR), not too small. That is consistent with Cam's candidate fix (a separate value head on the
+    shared reward, so the token's advantage is not the sender's full, own-deposit-dominated advantage), which
+    would raise the SNR rather than the share. The wire-on code started decaying ~80 updates later than wire-off
+    (a hint of protection, n = 1) but ended lower (0.09 vs 0.34 bit).
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
