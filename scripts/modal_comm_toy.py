@@ -11,7 +11,7 @@ import modal
 
 _REQUIREMENTS = str(Path(__file__).resolve().parents[1] / "requirements.txt")
 
-PINNED_SHA = "5100eb0f691ab769dc891486bac63a68731f4813"  # comm-toy branch
+PINNED_SHA = "a746b643b2a73ae1516d552ed918b6b215c0eaff"  # comm-toy branch
 REPO_URL = "https://github.com/overlordxrz-source/throng.git"
 VOLUME_NAME = "throng-runs"
 VOLUME_MOUNT = "/mnt/throng-runs"
@@ -57,6 +57,9 @@ def run_toy(tag: str, args: list) -> str:
 _W = "toy_out/ORACLE0.msgpack"
 _BASE = ["--updates", "2000", "--warm-start", _W, "--wire-init-scale", "0.06", "--craft-cost", "0.45", "--ps", "1.99",
          "--ps-anneal", "1000", "1500", "--erode-from", "1500"]
+_T3 = ["--warm-start", "toy_out/ORACLE0.msgpack", "--wire-init-scale", "0.06", "--craft-cost", "0.45", "--ps", "1.99",
+       "--ps-anneal", "1000", "1500", "--reset-from", "1750", "--reset-every", "250", "--reset-until", "2750",
+       "--eval-at", "1500", "1750", "2000", "2250", "2500", "2750", "--imitate"]
 _ERO = ["--updates", "2000", "--warm-start", _W, "--wire-init-scale", "0.06", "--craft-cost", "0.45", "--ps", "1.99",
         "--ps-anneal", "1000", "1500", "--erode-from", "1500", "--erode-wd", "3e-4", "--eval-at", "1500"]
 _ERO_JOBS = ([(f"erosion_on_s{s}", ["--arm", "COMM", "--seed", str(s), *_ERO, "--tag", "EROSION_ON"]) for s in (70, 71, 72)]
@@ -64,6 +67,14 @@ _ERO_JOBS = ([(f"erosion_on_s{s}", ["--arm", "COMM", "--seed", str(s), *_ERO, "-
 PLANS: dict = {
     # registered erosion test (2026-11-08): probe one container first (Cam: fan out only if < $0.01/min/container)
     "erosion_probe": _ERO_JOBS[:1],
+    # step B (2026-11-08): regenerate T3 wire-on seeds to 1,750 with a full-state snapshot, then branch to 2,000
+    **{f"stepB_pre_s{s}": [(f"stepB_pre_s{s}", ["--arm", "COMM", "--seed", str(s), "--updates", "1750", *_T3,
+                                               "--snapshot-at", "1750", "--snapshot-path", f"{{VOL}}/testbed/toy/snap/t3_s{s}_u1750.pkl",
+                                               "--tag", "T3_ON"])] for s in (140, 141, 142)},
+    "stepB_branch": [(f"stepB_{br}_s{s}", ["--arm", "COMM", "--seed", str(s), "--updates", "2000", *_T3,
+                                           "--resume", f"{{VOL}}/testbed/toy/snap/t3_s{s}_u1750.pkl", "--branch", br,
+                                           "--tag", f"STEPB_{br.upper()}"])
+                     for br in ("none", "frozen_listener", "stopgrad") for s in (140, 141, 142)],
     # build-order step 3 (approved 2026-11-08): no assigned sender; PS on (formation), local critic
     "step3": [(f"step3_{tag.lower()}_s{s}", ["--arm", arm, "--seed", str(s), "--updates", "2000", "--warm-start", _W,
                                              "--wire-init-scale", "0.06", "--craft-cost", "0.45", "--ps", "1.99",

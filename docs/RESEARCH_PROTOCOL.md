@@ -2269,6 +2269,42 @@ more expensive, because it produces publishable-looking nulls.
     listener's message losses. Both act in PROX too (everyone speaks and listens). Step 3 is run as approved; its
     reading takes this into account.
 
+- **REGISTRATION -- step B, live-wire branch diagnostic (before any run).** `comm-toy` `a746b64`; launcher plans
+  `stepB_pre_s140/141/142` then `stepB_branch` (Modal CPU, 2 cores / 4 GiB; cap $1.5; price probe = the first
+  regeneration container alone).
+  * **Phase 1:** regenerate the T3 wire-on seeds 140 / 141 / 142 with T3's exact arguments to update 1,750
+    (including the 1,750 sender reset + imitation). Then pickle the **full** training state (params, Adam, PopArt,
+    env state, JAX key, numpy RNG, MI buffer, turnover maps, imitation buffer, and the elder's (obs, token) pairs).
+    Fidelity check, reported: the regenerated records 1-1,750 vs the original T3 runs. The resume path was verified
+    locally: resuming from a snapshot is bit-identical to a straight run.
+  * **Phase 2, three arms per seed, 1,751-2,000, readouts at 2,000:**
+    - **(i) as T3** (branch `none`; it must reproduce T3's updates 1,751-2,000 if phase 1 is bit-identical);
+    - **(ii) listener frozen:** listener rows act with the params snapshotted at 1,750 (after the reset and
+      imitation) and are masked out of every loss, so the listener's policy, tokens and value do not change; the
+      sender learns normally;
+    - **(iii) stop-gradient on the wire** (step A found leaks): the message parameters (`gwt_comms_1`,
+      `head_signal_slot*`, codebooks) get gradient from **sender rows only**, rescaled to the all-row mean. The
+      listener's token PG, VQ and token-entropy terms cannot reach them; all other parameters train as usual.
+  * **Readouts at 2,000:**
+    - continuity vs the elder's map at 1,750;
+    - reliance (empirical swap, 10 pairs: drop, paired SE, deliveries);
+    - copy accuracy: the head's exact-triple and per-slot agreement with the elder's (obs, token) pairs.
+  * **Not run (disclosed):** an exploratory wire-blind arm (iv). At a trained code, zeroing the sender's heard wire
+    alone changes its tokens massively (step A: TV 0.90), so switching the message head to wire-blind at 1,751
+    would scramble the code by construction and make its continuity meaningless. Testing the forward coupling
+    needs a head that is wire-blind from the start; proposed to Cam separately.
+  * **Predictions (written before launch).**
+    - *Mine:* (i) reproduces T3 (continuity ~0.1-0.3). **(ii) listener frozen holds the code best:** continuity
+      clearly above (i) in >= 2 of 3 seeds, and reliance >= 30% in >= 2 of 3. With the listener's broadcast frozen,
+      the forward coupling still exists but its input stops drifting. **(iii) stop-gradient helps less than (ii):**
+      continuity above (i) by a smaller margin, because the forward coupling and the listener's own re-learning
+      remain.
+    - *Cam's (~50%):* the pair chase each other, so (ii) lifts continuity above the copy level and (iii) keeps
+      reliance >= 30%.
+  * **Registered reading (Cam):** if (ii) holds the code, the listener's re-learning drives the drift. If (ii)
+    still drifts, the sender's own learning does it (through a leak or the token's credit). If (iii) loses
+    reliance, listeners abandon an imperfect code. Anything else is reported.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
