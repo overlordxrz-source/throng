@@ -1,0 +1,17 @@
+== NOSIG listener deliveries/world (last 50): [2.99, 3.17] mean 3.08
+== S2_VQ
+   s190: drop +71% (paired 5.37 SE 0.11) L dep 7.93 -> reliance ok | crafts@T' 0.50 -> 22.96 -> redirection ok | MI 1.980 | MI>1 bit at update 8 | sender msg entropy 1.67
+   s191: drop +71% (paired 5.81 SE 0.09) L dep 8.46 -> reliance ok | crafts@T' 0.49 -> 22.50 -> redirection ok | MI 1.988 | MI>1 bit at update 9 | sender msg entropy 1.75
+   s192: drop +71% (paired 6.72 SE 0.16) L dep 9.50 -> reliance ok | crafts@T' 0.72 -> 22.98 -> redirection ok | MI 1.999 | MI>1 bit at update 9 | sender msg entropy 2.21
+   s193: drop +67% (paired 4.13 SE 0.06) L dep 6.75 -> reliance ok | crafts@T' 0.62 -> 20.56 -> redirection ok | MI 1.999 | MI>1 bit at update 9 | sender msg entropy 1.64
+   s194: drop +91% (paired 8.12 SE 0.09) L dep 9.35 -> reliance ok | crafts@T' 0.37 -> 4.79 -> redirection ok | MI 1.999 | MI>1 bit at update 9 | sender msg entropy 2.19
+   S2_VQ: reliance 5/5 | redirection 5/5 | mean drop +74%
+== S2_SYM
+   s195: drop +69% (paired 4.77 SE 0.11) L dep 6.87 -> reliance ok | crafts@T' 0.45 -> 20.18 -> redirection ok | MI 1.986 | MI>1 bit at update 10 | sender msg entropy 0.10
+   s196: drop +60% (paired 0.73 SE 0.03) L dep 2.26 -> reliance x | crafts@T' 0.33 -> 3.26 -> redirection ok | MI 1.992 | MI>1 bit at update 10 | sender msg entropy 0.23
+   s197: drop +57% (paired 1.49 SE 0.06) L dep 2.19 -> reliance x | crafts@T' 0.53 -> 7.12 -> redirection ok | MI 1.813 | MI>1 bit at update 11 | sender msg entropy 1.79
+   s198: drop +0% (paired 0.00 SE 0.00) L dep 0.37 -> reliance x | crafts@T' 0.10 -> 0.10 -> redirection x | MI 1.333 | MI>1 bit at update 11 | sender msg entropy 3.92
+   s199: drop +65% (paired 1.69 SE 0.05) L dep 1.17 -> reliance x | crafts@T' 0.40 -> 7.92 -> redirection ok | MI 1.679 | MI>1 bit at update 11 | sender msg entropy 2.58
+   S2_SYM: reliance 1/5 | redirection 4/5 | mean drop +50%
+
+== STEP 2: VQ STAYS (SYM reliance 1/5, mean drop +50% vs VQ +74% - 0.10)
