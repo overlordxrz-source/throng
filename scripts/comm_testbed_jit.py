@@ -64,6 +64,11 @@ def main():
     ap.add_argument("--mi-null-perms", type=int, default=100, help="block permutations for the per-update MI null")
     ap.add_argument("--swap-pairs", type=int, default=10)
     ap.add_argument("--eval-at", type=int, nargs="*", default=[])
+    ap.add_argument("--mi-halt-k", type=int, default=0, help="Cam 2026-11-08: halt if sender MI at update K < --mi-floor")
+    ap.add_argument("--mi-floor", type=float, default=0.0)
+    ap.add_argument("--mi-probe-halt", action="store_true",
+                    help="halt if the per-update MI at two consecutive eval updates is below --mi-floor")
+    ap.add_argument("--swap-modes", default="constructed,empirical")
     ap.add_argument("--no-eval", action="store_true", help="skip the end-of-run MI/swap eval (timing)")
     ap.add_argument("--ppo-scan", action="store_true", help="scanned-minibatch PPO update (batch on device)")
     ap.add_argument("--calibrate-ps", action="store_true",
@@ -321,7 +326,7 @@ def main():
                 table[t] = tt[rng_e.integers(0, len(tt), 512)]
             c_mu_sw = Rc["mu_sw"].sum() / max(Rc["m_sw"].sum(), 1); c_mu_tr = Rc["mu_tr"].sum() / max(Rc["m_tr"].sum(), 1)
             c_dep = float(Rc["dep"][:, is_listener_np].sum() / W); c_att = float(Rc["att_tp"][:, is_listener_np].sum() / W)
-            for mode, name in ((1, "constructed"), (2, "empirical")):
+            for mode, name in [(m_, n_) for m_, n_ in ((1, "constructed"), (2, "empirical")) if n_ in a.swap_modes.split(",")]:
                 Rk = jax.tree_util.tree_map(np.asarray, rollout_eval(params, st0, resp, inc, jnp.asarray(table), mode))
                 if not np.allclose(Rk["heard_next"][:, is_listener_np], Rk["used_bc"][:, ~is_listener_np]):
                     print("[APPARATUS] FATAL: swap wiring", flush=True); raise SystemExit(1)
@@ -356,6 +361,7 @@ def main():
     halt_sdep = []
     from collections import deque
     mi_buf = deque(maxlen=10)
+    probe_below = []
     for u in range(1, a.updates + 1):
         t0 = time.time()
         env_key, k_env = jax.random.split(env_key)
@@ -544,6 +550,20 @@ def main():
                   ppo_token_entropy=float(mets.get("ppo_token_entropy", np.nan)),
                   mi_bits=mi_u, mi_null_p95=mi_null95, ppo_ps_mi=float(mets.get('ppo_ps_mi', 0.0)),
                   t_update=round(time.time() - t0, 2), t_rollout=round(t_roll, 2), t_ppo=round(t_ppo, 2)))
+        if a.mi_halt_k and u == a.mi_halt_k:
+            ok = mi_u >= a.mi_floor
+            print(f"[MI-HALT CHECK] update {u}: sender MI {mi_u:.3f} (floor {a.mi_floor}) -> {'continue' if ok else 'HALT'}",
+                  flush=True)
+            emit(dict(base, phase="mi_check", update=u, mi_bits=mi_u, floor=a.mi_floor, ok=bool(ok)))
+            if not ok:
+                raise SystemExit(3)
+        if u in a.eval_at or u == a.updates:
+            if a.mi_probe_halt:
+                below = mi_u < a.mi_floor
+                probe_below.append(below)
+                if len(probe_below) >= 2 and probe_below[-1] and probe_below[-2]:
+                    print(f"[MI-PROBE HALT] update {u}: MI {mi_u:.3f} under {a.mi_floor} at two probes in a row", flush=True)
+                    emit(dict(base, phase="mi_probe_halt", update=u, mi_bits=mi_u)); raise SystemExit(3)
         if u in a.eval_at and u != a.updates:
             evaluate(params, u, list(mi_buf)[-10:])
 
