@@ -71,6 +71,8 @@ def main():
     ap.add_argument("--swap-modes", default="constructed,empirical")
     ap.add_argument("--no-eval", action="store_true", help="skip the end-of-run MI/swap eval (timing)")
     ap.add_argument("--ppo-scan", action="store_true", help="scanned-minibatch PPO update (batch on device)")
+    ap.add_argument("--coupling-test", action="store_true",
+                    help="step A on the real net (Cam 2026-11-08): sender token distribution vs its heard wire, one rollout; print and exit")
     ap.add_argument("--calibrate-ps", action="store_true",
                     help="c_ps = 0.25 x |grad PPO| / |grad PS| (full-param norms, pre-clip) on 4 minibatches of the update-1 rollout; print and exit")
     ap.add_argument("--check-ppo-scan", action="store_true",
@@ -340,6 +342,33 @@ def main():
                           listener_crafts_at_Tprime_swap=float(Rk["att_tp"][:, is_listener_np].sum() / W),
                           swapped_token_differs_frac=float(np.any(used != Rk["token_actions"][:, ~is_listener_np], -1).mean()),
                           swap_token_seen_for_Tprime=seen))
+
+    if a.coupling_test:
+        k_env, k_r = jax.random.split(jax.random.PRNGKey(777))
+        k0, k1, kd = jax.random.split(k_env, 3)
+        st = (VALID[jax.random.randint(k0, (N,), 0, VALID.shape[0])], jax.random.randint(k1, (W,), 0, 4),
+              jnp.zeros(W, jnp.int32), jnp.zeros((N, int(cfg["signal_dim"])), jnp.float32), jnp.zeros((N, hidden)), k_r)
+        resp, inc = env_draws(kd)
+        _, Rr = rollout(params, st, None, resp, inc)
+        obs_s = np.asarray(Rr["obs"])[:, ~is_listener_np].reshape(-1, L.total_dim)
+        car_s = np.asarray(Rr["carries"])[:, ~is_listener_np].reshape(-1, hidden)
+        ix = np.random.default_rng(0).choice(len(obs_s), 4096, replace=False)
+        O, C = jnp.asarray(obs_s[ix]), jnp.asarray(car_s[ix])
+        p_ = params["params"] if "params" in params else params
+        cbs = [p_[k]["embedding"] for _, _, k in rl_jax.TOKEN_SLOTS]
+        rt = jax.random.randint(jax.random.PRNGKey(3), (4096, 3), 0, int(cfg["vocab_size"]))
+        rbc = jnp.concatenate([jnp.zeros((4096, 8))] + [cbs[i][rt[:, i]] for i in range(3)], -1)
+
+        def dist(o_in):
+            _, o = apply_fn(params, C, o_in, nl)
+            return [np.asarray(jax.nn.softmax(lg, -1)) for lg in token_logits(params, o.z_e, a.tau)]
+        P, Qr, Qz = dist(O), dist(O.at[:, ns:ne].set(rbc)), dist(O.at[:, ns:ne].set(0.0))
+        tv = lambda A, B: float(np.mean([0.5 * np.abs(A[i] - B[i]).sum(-1).mean() for i in range(3)]))  # noqa: E731
+        am = lambda A, B: float(np.mean([np.mean(A[i].argmax(-1) != B[i].argmax(-1)) for i in range(3)]))  # noqa: E731
+        print(json.dumps(dict(phase="coupling_test", params=a.warm_start, n=4096,
+                              tv_random_wire=tv(P, Qr), argmax_changed_random_wire=am(P, Qr),
+                              tv_zeroed_wire=tv(P, Qz), argmax_changed_zeroed_wire=am(P, Qz))), flush=True)
+        return
 
     def emit(rec):
         if a.timing_only:
