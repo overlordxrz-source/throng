@@ -2037,6 +2037,24 @@ more expensive, because it produces publishable-looking nulls.
     step is his call (a stronger fix, COMA-style per-message credit with a better critic, a longer or weaker
     erosion window, or accepting that rung 3 needs a different pressure).
 
+- **Cam's rulings (2026-11-08, credit fixes).** (1) A FAIL and B FAIL accepted as registered; rung 3 is not shown;
+  the restart disclosure is fine (deterministic, exact match); the unregistered slowdown stays exploratory.
+  (2) **Bar change, prospective only:** future rung-3 tests take *reliance* as primary (swap drop >= 30%, paired
+  drop > 2 SE, listener deliveries >= NOSIG level), with MI >= 0.5 bit secondary. MI >= 1 was stricter than the
+  property of interest. This does not rescue B. (3) **Next batch** (toy, Modal CPU, fresh seeds, registered first,
+  in parallel): **T1** B replication on the new bar (wd 3e-4, wire-on x5, wire-off x2; pass = reliance in >= 4 of
+  5 wire-on and wire-off MI < 0.5); **T2** generational turnover (no decay, no credit fix; PS annealed 1,000-1,500;
+  then every 250 updates up to 3,000, reinitialise one side, alternating sender message head / listener
+  wire-input layers; wire-on x3, wire-off x2; metrics before each reset: reliance, MI and code continuity
+  (token -> fire agreement with the pre-reset mapping, chance 25%); pass = reliance and continuity >= 0.8 before
+  each of the last 3 resets in >= 2 of 3 seeds; manipulation = wire-off MI < 0.5 after the first sender reset);
+  **T3** turnover + newborn imitation (each reset sender head first imitates the previous head's (fire, token)
+  pairs from its last 50 updates, then learns normally; seeded iterated learning, Lu et al., ICML 2020).
+  (4) Toy/CPU allowance $10 total.
+- **M's decision (2026-11-08): T3 approved.** The newborn copying drive is a **permanent part of the agents' nature,
+  not a scaffold**. It is registered and run in parallel with T1 and T2: wire-on x3, wire-off x2, the same pass bar
+  as T2.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
