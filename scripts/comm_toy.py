@@ -133,6 +133,9 @@ def main():
     ap.add_argument("--imitate-steps", type=int, default=500)
     ap.add_argument("--imitate-lr", type=float, default=1e-3)
     ap.add_argument("--imitate-window", type=int, default=50)
+    ap.add_argument("--prox", type=int, default=None,
+                    help="step 3: no assigned sender -- an agent sees the active fire only within this Chebyshev radius of it; "
+                         "symmetric shared reward; PS on whoever is informed")
     ap.add_argument("--selftest-leak", action="store_true", help="Step A (Cam 2026-11-08): wire -> message-parameter gradient paths")
     ap.add_argument("--save-at", type=int, nargs="*", default=[], help="save actor (+ central critic) params at these updates")
     ap.add_argument("--save-prefix", default=None)
@@ -213,9 +216,14 @@ def main():
     def build_obs(pos, active, wire, k):
         diff = (HEARTHS[None] - pos[:, None, :] + G / 2) % G - G / 2
         hr = (diff / (G / 2.0)).reshape(N, 8)
-        need = jax.nn.one_hot(jnp.repeat(active, 2), 4) * informed[:, None]
+        if a.prox is not None:     # step 3: knowledge from proximity to the active fire
+            dh = jnp.abs(HEARTHS[jnp.repeat(active, 2)] - pos); dh = jnp.minimum(dh, G - dh).max(-1)
+            inf_ = dh <= a.prox
+        else:
+            inf_ = informed
+        need = jax.nn.one_hot(jnp.repeat(active, 2), 4) * inf_[:, None]
         heard = wire.reshape(W, 2, -1)[:, ::-1].reshape(N, -1) if live_wire else jnp.zeros((N, SIG))
-        return jnp.concatenate([pos / G, hr, informed[:, None].astype(jnp.float32), need,
+        return jnp.concatenate([pos / G, hr, inf_[:, None].astype(jnp.float32), need,
                                 jax.random.normal(k, (N, 4)), heard], -1)
 
     def policy(params, carries, obs, k):
@@ -278,7 +286,11 @@ def main():
                 bc_used, trip_used = bc_emp, trip
             else:
                 bc_used, trip_used = bc_sw, toks_sw
-            bc_out = jnp.where(is_listener[:, None], bc, bc_used) if swap else bc
+            if a.prox is not None:   # step 3: every currently informed speaker's broadcast is swapped
+                inf_now = obs[:, O_INF] > 0.5
+                bc_out = jnp.where(inf_now[:, None], bc_used, bc) if swap else bc
+            else:
+                bc_out = jnp.where(is_listener[:, None], bc, bc_used) if swap else bc
             # movement toward T' and T (listeners)
             mv = DEL[act].astype(jnp.float32)
             def mu(tgt):
@@ -297,7 +309,10 @@ def main():
             att_Tp = craft & nr_[jnp.arange(N), jnp.repeat((active + 1) % 4, 2)]     # Craft at the T' hearth
             r = jnp.where(dep, R_DEP, 0.0) - a.craft_cost * (craft & ~dep)
             ldep_w = dep[is_listener]
-            r = r + jnp.where(~is_listener, R_DEP * jnp.repeat(ldep_w, 2), 0.0)   # shared reward to the sender
+            if a.prox is not None:   # step 3: symmetric shared reward -- either agent's delivery also pays its partner
+                r = r + R_DEP * dep.reshape(W, 2)[:, ::-1].reshape(N)
+            else:
+                r = r + jnp.where(~is_listener, R_DEP * jnp.repeat(ldep_w, 2), 0.0)   # shared reward to the sender
             newpos = (pos + DEL[act]) % G
             rs = VALID[jax.random.randint(k_rs, (N,), 0, VALID.shape[0])]
             pos2 = jnp.where(dep[:, None], rs, newpos)
@@ -309,7 +324,8 @@ def main():
             wire2 = bc_out if live_wire else jnp.zeros_like(bc_out)
             heard_next = wire2.reshape(W, 2, -1)[:, ::-1].reshape(N, -1)
             r_shared = jnp.where(~is_listener, R_DEP * jnp.repeat(ldep_w, 2), 0.0)
-            rec = dict(lp_act=lp_act, crit=crit, r_shared=r_shared.astype(jnp.float32), obs=obs, actions=act, log_probs=lp, rewards=r.astype(jnp.float32), values=val,
+            extra = dict(inf=obs[:, O_INF] > 0.5, used_bc=bc_used) if a.prox is not None else {}
+            rec = dict(**extra, lp_act=lp_act, crit=crit, r_shared=r_shared.astype(jnp.float32), obs=obs, actions=act, log_probs=lp, rewards=r.astype(jnp.float32), values=val,
                        carries=carries, loss_vq=lvq, token_actions=toks, ent=ent, dep=dep, att=att,
                        swap_diff=swap_diff, sens=sens, att_Tp=att_Tp, mu_sw=mu_sw, m_sw=m_sw, mu_tr=mu_tr, m_tr=m_tr,
                        active=active, heard_next=heard_next, bc_sw=bc_used, toks_sw=toks_sw, trip_used=trip_used)
@@ -561,6 +577,8 @@ def main():
         if a.arm != "COMM":
             return
         enc = lambda x: (x[..., 0] * V + x[..., 1]) * V + x[..., 2]  # noqa: E731
+        if a.prox is not None:
+            evaluate_prox(params, u, ev_rng); return
         for k in range(a.swap_pairs):
             st0 = init_state(jax.random.PRNGKey(10_000 + k))
             _, Rc = rollout(params, st0, jax.random.PRNGKey(20_000 + k), swap=False)
@@ -593,6 +611,34 @@ def main():
                           swap_token_seen_for_Tprime=in_Tp, swap_token_seen_at_all=in_any,
                           listener_crafts_at_Tprime_control=ctrl[3],
                           listener_crafts_at_Tprime_swap=float(Rk["att_Tp"][:, lis].sum() / W)))
+
+    def evaluate_prox(params, u, ev_rng):
+        """step 3 swap: every currently informed speaker's broadcast is replaced by a full token triple drawn from the
+        triples informed agents emitted for T' in the paired control rollout. Redirection = Crafts at the T' hearth by
+        agents uninformed at that step; deposits = all deposits."""
+        partner = np.arange(N).reshape(W, 2)[:, ::-1].reshape(N)
+        for k in range(a.swap_pairs):
+            st0 = init_state(jax.random.PRNGKey(10_000 + k))
+            _, Rc = rollout(params, st0, jax.random.PRNGKey(20_000 + k), swap=False)
+            Rc = jax.tree_util.tree_map(np.asarray, Rc)
+            lab = np.repeat(Rc["active"], 2, axis=1); inf = Rc["inf"]
+            table = np.zeros((4, 512, 3), np.int32)
+            for t in range(4):
+                tt = Rc["token_actions"][inf & (lab == t)]
+                if len(tt) == 0:
+                    print(f"[APPARATUS] FATAL: no informed control tokens for hearth {t}", flush=True); raise SystemExit(1)
+                table[t] = tt[ev_rng.integers(0, len(tt), 512)]
+            _, Rk = rollout(params, st0, jax.random.PRNGKey(20_000 + k), swap="empirical", table=jnp.asarray(table))
+            Rk = jax.tree_util.tree_map(np.asarray, Rk)
+            pinf = Rk["inf"][:, partner]          # the partner (speaker) was informed -> what this agent hears is the swap
+            if not np.allclose(Rk["heard_next"][pinf], Rk["used_bc"][:, partner][pinf]):
+                print("[APPARATUS] FATAL: prox swap wiring", flush=True); raise SystemExit(1)
+            red = lambda R_: float((R_["att_Tp"] & ~R_["inf"]).sum() / W)  # noqa: E731
+            emit(dict(phase="swap", update=u, mode="empirical", pair=k, prox=True,
+                      listener_crafts_at_Tprime_control=red(Rc), listener_crafts_at_Tprime_swap=red(Rk),
+                      listener_dep_control=float(Rc["dep"].sum() / W), listener_dep_swap=float(Rk["dep"].sum() / W),
+                      informed_frac=float(Rc["inf"].mean()),
+                      mu_Tprime_control=0.0, mu_Tprime_swap=0.0, swap_token_seen_for_Tprime=1.0, swap_token_seen_at_all=1.0))
 
     def mi_plugin(tok, Tl):
         # plug-in MI(token; T), mean over the 3 slots, bits (cheap per-update trace; numpy only, no RNG)
@@ -1081,13 +1127,19 @@ def main():
                    listener_crafts=int((R["actions"][:, lis] == ACTION_CRAFT).sum()),
                    listener_correct_frac=float(dep[:, lis].sum() / max(att[:, lis].sum(), 1)),
                    token_entropy_sender=float(ent[:, ~lis].mean()), token_entropy_listener=float(ent[:, lis].mean()),
-                   mi_plugin=mi_plugin(R["token_actions"][:, ~lis].reshape(-1, 3), R["active"].reshape(-1)),
+                   mi_plugin=(mi_plugin(R["token_actions"][R["inf"]], np.repeat(R["active"], 2, axis=1)[R["inf"]])
+                              if a.prox is not None else mi_plugin(R["token_actions"][:, ~lis].reshape(-1, 3), R["active"].reshape(-1))),
+                   informed_frac=(float(R["inf"].mean()) if a.prox is not None else None),
                    tok_ent_coef=float(te_c),
                    swap_diff=float(R["swap_diff"][:, ~lis].mean()), listener_sens_tv=float(R["sens"][:, lis].mean()),
                    ev=float(ev), aux_ps=mets.get("aux_ps", 0.0), aux_pl=mets.get("aux_pl", 0.0),
                    ppo_entropy=mets.get("ppo_entropy"), ps_coef=float(ps_c), t_update=round(time.time() - t0, 2))
         emit(rec)
-        mi_buf_tok.append(R["token_actions"][:, ~lis].reshape(-1, 3)); mi_buf_T.append(R["active"].reshape(-1))
+        if a.prox is not None:
+            infm = R["inf"]; labm = np.repeat(R["active"], 2, axis=1)
+            mi_buf_tok.append(R["token_actions"][infm]); mi_buf_T.append(labm[infm])
+        else:
+            mi_buf_tok.append(R["token_actions"][:, ~lis].reshape(-1, 3)); mi_buf_T.append(R["active"].reshape(-1))
         if a.reset_from is not None and a.imitate:
             imit_buf.append((R["obs"][:, ~lis].reshape(-1, D), R["token_actions"][:, ~lis].reshape(-1, 3)))
         if u in a.eval_at and u != a.updates:
