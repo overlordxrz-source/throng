@@ -1,0 +1,96 @@
+== NOSIG listener deposits/world (last 50): [0.41, 3.12, 2.76] mean 2.10
+   known limit -- blind-search break-even cost NOSIG s30: p 0.084 -> 0.25 vs 0.45
+   known limit -- blind-search break-even cost NOSIG s31: p 0.203 -> 0.69 vs 0.45
+   known limit -- blind-search break-even cost NOSIG s32: p 0.196 -> 0.66 vs 0.45
+
+== PS per seed
+   s10 u1000 empirical  : L dep ctrl 6.09 swap 1.88 (drop +69%, paired 4.22 SE 0.06) | Delta +0.4371 (SE 0.0055) | swap token seen for T' 100.0%, at all 100.0%
+   s10 u1000 constructed: L dep ctrl 6.09 swap 1.93 (drop +68%, paired 4.16 SE 0.06) | Delta +0.4375 (SE 0.0059) | swap token seen for T' 99.8%, at all 99.8%
+   s10 u1000 MI mean over slots 1.985 bits
+   s10 u2000 empirical  : L dep ctrl 7.83 swap 2.38 (drop +70%, paired 5.45 SE 0.10) | Delta +0.3631 (SE 0.0060) | swap token seen for T' 100.0%, at all 100.0%
+   s10 u2000 constructed: L dep ctrl 7.83 swap 2.38 (drop +70%, paired 5.45 SE 0.12) | Delta +0.3640 (SE 0.0063) | swap token seen for T' 99.9%, at all 99.9%
+   s10 u2000 MI mean over slots 1.991 bits
+   s10 listener dep/world last 50 8.21 | sender H 0.08 | c_ps at end 1.990
+   s11 u1000 empirical  : L dep ctrl 6.89 swap 1.97 (drop +71%, paired 4.92 SE 0.07) | Delta +0.4266 (SE 0.0059) | swap token seen for T' 100.0%, at all 100.0%
+   s11 u1000 constructed: L dep ctrl 6.89 swap 1.95 (drop +72%, paired 4.94 SE 0.08) | Delta +0.4252 (SE 0.0059) | swap token seen for T' 99.6%, at all 99.6%
+   s11 u1000 MI mean over slots 1.974 bits
+   s11 u2000 empirical  : L dep ctrl 8.57 swap 0.74 (drop +91%, paired 7.83 SE 0.09) | Delta +0.2486 (SE 0.0053) | swap token seen for T' 100.0%, at all 100.0%
+   s11 u2000 constructed: L dep ctrl 8.57 swap 0.75 (drop +91%, paired 7.82 SE 0.09) | Delta +0.2302 (SE 0.0082) | swap token seen for T' 99.2%, at all 99.3%
+   s11 u2000 MI mean over slots 1.999 bits
+   s11 listener dep/world last 50 9.09 | sender H 0.08 | c_ps at end 1.990
+   s12 u1000 empirical  : L dep ctrl 4.13 swap 1.37 (drop +67%, paired 2.76 SE 0.08) | Delta -0.0643 (SE 0.0044) | swap token seen for T' 100.0%, at all 100.0%
+   s12 u1000 constructed: L dep ctrl 4.13 swap 1.25 (drop +70%, paired 2.88 SE 0.08) | Delta -0.0666 (SE 0.0065) | swap token seen for T' 99.0%, at all 99.0%
+   s12 u1000 MI mean over slots 1.980 bits
+   s12 u2000 empirical  : L dep ctrl 8.55 swap 2.58 (drop +70%, paired 5.97 SE 0.15) | Delta +0.2343 (SE 0.0073) | swap token seen for T' 100.0%, at all 100.0%
+   s12 u2000 constructed: L dep ctrl 8.55 swap 2.57 (drop +70%, paired 5.98 SE 0.10) | Delta +0.2334 (SE 0.0079) | swap token seen for T' 99.2%, at all 99.3%
+   s12 u2000 MI mean over slots 1.999 bits
+   s12 listener dep/world last 50 8.82 | sender H 0.00 | c_ps at end 1.990
+   s13 u1000 empirical  : L dep ctrl 2.31 swap 0.66 (drop +71%, paired 1.65 SE 0.07) | Delta +0.1552 (SE 0.0039) | swap token seen for T' 100.0%, at all 100.0%
+   s13 u1000 constructed: L dep ctrl 2.31 swap 0.69 (drop +70%, paired 1.62 SE 0.07) | Delta +0.1604 (SE 0.0034) | swap token seen for T' 99.2%, at all 99.2%
+   s13 u1000 MI mean over slots 1.993 bits
+   s13 u2000 empirical  : L dep ctrl 7.54 swap 2.50 (drop +67%, paired 5.04 SE 0.08) | Delta +0.3853 (SE 0.0047) | swap token seen for T' 100.0%, at all 100.0%
+   s13 u2000 constructed: L dep ctrl 7.54 swap 2.52 (drop +67%, paired 5.02 SE 0.09) | Delta +0.3862 (SE 0.0048) | swap token seen for T' 100.0%, at all 100.0%
+   s13 u2000 MI mean over slots 1.973 bits
+   s13 listener dep/world last 50 7.74 | sender H 0.00 | c_ps at end 1.990
+   s14 u1000 empirical  : L dep ctrl 6.01 swap 2.12 (drop +65%, paired 3.89 SE 0.08) | Delta +0.2170 (SE 0.0052) | swap token seen for T' 100.0%, at all 100.0%
+   s14 u1000 constructed: L dep ctrl 6.01 swap 2.00 (drop +67%, paired 4.01 SE 0.07) | Delta +0.2102 (SE 0.0067) | swap token seen for T' 97.9%, at all 97.9%
+   s14 u1000 MI mean over slots 1.979 bits
+   s14 u2000 empirical  : L dep ctrl 8.71 swap 1.04 (drop +88%, paired 7.67 SE 0.04) | Delta -0.1187 (SE 0.0066) | swap token seen for T' 100.0%, at all 100.0%
+   s14 u2000 constructed: L dep ctrl 8.71 swap 0.95 (drop +89%, paired 7.76 SE 0.03) | Delta -0.1320 (SE 0.0067) | swap token seen for T' 99.4%, at all 99.4%
+   s14 u2000 MI mean over slots 1.999 bits
+   s14 listener dep/world last 50 9.23 | sender H 0.05 | c_ps at end 1.990
+
+== PSA per seed
+   s20 u1000 empirical  : L dep ctrl 3.38 swap 1.39 (drop +59%, paired 1.99 SE 0.07) | Delta +0.1096 (SE 0.0060) | swap token seen for T' 100.0%, at all 100.0%
+   s20 u1000 constructed: L dep ctrl 3.38 swap 1.39 (drop +59%, paired 1.99 SE 0.06) | Delta +0.1088 (SE 0.0045) | swap token seen for T' 99.6%, at all 99.6%
+   s20 u1000 MI mean over slots 1.985 bits
+   s20 u2000 empirical  : L dep ctrl 7.51 swap 2.45 (drop +67%, paired 5.06 SE 0.07) | Delta +0.4924 (SE 0.0050) | swap token seen for T' 100.0%, at all 100.0%
+   s20 u2000 constructed: L dep ctrl 7.51 swap 2.41 (drop +68%, paired 5.10 SE 0.08) | Delta +0.4905 (SE 0.0050) | swap token seen for T' 99.9%, at all 100.0%
+   s20 u2000 MI mean over slots 1.991 bits
+   s20 listener dep/world last 50 7.84 | sender H 0.00 | c_ps at end 0.000
+   s21 u1000 empirical  : L dep ctrl 3.80 swap 1.38 (drop +64%, paired 2.41 SE 0.06) | Delta +0.0350 (SE 0.0062) | swap token seen for T' 100.0%, at all 100.0%
+   s21 u1000 constructed: L dep ctrl 3.80 swap 1.37 (drop +64%, paired 2.43 SE 0.06) | Delta +0.0441 (SE 0.0047) | swap token seen for T' 99.8%, at all 99.8%
+   s21 u1000 MI mean over slots 1.979 bits
+   s21 u2000 empirical  : L dep ctrl 5.63 swap 1.60 (drop +72%, paired 4.03 SE 0.12) | Delta -0.0062 (SE 0.0059) | swap token seen for T' 100.0%, at all 100.0%
+   s21 u2000 constructed: L dep ctrl 5.63 swap 1.15 (drop +80%, paired 4.48 SE 0.09) | Delta -0.0136 (SE 0.0034) | swap token seen for T' 99.7%, at all 99.7%
+   s21 u2000 MI mean over slots 1.941 bits
+   s21 listener dep/world last 50 5.81 | sender H 0.14 | c_ps at end 0.000
+   s22 u1000 empirical  : L dep ctrl 6.23 swap 2.07 (drop +67%, paired 4.17 SE 0.08) | Delta +0.4628 (SE 0.0056) | swap token seen for T' 100.0%, at all 100.0%
+   s22 u1000 constructed: L dep ctrl 6.23 swap 2.03 (drop +67%, paired 4.20 SE 0.09) | Delta +0.4614 (SE 0.0062) | swap token seen for T' 99.1%, at all 99.1%
+   s22 u1000 MI mean over slots 1.986 bits
+   s22 u2000 empirical  : L dep ctrl 8.75 swap 2.28 (drop +74%, paired 6.47 SE 0.10) | Delta +0.5799 (SE 0.0078) | swap token seen for T' 100.0%, at all 100.0%
+   s22 u2000 constructed: L dep ctrl 8.75 swap 2.33 (drop +73%, paired 6.42 SE 0.08) | Delta +0.5725 (SE 0.0061) | swap token seen for T' 99.2%, at all 99.3%
+   s22 u2000 MI mean over slots 1.999 bits
+   s22 listener dep/world last 50 8.99 | sender H 0.00 | c_ps at end 0.000
+
+== P1 reliance (all 5 PS seeds; empirical swap, final update)
+   PS s10: drop +70% (>= 30%), paired 5.45 > 2 x 0.10, L dep 8.21 >= NOSIG 2.10 -> pass
+   PS s11: drop +91% (>= 30%), paired 7.83 > 2 x 0.09, L dep 9.09 >= NOSIG 2.10 -> pass
+   PS s12: drop +70% (>= 30%), paired 5.97 > 2 x 0.15, L dep 8.82 >= NOSIG 2.10 -> pass
+   PS s13: drop +67% (>= 30%), paired 5.04 > 2 x 0.08, L dep 7.74 >= NOSIG 2.10 -> pass
+   PS s14: drop +88% (>= 30%), paired 7.67 > 2 x 0.04, L dep 9.23 >= NOSIG 2.10 -> pass
+   P1: PASS (5/5)
+
+== P2 meaning (>= 4 of 5 PS seeds; empirical swap; threshold set after a 2/3 outcome, fresh seeds)
+   PS s10: Delta +0.3631 (SE 0.0060) -> pass
+   PS s11: Delta +0.2486 (SE 0.0053) -> pass
+   PS s12: Delta +0.2343 (SE 0.0073) -> pass
+   PS s13: Delta +0.3853 (SE 0.0047) -> pass
+   PS s14: Delta -0.1187 (SE 0.0066) -> fail
+   P2: PASS (4/5)
+
+== SECONDARY (registered, not decisive) redirection: listener Crafts at the swapped hearth T' per world, swap >= 2x control and paired increase > 2 SE, in >= 4 of 5 PS seeds
+   PS s10: Crafts at T' control 0.59 swap 22.12 (paired +21.53, SE 0.33) -> pass
+   PS s11: Crafts at T' control 0.33 swap 49.73 (paired +49.41, SE 1.56) -> pass
+   PS s12: Crafts at T' control 0.85 swap 22.65 (paired +21.80, SE 0.37) -> pass
+   PS s13: Crafts at T' control 0.44 swap 22.14 (paired +21.70, SE 0.22) -> pass
+   PS s14: Crafts at T' control 0.41 swap 5.65 (paired +5.24, SE 0.27) -> pass
+   redirection: PASS (5/5)
+
+== P3 self-sustaining (>= 2 of 3 PSA seeds; final update, after 500 updates at c_ps = 0)
+   PSA s20: MI 1.991 (>= 1.0) | drop +67% paired 5.06 SE 0.07 | L dep 7.84 vs NOSIG 2.10 -> pass
+   PSA s21: MI 1.941 (>= 1.0) | drop +72% paired 4.03 SE 0.12 | L dep 5.81 vs NOSIG 2.10 -> pass
+   PSA s22: MI 1.999 (>= 1.0) | drop +74% paired 6.47 SE 0.10 | L dep 8.99 vs NOSIG 2.10 -> pass
+   P3: PASS (3/3)
+
+== DECISION: P1 and P2 pass -> draft the real-network PS confirmation (nothing launches) | P3 PASS -> include an anneal arm

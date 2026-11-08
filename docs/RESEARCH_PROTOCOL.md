@@ -1624,6 +1624,31 @@ more expensive, because it produces publishable-looking nulls.
     volume and params first; an MI floor instead of the token-entropy halt; P3 decides whether it has an anneal
     arm). Nothing launches until it is approved. Otherwise -> report; nothing goes to Modal.
 
+- **RESULTS -- PS replication in the CPU toy (2026-11-07).** 11 runs, laptop CPU, 39 min, $0. Data and output:
+  `comm-toy` `4a01b75` (`toy_out/rep_*.jsonl.gz`); `docs/data/toy_ps_replication_2026-11-07_analysis.txt`
+  (registered script, unmodified). All swap tokens in-distribution (empirical mode by construction; constructed
+  97.9-100% seen for T').
+  * **P1 reliance: PASS (5/5).** Deposit drop under the empirical swap 70 / 91 / 70 / 67 / 88% (paired SE <= 0.15);
+    PS listeners 8.2 / 9.1 / 8.8 / 7.7 / 9.2 deposits per world-update vs NOSIG 2.10 (0.41 / 3.12 / 2.76)
+    and ORACLE-toy 12.4.
+  * **P2 meaning: PASS (4/5).** Delta +0.363 / +0.249 / +0.234 / +0.385 / **-0.119** (s14), SE <= 0.008.
+    (Threshold set after the 2/3 outcome; fresh seeds.)
+  * **P3 self-sustaining: PASS (3/3).** After 500 updates at c_ps = 0: MI 1.99 / 1.94 / 2.00 bits; drop 67 / 72 /
+    74%; listeners 7.8 / 5.8 / 9.0. The anneal seeds' Delta was +0.49 / -0.01 / +0.58 (not part of P3).
+  * **Secondary redirection: 5/5.** Crafts at the swapped hearth T', control -> swap, per world: 0.59 -> 22.1,
+    0.33 -> 49.7, 0.85 -> 22.7, 0.44 -> 22.1, **0.41 -> 5.7 (s14)**. So s14's listeners also go where the
+    swapped token points, as PS0 did, while its movement score is negative. This is the second instance of the
+    movement metric misreading a seed that redirects.
+  * At update 1,000 (pre-anneal / mid-run), every PS and PSA seed already showed a 59-72% drop; MI was >= 1.97
+    bits. Between 1,000 and 2,000 listener deposits kept rising (PS 2.3-6.9 -> 7.5-8.7).
+  * Known limit, logged: blind search still pays at 0.45 (NOSIG break-even 0.25 / 0.69 / 0.66).
+  * **Reading (scope).** PS makes the code informative by design, and that part is not a finding. The emergent and
+    replicated part: listeners came to depend on the code and to act on its meaning, in 5/5 fresh seeds. The
+    shared reward then kept the code alive with the nudge removed (3/3). This is the CPU toy, not the real network.
+  * **Decision per the registration:** P1 and P2 pass -> draft the real-network PS confirmation for M; P3 passed ->
+    it includes an anneal arm. Draft: `docs/drafts/2026-11-07_real_network_PS_confirmation_DRAFT.md`. Nothing
+    launches until it is approved.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
