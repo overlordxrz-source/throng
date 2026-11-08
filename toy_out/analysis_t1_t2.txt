@@ -1,0 +1,22 @@
+== T1: credit B, wd 3e-4, reliance primary
+   wire-off s125: MI@2000 0.518
+   wire-off s126: MI@2000 0.410
+   wire-on s120: drop +9% paired 0.12 SE 0.05 | L dep 2.82 vs NOSIG 3.27 -> fail | MI@2000 0.471 (secondary >= 0.5: False)
+   wire-on s121: drop +3% paired 0.05 SE 0.06 | L dep 2.30 vs NOSIG 3.27 -> fail | MI@2000 0.003 (secondary >= 0.5: False)
+   wire-on s122: drop +6% paired 0.16 SE 0.07 | L dep 2.88 vs NOSIG 3.27 -> fail | MI@2000 0.047 (secondary >= 0.5: False)
+   wire-on s123: drop +4% paired 0.07 SE 0.05 | L dep 1.35 vs NOSIG 3.27 -> fail | MI@2000 0.036 (secondary >= 0.5: False)
+   wire-on s124: drop +53% paired 0.38 SE 0.04 | L dep 1.47 vs NOSIG 3.27 -> fail | MI@2000 0.274 (secondary >= 0.5: False)
+   T1: FAIL (reliance 0/5; wire-off erodes: False)
+
+== T2: generational turnover
+   wire-off s133: MI@1500 1.997 MI@2000 0.095 | MI by eval point: 1500:2.00 1750:2.00 2000:0.09 2250:0.02 2500:0.04 2750:0.03 3000:0.05
+   wire-off s134: MI@1500 1.996 MI@2000 0.078 | MI by eval point: 1500:2.00 1750:2.00 2000:0.08 2250:0.08 2500:0.10 2750:0.08 3000:0.05
+   manipulation check (wire-off MI < 0.5 at 2,000 in both): True
+   wire-on s130: @1500 drop +68% | 2250: drop +1% (ret 0.01) cont 0.26 Ldep 3.65/3.74 x | 2500: drop +0% (ret 0.00) cont 0.00 Ldep 4.13/3.65 x | 2750: drop -1% (ret -0.01) cont 0.23 Ldep 4.18/4.19 x -> fail
+      all eval points: 1500:cont nan/MI 1.98 1750:cont 1.00/MI 2.00 2000:cont 0.00/MI 0.01 2250:cont 0.26/MI 0.00 2500:cont 0.00/MI 0.02 2750:cont 0.23/MI 0.00 3000:cont 0.00/MI 0.00
+   wire-on s131: @1500 drop +69% | 2250: drop +2% (ret 0.04) cont 0.27 Ldep 3.17/3.74 x | 2500: drop +7% (ret 0.10) cont 0.00 Ldep 3.26/3.65 x | 2750: drop +22% (ret 0.32) cont 0.30 Ldep 3.82/4.19 x -> fail
+      all eval points: 1500:cont nan/MI 1.99 1750:cont 1.00/MI 1.98 2000:cont 0.00/MI 0.06 2250:cont 0.27/MI 0.05 2500:cont 0.00/MI 0.03 2750:cont 0.30/MI 0.06 3000:cont 0.00/MI 0.00
+   wire-on s132: @1500 drop +71% | 2250: drop +32% (ret 0.45) cont 0.31 Ldep 1.28/3.74 x | 2500: drop +2% (ret 0.03) cont 0.00 Ldep 2.22/3.65 x | 2750: drop -4% (ret -0.06) cont 0.25 Ldep 3.89/4.19 x -> fail
+      all eval points: 1500:cont nan/MI 2.00 1750:cont 1.00/MI 2.00 2000:cont 0.00/MI 0.20 2250:cont 0.31/MI 0.10 2500:cont 0.00/MI 0.01 2750:cont 0.25/MI 0.02 3000:cont 0.00/MI 0.03
+   T2: FAIL (wire-on passing 0/3)
+
