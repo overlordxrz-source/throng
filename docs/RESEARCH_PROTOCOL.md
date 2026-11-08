@@ -2732,8 +2732,9 @@ more expensive, because it produces publishable-looking nulls.
       works as well as the modal triple.
   - **Not understood:**
     - C1-E s187 u2000 (eroded: triple MI 0.12 bit; no condition moves listeners);
-    - step-2 VQ s194: only "T+2" is understood (89 Crafts at X, specificity 0.98). For T+1 / T+3 our words and its
-      own words both give ~4.9 Crafts at specificity 0.67, so its listener barely acts on them.
+    - step-2 VQ s194, an odd listener: babble itself sends it to T+2 (57.5 Crafts, specificity 0.83). That is where
+      the criterion fails, even though our "T+2" gives 89 Crafts at specificity 0.98. For T+1 / T+3, our words and
+      its own words are specific (0.67 vs babble 0.07) but few (~4.9 Crafts).
   - **Explains C1-E's puzzle.** In the eroded C1-E seeds s185 / s186 at u2000:
     - per-slot MI is 0.0-0.54 and triple MI 0.57 / 0.63 bit;
     - **our dictionary works *better* than the sender's own words** (18-20 vs 14.5-15.6 Crafts at X; specificity
