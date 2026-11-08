@@ -1,0 +1,16 @@
+== STEPB_NONE
+   s140: continuity 0.069 | reliance drop +67% (paired 3.51 SE 0.06) | L dep 5.22 | copy acc exact 0.000 per-slot 0.228
+   s141: continuity 0.081 | reliance drop -2% (paired -0.03 SE 0.05) | L dep 1.07 | copy acc exact 0.000 per-slot 0.098
+   s142: continuity 0.168 | reliance drop +1% (paired 0.03 SE 0.05) | L dep 2.30 | copy acc exact 0.000 per-slot 0.020
+== STEPB_FROZEN_LISTENER
+   s140: continuity 0.041 | reliance drop +14% (paired 0.17 SE 0.05) | L dep 1.36 | copy acc exact 0.000 per-slot 0.279
+   s141: continuity 0.000 | reliance drop -2% (paired -0.06 SE 0.07) | L dep 3.35 | copy acc exact 0.000 per-slot 0.252
+   s142: continuity 0.030 | reliance drop +1% (paired 0.02 SE 0.08) | L dep 3.84 | copy acc exact 0.000 per-slot 0.018
+== STEPB_STOPGRAD
+   s140: continuity 0.090 | reliance drop +55% (paired 2.15 SE 0.08) | L dep 4.16 | copy acc exact 0.000 per-slot 0.158
+   s141: continuity 0.000 | reliance drop +6% (paired 0.03 SE 0.04) | L dep 0.73 | copy acc exact 0.000 per-slot 0.097
+   s142: continuity 0.169 | reliance drop -3% (paired -0.10 SE 0.09) | L dep 2.58 | copy acc exact 0.000 per-slot 0.019
+
+== comparisons (continuity vs arm (i); reliance >= 30%)
+   STEPB_FROZEN_LISTENER: continuity above (i) in 0/3 seeds | reliance >= 30% in 0/3
+   STEPB_STOPGRAD: continuity above (i) in 2/3 seeds | reliance >= 30% in 1/3

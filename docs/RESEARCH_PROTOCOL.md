@@ -2305,6 +2305,42 @@ more expensive, because it produces publishable-looking nulls.
     still drifts, the sender's own learning does it (through a leak or the token's credit). If (iii) loses
     reliance, listeners abandon an imperfect code. Anything else is reported.
 
+- **RESULTS -- step B (2026-11-08).** Modal CPU (~$0.6), data `comm-toy` `9f8521d`, output
+  `docs/data/toy_stepB_2026-11-08_analysis.txt` (registered script, unmodified).
+  * **Fidelity.** The phase-1 regenerations are **bit-identical to the original T3 runs over updates 1-1,750** (all
+    three seeds). The resumed as-T3 arm (i) first differs from the original at 1,751 by ~1e-6 (token entropy),
+    float-level noise from the reset / imitation step running in a different process. It then diverges chaotically
+    within ~10 updates (e.g. s141 listener deposits at 2,000: 1.59 vs 0.47 in the original). So arm (i) is a valid
+    as-T3 continuation, not a bitwise replay, and **the post-reset dynamics are highly sensitive to tiny
+    perturbations.** All three arms start from the identical snapshot, so the registered comparisons stand. (The
+    local resume test was bit-identical; it had no imitation step between snapshot and resume.)
+  * **Readouts at 2,000** (s140 / s141 / s142); copy level right after imitation at 1,750 (exact triple): 0.82 /
+    0.78 / 0.56.
+    - **(i) as T3:** continuity 0.069 / 0.081 / 0.168; reliance drop +67% / -2% / +1%; copy accuracy (per slot)
+      0.23 / 0.10 / 0.02.
+    - **(ii) listener frozen:** continuity 0.041 / 0.000 / 0.030; reliance +14% / -2% / +1%; copy 0.28 / 0.25 /
+      0.02.
+    - **(iii) stop-gradient:** continuity 0.090 / 0.000 / 0.169; reliance +55% / +6% / -3%; copy 0.16 / 0.10 /
+      0.02.
+    - Exact-triple copy accuracy at 2,000 is 0.000 in every arm and seed.
+  * **Registered reading:** (ii) does **not** hold the code: continuity is above (i) in 0/3 seeds and reliance
+    >= 30% in 0/3. So the drift is driven by **the sender's own learning**, not the listener's re-learning. (iii)
+    makes no material difference (continuity above (i) in 2/3 by <= 0.02; reliance >= 30% in 1/3). **Both
+    predictions failed** (mine: (ii) holds best; Cam's: (ii) above the copy level and (iii) keeps reliance).
+  * **Reported as "anything else":**
+    1. **Arm (ii) did not remove the forward coupling.** The frozen listener params are post-reset, and the message
+       head is shared, so the frozen listener still broadcasts from the *new* head. The sender hears a wire unlike
+       the elder era's, and its message head reads that wire (step A).
+    2. **The head itself changes:** copy accuracy, measured on the elder's *fixed* (obs, token) inputs, fell from
+       0.56-0.82 (exact) to 0.02-0.28 (per slot) in every arm. So the drift is in the weights, not only in the
+       inputs.
+    3. **The copy is overwritten within 250 updates in every arm**, while in T3 with the wire off the copied code
+       held through every reset.
+    CONJECTURED: the sender's message head is pushed by its own losses (token PG on its shared-reward-diluted
+    advantage, VQ commitment toward codewords for z_e computed from the changed heard wire) once its inputs include
+    a live wire. A wire-blind-from-the-start message head (proposed) would separate the input path from the
+    credit path.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
