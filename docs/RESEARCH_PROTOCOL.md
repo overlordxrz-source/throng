@@ -2379,6 +2379,27 @@ more expensive, because it produces publishable-looking nulls.
       a quarter of wire-on's (measured 1.88 / 4.92 = 0.38). **Not supported.**
     -> **"Anything else": reported; T5 is not launched.**
 
+- **RESULTS -- real-network PS confirmation (2026-11-08): PRIMARY FAIL (1/2) as registered.** `comm-jit` `326c8cb`,
+  A10G, seeds 50 / 51, 450 updates each, both complete; no halts (the update-2 apparatus check and the update-5 MI
+  check, 1.83 bits vs 0.92, passed on both). Data `docs/data/confirm_PS5{0,1}_326c8cb.jsonl.gz`; output
+  `docs/data/confirm_PS_2026-11-08_analysis.txt` (registered script, unmodified).
+  * **Seed 51: PASS, strongly.** Redirection on the probes at 350 / 400 / 450 (30 pairs): Crafts at the swapped
+    fire per world 2.12 -> **39.78 (18.7x)**, paired +37.65, SE 1.59. **Reliance rose steadily across probes:**
+    +26 / +40 / +33 / +40 / +48 / +50 / +56 / **+61** / +53% (updates 50-450); movement Delta +0.05 to +0.40.
+    Listener deliveries per world (training window) climbed from 2.4 to 5.2-5.9, above the final run's no-signal
+    level (4.26). Sender deliveries never crashed (window minima >= 11.8 from update 150).
+  * **Seed 50: FAIL.** A weaker channel formed early (redirection 1.5-2.0x and reliance 12-23% at probes 50-200).
+    It faded by 250-300, and then **a sender crash** (window minimum sender deliveries 1.8 at 350 and 2.2 at 400;
+    window mean 9.7 at 400) took the listener with it: deliveries 0.8 at probes 350 / 400. Over 350-450,
+    redirection is 5.05 -> 5.56 (1.10x).
+  * MI of sender tokens ~2.0 bits at every probe in both seeds (null p95 <= 0.10). Swap tokens were 100%
+    in-distribution.
+  * **Reading.** As registered, the confirmation fails (the bar needed both seeds). MEASURED: **seed 51 is the first
+    real-network channel that listeners depend on and act on** (rung-2 behaviour, 18.7x redirection, 61% reliance
+    at 400), with the same PS recipe that passed in the toy. Seed 50 shows the risk the averaging was meant to
+    absorb: a sender crash-and-recover cycle that landed on the primary window. Per the roadmap, nothing is called
+    a result before a replication passes. Next step is Cam's.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
