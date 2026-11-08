@@ -2548,6 +2548,17 @@ more expensive, because it produces publishable-looking nulls.
     uninformative. Redirection is co-reported (4 of 5). Secondary: MI, formation speed (first update with plug-in MI
     > 1 bit), listener deliveries, message entropy.
 
+- **Done (free, Cam's item 1):** the real testbed (`comm-jit` `c242635`) now has `--log-diag` (PS gradient share,
+  grad norm, approx. KL, post-update clip fraction, value / policy / VQ loss), computed in separate passes on a fixed
+  2,048-row sample. **Training is bit-identical with and without it** (params after 2 updates compared byte for
+  byte). `--ckpt-every 50` checkpoints every paid run. Smoke values: grad norm 1.60, PS share 0.33, KL 0.020, clip
+  fraction 0.33.
+- **Ready for the replication (free): a wire-blind message pathway on the real network** (`AgentNetworkJax
+  wire_blind=1`: the heard-neighbour block of the message pathway's input is zeroed; the pathway shares nothing else
+  with the trunk). **Apparatus check on seed 51's trained weights:** max |dp| of the token distribution under random
+  input on all 6 neighbour slots = **0.000000**. The one-live-dim mutant gives 1.0 (caught); the normal pathway
+  changes 97.6% of tokens. The gradient tests still pass (12/12).
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
