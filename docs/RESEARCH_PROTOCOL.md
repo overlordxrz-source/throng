@@ -2055,6 +2055,41 @@ more expensive, because it produces publishable-looking nulls.
   not a scaffold**. It is registered and run in parallel with T1 and T2: wire-on x3, wire-off x2, the same pass bar
   as T2.
 
+- **REGISTRATION -- T1 / T2 / T3 (before any run).** `comm-toy` `69ad45e`; analysis `scripts/analyze_turnover.py`;
+  launcher plan `tbatch` (17 Modal CPU containers, 2 cores / 4 GiB). Everything else as the erosion protocol
+  (ORACLE0-toy warm start, `--wire-init-scale 0.06`, cost 0.45, PS 1.99 annealed to 0 over 1,000-1,500).
+  * **T1 (credit B on the reliance bar):** wd 3e-4 on the message head from 1,500, 2,000 updates. Wire-on seeds
+    120-124, wire-off 125/126. **Pass:** reliance at 2,000 in >= 4 of 5 wire-on, **and** wire-off MI < 0.5 at 2,000
+    in both. Reliance = empirical-swap deposit drop >= 30%, paired drop > 2 SE, listener deposits (50 updates
+    before) >= the wire-off mean over the same window. Secondary: MI >= 0.5.
+  * **T2 (generational turnover):** no decay, no credit fix, 3,000 updates. **Resets at 1,750 / 2,000 / 2,250 /
+    2,500 / 2,750**, alternating sender / listener / sender / listener / sender:
+    - **sender reset** = the message head (`gwt_comms_1` + `head_signal_slot*`) re-initialised from a fresh init;
+      the codebooks are kept;
+    - **listener reset** = the wire-input rows of `enc_0`, re-initialised at the same 0.06 scale;
+    - Adam moments are zeroed for the reset parameters.
+    Wire-on seeds 130-132, wire-off 133/134. Eval (10 empirical swap pairs + MI) at 1,500 and just before every
+    reset, plus at 3,000. **Code continuity** at an eval point = mean over slots of the accuracy of decoding the
+    current tokens (updates u-9..u) to fires with the per-slot token -> fire map recorded at the previous eval point,
+    i.e. across the reset in between. Chance 25%; tokens unseen in the old map count as misses.
+  * **T3 (turnover + newborn imitation; approved by M as a permanent part of the agents):** as T2. After each
+    **sender** reset, the new head first trains by supervised cross-entropy on (obs, token) pairs from the previous
+    head's last 50 updates: 500 Adam steps, lr 1e-3, minibatch 512, only the message head moves. Then it learns
+    normally. Wire-on seeds 140-142, wire-off 143/144.
+  * **T2 / T3 pass (Cam: "reliance and continuity >= 0.8 before each of the last 3 resets in >= 2 of 3 seeds"),
+    operationalised:** at 2,250, 2,500 and 2,750, all three must hold:
+    - reliance (the bar above);
+    - **reliance retention >= 0.8**, i.e. drop(u) / drop(1,500), because an absolute deposit drop of 0.8 is above
+      what even the peak toy channel reached (0.67-0.76);
+    - **continuity >= 0.8**.
+    The arm passes if >= 2 of 3 wire-on seeds do. *Interpretation flagged to Cam: "reliance >= 0.8" is read as
+    retention plus the absolute rung-3 bar.*
+  * **Manipulation check:** wire-off MI < 0.5 at 2,000 (after the first sender reset) in both wire-off seeds. This
+    is a gate for T2. **For T3 it is reported but not a gate, registered in advance:** newborn imitation passes the
+    code on whether or not anyone listens, so a maintained wire-off code is the expected effect of copying, not an
+    artifact. T3 is read against T2 on the wire-on bar.
+  * **Spend:** within the $10 toy/CPU allowance (~$3.6 used before; estimate ~$4.7 for the 17 runs).
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under

@@ -11,7 +11,7 @@ import modal
 
 _REQUIREMENTS = str(Path(__file__).resolve().parents[1] / "requirements.txt")
 
-PINNED_SHA = "14fd2c7b0d352f7f6dd60503fa37499e3bc3880b"  # comm-toy branch
+PINNED_SHA = "69ad45ef23935d25d8767bf592e6a8832eaa5ac0"  # comm-toy branch
 REPO_URL = "https://github.com/overlordxrz-source/throng.git"
 VOLUME_NAME = "throng-runs"
 VOLUME_MOUNT = "/mnt/throng-runs"
@@ -60,6 +60,16 @@ _ERO_JOBS = ([(f"erosion_on_s{s}", ["--arm", "COMM", "--seed", str(s), *_ERO, "-
 PLANS: dict = {
     # registered erosion test (2026-11-08): probe one container first (Cam: fan out only if < $0.01/min/container)
     "erosion_probe": _ERO_JOBS[:1],
+    # registered T1 / T2 / T3 (2026-11-08)
+    "tbatch": ([(f"t1_{w}_s{s}", ["--arm", arm, "--seed", str(s), *_ERO, "--credit", "B", "--tag", f"T1_{w.upper()}"])
+                for w, arm, ss in (("on", "COMM", range(120, 125)), ("off", "NOSIG", (125, 126))) for s in ss]
+               + [(f"{t.lower()}_{w}_s{s}", ["--arm", arm, "--seed", str(s), "--updates", "3000", "--warm-start", _W,
+                                             "--wire-init-scale", "0.06", "--craft-cost", "0.45", "--ps", "1.99",
+                                             "--ps-anneal", "1000", "1500", "--reset-from", "1750", "--reset-every", "250",
+                                             "--reset-until", "2750", "--eval-at", "1500", "1750", "2000", "2250", "2500",
+                                             "2750", *(["--imitate"] if t == "T3" else []), "--tag", f"{t}_{w.upper()}"])
+                  for t, base in (("T2", 130), ("T3", 140))
+                  for w, arm, ss in (("on", "COMM", (0, 1, 2)), ("off", "NOSIG", (3, 4))) for s in [base + i for i in ss]]),
     # registered credit fixes under the erosion protocol (2026-11-08): wire-on x3 + wire-off x2 per fix, fresh seeds
     "credit": [(f"credit_{fx}_{w}_s{s}", ["--arm", arm, "--seed", str(s), *_ERO, "--credit", fx,
                                           "--tag", f"CREDIT_{fx}_{w.upper()}"])
