@@ -20,15 +20,20 @@ with the nudge annealed away, does the code keep itself alive?
   - The same role self-test and mutants as the toy.
 - **c_ps** by the toy's registered rule (0.25 x ||grad PPO|| / ||grad PS|| at ORACLE0, 4 minibatches). It is
   computed free on CPU before registration.
-- **Craft cost stays 0.1.** That makes the final run's COMM0/1 and NOSIG0 (same settings, 120 updates) direct
-  baselines, so PS is the only difference. The toy used 0.45; neither value closes blind search.
+- **Craft cost 0.1 (deviation from Cam's 0.45; needs his approval).** It makes the final run's COMM0/1 and
+  NOSIG0 direct baselines, so PS is the only difference. The toy used 0.45; neither value closes blind search.
+  Keeping 0.45 instead means a fresh NOSIG control is needed.
 - **Primaries (as the toy, both swap modes logged):**
   - P1: reliance. Deposits drop >= 30% under the empirical swap, paired > 2 SE, and PS listeners >= the NOSIG
     level.
   - P2: meaning. Delta >= 0.05.
-  - Redirection (crafts at the swapped hearth) is a co-reported secondary, because the movement score misread 2
-    of 8 toy seeds that did redirect.
-  - P3 (anneal arm): MI >= 1.0 bit and P1, after the nudge has been off for a quarter of the run.
+  - **Proposed for Cam: redirection (crafts at the swapped hearth) as the meaning primary, movement reported
+    alongside.** The movement score misread 2 of 8 toy seeds that clearly redirected. With two paid seeds, the
+    chance that both pass on movement even when meaning is present is ~0.75^2 = 56%.
+  - **No plain anneal arm.** The toy's wire-off control showed the code persists without any listener
+    (inertia), so a plain anneal arm would test nothing worth paying for. A self-maintenance test needs a force
+    that erodes unused codes: design it in the toy first (free), and fund it on the real network only if it
+    separates wire-on from wire-off there.
 - **Halts:**
   - Replace the token-entropy floor with an **MI floor**: sender MI, mean over slots, >= 0.5 bit by update 20.
     The floor is set from a free local CPU smoke before registering. PS lowers entropy by design, so the old
@@ -53,7 +58,8 @@ The toy says listener competence takes time:
 
 - Exact-equivalence tests against the current Python world come first:
   - obs builder: same state -> identical obs
-  - dynamics: same actions -> identical positions, deposits, re-rolls, rewards
+  - dynamics: same actions **and the same injected random draws** (re-roll and respawn use numpy's RNG today)
+    -> identical positions, deposits, re-rolls, rewards
   - swap apparatus: unchanged check
 - Then one timing run (~$0.10) on the new account.
 - The toy's jitted rollout runs ~0.2 s per update on a laptop CPU, so a 10x+ speed-up on GPU is plausible but
@@ -62,9 +68,9 @@ The toy says listener competence takes time:
 
 | plan | runs (updates) | est. cost | fits $12? |
 |---|---|---|---|
-| **With the scan port (if ~10x)** | PS x3, PS-anneal x2, NOSIG x1 (500 each) | ~$4-5 + timing | yes, with margin |
-| Without the port, A | PS x2 (300), reuse final-run NOSIG0 as the control | ~$8.5 + 30% margin | yes; anneal untested; may be too short |
-| Without the port, B | PS x2 + PS-anneal x1 (500) | ~$21 | no (would need the reserve) |
+| **With the scan port (if ~10x)** | PS x3, NOSIG x1 (500 each), + a self-maintenance arm if the toy designs one | ~$3-5 + timing | yes, with margin |
+| Without the port, A | PS x2 (300), reuse final-run NOSIG0 as the control | ~$8.5 + 30% margin | yes; anneal untested; may be too short; NOSIG0 ran only 120 updates, so the comparison favours PS |
+| Without the port, B | PS x2 + NOSIG x1 (500) | ~$21 | no (would need the reserve) |
 
 The estimates include a 30% margin: the last estimate ($3.7) came in at $4.8.
 

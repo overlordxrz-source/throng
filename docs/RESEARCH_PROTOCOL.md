@@ -1643,8 +1643,19 @@ more expensive, because it produces publishable-looking nulls.
     bits. Between 1,000 and 2,000 listener deposits kept rising (PS 2.3-6.9 -> 7.5-8.7).
   * Known limit, logged: blind search still pays at 0.45 (NOSIG break-even 0.25 / 0.69 / 0.66).
   * **Reading (scope).** PS makes the code informative by design, and that part is not a finding. The emergent and
-    replicated part: listeners came to depend on the code and to act on its meaning, in 5/5 fresh seeds. The
-    shared reward then kept the code alive with the nudge removed (3/3). This is the CPU toy, not the real network.
+    replicated part: listeners came to depend on the code and to act on its meaning, in 5/5 fresh seeds. With the
+    nudge removed, **the code persisted (3/3, MEASURED)**. That the shared reward *maintains* it through listener use
+    is CONJECTURED: sender token entropy ended at 0.00-0.14 (tau 0.08), and a saturated policy gets almost no
+    gradient, so it could persist from inertia alone. A wire-off control tests this (below). This is the CPU toy,
+    not the real network.
+  * **Exploratory control (not registered; `comm-toy` `bfedcf2`): PS-anneal with the wire OFF** (NOSIG arm, same
+    schedule, seeds 40-42). MI at update 1,000 -> 2,000: 2.000 -> 1.970, 1.997 -> 1.995, 2.000 -> 2.000. The
+    wire-on PSA seeds went 1.985 -> 1.991, 1.979 -> 1.941, 1.986 -> 1.999. **The code persists just as well with no
+    listener**, even though those senders' token entropy stayed ~2.2 rather than saturating. So in this toy nothing
+    erodes an unused code within 500 updates: **P3, as registered, measured inertia, not self-maintenance.** The
+    "self-sustaining" question stays open. A test that can tell use from inertia needs a force that erodes unused
+    codes, e.g. a perturbation after the anneal, or a token-entropy pressure under which the wire-off code decays.
+    The question is whether the wire-on code resists it.
   * **Decision per the registration:** P1 and P2 pass -> draft the real-network PS confirmation for M; P3 passed ->
     it includes an anneal arm. Draft: `docs/drafts/2026-11-07_real_network_PS_confirmation_DRAFT.md`. Nothing
     launches until it is approved.
