@@ -2559,6 +2559,23 @@ more expensive, because it produces publishable-looking nulls.
   input on all 6 neighbour slots = **0.000000**. The one-live-dim mutant gives 1.0 (caught); the normal pathway
   changes 97.6% of tokens. The gradient tests still pass (12/12).
 
+- **RESULTS -- build-order step 2, channel A/B (2026-11-08): VQ STAYS.** Registered script,
+  `docs/data/toy_step2_2026-11-08_analysis.txt`, data `comm-toy` `3723769` (all 12 runs complete; wire-blind head in
+  both arms).
+  * **S2_VQ:** reliance **5/5** (drop +71 / +71 / +71 / +67 / +91%; listener deliveries 6.8-9.5 vs NOSIG 3.1);
+    redirection 5/5; MI 1.98-2.00; MI > 1 bit by update 8-9. **Rung 2 replicates again, now with the wire-blind
+    head.**
+  * **S2_SYM** (3 x 8 symbols): reliance **1/5**. Drops of +69 / +60 / +57 / +65% in four seeds and redirection 4/5:
+    listeners do depend on the symbols. But their deliveries are 6.9 / 2.3 / 2.2 / 0.4 / 1.2, **below** the NOSIG
+    level in four seeds. Seed 198 never formed a usable code (drop 0%, MI 1.33, message entropy 3.9). MI 1.33-1.99;
+    MI > 1 bit by update 10-11. Mean drop +50% vs VQ's +74% (-0.10 margin not met).
+  * **Reading:** in this toy, 3 x 8 one-hot symbols chosen as actions do not match the learned VQ wire: listeners
+    rely on symbols but deliver less with them than with no channel. CONJECTURED (not tested): the fixed, low-norm
+    one-hot inputs are harder for the listener to decode than learned codewords, or the symbol-policy temperature
+    (tau / 0.6) is mis-sized. Per the ruling, **step 6 follows on the winning channel (VQ)**. Note for Cam: with 64
+    codes per VQ slot, 16 (fire x material) meanings do **not** outnumber one slot's codes, which the step-6 design
+    requires.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
