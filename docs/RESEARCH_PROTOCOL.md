@@ -1941,6 +1941,21 @@ more expensive, because it produces publishable-looking nulls.
     would raise the SNR rather than the share. The wire-on code started decaying ~80 updates later than wire-off
     (a hint of protection, n = 1) but ended lower (0.09 vs 0.34 bit).
 
+- **Cam's rulings (2026-11-08, smoke and diagnostic).** (1) His N rule measured the sender's code (built by PS by
+  update 5), not listener use. (2) **Confirmation:** PS x2 on fresh seeds, N_max = 450, A10G, guard $15; swap
+  probes every 50 updates. **Primary:** the draft's redirection bar on the mean of the probes at 350/400/450, in
+  both seeds (averaging because of the crash-and-recover cycles). **Halts:** update-2 apparatus; MI at K = 5 >=
+  0.92 bit; MI under the floor at two probes in a row. No futility stop on redirection. Reported: sender-delivery
+  crashes, listener deliveries and reliance at every probe. NOSIG moves to the replication stage (fresh,
+  matched); the primary is within-run, so "matched NOSIG now" is withdrawn. (3) Diagnostic accepted with the slip
+  disclosed; reading: **the message-head credit is noise-dominated, not too small and not anti-restoring.**
+  (4) **Credit fixes in the toy** (registered first, Modal CPU, in parallel). A: a separate value head V_shared(s)
+  on the shared reward, with the token's advantage from that stream only (movement keeps the full advantage).
+  B: a message-conditioned critic Q_shared(s, m) with the COMA counterfactual advantage. Same erosion protocol
+  (wd 3e-4), fresh seeds, wire-on x3 + wire-off x2 per fix. Pass = the erosion pass on wire-on while wire-off
+  still erodes; a maintained wire-off is an artifact (= fail of that fix). Gradient tests and mutants for both
+  heads before any run. (5) **Toy/CPU allowance raised to $6 total.**
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
