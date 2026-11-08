@@ -2459,6 +2459,30 @@ more expensive, because it produces publishable-looking nulls.
       no restoring direction.
     - *Cam's (~55%):* C1-T3 passes its reading; C1-E still fails the rung-3 bar.
 
+- **RESULTS -- free checks (2026-11-08 evening).**
+  * **Seed-50 post-mortem** (saved confirmation logs):
+    - **The 250-300 fade starts with the listener, not the sender.** Sender MI stays 1.995-1.998 bits through every
+      window, and so does the PS term (4.13 nats). Reliance fell from +16% (probe 200) to -2% (probe 250). Seed 50's
+      listener per-attempt correctness never rose (0.12-0.15); seed 51's rose 0.17 -> 0.32.
+    - **The crash (onset update 341; sender deliveries 21 -> 4 within 6 updates)** was preceded by rising
+      **policy entropy** (window means 1.65 at 301-325, 1.87 at 326-350; 2.19 at 342) and a slight EV dip
+      (1.000 -> 0.99). Token entropy and MI were unchanged.
+    - **Not answerable from the logs:** the PS loss's share of the gradient, grad norm, KL, clip fraction and value
+      loss were never written to the real-testbed records (`ppo_update` computes most of them; they were not
+      emitted). Adding them is a free change before any replication.
+  * **Step A's random-heard-input test on the real network** (`comm-jit` `--coupling-test`, one rollout, 4,096
+    sender rows). Only *final* checkpoints were saved for the confirmation, so there is no seed-50 checkpoint near
+    update 200; both finals were used. Replacing the sender's heard wire with random tokens changes its own token
+    argmax in **97.6% (seed 51) and 94.6% (seed 50) of slots** (TV 0.98 / 0.95); zeroing it changes 99.7%. At the
+    ORACLE0 warm start: 16.7% (TV 0.021). **On the real network, the trained sender code is almost entirely a
+    function of (fire, what the partner just said)**, including in seed 51, whose channel works. The forward
+    coupling exists, and is learned, on the real network too.
+  * **Step 3's world** (saved PROX params at 2,000, 4 rollouts each, 3,700-5,100 delivered fire periods per seed):
+    **96-98% of deliveries are by the agent that became informed first**, with a **median of 1 step** from becoming
+    informed to delivering (seeing the fire at radius 2 means already being at it; the delivery radius is 1).
+    Partners deliver 2-4% of the time and find the fire on their own beforehand in 6-13% of periods. **The world
+    gives almost no reason to listen**, so per Cam's rule the redesign is the world, not the agents.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
