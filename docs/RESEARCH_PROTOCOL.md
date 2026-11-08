@@ -2143,6 +2143,34 @@ more expensive, because it produces publishable-looking nulls.
     (a known weak spot of COMA-style baselines when coverage is narrow). A test: the same arm with forced
     exploration of off-code tokens (or a critic trained with token dropout), with the wire-off control.
 
+- **Cam's ruling (2026-11-08, T4).** T4a / T4b FAIL accepted; T4b's wire-on result is not evidence for rung 3 (the
+  wire-off control kept its code). Two hypotheses: **H1 entrenchment** (counterfactual Q for never-sent tokens is
+  extrapolated low, so the advantage always favours the token in use) and **H2 slow decay** (central critics remove
+  gradient noise that helped erode codes, so wd 3e-4 is too weak; T4a's wire-off 0.83 fits H2). Free check on saved
+  T4b outputs first; then T5a (forced off-code exploration, if H1), T5b (wd recalibrated on wire-off, if H2), or
+  both. Relabel-only token dropout is ruled out. Bar unchanged. T5 cap $3 inside the $15 toy allowance, with a
+  price probe. Build-order steps 2, 3 and 6 use the local critic (they test code formation, not survival); their
+  registrations go to Cam with prices and do not wait for T5. T1-T3 are analysed first.
+- **RESULTS -- T1 and T2 (2026-11-08), registered script (amended pre-data), `docs/data/toy_t1_t2_2026-11-08_analysis.txt`,
+  data `comm-toy` `63ada8d`.**
+  * **T1 (credit B on the reliance bar): FAIL.** Wire-on reliance at 2,000 is 0/5 (drops +9 / +3 / +6 / +4 / +53%;
+    listener deposits 1.4-2.9, all below the NOSIG level 3.3). Wire-off MI 0.518 / 0.410: seed 125 is just above
+    0.5. B's earlier partial channel (seed 110) does not replicate.
+  * **T2 (generational turnover): FAIL (0/3); the manipulation check holds** (wire-off MI 0.09 / 0.08 at 2,000).
+    After the first sender reset (1,750) the wire-on code is gone too (MI <= 0.2 from 2,000 on) and never re-forms
+    within the 250-update windows. Without the nudge, a fresh message head does not rebuild a code through use.
+    Continuity therefore alternates between 0.00 and about chance (0.23-0.31). Retention (secondary) 0.00-0.45.
+- **T4 free check (Cam's item 3), partial.** (a) **wire-off MI trajectory**, 10-update means, 1,500 -> 2,000:
+  * T4b s163: 1.99 -> 1.31 by 1,600, then flat at 1.26-1.45 (slope over 1,901-2,000: +0.07 bit / 100 updates).
+  * T4b s164: 2.00 -> 0.53 by 1,700, then 0.73-0.81 (+0.01).
+  * For comparison, T4a s153 / s154: still falling at -0.32 / -0.33 bit / 100.
+  So **T4b's wire-off codes stopped decaying partway rather than still falling** (against H2 for T4b); T4a's fit
+  H2. **(b) and (c) cannot be computed from the saved outputs:** the T4 runs saved neither the actor nor the
+  critic parameters, and no Q values or message advantages were logged. Per the ruling ("anything else: report it
+  and don't launch") nothing was launched. The runs are deterministic (the B s111 restart reproduced exactly), so
+  a bit-identical regeneration of the T4b seeds with parameters saved at 1,500 and 2,000 (~$0.8) would give the
+  exact states; that needs Cam's OK.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
