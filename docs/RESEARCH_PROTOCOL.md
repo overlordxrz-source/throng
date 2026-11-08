@@ -2483,6 +2483,31 @@ more expensive, because it produces publishable-looking nulls.
     Partners deliver 2-4% of the time and find the fire on their own beforehand in 6-13% of periods. **The world
     gives almost no reason to listen**, so per Cam's rule the redesign is the world, not the agents.
 
+- **RESULTS -- C1, the wire-blind message head (2026-11-08): formation gate PASS (3/3 both protocols); C1-T3
+  coupling CONFIRMED as the destabiliser (3/3); C1-E PASS -- the first pass of the rung-3 bar.** Registered script,
+  `docs/data/toy_c1_2026-11-08_analysis.txt`, data `comm-toy` `09d16e4`. *Disclosed:* seed 180's container (the probe)
+  restarted once; the final complete attempt was used (raw file kept). ~$2 Modal CPU.
+  * **Formation (1,500):** C1-T3 drops +65 / +67 / +73%, listener deposits 5.1 / 7.9 / 9.3 vs NOSIG 2.3. C1-E +69 /
+    +73 / +65%, 5.7 / 7.1 / 6.5 vs 2.1. MI 1.98-2.00. **A wire-blind head forms the code as well as the normal one.**
+  * **C1-T3:** continuity across the first sender reset **0.868 / 0.957 / 0.853** (T3 with the normal head: 0.07 -
+    0.17). Exact-triple copy accuracy post-imitation -> 2,000: 0.781 -> 0.500, 0.492 -> 0.417, 0.384 -> 0.309 (all
+    >= half; T3: -> 0.000). Wire-off continuity 0.957 / 0.961. **Removing the forward coupling lets a copied code
+    survive the reset.**
+  * **C1-E (rung-3 bar):** wire-on reliance at 2,000 **+39%** (paired 2.03, SE 0.08; deliveries 5.27 vs NOSIG 2.50),
+    **+73%** (3.81, SE 0.07; 5.48), +17% (fails); **wire-off MI 0.001 / 0.022** (eroded). **PASS (2/3, wire-off
+    erodes).** With the coupling removed, listener use kept the channel alive through erosion while the unused
+    code died. Secondary: wire-on MI at 2,000 is 0.18 / 0.41 / 0.03 (below 0.5). The code got sparser but stayed
+    relied on.
+  * **Predictions:** C1-T3 passes (mine ~60%, Cam's ~55%) -- right. C1-E fails (mine ~65%, Cam's) -- **wrong.**
+  * **Not registered, reported:** in C1-T3, reliance at 2,000 is -4% / -15% / +2% despite continuity 0.85-0.96.
+    The sender kept its mapping across the reset, but listeners were not relying on it at that checkpoint. Not
+    explained yet.
+  * **Reading:** the live wire's forward coupling (the message head reading the heard wire) is the active
+    destabiliser behind T3's lost copies, and plausibly behind the erosion failures and the real network's
+    collapse (step A on the real net: 95-98% token dependence on the heard wire). Rung 3 passes in the toy with a
+    wire-blind head. This is the toy only; nothing is called a result before a replication. Per the ruling, step
+    2 now launches with the wire-blind head in both arms.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
