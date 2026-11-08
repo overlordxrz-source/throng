@@ -2508,6 +2508,26 @@ more expensive, because it produces publishable-looking nulls.
     wire-blind head. This is the toy only; nothing is called a result before a replication. Per the ruling, step
     2 now launches with the wire-blind head in both arms.
 
+- **Cam's rulings (2026-11-08, free checks).**
+  1. All three accepted. Approved (free): add the PS loss's gradient share, grad norm, KL, clip fraction and value
+     loss to the real testbed's logs, with the default path bit-identical. **Every future paid run saves a
+     checkpoint every 50 updates.**
+  2. The real-net coupling (95-98% vs 17% at ORACLE0) means the toy's suspect exists there too, and stronger. The
+     replication waits for C1. If C1-T3 confirms the coupling (**it did, 3/3**), the replication gets a wire-blind
+     message pathway (with its apparatus check) against the current pathway; Cam registers it.
+  3. Seed 50 noted (the fade began with listeners who never learned to decode; the crash followed rising action
+     entropy). No ruling until the new logs exist.
+  4. **Step 3b, a redesign of the world:** a **lookout** -- a cell or small area far from all 4 fires. Whoever
+     stands there sees which fire is lit; nobody else does, and no roles are assigned. The lookout-to-fire distance
+     and the fire's lit duration are set (by a free calculation from movement speed) so that walking there yourself
+     loses to telling a nearer partner. A value-of-information check comes first: LOOKOUT-ORACLE (the agent not at
+     the lookout is fed the lit fire) vs NOSIG must give >= 1.5x deliveries; if not, retune the distances, not the
+     agents. Arms: LOOKOUT x5, NOSIG x2, ASSIGNED x3 in the same world. Pass: redirection in >= 4 of 5 LOOKOUT at
+     >= 0.5x the assigned mean. Report, don't gate, the share of time at the lookout. Priced with the draft; it waits
+     for M's top-up if it doesn't fit after C1, step 2 and step 6.
+  5. Rejected: making the informed agent unable to deliver (a role by rule; the lookout puts the pressure in the
+     geography instead).
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
