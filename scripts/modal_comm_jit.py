@@ -13,7 +13,7 @@ import modal
 
 _REQUIREMENTS = str(Path(__file__).resolve().parents[1] / "requirements.txt")
 
-PINNED_SHA = "326c8cb3f366c49b24be97dffbb2c419f2a525d0"  # comm-jit branch
+PINNED_SHA = "c242635a067672a937beef1c922da94fb5fee2d1"  # comm-jit branch
 REPO_URL = "https://github.com/overlordxrz-source/throng.git"
 VOLUME_NAME = "throng-runs"
 VOLUME_MOUNT = "/mnt/throng-runs"
@@ -122,6 +122,25 @@ CONFIRM = [(f"confirm_PS{s}", ["--arm", "COMM", "--seed", str(s), "--updates", "
 @app.local_entrypoint()
 def confirm():
     for (tag, _), recs in zip(CONFIRM, run_a10.starmap(CONFIRM)):
+        print(f"[{tag}] {len(recs)} records", flush=True)
+
+
+# Real-net replication (Cam, 2026-11-08 night; shrunk to fit this account): the confirmation's recipe exactly, plus the
+# wire-blind message pathway, --log-diag and checkpoints every 50 updates; fresh seeds 52 / 53; price probe = rep_PS52 alone.
+REPLICATE = [(f"rep_PS{s}", ["--arm", "COMM", "--seed", str(s), "--updates", "450", "--tau", "0.08", "--craft-cost", "0.1",
+                             "--warm-start", "{VOL}/testbed/params/comm_ORACLE0_run_b88fe7f_a2.msgpack", "--ps", "2.015",
+                             "--apparatus-update", "2", "--mi-halt-k", "5", "--mi-floor", "0.92", "--mi-probe-halt",
+                             "--eval-at", *[str(u) for u in range(50, 450, 50)], "--swap-pairs", "10",
+                             "--swap-modes", "empirical", "--wire-blind", "1", "--log-diag", "--ckpt-every", "50",
+                             "--ckpt-prefix", f"{{VOL}}/testbed/comm_jit/ckpt/rep_PS{s}",
+                             "--save-params", f"{{VOL}}/testbed/params/rep_PS{s}.msgpack"])
+             for s in (52, 53)]
+
+
+@app.local_entrypoint()
+def replicate(only: str = ""):
+    jobs = [j for j in REPLICATE if not only or j[0] in only.split(",")]
+    for (tag, _), recs in zip(jobs, run_a10.starmap(jobs)):
         print(f"[{tag}] {len(recs)} records", flush=True)
 
 

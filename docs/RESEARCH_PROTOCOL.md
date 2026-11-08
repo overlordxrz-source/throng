@@ -2745,6 +2745,62 @@ more expensive, because it produces publishable-looking nulls.
   - **Caveat:** the triples are diverse (363-4,076 distinct triples, modal-triple purity often < 1%) while each slot
     is nearly pure. The words are per-slot tokens, and the three slots are redundant copies, not a composition.
 
+- **REGISTRATIONS -- this account's remaining runs (before any launch; Cam's night rulings). Launch waits for the
+  verified remaining credit.**
+  - **Code:**
+    - `comm-toy` `1f8e51d` (launcher PINNED_SHA); `comm-jit` `c242635` (jit launcher PINNED_SHA; plan `replicate`).
+    - Default toy path re-verified bit-identical to PS0 after the speak-test and lookout additions (30 updates,
+      common keys).
+  1. **C1-E replication (item 4), plan `c1rep`.**
+     - Wire-blind head, erosion protocol exactly as C1-E. Fresh seeds: wire-on 230-234, wire-off 235 / 236.
+       2,000 updates.
+     - Analysis `scripts/analyze_c1rep.py`, registered: reliance as C1. **PASS = reliance at 2,000 in >= 3 of 5
+       AND pooled drop >= 30%** (1 - sum swap / sum control over all 50 wire-on empirical pairs) **AND wire-off MI
+       < 0.5 in both.** Redirection reported.
+     - **Each run also saves a full-state snapshot at 2,000** (`testbed/toy/snap/c1rep_*_u2000.pkl`). If Cam
+       approves extending to 3,000, the continuation resumes from the real state.
+       - Checked locally: snapshot at 25 + resume to 40 reproduces a straight 40-update run bit for bit, training
+         rows and final swap probe, under erosion + wire-blind.
+       - The registered 2,000 readout is unaffected (the snapshot consumes no RNG).
+     - Price ~$0.6-1.4 (step 6 metered ~$0.045 / 1,000 updates; C1's estimate was ~$0.1).
+     - **My prediction:** given C1-E's decay (item 2), reliance at 2,000 passes in 3 of 5 (~45%) and the replication
+       fails on the count (~55%). The pooled drop >= 30% is likely (~65%).
+  2. **Step 3b value-of-information check (item 6), plan `s3b_voi`.**
+     - World: G 24, fires at (3,3) (3,9) (9,3) (9,9), lookout Chebyshev 1 around (18,18), reroll 10, warm start
+       ORACLE0, PS off, wire off in both arms.
+     - LOOKOUT-ORACLE (`--lookout-oracle`: an agent is informed while it **or its partner** stands at the lookout)
+       s220 / s221 vs NOSIG (informed only while standing there itself) s222 / s223. 2,000 updates.
+     - **Apparatus** (`--selftest-lookout`): PASS for both arms. Geometry: lookout -> every fire 16 steps, cluster
+       centre (6,6) -> every fire 4. The informed bit and the need dims are nonzero exactly where the predicate,
+       recomputed from positions, says. The everyone-at-the-lookout mutant FAILS in both arms.
+     - Analysis `scripts/analyze_step3b_voi.py`. Deliveries by either agent per world, mean over 1,801-2,000.
+       **QUALIFIES iff ORACLE >= 1.5x NOSIG AND every ORACLE seed > every NOSIG seed AND ORACLE >= 0.5 per world.**
+       - The last two conditions are **my additions; Cam can strike them.**
+       - Why the floor: in a 20-update local smoke, both arms deliver ~0 per world, and the warm-start policy stands
+         at the lookout in <= 0.1% of agent-steps. If neither arm learns the world, a 1.5x ratio of two near-zeros
+         means nothing.
+     - Occupancy reported (agent-steps at the lookout; world-steps with either agent there). Price ~$0.4-0.8.
+     - **My prediction:** does not qualify at 2,000 (~60%). Discovering the lookout and holding a lookout / runner
+       division of labour from a 0.1% start is a hard exploration problem. NOSIG stays near blind search.
+  3. **Real-net replication, shrunk (Cam's message 2), plan `replicate`.**
+     - The confirmation's recipe exactly (450 updates, tau 0.08, craft cost 0.1, c_ps 2.015, ORACLE0 warm start,
+       apparatus check at 2, MI halt K = 5 / floor 0.92 / two-probe halt, empirical-swap probes every 50 x 10
+       pairs), **plus the wire-blind message pathway (`--wire-blind 1`, apparatus PASS earlier), `--log-diag`, and
+       `--ckpt-every 50`** (params to `testbed/comm_jit/ckpt/`).
+     - Fresh seeds 52 / 53.
+     - Primary and analysis unchanged: `scripts/analyze_confirm.py` (redirection on probes 350 / 400 / 450,
+       swap >= 2x control and paired > 2 SE). **PASS = primary in 2 of 2; 1 of 2 = partial** (the third seed and
+       NOSIG on the next account; historical NOSIG reference 4.26).
+     - **Price:** the confirmation's runs took 4.4 h of training each on an A10G ($1.10/h), so ~$5.5-6 per run and
+       ~$11-12.5 for two, against the $13 cap. Price probe: `rep_PS52` alone for ~15 min, projected from its meter
+       and t_update; `rep_PS53` launches only if the projection for both is <= $13.
+     - Spend guard on the jit app at baseline + $13.
+     - **My prediction:** primary 1 of 2 (~45%), 2 of 2 (~35%), 0 of 2 (~20%). Wire-blind removes the coupling but
+       not the sender crash seen in seed 50.
+  - **Budget arithmetic.** Metered $24.78 now, + toy (1 + 2) ~$1.0-2.2, + real net <= $13 = **~$38.8-40.0**, plus
+    item 3 if approved (~$0.4-1.4). That leaves < $1-2 of slack under $41. The real limit is still unverified, so
+    the guard stays where it is until it is.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under

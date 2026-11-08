@@ -11,7 +11,7 @@ import modal
 
 _REQUIREMENTS = str(Path(__file__).resolve().parents[1] / "requirements.txt")
 
-PINNED_SHA = "e48e98f9abdc6c790e6afd69812aba77a76db63c"  # comm-toy branch
+PINNED_SHA = "1f8e51d25f8fdfdd2e0c243a38a4b48c2832a350"  # comm-toy branch
 REPO_URL = "https://github.com/overlordxrz-source/throng.git"
 VOLUME_NAME = "throng-runs"
 VOLUME_MOUNT = "/mnt/throng-runs"
@@ -87,6 +87,16 @@ PLANS: dict = {
               for tag, arm, extra, ss in (("S2_VQ", "COMM", [], range(190, 195)),
                                           ("S2_SYM", "COMM", ["--channel", "sym"], range(195, 200)),
                                           ("S2_NOSIG", "NOSIG", [], (200, 201))) for s in ss],
+    # C1-E replication (Cam item 4, 2026-11-08 night): fresh seeds; full-state snapshot at 2,000 so that a continuation (if
+    # Cam approves) resumes faithfully instead of regenerating (C1 saved actor params only)
+    "c1rep": [(f"c1rep_{w}_s{s}", ["--arm", arm, "--seed", str(s), *_ERO, "--wire-blind", "1", "--snapshot-at", "2000",
+                                   "--snapshot-path", f"{{VOL}}/testbed/toy/snap/c1rep_{w}_s{s}_u2000.pkl", "--tag", f"C1REP_{w.upper()}"])
+              for w, arm, ss in (("on", "COMM", range(230, 235)), ("off", "NOSIG", (235, 236))) for s in ss],
+    # step 3b value-of-information check (Cam item 6, 2026-11-08 night): lookout world, PS off, wire off in both arms
+    "s3b_voi": [(f"s3b_{w}_s{s}", ["--arm", "NOSIG", "--seed", str(s), "--updates", "2000", "--warm-start", _W, "--craft-cost", "0.45",
+                                  "--grid", "24", "--hearths", "3,3;3,9;9,3;9,9", "--lookout", "18,18,1", "--reroll", "10", *extra,
+                                  "--tag", f"S3B_{w.upper()}"])
+                for w, extra, ss in (("oracle", ["--lookout-oracle"], (220, 221)), ("nosig", [], (222, 223))) for s in ss],
     # C1 (2026-11-08): wire-blind message head from the start; T3 protocol (to 2,000) and erosion protocol
     "c1": ([(f"c1t3_{w}_s{s}", ["--arm", arm, "--seed", str(s), "--updates", "2000", *_T3, "--wire-blind", "1", "--tag", f"C1T3_{w.upper()}"])
             for w, arm, ss in (("on", "COMM", (180, 181, 182)), ("off", "NOSIG", (183, 184))) for s in ss]
