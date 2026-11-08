@@ -1790,6 +1790,21 @@ more expensive, because it produces publishable-looking nulls.
   * **Spend:** within the $4 toy/CPU allowance (~$0.9 spent). Probe one container for >= 2 min and fan out only if
     it costs < $0.01/min (list estimate for 2 cores / 4 GiB: ~$0.002/min).
 
+- **Speed option 1 (scanned PPO update) -- on hold for Cam's bar definition (not run on GPU).** A dev check on the
+  laptop (CPU, 2 worlds, PS on) gave identical minibatch order but a **max per-leaf relative parameter
+  difference of 9.7e-4** (> 1e-5). Diagnosis: the largest absolute difference anywhere is 2.9e-6 (~1% of one lr
+  step), in the attention key biases. Those biases get exactly zero true gradient (a constant added to every key
+  leaves the softmax unchanged), so they receive only float noise, which Adam's first step amplifies to about ±lr.
+  Their values are tiny, so the per-leaf ratio inflates. Relative to the whole parameter vector the difference is
+  ~3e-6. Cam's bar does not say per-leaf or global; choosing the passing definition after seeing this would be
+  post hoc, so it goes to Cam. Per his rule the confirmation path runs at current speed.
+- **c_ps for the real network = 2.015** (registered rule: 0.25 x |grad PPO| / |grad PS| at ORACLE0, 4 minibatches of
+  one COMM rollout, seed 0; ratios 6.61 / 8.86 / 8.86 / 7.92). Laptop, 8.8 min.
+- **Smoke (Cam ruling 4), launched:** `comm-jit` `0a82f1e`, Modal GPU, PS arm (c_ps 2.015), seeds 20 / 21 (the
+  confirmation will not use them), 120 updates each, loop PPO path, update-2 apparatus halt, per-update MI with a
+  block-permutation null (p95). K, the floor and N are derived from it by Cam's rule and registered before the
+  paid launch. Spend guard: the smoke's  on top of the toy allowance.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under

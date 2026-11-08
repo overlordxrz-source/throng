@@ -13,7 +13,7 @@ import modal
 
 _REQUIREMENTS = str(Path(__file__).resolve().parents[1] / "requirements.txt")
 
-PINNED_SHA = "1d3b951af97962079d48b2f1f3d8e0388fa3bed6"  # comm-jit branch
+PINNED_SHA = "0a82f1e89d86a5cc68c17e70fa97da0c3983921e"  # comm-jit branch
 REPO_URL = "https://github.com/overlordxrz-source/throng.git"
 VOLUME_NAME = "throng-runs"
 VOLUME_MOUNT = "/mnt/throng-runs"
@@ -67,6 +67,11 @@ PLANS = {
     # step 0 timing (<= $0.50): 6 COMM updates at the real settings; compile time is in update 1
     "timing": [("timing_COMM0", ["--arm", "COMM", "--seed", "0", "--updates", "6", "--tau", "0.08",
                                  "--craft-cost", "0.1", "--warm-start", WARM, "--no-eval"])],
+    # MI-floor / run-length smoke (Cam 2026-11-08 ruling 4): PS arm, 2 fresh seeds the confirmation won't use,
+    # <= 120 updates, loop PPO path (current speed), c_ps 2.015 (registered calibration rule on the real network)
+    "smoke": [(f"smoke_PS{s}", ["--arm", "COMM", "--seed", str(s), "--updates", "120", "--tau", "0.08",
+                                "--craft-cost", "0.1", "--warm-start", WARM, "--ps", "2.015", "--apparatus-update", "2",
+                                "--no-eval"]) for s in (20, 21)],
 }
 
 
