@@ -101,9 +101,13 @@ def main():
     ap.add_argument("--warm-start", default=None)
     ap.add_argument("--save-params", default=None)
     ap.add_argument("--swap-pairs", type=int, default=10)
+    ap.add_argument("--ps-anneal", type=int, nargs=2, default=None, metavar=("START", "END"),
+                    help="c_ps decays linearly from --ps to 0 over updates START..END, then stays 0")
+    ap.add_argument("--eval-at", type=int, nargs="*", default=[], help="extra eval (MI + swaps) after these updates")
     ap.add_argument("--out", default=None)
     ap.add_argument("--tag", default="")
     ap.add_argument("--selftest", action="store_true")
+    ap.add_argument("--eval-only", action="store_true")
     ap.add_argument("--calibrate", action="store_true")
     ap.add_argument("--wire-init-scale", type=float, default=1.0,
                     help="after warm start, scale the (never-trained) wire-input rows of enc_0 and gwt_comms_1 (fidelity calibration)")
@@ -180,7 +184,7 @@ def main():
         return 0.5 * jnp.abs(p1 - p2).sum(-1)
 
     @functools.partial(jax.jit, static_argnames=("swap",))
-    def rollout(params, state, key, swap=False):
+    def rollout(params, state, key, swap=False, table=None):
         """lax.scan over T steps. swap=True (eval): the listener hears what its sender WOULD broadcast for
         T' = (T + 1) % 4 (same pre-step carry, same key); the sender's own action/reward come from the true T."""
         cb = [params["params"][k]["embedding"] for _, _, k in rl_jax.TOKEN_SLOTS]
@@ -200,7 +204,18 @@ def main():
             w_r = jnp.where(is_listener[:, None], wire, rbc)          # replace the SENDER's entry (partner of listener)
             _, o_r = apply_fn(params, carries, build_obs(pos, active, w_r, k_obs))
             sens = tv(logits, mask_disabled_actions(o_r.action_logits, axis=-1))
-            bc_out = jnp.where(is_listener[:, None], bc, bc_sw) if swap else bc
+            # swap modes (eval only): "constructed" = the sender's own policy sample for T' (same carry/key);
+            # "empirical" = a full token triple drawn from the triples this sender emitted for T' in the paired
+            # control rollout (Cam, 2026-11-07: guarantees the listener hears an in-distribution token)
+            if swap == "empirical":
+                k_tab = jax.random.fold_in(k_rand, 7)          # fold_in: leaves every training RNG stream unchanged
+                idx = jax.random.randint(k_tab, (N,), 0, table.shape[1])
+                trip = table[jnp.repeat((active + 1) % 4, 2), idx]
+                bc_emp = jnp.concatenate([jnp.zeros((N, 8))] + [cb[i][trip[:, i]] for i in range(3)], -1)
+                bc_used, trip_used = bc_emp, trip
+            else:
+                bc_used, trip_used = bc_sw, toks_sw
+            bc_out = jnp.where(is_listener[:, None], bc, bc_used) if swap else bc
             # movement toward T' and T (listeners)
             mv = DEL[act].astype(jnp.float32)
             def mu(tgt):
@@ -216,6 +231,7 @@ def main():
             at_active = nr_[jnp.arange(N), jnp.repeat(active, 2)]
             dep = craft & at_active
             att = craft & nr_.any(1)
+            att_Tp = craft & nr_[jnp.arange(N), jnp.repeat((active + 1) % 4, 2)]     # Craft at the T' hearth
             r = jnp.where(dep, R_DEP, 0.0) - a.craft_cost * (craft & ~dep)
             ldep_w = dep[is_listener]
             r = r + jnp.where(~is_listener, R_DEP * jnp.repeat(ldep_w, 2), 0.0)   # shared reward to the sender
@@ -231,8 +247,8 @@ def main():
             heard_next = wire2.reshape(W, 2, -1)[:, ::-1].reshape(N, -1)
             rec = dict(obs=obs, actions=act, log_probs=lp, rewards=r.astype(jnp.float32), values=val,
                        carries=carries, loss_vq=lvq, token_actions=toks, ent=ent, dep=dep, att=att,
-                       swap_diff=swap_diff, sens=sens, mu_sw=mu_sw, m_sw=m_sw, mu_tr=mu_tr, m_tr=m_tr,
-                       active=active, heard_next=heard_next, bc_sw=bc_sw)
+                       swap_diff=swap_diff, sens=sens, att_Tp=att_Tp, mu_sw=mu_sw, m_sw=m_sw, mu_tr=mu_tr, m_tr=m_tr,
+                       active=active, heard_next=heard_next, bc_sw=bc_used, toks_sw=toks_sw, trip_used=trip_used)
             return (pos2, active2, since2, wire2, new_c), rec
 
         ks = jax.random.split(key, T)
@@ -281,7 +297,7 @@ def main():
             lst = jnp.ones_like(lst)
         return (jnp.abs(p - p0).sum(-1) * lst).sum() / (lst.sum() + 1e-8)
 
-    def total_loss(params, mb, vs, vsh):
+    def total_loss(params, mb, vs, vsh, ps_c):
         loss, mets = ppo_loss(params, apply_fn, mb["obs"], mb["actions"], None, mb["log_probs"], mb["adv"],
                               mb["ret"], mb["carries"], 1, mb["values"], clip_eps=CLIP, vf_coef=VF, ent_coef=ENT,
                               vq_coef=VQC, value_scale=vs, value_clip=False, value_shift=vsh, popart_mode=True,
@@ -289,7 +305,9 @@ def main():
         ps = ps_term(params, mb["obs"], mb["carries"]) if a.ps else jnp.array(0.0)
         pl = pl_term(params, mb["obs"], mb["carries"]) if a.pl else jnp.array(0.0)
         mets = dict(mets, aux_ps=ps, aux_pl=pl)
-        return loss - a.ps * ps - a.pl * pl, mets
+        ps_coef = ps_c if a.ps_anneal else a.ps            # constant path unchanged when not annealing
+        mets = dict(mets, ps_coef=ps_coef)
+        return loss - ps_coef * ps - a.pl * pl, mets
 
     def _clip_group(g, max_norm=2.0):
         norm = jnp.sqrt(sum(jnp.sum(x ** 2) for x in jax.tree_util.tree_leaves(g)))
@@ -297,8 +315,8 @@ def main():
         return jax.tree_util.tree_map(lambda x: x * s, g)
 
     @jax.jit
-    def mb_step(params, opt_state, mb, vs, vsh):
-        (loss, mets), grads = jax.value_and_grad(total_loss, has_aux=True)(params, mb, vs, vsh)
+    def mb_step(params, opt_state, mb, vs, vsh, ps_c):
+        (loss, mets), grads = jax.value_and_grad(total_loss, has_aux=True)(params, mb, vs, vsh, ps_c)
         g = dict(grads["params"])
         groups = [["head_action"], ["head_value"], [k for k in g if k not in ("head_action", "head_value")]]
         for grp in groups:
@@ -387,11 +405,62 @@ def main():
             with open(a.out, "a") as fh:
                 fh.write(json.dumps(rec) + "\n")
 
+    def evaluate(params, u):
+        """MI over the last 10 updates' sender tokens + paired swaps in two modes. Uses its own RNGs, so an eval in
+        the middle of training does not perturb the training streams."""
+        from comm_testbed import mi_miller_madow
+        ev_rng = np.random.default_rng(1000 + 7919 * a.seed + u)
+        tok, Tt = (np.concatenate(list(mi_buf_tok)), np.concatenate(list(mi_buf_T))) if mi_buf_tok else (None, None)
+        for i in (range(3) if tok is not None else []):
+            mi = mi_miller_madow(tok[:, i], Tt, V, 4)
+            null = np.array([mi_miller_madow(tok[:, i], ev_rng.permutation(Tt), V, 4) for _ in range(200)])
+            emit(dict(phase="mi", update=u, slot=i, mi_bits=mi, null_p99=float(np.percentile(null, 99)), n=int(len(Tt))))
+        if a.arm != "COMM":
+            return
+        enc = lambda x: (x[..., 0] * V + x[..., 1]) * V + x[..., 2]  # noqa: E731
+        for k in range(a.swap_pairs):
+            st0 = init_state(jax.random.PRNGKey(10_000 + k))
+            _, Rc = rollout(params, st0, jax.random.PRNGKey(20_000 + k), swap=False)
+            Rc = jax.tree_util.tree_map(np.asarray, Rc)
+            trip_c, lab = Rc["token_actions"][:, ~lis], Rc["active"]                 # (T, W, 3), (T, W)
+            sets = [set(enc(trip_c[lab == t]).tolist()) for t in range(4)]
+            s_all = set().union(*sets)
+            table = np.zeros((4, 512, 3), np.int32)
+            for t in range(4):
+                tt = trip_c[lab == t]
+                if len(tt) == 0:
+                    print(f"[APPARATUS] FATAL: no control-rollout tokens for hearth {t}", flush=True); raise SystemExit(1)
+                table[t] = tt[ev_rng.integers(0, len(tt), 512)]
+            ctrl = (Rc["mu_sw"].sum() / max(Rc["m_sw"].sum(), 1), Rc["mu_tr"].sum() / max(Rc["m_tr"].sum(), 1),
+                    float(Rc["dep"][:, lis].sum() / W), float(Rc["att_Tp"][:, lis].sum() / W))
+            for mode in ("constructed", "empirical"):
+                _, Rk = rollout(params, st0, jax.random.PRNGKey(20_000 + k), swap=mode, table=jnp.asarray(table))
+                Rk = jax.tree_util.tree_map(np.asarray, Rk)
+                if not np.allclose(Rk["heard_next"][:, lis], Rk["bc_sw"][:, ~lis]):   # listener hears the swap token
+                    print("[APPARATUS] FATAL: swap wiring", flush=True); raise SystemExit(1)
+                used, lab_sw = Rk["trip_used"][:, ~lis], (Rk["active"] + 1) % 4
+                e_used = enc(used)
+                in_Tp = float(np.mean([e in sets[t] for e, t in zip(e_used.ravel().tolist(), lab_sw.ravel().tolist())]))
+                in_any = float(np.mean([e in s_all for e in e_used.ravel().tolist()]))
+                emit(dict(phase="swap", update=u, mode=mode, pair=k, mu_Tprime_control=float(ctrl[0]),
+                          mu_Tprime_swap=float(Rk["mu_sw"].sum() / max(Rk["m_sw"].sum(), 1)),
+                          mu_T_control=float(ctrl[1]), mu_T_swap=float(Rk["mu_tr"].sum() / max(Rk["m_tr"].sum(), 1)),
+                          listener_dep_control=ctrl[2], listener_dep_swap=float(Rk["dep"][:, lis].sum() / W),
+                          swapped_token_differs_frac=float(np.any(used != Rk["token_actions"][:, ~lis], -1).mean()),
+                          swap_token_seen_for_Tprime=in_Tp, swap_token_seen_at_all=in_any,
+                          listener_crafts_at_Tprime_control=ctrl[3],
+                          listener_crafts_at_Tprime_swap=float(Rk["att_Tp"][:, lis].sum() / W)))
+
     np_rng = np.random.default_rng(a.seed)
+    if a.eval_only:            # exploratory: evaluate the loaded params (no training, no MI)
+        from collections import deque
+        lis = np.asarray(is_listener); mi_buf_tok, mi_buf_T = deque(), deque()
+        evaluate(params, 0); return
     key, k_s = jax.random.split(key)
     state = init_state(k_s)
     lis = np.asarray(is_listener)
-    mi_tok, mi_T = [], []
+    from collections import deque
+    mi_buf_tok, mi_buf_T = deque(maxlen=10), deque(maxlen=10)
     for u in range(1, a.updates + 1):
         t0 = time.time()
         key, k_r, k_l = jax.random.split(key, 3)
@@ -409,11 +478,15 @@ def main():
         flat["values"] = values.reshape(M).astype(np.float32)
         flat["adv"], flat["ret"] = adv.reshape(M), ret.reshape(M).astype(np.float32)
         perm = np_rng.permutation(M)
+        ps_c = a.ps
+        if a.ps_anneal:
+            s0_, e0_ = a.ps_anneal
+            ps_c = a.ps * float(np.clip((e0_ - u) / (e0_ - s0_), 0.0, 1.0)) if u > s0_ else a.ps
         msum = {}
         for i in range(M // MB):
             idx = perm[i * MB:(i + 1) * MB]
             mb = {k: jnp.asarray(v[idx]) for k, v in flat.items()}
-            params, opt_state, mets = mb_step(params, opt_state, mb, popart.sigma, popart.mu)
+            params, opt_state, mets = mb_step(params, opt_state, mb, popart.sigma, popart.mu, ps_c)
             for k, v in mets.items():
                 msum[k] = msum.get(k, 0.0) + float(v)
         mets = {k: v / (M // MB) for k, v in msum.items()}
@@ -427,40 +500,16 @@ def main():
                    token_entropy_sender=float(ent[:, ~lis].mean()), token_entropy_listener=float(ent[:, lis].mean()),
                    swap_diff=float(R["swap_diff"][:, ~lis].mean()), listener_sens_tv=float(R["sens"][:, lis].mean()),
                    ev=float(ev), aux_ps=mets.get("aux_ps", 0.0), aux_pl=mets.get("aux_pl", 0.0),
-                   ppo_entropy=mets.get("ppo_entropy"), t_update=round(time.time() - t0, 2))
+                   ppo_entropy=mets.get("ppo_entropy"), ps_coef=float(ps_c), t_update=round(time.time() - t0, 2))
         emit(rec)
-        if u > a.updates - 10:
-            mi_tok.append(R["token_actions"][:, ~lis].reshape(-1, 3)); mi_T.append(R["active"].reshape(-1))
+        mi_buf_tok.append(R["token_actions"][:, ~lis].reshape(-1, 3)); mi_buf_T.append(R["active"].reshape(-1))
+        if u in a.eval_at and u != a.updates:
+            evaluate(params, u)
 
     if a.save_params:
         Path(a.save_params).parent.mkdir(parents=True, exist_ok=True)
         Path(a.save_params).write_bytes(flax.serialization.to_bytes(params))
-
-    from comm_testbed import mi_miller_madow
-    tok, Tt = np.concatenate(mi_tok), np.concatenate(mi_T)
-    for i in range(3):
-        mi = mi_miller_madow(tok[:, i], Tt, V, 4)
-        null = np.array([mi_miller_madow(tok[:, i], np_rng.permutation(Tt), V, 4) for _ in range(200)])
-        emit(dict(phase="mi", slot=i, mi_bits=mi, null_p99=float(np.percentile(null, 99)), n=int(len(Tt))))
-
-    if a.arm == "COMM":
-        for k in range(a.swap_pairs):
-            res = {}
-            for name, sw in (("control", False), ("swap", True)):
-                st0 = init_state(jax.random.PRNGKey(10_000 + k))
-                _, Rk = rollout(params, st0, jax.random.PRNGKey(20_000 + k), swap=sw)
-                Rk = jax.tree_util.tree_map(np.asarray, Rk)
-                if sw:   # apparatus: what each listener hears next step == its sender's T' broadcast
-                    heard = Rk["heard_next"][:, lis]
-                    if not np.allclose(heard, Rk["bc_sw"][:, ~lis]):
-                        print("[APPARATUS] FATAL: swap wiring", flush=True); raise SystemExit(1)
-                res[name] = (Rk["mu_sw"].sum() / max(Rk["m_sw"].sum(), 1), Rk["mu_tr"].sum() / max(Rk["m_tr"].sum(), 1),
-                             float(Rk["dep"][:, lis].sum() / W), float(Rk["swap_diff"][:, ~lis].mean()))
-            emit(dict(phase="swap", pair=k, mu_Tprime_control=float(res["control"][0]),
-                      mu_Tprime_swap=float(res["swap"][0]), mu_T_control=float(res["control"][1]),
-                      mu_T_swap=float(res["swap"][1]), listener_dep_control=res["control"][2],
-                      listener_dep_swap=res["swap"][2], swapped_token_differs_frac=res["swap"][3]))
-
+    evaluate(params, a.updates)
 
 if __name__ == "__main__":
     main()
