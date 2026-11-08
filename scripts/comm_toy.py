@@ -133,6 +133,7 @@ def main():
     ap.add_argument("--imitate-steps", type=int, default=500)
     ap.add_argument("--imitate-lr", type=float, default=1e-3)
     ap.add_argument("--imitate-window", type=int, default=50)
+    ap.add_argument("--selftest-leak", action="store_true", help="Step A (Cam 2026-11-08): wire -> message-parameter gradient paths")
     ap.add_argument("--save-at", type=int, nargs="*", default=[], help="save actor (+ central critic) params at these updates")
     ap.add_argument("--save-prefix", default=None)
     ap.add_argument("--qcheck", default=None, help="T4 check 3 (b)/(c): path prefix of saved params at one update; print and exit")
@@ -905,6 +906,65 @@ def main():
         adv = float(np.mean(sum(np.take_along_axis(q[i], sent[:, i:i + 1], -1)[:, 0] - (pis[i] * q[i]).sum(-1) for i in range(3))))
         print(json.dumps(dict(phase="qcheck", prefix=a.qcheck, arm=a.arm, sent_top_share=top, q_spread=spread,
                               mean_sent_adv=adv, n=500)), flush=True)
+        raise SystemExit(0)
+
+    if a.selftest_leak:
+        """Step A: gradient of the LISTENER's losses (token PPO term zeroed) w.r.t. the shared message parameters,
+        on one wire-on rollout batch, with the listener's heard wire as recorded vs zeroed (same batch otherwise).
+        A nonzero difference = the wire reaches the message parameters through the listener's losses. Also: the
+        listener's own token policy-gradient path, and the forward coupling (sender tokens vs heard wire)."""
+        assert a.arm == "COMM"
+        lisq = np.asarray(is_listener)
+        _, Rq = rollout(params, init_state(jax.random.PRNGKey(31)), jax.random.PRNGKey(32))
+        Rq = jax.tree_util.tree_map(np.asarray, Rq)
+        vals = popart.denormalise(Rq["values"])
+        advq, _ = gae_bootstrap(Rq["rewards"], vals, np.zeros_like(Rq["rewards"]), vals[-1], GAMMA, LAM)
+        Lrows = lambda x: x[:, lisq].reshape((-1,) + x.shape[2:])  # noqa: E731
+        obsL, carL, tokL, advL = (jnp.asarray(Lrows(Rq["obs"])), jnp.asarray(Lrows(Rq["carries"])),
+                                  jnp.asarray(Lrows(Rq["token_actions"])), jnp.asarray(Lrows(advq)))
+        obsL0 = obsL.at[:, O_WIRE:].set(0.0)
+        MSG = ["gwt_comms_1", "head_signal_slot0", "head_signal_slot1", "head_signal_slot2", "codebook_0", "codebook_1", "codebook_2"]
+
+        def parts(p_, o_in):
+            _, o = apply_fn(p_, carL, o_in)
+            lsm = [jax.nn.log_softmax(lg, -1) for lg in token_logits(p_, o.z_e, TAU)]
+            lp = sum(jnp.take_along_axis(lsm[i], tokL[:, i:i + 1], -1)[:, 0] for i in range(3))
+            return dict(vq=VQC * jnp.mean(o.loss_vq.sum(-1)),
+                        tok_ent=-TOK_ENT * jnp.mean(sum(-jnp.sum(jnp.exp(l_) * l_, -1) for l_ in lsm)),
+                        tok_pg_listener=-jnp.mean(advL * lp),
+                        move=jnp.mean(-jax.nn.log_softmax(mask_disabled_actions(o.action_logits, -1), -1)[:, 0] * advL)
+                        + VF * jnp.mean(o.values ** 2))
+
+        def gvec(term, o_in):
+            g = jax.grad(lambda p_: parts(p_, o_in)[term])(params)
+            return np.concatenate([np.asarray(x).ravel() for k in MSG for x in jax.tree_util.tree_leaves(g["params"][k])])
+        res = {}
+        for term in ("vq", "tok_ent", "tok_pg_listener", "move"):
+            g1, g0 = gvec(term, obsL), gvec(term, obsL0)
+            res[term] = dict(grad_norm_wire=float(np.linalg.norm(g1)), grad_norm_wire_zeroed=float(np.linalg.norm(g0)),
+                             diff_norm=float(np.linalg.norm(g1 - g0)))
+        # codebook specifically (the codebook vectors ARE the wire content)
+        def gcb(term, o_in):
+            g = jax.grad(lambda p_: parts(p_, o_in)[term])(params)
+            return float(np.sqrt(sum(float(jnp.sum(x ** 2)) for k in ("codebook_0", "codebook_1", "codebook_2")
+                                     for x in jax.tree_util.tree_leaves(g["params"][k]))))
+        res["vq_codebook_grad_norm"] = gcb("vq", obsL)
+        # forward coupling: the sender's token distribution vs the heard wire (recorded vs zeroed vs random tokens)
+        obsS = jnp.asarray(Rq["obs"][:, ~lisq].reshape(-1, D))
+        cb = [params["params"][k]["embedding"] for _, _, k in rl_jax.TOKEN_SLOTS]
+        rt = jax.random.randint(jax.random.PRNGKey(3), (obsS.shape[0], 3), 0, V)
+        rbc = jnp.concatenate([jnp.zeros((obsS.shape[0], 8))] + [cb[i][rt[:, i]] for i in range(3)], -1)
+        def tokdist(o_in):
+            _, o = apply_fn(params, jnp.zeros((o_in.shape[0], H)), o_in)
+            return [jax.nn.softmax(lg, -1) for lg in token_logits(params, o.z_e, TAU)]
+        p_rec, p_zero, p_rand = tokdist(obsS), tokdist(obsS.at[:, O_WIRE:].set(0.0)), tokdist(obsS.at[:, O_WIRE:].set(rbc))
+        tv = lambda P, Q: float(np.mean([0.5 * np.abs(np.asarray(P[i]) - np.asarray(Q[i])).sum(-1).mean() for i in range(3)]))  # noqa: E731
+        am = lambda P, Q: float(np.mean([np.mean(np.argmax(np.asarray(P[i]), -1) != np.argmax(np.asarray(Q[i]), -1)) for i in range(3)]))  # noqa: E731
+        res["forward_sender_token_TV_recorded_vs_zeroed_wire"] = tv(p_rec, p_zero)
+        res["forward_sender_token_TV_recorded_vs_random_wire"] = tv(p_rec, p_rand)
+        res["forward_sender_argmax_changed_frac_random_wire"] = am(p_rec, p_rand)
+        res["shared_parameters_sender_listener"] = "all (one ToyNet; the role is set only by the informed flag in obs)"
+        print(json.dumps(res, indent=1), flush=True)
         raise SystemExit(0)
 
     np_rng = np.random.default_rng(a.seed)
