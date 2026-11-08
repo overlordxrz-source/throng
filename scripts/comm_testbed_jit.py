@@ -425,34 +425,67 @@ def main():
             print(f"[CALIBRATE-PS] c_ps = {c_ps:.4g} (ratios {[round(r, 3) for r in ratios]})", flush=True)
             return
         if a.check_ppo_scan:
+            # Registered bar (Cam, 2026-11-08): (a) per-minibatch losses within 1e-6 relative; (b) per-minibatch
+            # gradients, every leaf, elementwise |dg| <= 1e-4 |g_ref| + 1e-6 max|g_ref|; (c) parameters after the
+            # update, every element |dtheta| <= 0.05 lr; identical permutation; (d) mutants (drop one minibatch,
+            # shuffle the order, zero the PS term) must each fail at least one of (a)-(c). No leaves excluded.
             import copy
+            lr = float(cfg["ppo_lr"])
             upd_kw = dict(clip_eps=float(cfg.get("ppo_clip_eps", 0.2)), vf_coef=a.vf_coef,
                           ent_coef=float(cfg.get("ppo_entropy_coef", 0.02)), vq_coef=float(cfg.get("vq_loss_coef", 0.1)),
                           minibatch_size=int(cfg["ppo_minibatch_size"]), gamma=gamma, lam=lam, team="blue",
                           alarm_ent_coef=float(cfg.get("alarm_ent_coef", 0.0)), freeze_comms=False, value_clip=False,
                           token_tau=a.tau, token_ent_coef=a.token_ent_coef, ps_coef=a.ps,
                           ps_cols=((s0 + 12, s0 + 21) if a.ps > 0 else None))
-            out = {}
-            for name, scan in (("loop", False), ("scan", True)):
-                pa = copy.deepcopy(popart); perm = []
+
+            def run(scan, mutant=None):
+                pa = copy.deepcopy(popart); perm = []; dbg = {}
                 t1 = time.time()
-                p_, o_, m_ = ppo_update(params, opt_state, opt, apply_fn, batch, nl, k_up, popart=pa,
-                                        scan_minibatches=scan, perm_out=perm, **upd_kw)
+                p_, _, _ = ppo_update(params, opt_state, opt, apply_fn, batch, nl, k_up, popart=pa,
+                                      scan_minibatches=scan, perm_out=perm, debug_out=dbg, _mutant=mutant, **upd_kw)
                 jax.block_until_ready(p_)
-                out[name] = (p_, m_, perm[0], time.time() - t1)
-            la, lb = jax.tree_util.tree_leaves(out["loop"][0]), jax.tree_util.tree_leaves(out["scan"][0])
-            rel = max(float(jnp.max(jnp.abs(x - y)) / (jnp.max(jnp.abs(x)) + 1e-12)) for x, y in zip(la, lb))
-            same_perm = bool(np.array_equal(out["loop"][2], out["scan"][2]))
-            changed = max(float(jnp.max(jnp.abs(x - y))) for x, y in zip(jax.tree_util.tree_leaves(params), la))
-            stats = {k: (round(out["loop"][1][k], 6), round(out["scan"][1].get(k, float("nan")), 6))
-                     for k in sorted(out["loop"][1]) if k in out["scan"][1]}
-            ok = rel <= 1e-5 and same_perm
-            rec = dict(base, phase="ppo_scan_check", seed=a.seed, ps=a.ps, max_rel_param_diff=rel,
-                       identical_perm=same_perm, update_moved_params_by=changed, t_loop=round(out["loop"][3], 2),
-                       t_scan=round(out["scan"][3], 2), stats_loop_vs_scan=stats, ok=bool(ok))
-            emit(rec)
-            print(f"[PPO-SCAN CHECK] seed {a.seed} ps {a.ps}: max rel param diff {rel:.3g} (<= 1e-5), identical perm "
-                  f"{same_perm} -> {'PASS' if ok else 'FAIL'} | t_loop {out['loop'][3]:.1f}s t_scan {out['scan'][3]:.1f}s",
+                if scan:
+                    L = np.asarray(dbg["loss"]); Gs = dbg["grads"]
+                    G = [jax.tree_util.tree_map(lambda x, i=i: x[i], Gs) for i in range(L.shape[0])]
+                else:
+                    L = np.asarray([float(x) for x in dbg["loss_list"]]); G = dbg["grad_list"]
+                return p_, L, G, perm[0], time.time() - t1
+
+            ref = run(False)
+
+            def criteria(c):
+                p_c, L_c, G_c, perm_c, _ = c
+                p_r, L_r, G_r, perm_r, _ = ref
+                n = min(len(L_r), len(L_c))
+                ca = len(L_c) == len(L_r) and bool(np.all(np.abs(L_c - L_r) <= 1e-6 * np.abs(L_r)))
+                worst_b = 0.0; cb = len(G_c) == len(G_r)
+                for i in range(n):
+                    for gr, gc in zip(jax.tree_util.tree_leaves(G_r[i]), jax.tree_util.tree_leaves(G_c[i])):
+                        tol = 1e-4 * jnp.abs(gr) + 1e-6 * jnp.max(jnp.abs(gr))
+                        excess = float(jnp.max(jnp.abs(gc - gr) - tol))
+                        worst_b = max(worst_b, excess)
+                cb = cb and worst_b <= 0.0
+                dth = max(float(jnp.max(jnp.abs(x - y))) for x, y in zip(jax.tree_util.tree_leaves(p_r),
+                                                                          jax.tree_util.tree_leaves(p_c)))
+                cc = dth <= 0.05 * lr
+                return dict(a_losses=ca, a_max_rel=float(np.max(np.abs(L_c[:n] - L_r[:n]) / np.abs(L_r[:n]))),
+                            b_grads=cb, b_worst_excess=worst_b, c_params=cc, c_max_abs_dtheta=dth,
+                            c_in_lr=dth / lr, same_perm=bool(np.array_equal(perm_c, perm_r)))
+
+            cand = run(True)
+            res = {"candidate": criteria(cand)}
+            del cand
+            for mt in ("drop", "shuffle", "nops"):
+                res[mt] = criteria(run(True, mt))
+            c = res["candidate"]
+            cand_ok = c["a_losses"] and c["b_grads"] and c["c_params"] and c["same_perm"]
+            mut_ok = {mt: not (res[mt]["a_losses"] and res[mt]["b_grads"] and res[mt]["c_params"])
+                      for mt in ("drop", "shuffle", "nops")}
+            ok = cand_ok and all(mut_ok.values())
+            emit(dict(base, phase="ppo_scan_check", seed=a.seed, ps=a.ps, results=res, candidate_pass=bool(cand_ok),
+                      mutants_fail=mut_ok, ok=bool(ok), t_loop=round(ref[4], 2)))
+            print(f"[PPO-SCAN CHECK] seed {a.seed} ps {a.ps}: candidate {res['candidate']} -> "
+                  f"{'PASS' if cand_ok else 'FAIL'} | mutants fail: {mut_ok} -> {'BAR OK' if ok else 'BAR NOT OK'}",
                   flush=True)
             return
         t1 = time.time()

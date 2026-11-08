@@ -513,27 +513,27 @@ def _minibatch_step(
 
 
 @functools.partial(jax.jit, static_argnames=("apply_fn", "optimizer", "n_layers", "freeze_comms", "value_clip",
-                                             "popart_mode", "ps_cols"))
+                                             "popart_mode", "ps_cols", "return_grads"))
 def _scan_minibatch_steps(params, opt_state, apply_fn, optimizer, arrays, idx_all, mb_keys, n_layers, clip_eps,
                           vf_coef, ent_coef, vq_coef, ignition_discount, alarm_ent_coef, freeze_comms,
                           comms_lr_warmup, value_scale, value_clip, value_shift, popart_mode, token_tau,
-                          token_ent_coef, ps_coef, ps_cols):
+                          token_ent_coef, ps_coef, ps_cols, return_grads=False):
     take = lambda name, idx: None if arrays[name] is None else arrays[name][idx]  # noqa: E731
 
     def body(carry, x):
         p, o = carry
         idx, k = x
-        p, o, mets, _ = _minibatch_step(
+        p, o, mets, g = _minibatch_step(
             p, o, apply_fn, optimizer,
             take("obs", idx), take("act", idx), take("alarm", idx), take("lp", idx), take("adv", idx),
             take("ret", idx), take("c", idx), n_layers, take("v", idx), clip_eps, vf_coef, ent_coef, vq_coef,
             take("vq", idx), take("al", idx), k, take("ig", idx), ignition_discount, alarm_ent_coef, freeze_comms,
             comms_lr_warmup, value_scale, value_clip, value_shift, popart_mode,
             take("tok", idx), token_tau, token_ent_coef, ps_coef, ps_cols)
-        return (p, o), mets
+        return (p, o), ((mets, g) if return_grads else (mets, None))
 
-    (params, opt_state), mets = jax.lax.scan(body, (params, opt_state), (idx_all, mb_keys))
-    return params, opt_state, mets
+    (params, opt_state), (mets, grads) = jax.lax.scan(body, (params, opt_state), (idx_all, mb_keys))
+    return params, opt_state, mets, grads
 
 
 def ppo_update(
@@ -565,6 +565,8 @@ def ppo_update(
     ps_cols: "Tuple[int, int] | None" = None,
     scan_minibatches: bool = False,  # comm-jit speed path: batch on device, minibatches in one jitted lax.scan
     perm_out: "list | None" = None,  # test hook: receives the minibatch permutation
+    debug_out: "dict | None" = None,  # test hook: per-minibatch total losses and grads
+    _mutant: "str | None" = None,     # test only (scan path): "drop" | "shuffle" | "nops"
 ) -> Tuple[Dict, Any, Dict]:
     """
     Single gradient update step using minibatches.
@@ -663,10 +665,21 @@ def ppo_update(
         arrays = dict(obs=dev(flat_obs), act=dev(flat_actions), alarm=dev(flat_alarm_actions), lp=dev(flat_log_probs),
                       adv=dev(flat_adv), ret=dev(flat_ret), c=dev(flat_carries), v=dev(flat_values), al=dev(flat_alive),
                       vq=dev(flat_loss_vq), ig=dev(flat_ignition), tok=dev(flat_tokens))
-        params, opt_state, mets = _scan_minibatch_steps(
-            params, opt_state, apply_fn, optimizer, arrays, idx_all, jnp.stack(mb_keys), n_layers, clip_eps, vf_coef,
+        keys_all = jnp.stack(mb_keys)
+        if _mutant == "drop":
+            idx_all, keys_all = idx_all[1:], keys_all[1:]
+        elif _mutant == "shuffle":
+            order = np.random.RandomState(12345).permutation(n_minibatches)
+            idx_all, keys_all = idx_all[order], keys_all[order]
+        ps_used = 0.0 if _mutant == "nops" else ps_coef
+        params, opt_state, mets, grads = _scan_minibatch_steps(
+            params, opt_state, apply_fn, optimizer, arrays, idx_all, keys_all, n_layers, clip_eps, vf_coef,
             ent_coef, vq_coef, ignition_discount, alarm_ent_coef, freeze_comms, comms_lr_warmup, value_scale,
-            value_clip, value_shift, popart_mode, token_tau, token_ent_coef, ps_coef, ps_cols)
+            value_clip, value_shift, popart_mode, token_tau, token_ent_coef, ps_used, ps_cols,
+            return_grads=debug_out is not None)
+        if debug_out is not None:
+            debug_out["loss"] = mets["total_loss"]
+            debug_out["grads"] = grads
         metrics = {k: float(jnp.mean(v)) for k, v in mets.items()}
         return params, opt_state, metrics
 
@@ -708,6 +721,9 @@ def ppo_update(
             mb_tok, token_tau, token_ent_coef, ps_coef, ps_cols,
         )
 
+        if debug_out is not None:
+            debug_out.setdefault("loss_list", []).append(mb_mets["total_loss"])
+            debug_out.setdefault("grad_list", []).append(grads)
         # Accumulate as Python floats to avoid holding 500 JAX arrays
         for k, v in mb_mets.items():
             metric_sums[k] = metric_sums.get(k, 0.0) + float(v)
