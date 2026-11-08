@@ -133,6 +133,9 @@ def main():
     ap.add_argument("--imitate-steps", type=int, default=500)
     ap.add_argument("--imitate-lr", type=float, default=1e-3)
     ap.add_argument("--imitate-window", type=int, default=50)
+    ap.add_argument("--save-at", type=int, nargs="*", default=[], help="save actor (+ central critic) params at these updates")
+    ap.add_argument("--save-prefix", default=None)
+    ap.add_argument("--qcheck", default=None, help="T4 check 3 (b)/(c): path prefix of saved params at one update; print and exit")
     ap.add_argument("--credit", default="joint", choices=["joint", "A", "B", "Ag", "Bg"],
                     help="token credit: joint (baseline) | A separate V_shared stream | B COMA-style Q_shared(s, m)")
     ap.add_argument("--selftest-credit", action="store_true")
@@ -876,6 +879,34 @@ def main():
             adv_[t] = c; nv = v[t]
         return adv_, adv_ + v
 
+    if a.qcheck:   # T4 free check (b)/(c): Q over all tokens on ~500 sampled sender states at the saved params
+        assert a.credit == "Bg"
+        params = flax.serialization.from_bytes(params, Path(f"{a.qcheck}_actor.msgpack").read_bytes())
+        cparams = flax.serialization.from_bytes(cparams, Path(f"{a.qcheck}_critic.msgpack").read_bytes())
+        lisq = np.asarray(is_listener)
+        Gs, toks = [], []
+        for k in range(2):
+            st0 = init_state(jax.random.PRNGKey(70_000 + k))
+            stq, Rq = rollout(params, st0, jax.random.PRNGKey(80_000 + k))
+            Rq = jax.tree_util.tree_map(np.asarray, Rq)
+            Gs.append(np.asarray(gfeat(jnp.asarray(Rq["obs"]), jnp.asarray(Rq["carries"]), jnp.asarray(Rq["active"]))).reshape(-1, DG))
+            toks.append(Rq["token_actions"][:, ~lisq].reshape(-1, 3))
+        Gs, toks = np.concatenate(Gs), np.concatenate(toks)
+        ix = np.random.default_rng(1).choice(len(Gs), 500, replace=False)
+        q = [np.asarray(x) for x in ccrit.apply(cparams, jnp.asarray(Gs[ix]))]                       # 3 x (500, 64)
+        sent = toks[ix]
+        top = float(np.mean([np.mean(np.argmax(q[i], -1) == sent[:, i]) for i in range(3)]))
+        spread = float(np.mean([np.std(q[i], -1).mean() for i in range(3)]))
+        # sent token's counterfactual advantage under the current policy (raw, units of one delivery), sum over slots
+        obs_s = np.zeros((500, D), np.float32)
+        obs_s[:] = Gs[ix][:, :D]
+        _, o = apply_fn(params, jnp.zeros((500, H)), jnp.asarray(obs_s))   # message pathway is feed-forward from obs
+        pis = [np.asarray(jax.nn.softmax(lg, -1)) for lg in token_logits(params, o.z_e, TAU)]
+        adv = float(np.mean(sum(np.take_along_axis(q[i], sent[:, i:i + 1], -1)[:, 0] - (pis[i] * q[i]).sum(-1) for i in range(3))))
+        print(json.dumps(dict(phase="qcheck", prefix=a.qcheck, arm=a.arm, sent_top_share=top, q_spread=spread,
+                              mean_sent_adv=adv, n=500)), flush=True)
+        raise SystemExit(0)
+
     np_rng = np.random.default_rng(a.seed)
     if a.eval_only:            # exploratory: evaluate the loaded params (no training, no MI)
         lis = np.asarray(is_listener); mi_buf_tok, mi_buf_T = deque(), deque()
@@ -1001,6 +1032,12 @@ def main():
             imit_buf.append((R["obs"][:, ~lis].reshape(-1, D), R["token_actions"][:, ~lis].reshape(-1, 3)))
         if u in a.eval_at and u != a.updates:
             evaluate(params, u)
+        if u in a.save_at and a.save_prefix:
+            Path(a.save_prefix).parent.mkdir(parents=True, exist_ok=True)
+            Path(f"{a.save_prefix}_u{u}_actor.msgpack").write_bytes(flax.serialization.to_bytes(params))
+            if CENTRAL:
+                Path(f"{a.save_prefix}_u{u}_critic.msgpack").write_bytes(flax.serialization.to_bytes(cparams))
+                Path(f"{a.save_prefix}_u{u}_popart_g.json").write_text(json.dumps(dict(mu=popart_g.mu, nu=popart_g.nu)))
         if a.reset_from is not None and (u in a.eval_at or u == a.updates):
             turnover_record(u)
         if a.reset_from is not None and u in reset_sched:
