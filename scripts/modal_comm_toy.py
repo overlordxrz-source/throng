@@ -11,7 +11,7 @@ import modal
 
 _REQUIREMENTS = str(Path(__file__).resolve().parents[1] / "requirements.txt")
 
-PINNED_SHA = "8469c90bdaead44df79ad18c6c0db40b675f8714"  # comm-toy branch
+PINNED_SHA = "5f3da12eed94a0fccca43726b754177bc01a3987"  # comm-toy branch
 REPO_URL = "https://github.com/overlordxrz-source/throng.git"
 VOLUME_NAME = "throng-runs"
 VOLUME_MOUNT = "/mnt/throng-runs"
@@ -60,6 +60,11 @@ _ERO_JOBS = ([(f"erosion_on_s{s}", ["--arm", "COMM", "--seed", str(s), *_ERO, "-
 PLANS: dict = {
     # registered erosion test (2026-11-08): probe one container first (Cam: fan out only if < $0.01/min/container)
     "erosion_probe": _ERO_JOBS[:1],
+    # registered erosion diagnostic (2026-11-08): fresh seeds 90 (wire on) / 91 (wire off), log 1,500-1,800
+    "diag": [(f"diag_{tag}_s{s}", ["--arm", arm, "--seed", str(s), *[x if x != "2000" else "1800" for x in _ERO],
+                                    "--diag-from", "1500", "--diag-to", "1800", "--diag-every", "10", "--diag-pairs", "4",
+                                    "--swap-pairs", "4", "--tag", f"DIAG_{tag}"])
+             for tag, arm, s in (("on", "COMM", 90), ("off", "NOSIG", 91))],
     "erosion_rest": _ERO_JOBS[1:],
     # exploratory (2026-11-08): weight-decay erosion calibration, wire OFF, 2 calibration seeds per strength.
     # The token-entropy force failed calibration (none < 0.5 bit); this is reported to Cam, not registered.

@@ -1846,6 +1846,32 @@ more expensive, because it produces publishable-looking nulls.
     ("the code survives without the nudge") is not shown; the anneal arm stays out of the paid run. The
     confirmation is not blocked (Cam).
 
+- **Cam's ruling (2026-11-08, erosion).** FAIL accepted as registered; rung 3 isn't shown in the toy; the anneal arm
+  stays out of the paid run. On the record: **wire-on eroded as fast as or faster than wire-off, which echoes the
+  real network's live-wire collapse.** Next: a diagnostic, then a candidate fix designed only after it (message
+  actions get their own credit: a second value head on the shared reward, with the token log-prob trained on that
+  advantage only; fallback COMA-style counterfactual credit), then the same erosion test. Paid confirmation
+  unchanged.
+- **REGISTRATION -- erosion diagnostic (before the runs).** `comm-toy` `5f3da12`, Modal CPU (plan `diag`), the
+  erosion test's settings with 1,800 updates: wire ON seed 90, wire OFF seed 91 (fresh). Logged at every update
+  1,500-1,800 on the message head (`gwt_comms_1` + `head_signal_slot*`):
+  * (a) ||g|| = norm of the PPO-loss gradient (mean of 4 minibatches of the update's batch, before the update) vs
+    the decay pull wd·||theta||; plus the realised per-update displacements: optimizer ||Delta_opt|| vs decay
+    ||Delta_wd|| (comparable units, since Adam rescales g).
+  * (b) cos(-g, theta_1500 - theta), and cos(Delta_opt, theta_1500 - theta).
+  * (c) shared share = Var(S_shared) / (Var(S_shared) + Var(S_own)): S = discounted (gamma·lambda) forward sums of
+    each reward component on sender rows, no baseline.
+  * (d) reliance every 10 updates (4 empirical-swap pairs: deposit drop, crafts at T') vs plug-in sender MI every
+    update.
+  * **Predictions, operationalised (means over updates 1,501-1,800, wire-on run):**
+    - **Dilution:** cos(-g, back) > 0 **and** the optimizer's displacement component toward theta_1500
+      (Delta_opt · back-hat) < 0.1 x ||Delta_wd|| **and** shared share < 0.2.
+    - **Live-wire collapse:** cos(-g, back) < 0.
+    - **Listener-first:** reliance (deposit drop) falls below 50% of its update-1,500 value at an earlier probe
+      than the first update at which MI falls below 50% of its 1,500 value. Within 10 updates of each other
+      counts as simultaneous.
+  * The wire-off run is the reference for all of the above (no listener, so no use-gradient).
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
