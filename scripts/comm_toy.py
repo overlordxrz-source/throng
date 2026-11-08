@@ -166,6 +166,14 @@ def main():
     ap.add_argument("--prox", type=int, default=None,
                     help="step 3: no assigned sender -- an agent sees the active fire only within this Chebyshev radius of it; "
                          "symmetric shared reward; PS on whoever is informed")
+    ap.add_argument("--hearths", default=None, help="step 3b: custom fire positions 'x,y;x,y;x,y;x,y' (default: the generator's lattice)")
+    ap.add_argument("--lookout", default=None,
+                    help="step 3b: 'x,y,r' -- an agent sees the lit fire only while within Chebyshev r of (x,y); symmetric roles and "
+                         "shared reward as step 3")
+    ap.add_argument("--lookout-oracle", action="store_true",
+                    help="step 3b VOI (Cam 2026-11-08): the non-lookout agent is also fed the lit fire while its partner stands at the lookout")
+    ap.add_argument("--mutant-lookout-everywhere", action="store_true", help="apparatus mutant: everyone counts as at the lookout")
+    ap.add_argument("--selftest-lookout", action="store_true", help="step 3b apparatus: geometry + need dims only at the lookout")
     ap.add_argument("--selftest-leak", action="store_true", help="Step A (Cam 2026-11-08): wire -> message-parameter gradient paths")
     ap.add_argument("--save-at", type=int, nargs="*", default=[], help="save actor (+ central critic) params at these updates")
     ap.add_argument("--save-prefix", default=None)
@@ -195,7 +203,10 @@ def main():
 
     G, W, T, H = a.grid, a.worlds, a.steps, 64
     N = 2 * W
-    HEARTHS = jnp.asarray(np.asarray(generate_hearth_positions(G)))
+    HEARTHS = jnp.asarray(np.asarray(generate_hearth_positions(G)) if a.hearths is None else
+                          np.array([[int(v) for v in q.split(",")] for q in a.hearths.split(";")], np.int32))
+    LOOK = None if a.lookout is None else [int(v) for v in a.lookout.split(",")]
+    SYMR = a.prox is not None or LOOK is not None        # symmetric roles (steps 3 / 3b)
     is_listener = jnp.tile(jnp.array([False, True]), W)
     live_wire = a.arm == "COMM"
     oracle = a.arm == "ORACLE"
@@ -275,10 +286,17 @@ def main():
         d = jnp.abs(pos[:, None, :] - HEARTHS[None]); d = jnp.minimum(d, G - d).max(-1)
         return d <= 1
 
+    def at_look(pos):
+        dl = jnp.abs(pos - jnp.asarray(LOOK[:2])[None]); dl = jnp.minimum(dl, G - dl).max(-1)
+        return jnp.ones(pos.shape[0], bool) if a.mutant_lookout_everywhere else dl <= LOOK[2]
+
     def build_obs(pos, active, wire, k):
         diff = (HEARTHS[None] - pos[:, None, :] + G / 2) % G - G / 2
         hr = (diff / (G / 2.0)).reshape(N, 8)
-        if a.prox is not None:     # step 3: knowledge from proximity to the active fire
+        if LOOK is not None:       # step 3b: knowledge from standing at the lookout (or, VOI oracle, the partner standing there)
+            at = at_look(pos)
+            inf_ = (at | at.reshape(W, 2)[:, ::-1].reshape(N)) if a.lookout_oracle else at
+        elif a.prox is not None:     # step 3: knowledge from proximity to the active fire
             dh = jnp.abs(HEARTHS[jnp.repeat(active, 2)] - pos); dh = jnp.minimum(dh, G - dh).max(-1)
             inf_ = dh <= a.prox
         else:
@@ -355,7 +373,7 @@ def main():
                 bc_used, trip_used = bc_emp, trip
             else:
                 bc_used, trip_used = bc_sw, toks_sw
-            if a.prox is not None:   # step 3: every currently informed speaker's broadcast is swapped
+            if SYMR:   # step 3: every currently informed speaker's broadcast is swapped
                 inf_now = obs[:, O_INF] > 0.5
                 bc_out = jnp.where(inf_now[:, None], bc_used, bc) if swap else bc
             elif swap == "shuffle":   # step 6 null: each listener hears ANOTHER world's sender broadcast
@@ -384,7 +402,7 @@ def main():
             att_Tp = craft & nr_[jnp.arange(N), jnp.repeat((fire + shift) % 4, 2)]     # Craft at the T' hearth
             r = jnp.where(dep, R_DEP, 0.0) - a.craft_cost * (craft & ~dep)
             ldep_w = dep[is_listener]
-            if a.prox is not None:   # step 3: symmetric shared reward -- either agent's delivery also pays its partner
+            if SYMR:   # step 3: symmetric shared reward -- either agent's delivery also pays its partner
                 r = r + R_DEP * dep.reshape(W, 2)[:, ::-1].reshape(N)
             else:
                 r = r + jnp.where(~is_listener, R_DEP * jnp.repeat(ldep_w, 2), 0.0)   # shared reward to the sender
@@ -405,7 +423,9 @@ def main():
             wire2 = bc_out if live_wire else jnp.zeros_like(bc_out)
             heard_next = wire2.reshape(W, 2, -1)[:, ::-1].reshape(N, -1)
             r_shared = jnp.where(~is_listener, R_DEP * jnp.repeat(ldep_w, 2), 0.0)
-            extra = dict(inf=obs[:, O_INF] > 0.5, used_bc=bc_used) if a.prox is not None else {}
+            extra = dict(inf=obs[:, O_INF] > 0.5, used_bc=bc_used) if SYMR else {}
+            if LOOK is not None:
+                extra["atl"] = at_look(pos)
             rec = dict(**extra, lp_act=lp_act, crit=crit, r_shared=r_shared.astype(jnp.float32), obs=obs, actions=act, log_probs=lp, rewards=r.astype(jnp.float32), values=val,
                        carries=carries, loss_vq=lvq, token_actions=toks, ent=ent, dep=dep, att=att,
                        swap_diff=swap_diff, sens=sens, att_Tp=att_Tp, mu_sw=mu_sw, m_sw=m_sw, mu_tr=mu_tr, m_tr=m_tr,
@@ -692,7 +712,7 @@ def main():
         if a.arm != "COMM":
             return
         enc = lambda x: (x[..., 0] * V + x[..., 1]) * V + x[..., 2]  # noqa: E731
-        if a.prox is not None:
+        if SYMR:
             evaluate_prox(params, u, ev_rng); return
         if COMP:
             evaluate_comp(params, u, ev_rng); return
@@ -1174,6 +1194,30 @@ def main():
         print(json.dumps(res, indent=1), flush=True)
         raise SystemExit(0)
 
+    if a.selftest_lookout:
+        """step 3b apparatus: (1) geometry -- 4-neighbour steps to Chebyshev <= 1 of each fire, from the lookout centre and
+        from the cluster centre; (2) on a rollout, the informed bit and the need dims are nonzero exactly where the
+        lookout predicate (recomputed here from positions) says so -- self at the lookout, or (VOI oracle) self or
+        partner. The mutant (everyone at the lookout) must FAIL."""
+        assert LOOK is not None
+        hn, L = np.asarray(HEARTHS), np.array(LOOK[:2])
+
+        def steps(p_, h_):
+            d = np.abs(p_ - h_); d = np.minimum(d, G - d); return int(max(d[0] - 1, 0) + max(d[1] - 1, 0))
+        ctr = np.rint(hn.mean(0)).astype(int)
+        geo = dict(lookout_to_fire=[steps(L, h) for h in hn], centre=ctr.tolist(), centre_to_fire=[steps(ctr, h) for h in hn])
+        _, Rc = rollout(params, init_state(jax.random.PRNGKey(5)), jax.random.PRNGKey(6))
+        ob = np.asarray(Rc["obs"])                                            # (T, N, D)
+        pos = np.rint(ob[..., O_POS:O_POS + 2] * G).astype(int) % G
+        dl = np.abs(pos - L); dl = np.minimum(dl, G - dl).max(-1); at = dl <= LOOK[2]
+        want = (at | at.reshape(T, W, 2)[..., ::-1].reshape(T, N)) if a.lookout_oracle else at
+        got = ob[..., O_INF] > 0.5
+        need_nz = np.abs(ob[..., O_NEED:O_NEED + 4]).sum(-1) > 0
+        res = dict(geo, agent_steps=int(at.size), at_lookout=int(at.sum()), informed=int(got.sum()), want_informed=int(want.sum()),
+                   informed_match=bool((got == want).all()), need_match=bool((need_nz == want).all()))
+        ok = res["informed_match"] and res["need_match"] and 0 < at.sum() < at.size
+        print(json.dumps(res)); print("SELFTEST-LOOKOUT", "PASS" if ok else "FAIL", flush=True)
+        raise SystemExit(0 if ok else 1)
     if a.prox_world_check:
         """Cam 2026-11-08 (step 3): per fire period (active hearth until a delivery or a re-roll), who delivers, and
         whether the partner of the first-informed agent became informed on its own before the delivery."""
@@ -1481,14 +1525,16 @@ def main():
                    listener_correct_frac=float(dep[:, lis].sum() / max(att[:, lis].sum(), 1)),
                    token_entropy_sender=float(ent[:, ~lis].mean()), token_entropy_listener=float(ent[:, lis].mean()),
                    mi_plugin=(mi_plugin(R["token_actions"][R["inf"]], np.repeat(R["active"], 2, axis=1)[R["inf"]])
-                              if a.prox is not None else mi_plugin(R["token_actions"][:, ~lis].reshape(-1, 3), R["active"].reshape(-1))),
-                   informed_frac=(float(R["inf"].mean()) if a.prox is not None else None),
+                              if SYMR else mi_plugin(R["token_actions"][:, ~lis].reshape(-1, 3), R["active"].reshape(-1))),
+                   informed_frac=(float(R["inf"].mean()) if SYMR else None),
+                   **(dict(lookout_occ=float(R["atl"].mean()), lookout_any=float(R["atl"].reshape(T, W, 2).any(-1).mean()),
+                           agent_dep_per_world=float(R["dep"].sum() / W)) if LOOK is not None else {}),
                    tok_ent_coef=float(te_c),
                    swap_diff=float(R["swap_diff"][:, ~lis].mean()), listener_sens_tv=float(R["sens"][:, lis].mean()),
                    ev=float(ev), aux_ps=mets.get("aux_ps", 0.0), aux_pl=mets.get("aux_pl", 0.0),
                    ppo_entropy=mets.get("ppo_entropy"), ps_coef=float(ps_c), t_update=round(time.time() - t0, 2))
         emit(rec)
-        if a.prox is not None:
+        if SYMR:
             infm = R["inf"]; labm = np.repeat(R["active"], 2, axis=1)
             mi_buf_tok.append(R["token_actions"][infm]); mi_buf_T.append(labm[infm])
         else:
