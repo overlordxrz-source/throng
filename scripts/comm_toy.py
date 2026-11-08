@@ -106,6 +106,10 @@ def main():
     ap.add_argument("--eval-at", type=int, nargs="*", default=[], help="extra eval (MI + swaps) after these updates")
     ap.add_argument("--erode-tok-ent", type=float, default=None, help="erosion: token entropy coef from --erode-from on")
     ap.add_argument("--erode-from", type=int, default=1500)
+    ap.add_argument("--diag-from", type=int, default=None, help="erosion diagnostic (Cam 2026-11-08): log from this update")
+    ap.add_argument("--diag-to", type=int, default=None)
+    ap.add_argument("--diag-every", type=int, default=10, help="reliance probe every N updates in the window")
+    ap.add_argument("--diag-pairs", type=int, default=4)
     ap.add_argument("--erode-wd", type=float, default=None,
                     help="erosion: decoupled weight decay on the message head (gwt_comms_1, head_signal_slot*) per minibatch step from --erode-from on")
     ap.add_argument("--out", default=None)
@@ -249,7 +253,8 @@ def main():
             since2 = jnp.where(reroll, 0, since2)
             wire2 = bc_out if live_wire else jnp.zeros_like(bc_out)
             heard_next = wire2.reshape(W, 2, -1)[:, ::-1].reshape(N, -1)
-            rec = dict(obs=obs, actions=act, log_probs=lp, rewards=r.astype(jnp.float32), values=val,
+            r_shared = jnp.where(~is_listener, R_DEP * jnp.repeat(ldep_w, 2), 0.0)
+            rec = dict(r_shared=r_shared.astype(jnp.float32), obs=obs, actions=act, log_probs=lp, rewards=r.astype(jnp.float32), values=val,
                        carries=carries, loss_vq=lvq, token_actions=toks, ent=ent, dep=dep, att=att,
                        swap_diff=swap_diff, sens=sens, att_Tp=att_Tp, mu_sw=mu_sw, m_sw=m_sw, mu_tr=mu_tr, m_tr=m_tr,
                        active=active, heard_next=heard_next, bc_sw=bc_used, toks_sw=toks_sw, trip_used=trip_used)
@@ -410,6 +415,34 @@ def main():
             with open(a.out, "a") as fh:
                 fh.write(json.dumps(rec) + "\n")
 
+    HEADS = ("gwt_comms_1", "head_signal_slot0", "head_signal_slot1", "head_signal_slot2")
+    diag_state = {}
+
+    def head_vec(tree):
+        t = tree["params"] if "params" in tree else tree
+        return np.concatenate([np.asarray(x, np.float64).ravel() for h in HEADS for x in jax.tree_util.tree_leaves(t[h])])
+
+    def reliance_probe(params):
+        # light reliance probe: a.diag_pairs paired control / empirical-swap rollouts (own keys), deposits and
+        # crafts at the swapped hearth
+        cs, ss, rc, rsw = [], [], [], []
+        for k in range(a.diag_pairs):
+            st0 = init_state(jax.random.PRNGKey(30_000 + k))
+            _, Rc = rollout(params, st0, jax.random.PRNGKey(40_000 + k), swap=False)
+            Rc = jax.tree_util.tree_map(np.asarray, Rc)
+            trip_c, labc = Rc["token_actions"][:, ~lis], Rc["active"]
+            table = np.zeros((4, 512, 3), np.int32); rng_p = np.random.default_rng(k)
+            for t in range(4):
+                tt = trip_c[labc == t]
+                table[t] = tt[rng_p.integers(0, len(tt), 512)] if len(tt) else 0
+            _, Rk = rollout(params, st0, jax.random.PRNGKey(40_000 + k), swap="empirical", table=jnp.asarray(table))
+            Rk = jax.tree_util.tree_map(np.asarray, Rk)
+            cs.append(Rc["dep"][:, lis].sum() / W); ss.append(Rk["dep"][:, lis].sum() / W)
+            rc.append(Rc["att_Tp"][:, lis].sum() / W); rsw.append(Rk["att_Tp"][:, lis].sum() / W)
+        c, s_ = float(np.mean(cs)), float(np.mean(ss))
+        return dict(rel_dep_control=c, rel_dep_swap=s_, rel_drop=1 - s_ / max(c, 1e-9),
+                    rel_crafts_Tp_control=float(np.mean(rc)), rel_crafts_Tp_swap=float(np.mean(rsw)))
+
     def evaluate(params, u):
         """MI over the last 10 updates' sender tokens + paired swaps in two modes. Uses its own RNGs, so an eval in
         the middle of training does not perturb the training streams."""
@@ -498,19 +531,61 @@ def main():
             s0_, e0_ = a.ps_anneal
             ps_c = a.ps * float(np.clip((e0_ - u) / (e0_ - s0_), 0.0, 1.0)) if u > s0_ else a.ps
         msum = {}
+        diag = a.diag_from is not None and a.diag_from <= u <= a.diag_to
+        if diag:
+            th = head_vec(params)
+            if u == a.diag_from:
+                diag_state["theta0"] = th
+            gsum = 0.0
+            for i in range(4):   # PPO-loss gradient on the message head, mean over the first 4 minibatches
+                mb = {k: jnp.asarray(v[perm[i * MB:(i + 1) * MB]]) for k, v in flat.items()}
+                g = jax.grad(lambda p_: total_loss(p_, mb, popart.sigma, popart.mu, ps_c, te_c)[0])(params)
+                gsum = gsum + head_vec(g)
+            g_head = gsum / 4
+            back = diag_state["theta0"] - th
+            opt_disp = np.zeros_like(th); dec_disp = np.zeros_like(th)
         for i in range(M // MB):
             idx = perm[i * MB:(i + 1) * MB]
             mb = {k: jnp.asarray(v[idx]) for k, v in flat.items()}
+            if diag:
+                before = head_vec(params)
             params, opt_state, mets = mb_step(params, opt_state, mb, popart.sigma, popart.mu, ps_c, te_c)
+            if diag:
+                mid = head_vec(params); opt_disp += mid - before
             if a.erode_wd is not None and u >= a.erode_from:
                 pp = dict(params["params"])
                 for hk in ("gwt_comms_1", "head_signal_slot0", "head_signal_slot1", "head_signal_slot2"):
                     pp[hk] = jax.tree_util.tree_map(lambda x: x * (1.0 - a.erode_wd), pp[hk])
                 params = {"params": pp}
+            if diag:
+                dec_disp += head_vec(params) - mid
             for k, v in mets.items():
                 msum[k] = msum.get(k, 0.0) + float(v)
         mets = {k: v / (M // MB) for k, v in msum.items()}
         dep, att, ent = R["dep"], R["att"], R["ent"]
+        if diag:
+            nb = float(np.linalg.norm(back))
+            cos = lambda x, y: float(np.dot(x, y) / (np.linalg.norm(x) * np.linalg.norm(y) + 1e-30))  # noqa: E731
+            # advantage-variance share of the token action from the shared vs the sender's own reward: discounted
+            # (gamma * lambda) forward sums of each reward component on sender rows, no baseline
+            rs = R["r_shared"][:, ~lis]; ro = R["rewards"][:, ~lis] - rs
+            def disc(x):
+                out = np.zeros_like(x); c = np.zeros(x.shape[1], np.float64)
+                for t in range(x.shape[0] - 1, -1, -1):
+                    c = x[t] + GAMMA * LAM * c; out[t] = c
+                return out
+            vs_, vo_ = float(np.var(disc(rs))), float(np.var(disc(ro)))
+            drec = dict(phase="diag", update=u, grad_head_norm=float(np.linalg.norm(g_head)),
+                        decay_pull_norm=float(a.erode_wd * np.linalg.norm(th)) if a.erode_wd else 0.0,
+                        theta_head_norm=float(np.linalg.norm(th)), dist_from_1500=nb,
+                        cos_negrad_back=(cos(-g_head, back) if nb > 0 else None),
+                        opt_disp_norm=float(np.linalg.norm(opt_disp)), decay_disp_norm=float(np.linalg.norm(dec_disp)),
+                        cos_optdisp_back=(cos(opt_disp, back) if nb > 0 else None),
+                        shared_var=vs_, own_var=vo_, shared_share=vs_ / (vs_ + vo_ + 1e-30),
+                        mi_plugin=mi_plugin(R["token_actions"][:, ~lis].reshape(-1, 3), R["active"].reshape(-1)))
+            if (u - a.diag_from) % a.diag_every == 0 or u == a.diag_to:
+                drec.update(reliance_probe(params))
+            emit(drec)
         ev = 1 - np.var(ret - values) / (np.var(ret) + 1e-8)
         rec = dict(phase="train", update=u,
                    listener_dep_per_world=float(dep[:, lis].sum() / W), sender_dep_per_world=float(dep[:, ~lis].sum() / W),
