@@ -143,6 +143,13 @@ def main():
     ap.add_argument("--imitate-lr", type=float, default=1e-3)
     ap.add_argument("--imitate-window", type=int, default=50)
     ap.add_argument("--wire-blind", type=int, default=0, help="C1: 1 = wire-blind message head from the start")
+    ap.add_argument("--comp", action="store_true",
+                    help="step 6: the target is a (fire, material) pair (16 meanings); material one-hot in the sender's 4 noise "
+                         "dims; 4 Craft-material actions (5, 9, 10, 11); a delivery needs the active fire AND the material")
+    ap.add_argument("--held-out", default="1,11", help="step 6: pair ids (fire*4 + material) never active in training")
+    ap.add_argument("--vq-vocab", type=int, default=0, help="step 6: VQ codes per slot reachable (0 = all 64)")
+    ap.add_argument("--selftest-comp", action="store_true")
+    ap.add_argument("--mutant-leak-heldout", action="store_true", help="TEST ONLY: training pool includes held-out pairs")
     ap.add_argument("--channel", default="vq", choices=["vq", "sym"],
                     help="step 2: sym = 3 discrete symbols from a vocabulary of --sym-vocab, broadcast one-hot (fixed orthogonal "
                          "codewords a*e_k, the rest unreachable; no VQ loss)")
@@ -189,6 +196,12 @@ def main():
     live_wire = a.arm == "COMM"
     oracle = a.arm == "ORACLE"
     informed = jnp.ones(N, bool) if oracle else ~is_listener
+    COMP = a.comp
+    NCLS = 16 if COMP else 4
+    CRAFT_ACTS = jnp.asarray([5, 9, 10, 11])
+    HELD = [int(x) for x in a.held_out.split(",")] if COMP else []
+    TRAIN_POOL = jnp.asarray([q for q in range(16) if (q not in HELD or a.mutant_leak_heldout)]) if COMP else None
+    fire_of = (lambda act_: act_ // 4) if COMP else (lambda act_: act_)
     DEL = jnp.asarray(DELTAS)
     cells = np.stack(np.meshgrid(np.arange(G), np.arange(G), indexing="ij"), -1).reshape(-1, 2)
     hn = np.asarray(HEARTHS)
@@ -231,6 +244,15 @@ def main():
             E[:a.sym_vocab] = a.sym_scale * np.eye(a.sym_vocab, d, dtype=np.float32)
             pp[ck] = dict(pp[ck], embedding=jnp.asarray(E))
         params = {"params": pp}
+    if a.vq_vocab and a.channel == "vq":
+        # step 6: only the first vq_vocab codewords per slot are reachable (the rest pushed unreachably far); the
+        # reachable ones stay learned VQ codewords
+        pp = {k: dict(v) if isinstance(v, dict) else v for k, v in params["params"].items()}
+        for lo, hi, ck in rl_jax.TOKEN_SLOTS:
+            E = np.array(pp[ck]["embedding"], np.float32)
+            E[a.vq_vocab:] = 1e3 / np.sqrt(hi - lo)
+            pp[ck] = dict(pp[ck], embedding=jnp.asarray(E))
+        params = {"params": pp}
     opt = optax.adam(LR)
     opt_state = opt.init(params)
     popart = PopArt(beta=0.1)
@@ -257,10 +279,10 @@ def main():
             inf_ = dh <= a.prox
         else:
             inf_ = informed
-        need = jax.nn.one_hot(jnp.repeat(active, 2), 4) * inf_[:, None]
+        need = jax.nn.one_hot(jnp.repeat(fire_of(active), 2), 4) * inf_[:, None]
         heard = wire.reshape(W, 2, -1)[:, ::-1].reshape(N, -1) if live_wire else jnp.zeros((N, SIG))
-        return jnp.concatenate([pos / G, hr, inf_[:, None].astype(jnp.float32), need,
-                                jax.random.normal(k, (N, 4)), heard], -1)
+        noise = (jax.nn.one_hot(jnp.repeat(active % 4, 2), 4) * inf_[:, None]) if COMP else jax.random.normal(k, (N, 4))
+        return jnp.concatenate([pos / G, hr, inf_[:, None].astype(jnp.float32), need, noise, heard], -1)
 
     def policy(params, carries, obs, k):
         new_c, o = apply_fn(params, carries, obs)
@@ -286,7 +308,7 @@ def main():
     branch_hold = {"pL": None}
 
     @functools.partial(jax.jit, static_argnames=("swap",))
-    def rollout(params, state, key, swap=False, table=None):
+    def rollout(params, state, key, swap=False, table=None, pool=None):
         """lax.scan over T steps. swap=True (eval): the listener hears what its sender WOULD broadcast for
         T' = (T + 1) % 4 (same pre-step carry, same key); the sender's own action/reward come from the true T."""
         cb = [params["params"][k]["embedding"] for _, _, k in rl_jax.TOKEN_SLOTS]
@@ -332,6 +354,9 @@ def main():
             if a.prox is not None:   # step 3: every currently informed speaker's broadcast is swapped
                 inf_now = obs[:, O_INF] > 0.5
                 bc_out = jnp.where(inf_now[:, None], bc_used, bc) if swap else bc
+            elif swap == "shuffle":   # step 6 null: each listener hears ANOTHER world's sender broadcast
+                bs = bc.reshape(W, 2, -1)
+                bc_out = bs.at[:, 0].set(jnp.roll(bs[:, 0], 1, axis=0)).reshape(N, -1)
             else:
                 bc_out = jnp.where(is_listener[:, None], bc, bc_used) if swap else bc
             # movement toward T' and T (listeners)
@@ -342,14 +367,17 @@ def main():
                 nr = jnp.linalg.norm(dv, axis=1)
                 m = is_listener & (act >= 1) & (act <= 4) & (nr > 0)
                 return jnp.where(m, (mv * dv).sum(1) / jnp.maximum(nr, 1e-6), 0.0), m
-            mu_sw, m_sw = mu((active + 1) % 4)
-            mu_tr, m_tr = mu(active)
+            fire = fire_of(active)
+            mu_sw, m_sw = mu((fire + 1) % 4)
+            mu_tr, m_tr = mu(fire)
             nr_ = near(pos)
-            craft = act == ACTION_CRAFT
-            at_active = nr_[jnp.arange(N), jnp.repeat(active, 2)]
+            craft = jnp.isin(act, CRAFT_ACTS) if COMP else act == ACTION_CRAFT
+            at_active = nr_[jnp.arange(N), jnp.repeat(fire, 2)]
             dep = craft & at_active
+            if COMP:   # step 6: the delivery also needs the target material's Craft action
+                dep = dep & (act == CRAFT_ACTS[jnp.repeat(active % 4, 2)])
             att = craft & nr_.any(1)
-            att_Tp = craft & nr_[jnp.arange(N), jnp.repeat((active + 1) % 4, 2)]     # Craft at the T' hearth
+            att_Tp = craft & nr_[jnp.arange(N), jnp.repeat((fire + 1) % 4, 2)]     # Craft at the T' hearth
             r = jnp.where(dep, R_DEP, 0.0) - a.craft_cost * (craft & ~dep)
             ldep_w = dep[is_listener]
             if a.prox is not None:   # step 3: symmetric shared reward -- either agent's delivery also pays its partner
@@ -362,7 +390,13 @@ def main():
             dep_w = dep.reshape(W, 2).any(1)
             since2 = since + 1
             reroll = dep_w | (since2 >= a.reroll)
-            active2 = jnp.where(reroll, (active + jax.random.randint(k_rr, (W,), 1, 4)) % 4, active)
+            if COMP:   # re-roll to a different pair from the pool (training pool, or the held-out pool in the frozen test)
+                pl = TRAIN_POOL if pool is None else pool
+                cur = jnp.argmax(pl[None, :] == active[:, None], -1)
+                nxt = pl[(cur + jax.random.randint(k_rr, (W,), 1, max(int(pl.shape[0]), 2))) % pl.shape[0]]
+                active2 = jnp.where(reroll, nxt, active)
+            else:
+                active2 = jnp.where(reroll, (active + jax.random.randint(k_rr, (W,), 1, 4)) % 4, active)
             since2 = jnp.where(reroll, 0, since2)
             wire2 = bc_out if live_wire else jnp.zeros_like(bc_out)
             heard_next = wire2.reshape(W, 2, -1)[:, ::-1].reshape(N, -1)
@@ -378,11 +412,15 @@ def main():
         st, recs = jax.lax.scan(step, state, ks)
         return st, recs
 
-    def init_state(r_key):
+    def init_state(r_key, pool=None):
         k1, k2 = jax.random.split(r_key)
         pos = VALID[jax.random.randint(k1, (N,), 0, VALID.shape[0])]
-        return (pos, jax.random.randint(k2, (W,), 0, 4), jnp.zeros(W, jnp.int32), jnp.zeros((N, SIG)),
-                jnp.zeros((N, H)))
+        if COMP:
+            pl = TRAIN_POOL if pool is None else pool
+            act0 = pl[jax.random.randint(k2, (W,), 0, pl.shape[0])]
+        else:
+            act0 = jax.random.randint(k2, (W,), 0, 4)
+        return (pos, act0, jnp.zeros(W, jnp.int32), jnp.zeros((N, SIG)), jnp.zeros((N, H)))
 
     # ---------------------------------------------------------------- aux losses
     def ps_term(params, obs, carries, role_mask=True):
@@ -394,6 +432,8 @@ def main():
         if not role_mask:          # mutation-test only
             snd = jnp.ones_like(snd)
         Tl = jnp.argmax(obs[:, O_NEED:O_NEED + 4], -1)
+        if COMP:
+            Tl = Tl * 4 + jnp.argmax(obs[:, O_NOISE:O_NOISE + 4], -1)
         w_s = snd.astype(jnp.float32)
         mi = 0.0
         for lg in token_logits(params, o.z_e, TAU):
@@ -401,7 +441,7 @@ def main():
             pbar = (p * w_s[:, None]).sum(0) / (w_s.sum() + 1e-8)
             h_all = -(pbar * jnp.log(pbar + 1e-10)).sum()
             h_cond = 0.0
-            for tt in range(4):
+            for tt in range(NCLS):
                 wt = w_s * (Tl == tt)
                 pt = (p * wt[:, None]).sum(0) / (wt.sum() + 1e-8)
                 h_cond = h_cond + (wt.sum() / (w_s.sum() + 1e-8)) * -(pt * jnp.log(pt + 1e-10)).sum()
@@ -642,14 +682,16 @@ def main():
         ev_rng = np.random.default_rng(1000 + 7919 * a.seed + u)
         tok, Tt = (np.concatenate(list(mi_buf_tok)), np.concatenate(list(mi_buf_T))) if mi_buf_tok else (None, None)
         for i in (range(3) if tok is not None else []):
-            mi = mi_miller_madow(tok[:, i], Tt, V, 4)
-            null = np.array([mi_miller_madow(tok[:, i], ev_rng.permutation(Tt), V, 4) for _ in range(200)])
+            mi = mi_miller_madow(tok[:, i], Tt, V, NCLS)
+            null = np.array([mi_miller_madow(tok[:, i], ev_rng.permutation(Tt), V, NCLS) for _ in range(200)])
             emit(dict(phase="mi", update=u, slot=i, mi_bits=mi, null_p99=float(np.percentile(null, 99)), n=int(len(Tt))))
         if a.arm != "COMM":
             return
         enc = lambda x: (x[..., 0] * V + x[..., 1]) * V + x[..., 2]  # noqa: E731
         if a.prox is not None:
             evaluate_prox(params, u, ev_rng); return
+        if COMP:
+            evaluate_comp(params, u, ev_rng); return
         for k in range(a.swap_pairs):
             st0 = init_state(jax.random.PRNGKey(10_000 + k))
             _, Rc = rollout(params, st0, jax.random.PRNGKey(20_000 + k), swap=False)
@@ -683,6 +725,50 @@ def main():
                           listener_crafts_at_Tprime_control=ctrl[3],
                           listener_crafts_at_Tprime_swap=float(Rk["att_Tp"][:, lis].sum() / W)))
 
+    def evaluate_comp(params, u, ev_rng):
+        """step 6: (a) topographic similarity between meaning distance (Hamming over (fire, material)) and message
+        distance (Hamming over the 3 slots of each meaning's modal token triple), training meanings, vs a 1,000-perm
+        null over the message-to-meaning assignment; (b) held-out generalisation: frozen rollouts where only the
+        held-out pairs are ever active -- listener success per Craft attempt at a fire (both parts right; chance 1/16),
+        with real messages vs a shuffled-message null (each listener hears another world's sender)."""
+        from scipy.stats import spearmanr
+        toks, labs = [], []
+        for k in range(4):
+            _, Rc = rollout(params, init_state(jax.random.PRNGKey(60_000 + k)), jax.random.PRNGKey(61_000 + k))
+            Rc = jax.tree_util.tree_map(np.asarray, Rc)
+            toks.append(Rc["token_actions"][:, ~lis].reshape(-1, 3)); labs.append(Rc["active"].reshape(-1))
+        tok, lab = np.concatenate(toks), np.concatenate(labs)
+        modal = {}
+        for q in np.unique(lab):
+            tq = tok[lab == q]
+            if len(tq) >= 20:
+                vals, cnts = np.unique(tq, axis=0, return_counts=True); modal[int(q)] = vals[cnts.argmax()]
+        qs = sorted(modal)
+        pairs = [(i, j) for i in range(len(qs)) for j in range(i + 1, len(qs))]
+        mdist = np.array([(qs[i] // 4 != qs[j] // 4) + (qs[i] % 4 != qs[j] % 4) for i, j in pairs])
+        msgs = np.stack([modal[q] for q in qs])
+        gd = lambda M: np.array([int((M[i] != M[j]).sum()) for i, j in pairs])  # noqa: E731
+        rho = float(spearmanr(mdist, gd(msgs)).correlation) if len(pairs) > 2 else float("nan")
+        null = [spearmanr(mdist, gd(msgs[ev_rng.permutation(len(qs))])).correlation for _ in range(1000)]
+        null = np.nan_to_num(np.array(null, float))
+        emit(dict(phase="topsim", update=u, rho=rho, null_p95=float(np.percentile(null, 95)), n_meanings=len(qs),
+                  distinct_messages=int(len(np.unique(msgs, axis=0)))))
+        HP = jnp.asarray(HELD)
+        c = dict(sr=0, ar=0, ss=0, as_=0)
+        for k in range(10):
+            st0 = init_state(jax.random.PRNGKey(62_000 + k), pool=HP)
+            for mode, kk in ((False, "r"), ("shuffle", "s")):
+                _, Rh = rollout(params, st0, jax.random.PRNGKey(63_000 + k), swap=mode, pool=HP)
+                Rh = jax.tree_util.tree_map(np.asarray, Rh)
+                if not np.isin(Rh["active"], HELD).all():
+                    print("[APPARATUS] FATAL: held-out eval saw a training pair", flush=True); raise SystemExit(1)
+                c["s" + kk] += int(Rh["dep"][:, lis].sum()); c[("a" + kk) if kk == "r" else "as_"] += int(Rh["att"][:, lis].sum())
+        _, Rt = rollout(params, init_state(jax.random.PRNGKey(64_000)), jax.random.PRNGKey(65_000))
+        Rt = jax.tree_util.tree_map(np.asarray, Rt)
+        emit(dict(phase="heldout", update=u, succ_real=c["sr"], att_real=c["ar"], succ_shuf=c["ss"], att_shuf=c["as_"],
+                  rate_real=c["sr"] / max(c["ar"], 1), rate_shuf=c["ss"] / max(c["as_"], 1),
+                  train_rate=float(Rt["dep"][:, lis].sum() / max(Rt["att"][:, lis].sum(), 1))))
+
     def evaluate_prox(params, u, ev_rng):
         """step 3 swap: every currently informed speaker's broadcast is replaced by a full token triple drawn from the
         triples informed agents emitted for T' in the paired control rollout. Redirection = Crafts at the T' hearth by
@@ -715,7 +801,7 @@ def main():
         # plug-in MI(token; T), mean over the 3 slots, bits (cheap per-update trace; numpy only, no RNG)
         out = []
         for i in range(3):
-            j = np.zeros((V, 4)); np.add.at(j, (tok[:, i], Tl), 1); pj = j / j.sum()
+            j = np.zeros((V, NCLS)); np.add.at(j, (tok[:, i], Tl), 1); pj = j / j.sum()
             px, py = pj.sum(1, keepdims=True), pj.sum(0, keepdims=True); nz = pj > 0
             out.append(float((pj[nz] * np.log2(pj[nz] / (px @ py)[nz])).sum()))
         return float(np.mean(out))
@@ -1120,6 +1206,26 @@ def main():
                               median_steps_first_informed_to_delivery=float(np.median(delays)) if delays else None)), flush=True)
         raise SystemExit(0)
 
+    if a.selftest_comp:
+        """step 6 apparatus: (1) every delivery is at the active fire with the target material's Craft action; (2) the
+        material one-hot is present for informed rows only; (3) no held-out pair is ever active in training rollouts."""
+        assert COMP
+        lisq = np.asarray(is_listener); ok = True; res = {}
+        _, Rq = rollout(params, init_state(jax.random.PRNGKey(71)), jax.random.PRNGKey(72))
+        Rq = jax.tree_util.tree_map(np.asarray, Rq)
+        act, dep, actv = Rq["actions"], Rq["dep"], np.repeat(Rq["active"], 2, axis=1)
+        pos = Rq["obs"][:, :, O_POS:O_POS + 2] * G
+        hf = np.asarray(HEARTHS)[actv // 4]
+        dd = np.abs(np.rint(pos) - hf); dd = np.minimum(dd, G - dd).max(-1)
+        ok_dep = bool(((act[dep] == np.asarray(CRAFT_ACTS)[actv[dep] % 4]) & (dd[dep] <= 1)).all())
+        mat = Rq["obs"][:, :, O_NOISE:O_NOISE + 4]
+        ok_mat = bool((mat[:, lisq] == 0).all() and np.allclose(mat[:, ~lisq].sum(-1), 1))
+        ok_held = not np.isin(Rq["active"], HELD).any()
+        res.update(deposits=int(dep.sum()), deposit_rule_ok=ok_dep, material_dims_ok=ok_mat, no_heldout_active=ok_held)
+        ok = ok_dep and ok_mat and (ok_held or a.mutant_leak_heldout)
+        print(json.dumps(res)); print("SELFTEST-COMP", "PASS" if ok else "FAIL", flush=True)
+        raise SystemExit(0 if ok else 1)
+
     if a.selftest_sym:
         """step 2 apparatus: (1) no probability on unreachable codewords; (2) a broadcast is a * one-hot of the symbol;
         (3) one training update leaves the codebooks bit-identical; (4) a mutant with all codewords equal (constant
@@ -1210,6 +1316,8 @@ def main():
         key, k_r, k_l = jax.random.split(key, 3)
         state, R = rollout(params, state, k_r)
         R = jax.tree_util.tree_map(np.asarray, R)
+        if COMP and np.isin(R["active"], HELD).any():
+            print(f"[APPARATUS] FATAL: a held-out pair was active in training at update {u}", flush=True); raise SystemExit(1)
         values = popart.denormalise(R["values"])
         obs_last = build_obs(state[0], state[1], state[3], k_l)
         _, o_last = apply_fn(params, state[4], obs_last)
