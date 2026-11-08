@@ -309,6 +309,7 @@ class AgentNetworkJax(nn.Module):
     env_channels: int = 9
     own_state_dim: int = 10
     n_actions: int = 12
+    wire_blind: int = 0   # comm-jit (Cam 2026-11-08): 1 = the message pathway does not read heard neighbour signals; 2 = MUTANT (one live dim)
 
     def setup(self):
         d = self.hidden_dim
@@ -506,6 +507,11 @@ class AgentNetworkJax(nn.Module):
         # Phase 16.6 GWT Router for Blue
         # Zero out age(0), mat(1), energy(2), layers(3) to completely sever the metabolic leak
         exteroceptive_obs = obs.at[:, :4].set(0.0)
+        if self.wire_blind:   # no path from the heard wire into the tokens (the pathway shares nothing else with the trunk)
+            _lay = self._obs_layout()
+            exteroceptive_obs = exteroceptive_obs.at[:, _lay.nb_sigs_start:_lay.nb_sigs_end].set(0.0)
+            if self.wire_blind == 2:   # apparatus-check mutant: one heard dim left live
+                exteroceptive_obs = exteroceptive_obs.at[:, _lay.nb_sigs_start + 8].set(obs[:, _lay.nb_sigs_start + 8])
         h_comms = nn.relu(self.gwt_comms_1(exteroceptive_obs))
         
         # Phase 18: 40D Wire (8D cont + 12/8/12 slots)

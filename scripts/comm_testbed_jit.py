@@ -71,6 +71,12 @@ def main():
     ap.add_argument("--swap-modes", default="constructed,empirical")
     ap.add_argument("--no-eval", action="store_true", help="skip the end-of-run MI/swap eval (timing)")
     ap.add_argument("--ppo-scan", action="store_true", help="scanned-minibatch PPO update (batch on device)")
+    ap.add_argument("--wire-blind", type=int, default=0, help="1 = wire-blind message pathway (2 = mutant, apparatus only)")
+    ap.add_argument("--log-diag", action="store_true",
+                    help="Cam 2026-11-08: log PS gradient share, grad norm, KL, clip fraction, value loss (separate passes; "
+                         "the training path is unchanged)")
+    ap.add_argument("--ckpt-every", type=int, default=0, help="save params every N updates (Cam: every paid run, N = 50)")
+    ap.add_argument("--ckpt-prefix", default=None)
     ap.add_argument("--coupling-test", action="store_true",
                     help="step A on the real net (Cam 2026-11-08): sender token distribution vs its heard wire, one rollout; print and exit")
     ap.add_argument("--calibrate-ps", action="store_true",
@@ -101,7 +107,7 @@ def main():
         cross_attn_enabled=bool((cfg.get("phase9_canvas") or {}).get("cross_attn_enabled", False)),
         cross_attn_num_heads=int((cfg.get("phase9_canvas") or {}).get("cross_attn_num_heads", cfg["n_heads"])),
         env_channels=int(cfg.get("env_channels", 15)), own_state_dim=L.own_state_dim, n_actions=int(cfg["n_actions"]),
-        local_cells=L.local_cells, neighbor_k=cfg["neighbor_k"])
+        local_cells=L.local_cells, neighbor_k=cfg["neighbor_k"], wire_blind=a.wire_blind)
     apply_fn = make_model_apply(model)
     key = jax.random.PRNGKey(a.seed)
     key, k_init = jax.random.split(key)
@@ -363,11 +369,17 @@ def main():
             _, o = apply_fn(params, C, o_in, nl)
             return [np.asarray(jax.nn.softmax(lg, -1)) for lg in token_logits(params, o.z_e, a.tau)]
         P, Qr, Qz = dist(O), dist(O.at[:, ns:ne].set(rbc)), dist(O.at[:, ns:ne].set(0.0))
+        # random-heard-input check on ALL neighbour slots (the wire-blind apparatus check)
+        nb0, nb1 = L.nb_sigs_start, L.nb_sigs_end
+        Rall = jax.random.normal(jax.random.PRNGKey(5), (4096, nb1 - nb0)) * 0.3
+        Qall = dist(O.at[:, nb0:nb1].set(Rall))
+        maxabs = float(max(np.abs(P[i] - Qall[i]).max() for i in range(3)))
         tv = lambda A, B: float(np.mean([0.5 * np.abs(A[i] - B[i]).sum(-1).mean() for i in range(3)]))  # noqa: E731
         am = lambda A, B: float(np.mean([np.mean(A[i].argmax(-1) != B[i].argmax(-1)) for i in range(3)]))  # noqa: E731
         print(json.dumps(dict(phase="coupling_test", params=a.warm_start, n=4096,
                               tv_random_wire=tv(P, Qr), argmax_changed_random_wire=am(P, Qr),
-                              tv_zeroed_wire=tv(P, Qz), argmax_changed_zeroed_wire=am(P, Qz))), flush=True)
+                              tv_zeroed_wire=tv(P, Qz), argmax_changed_zeroed_wire=am(P, Qz),
+                              wire_blind=a.wire_blind, max_abs_dp_random_all_neighbour_slots=maxabs)), flush=True)
         return
 
     def emit(rec):
@@ -427,6 +439,7 @@ def main():
         rl_jax.compute_gae = lambda r_, v_, d_, gamma, lam, **kw: gae_bootstrap(r_, v_, d_, v_last, gamma, lam)
         _, targets = gae_bootstrap(rewards_np, values_np, np.zeros_like(rewards_np), v_last, gamma, lam)
         key, k_up = jax.random.split(key)
+        params_before = params
         if a.calibrate_ps:
             import copy
             pa = copy.deepcopy(popart)
@@ -533,6 +546,43 @@ def main():
             ps_coef=a.ps, ps_cols=((s0 + 12, s0 + 21) if a.ps > 0 else None), scan_minibatches=a.ppo_scan)
         rl_jax.compute_gae = _production_compute_gae
         t_ppo = time.time() - t1
+        diag = {}
+        if a.log_diag:   # separate passes on a fixed 2,048-row sample; nothing here feeds back into training
+            ix = np.random.default_rng(u).choice(T * N, 2048, replace=False)
+            flat = lambda x: jnp.asarray(np.asarray(x).reshape((T * N,) + np.asarray(x).shape[2:])[ix])  # noqa: E731
+            _, tg = gae_bootstrap(rewards_np, values_np, np.zeros_like(rewards_np), v_last, gamma, lam)
+            ad, _ = gae_bootstrap(rewards_np, values_np, np.zeros_like(rewards_np), v_last, gamma, lam)
+            S = dict(obs=flat(R["obs"]), act=flat(R["actions"]), alarm=flat(R["alarm_actions"]), lp=flat(R["log_probs"]),
+                     adv=flat(ad), ret=flat(tg), c=flat(R["carries"]), v=flat(values_np), tok=flat(R["token_actions"]))
+            kw = dict(clip_eps=float(cfg.get("ppo_clip_eps", 0.2)), vf_coef=a.vf_coef, ent_coef=float(cfg.get("ppo_entropy_coef", 0.02)),
+                      vq_coef=float(cfg.get("vq_loss_coef", 0.1)), value_scale=popart.sigma, value_clip=False, value_shift=popart.mu,
+                      popart_mode=True, token_actions=S["tok"], token_tau=a.tau, token_ent_coef=a.token_ent_coef)
+            lossf = lambda p_, ps_c: rl_jax.ppo_loss(p_, apply_fn, S["obs"], S["act"], S["alarm"], S["lp"], S["adv"], S["ret"],  # noqa: E731
+                                                     S["c"], nl, S["v"], **kw, ps_coef=ps_c,
+                                                     ps_cols=((s0 + 12, s0 + 21) if a.ps > 0 else None))
+            gnorm = lambda g: float(np.sqrt(sum(float(jnp.sum(x ** 2)) for x in jax.tree_util.tree_leaves(g))))  # noqa: E731
+            g_tot = jax.grad(lambda p_: lossf(p_, a.ps)[0])(params_before)
+            diag["grad_norm"] = gnorm(g_tot)
+            if a.ps > 0:
+                g_nops = jax.grad(lambda p_: lossf(p_, 0.0)[0])(params_before)
+                g_ps = jax.tree_util.tree_map(lambda x, y: x - y, g_tot, g_nops)
+                diag["ps_grad_norm"] = gnorm(g_ps); diag["ps_grad_share"] = diag["ps_grad_norm"] / max(diag["grad_norm"], 1e-12)
+            # KL and clip fraction of the update, on the sample: old = rollout log-probs, new = params after the update
+            l_new, m_new = lossf(params, a.ps)
+            _, o_new = apply_fn(params, S["c"], S["obs"], nl)
+            from jax_sim.action_space import mask_disabled_actions as _mask
+            lp_new = jnp.take_along_axis(jax.nn.log_softmax(_mask(o_new.action_logits, axis=-1), -1), S["act"][:, None], -1)[:, 0]
+            lp_new = lp_new + jnp.take_along_axis(jax.nn.log_softmax(o_new.alarm_out, -1), S["alarm"][:, None], -1)[:, 0]
+            for i_, lg in enumerate(token_logits(params, o_new.z_e, a.tau)):
+                lp_new = lp_new + jnp.take_along_axis(jax.nn.log_softmax(lg, -1), S["tok"][:, i_:i_ + 1], -1)[:, 0]
+            logr = lp_new - S["lp"]
+            diag["approx_kl"] = float(jnp.mean(jnp.exp(logr) - 1.0 - logr))
+            diag["clip_frac_after"] = float(jnp.mean(jnp.abs(jnp.exp(logr) - 1.0) > float(cfg.get("ppo_clip_eps", 0.2))))
+            diag.update({k: float(v) for k, v in mets.items() if k in ("ppo_vf_loss", "ppo_pg_loss", "ppo_clip_frac", "ppo_vq_loss")})
+        if a.ckpt_every and a.ckpt_prefix and u % a.ckpt_every == 0:
+            import flax.serialization
+            Path(a.ckpt_prefix).parent.mkdir(parents=True, exist_ok=True)
+            Path(f"{a.ckpt_prefix}_u{u}.msgpack").write_bytes(flax.serialization.to_bytes(params))
         ev = 1 - np.var(targets - values_np) / (np.var(targets) + 1e-8)
         dep, att = R["dep"], R["att"]
         s_dep = int(dep[:, ~is_listener_np].sum())
@@ -577,7 +627,7 @@ def main():
                   listener_correct_frac=l_dep / max(l_att, 1), token_entropy=float(R["tent"].mean()), ev=float(ev),
                   entropy=float(mets.get("ppo_entropy", np.nan)),
                   ppo_token_entropy=float(mets.get("ppo_token_entropy", np.nan)),
-                  mi_bits=mi_u, mi_null_p95=mi_null95, ppo_ps_mi=float(mets.get('ppo_ps_mi', 0.0)),
+                  mi_bits=mi_u, mi_null_p95=mi_null95, ppo_ps_mi=float(mets.get('ppo_ps_mi', 0.0)), **diag,
                   t_update=round(time.time() - t0, 2), t_rollout=round(t_roll, 2), t_ppo=round(t_ppo, 2)))
         if a.mi_halt_k and u == a.mi_halt_k:
             ok = mi_u >= a.mi_floor
