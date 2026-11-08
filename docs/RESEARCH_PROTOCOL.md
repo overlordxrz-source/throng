@@ -2090,6 +2090,43 @@ more expensive, because it produces publishable-looking nulls.
     artifact. T3 is read against T2 on the wire-on bar.
   * **Spend:** within the $10 toy/CPU allowance (~$3.6 used before; estimate ~$4.7 for the 17 runs).
 
+- **Cam's rulings (2026-11-08, T-batch and architecture).**
+  1. **Pre-data amendment to T2 / T3** (no T data had been read): "reliance" = the absolute rung-3 reliance bar,
+     and ">= 0.8" applies to continuity only. Retention (drop / drop at 1,500) is reported as a secondary, not a
+     gate. The analysis was amended and committed before any T data was read (`comm-toy` `b32fded`).
+  2. T3's wire-off is reported, not gated; T3 wire-on vs wire-off shows what use adds beyond copying (secondary).
+  3. Reset details accepted.
+  4. **The architecture doc is accepted as the target and is now in the roadmap.** When the production learner
+     fixes land, also **disable the culture-grid writers and the ToM and symbol heads** (no loss; they write noise
+     into the world).
+  5. **T4 approved** (below).
+  6. **Toy/CPU allowance $15 total; guard raised by $5** (to $33.40).
+- **REGISTRATION -- T4, a MAPPO-style centralized critic for message credit (before any run).** `comm-toy`
+  `07e8c34`; analysis `scripts/analyze_t4.py`; launcher plan `t4` (10 Modal CPU containers).
+  * **Critic (training time only; actors unchanged; separate params and Adam):** an MLP 128 x 2 on global features
+    of the world at that step:
+    - the sender's obs and the listener's obs (positions are inside both);
+    - the listener's GRU state;
+    - the active-fire one-hot.
+    **T4a:** V_shared(g), PopArt-normalised, on the shared (listener-delivery) reward. The token's advantage is its
+    GAE, standardised over sender rows. **T4b:** per-slot q_i(g, m_i) over the 64 codes, regressed on the shared
+    lambda-return (units of one delivery). The token's advantage is the COMA counterfactual
+    sum_i [q_i(g, m_i) - sum_m pi_i(m) q_i(g, m)]. Movement keeps the full advantage in both. Listener rows get no
+    token credit (they receive no shared reward).
+  * **Self-tests PASS, mutants caught:**
+    - the actor param tree is identical to the baseline network;
+    - the token term reaches only the message heads;
+    - the critic reacts to the listener and fire inputs (max change 1.19 / 1.84) while a listener-blind (local)
+      mutant does not (0.0);
+    - the token stream is unchanged when only the sender's own reward changes, and the full-reward mutant is caught;
+    - T4b's baseline has E_pi[A] = 2.4e-8 (the no-baseline mutant 0.17).
+    The joint path still reproduces PS0 bit for bit; the A / B self-tests still pass.
+  * **Protocol:** the erosion test's (2,000 updates; PS 1.99 annealed over 1,000-1,500; wd 3e-4 on the message head
+    from 1,500; eval at 1,500 and 2,000). **Fresh seeds:** T4a on 150-152, off 153/154; T4b on 160-162, off 163/164.
+  * **Pass per arm:** the reliance bar (empirical-swap drop >= 30%, paired drop > 2 SE, listener deposits >= the
+    arm's wire-off mean) in >= 2 of 3 wire-on at 2,000, **and** wire-off MI < 0.5 bit at 2,000 in both. Secondary:
+    MI >= 0.5; retention vs 1,500.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under

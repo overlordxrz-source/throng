@@ -11,7 +11,7 @@ import modal
 
 _REQUIREMENTS = str(Path(__file__).resolve().parents[1] / "requirements.txt")
 
-PINNED_SHA = "69ad45ef23935d25d8767bf592e6a8832eaa5ac0"  # comm-toy branch
+PINNED_SHA = "07e8c342242a0b86df87672713fc93bb5208bf56"  # comm-toy branch
 REPO_URL = "https://github.com/overlordxrz-source/throng.git"
 VOLUME_NAME = "throng-runs"
 VOLUME_MOUNT = "/mnt/throng-runs"
@@ -60,6 +60,10 @@ _ERO_JOBS = ([(f"erosion_on_s{s}", ["--arm", "COMM", "--seed", str(s), *_ERO, "-
 PLANS: dict = {
     # registered erosion test (2026-11-08): probe one container first (Cam: fan out only if < $0.01/min/container)
     "erosion_probe": _ERO_JOBS[:1],
+    # registered T4 (2026-11-08): centralized critic for message credit, erosion protocol, reliance-first bar
+    "t4": [(f"t4{fx[0].lower()}_{w}_s{s}", ["--arm", arm, "--seed", str(s), *_ERO, "--credit", fx, "--tag", f"T4{fx[0]}_{w.upper()}"])
+           for fx, base in (("Ag", 150), ("Bg", 160))
+           for w, arm, ss in (("on", "COMM", (0, 1, 2)), ("off", "NOSIG", (3, 4))) for s in [base + i for i in ss]],
     # registered T1 / T2 / T3 (2026-11-08)
     "tbatch": ([(f"t1_{w}_s{s}", ["--arm", arm, "--seed", str(s), *_ERO, "--credit", "B", "--tag", f"T1_{w.upper()}"])
                 for w, arm, ss in (("on", "COMM", range(120, 125)), ("off", "NOSIG", (125, 126))) for s in ss]
