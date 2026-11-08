@@ -2009,6 +2009,15 @@ more expensive, because it produces publishable-looking nulls.
     maintained is an artifact, so it counts as a FAIL of that fix (Cam). Reference: the joint baseline went 0/3.
   * **Spend:** toy/CPU allowance $6 total; ~$1.6 used before this; estimate ~$2 for the 10 runs.
 
+- **Pin check for the confirmation (Cam, 2026-11-08; done before reading any probe result).** Seeds 50 / 51 run the
+  real-network testbed on **`comm-jit` `326c8cb`** (the containers assert the cloned SHA equals the pin; the output
+  files are `confirm_PS50_326c8cb.jsonl` / `confirm_PS51_326c8cb.jsonl`). The toy drift and its bisect (`5f3da12`
+  vs `ce3b7c1`) are on the `comm-toy` branch, whose code the confirmation does not use. **The registered step-0
+  equivalence was re-run on `326c8cb` itself: PASS** (actions, rewards, positions, obs, tokens and log-probs
+  bitwise identical to the Python path, 3 seeds x 512 steps; `docs/data/step0_equiv_326c8cb.txt`). The three
+  commits after `1d3b951` add opt-in code only (PS in `ppo_loss`, the unmerged scan path, check modes, halts);
+  the training rollout is unchanged. Nothing from the probes had been read when this was checked.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
