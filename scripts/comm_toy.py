@@ -115,6 +115,7 @@ class CentralCritic(nn.Module):
 
 
 def main():
+    global VQC
     ap = argparse.ArgumentParser()
     ap.add_argument("--arm", required=True, choices=["COMM", "NOSIG", "ORACLE"])
     ap.add_argument("--seed", type=int, default=0)
@@ -142,6 +143,12 @@ def main():
     ap.add_argument("--imitate-lr", type=float, default=1e-3)
     ap.add_argument("--imitate-window", type=int, default=50)
     ap.add_argument("--wire-blind", type=int, default=0, help="C1: 1 = wire-blind message head from the start")
+    ap.add_argument("--channel", default="vq", choices=["vq", "sym"],
+                    help="step 2: sym = 3 discrete symbols from a vocabulary of --sym-vocab, broadcast one-hot (fixed orthogonal "
+                         "codewords a*e_k, the rest unreachable; no VQ loss)")
+    ap.add_argument("--sym-vocab", type=int, default=8)
+    ap.add_argument("--sym-scale", type=float, default=0.3)
+    ap.add_argument("--selftest-sym", action="store_true")
     ap.add_argument("--prox-world-check", default=None, help="step 3 free check: saved actor params path; print and exit")
     ap.add_argument("--selftest-wireblind", action="store_true", help="C1 apparatus: token TV under random heard input")
     ap.add_argument("--snapshot-at", type=int, default=None, help="step B: pickle the full training state after this update")
@@ -211,6 +218,19 @@ def main():
             for n in ("enc_0", "gwt_comms_1"):
                 pp[n]["kernel"] = jnp.asarray(pp[n]["kernel"]).at[O_WIRE:].multiply(a.wire_init_scale)
             params = {"params": pp}
+    if a.channel == "sym":
+        # Symbols as actions with a codebook-distance policy over FIXED orthogonal codewords c_k = a e_k (k < vocab):
+        # -||z - c_k||^2 / tau = (2a/tau) z_k + const, i.e. a linear symbol head with temperature tau / (2a); the
+        # broadcast is a * one-hot. Rows >= vocab are pushed far away (never chosen). No VQ loss, so the codebooks
+        # get no gradient and stay fixed.
+        VQC = 0.0
+        pp = {k: dict(v) if isinstance(v, dict) else v for k, v in params["params"].items()}
+        for lo, hi, ck in rl_jax.TOKEN_SLOTS:
+            d = hi - lo
+            E = np.full((V, d), 1e3 / np.sqrt(d), np.float32)
+            E[:a.sym_vocab] = a.sym_scale * np.eye(a.sym_vocab, d, dtype=np.float32)
+            pp[ck] = dict(pp[ck], embedding=jnp.asarray(E))
+        params = {"params": pp}
     opt = optax.adam(LR)
     opt_state = opt.init(params)
     popart = PopArt(beta=0.1)
@@ -1099,6 +1119,42 @@ def main():
                               frac_partner_informed_on_its_own_before_delivery=partner_found / max(n_ep, 1),
                               median_steps_first_informed_to_delivery=float(np.median(delays)) if delays else None)), flush=True)
         raise SystemExit(0)
+
+    if a.selftest_sym:
+        """step 2 apparatus: (1) no probability on unreachable codewords; (2) a broadcast is a * one-hot of the symbol;
+        (3) one training update leaves the codebooks bit-identical; (4) a mutant with all codewords equal (constant
+        broadcast) must fail check (2)."""
+        assert a.channel == "sym"
+        lisq = np.asarray(is_listener)
+        _, Rs = rollout(params, init_state(jax.random.PRNGKey(51)), jax.random.PRNGKey(52))
+        Rs = jax.tree_util.tree_map(np.asarray, Rs)
+        O = jnp.asarray(Rs["obs"].reshape(-1, D)[:4096]); C = jnp.asarray(Rs["carries"].reshape(-1, H)[:4096])
+        _, o = apply_fn(params, C, O)
+        probs = [np.asarray(jax.nn.softmax(lg, -1)) for lg in token_logits(params, o.z_e, TAU)]
+        unreach = max(float(p_[:, a.sym_vocab:].sum(-1).max()) for p_ in probs)
+        toks = Rs["token_actions"].reshape(-1, 3)
+        def bcast(par, t):
+            return np.concatenate([np.asarray(par["params"][k]["embedding"])[t[:, i]] for i, (_, _, k) in enumerate(rl_jax.TOKEN_SLOTS)], -1)
+        want = np.concatenate([a.sym_scale * np.eye(a.sym_vocab, hi - lo)[toks[:, i]] for i, (lo, hi, _) in enumerate(rl_jax.TOKEN_SLOTS)], -1)
+        ok_bc = bool(np.allclose(bcast(params, toks), want))
+        mut = {"params": {k: (dict(v, embedding=jnp.ones_like(v["embedding"]) * 0.3) if k.startswith("codebook") else v)
+                          for k, v in params["params"].items()}}
+        mut_caught = not np.allclose(bcast(mut, toks), want)
+        # one real update
+        cb0 = {k: np.asarray(params["params"][k]["embedding"]) for _, _, k in rl_jax.TOKEN_SLOTS}
+        vals = popart.denormalise(Rs["values"]); adv, ret = gae_bootstrap(Rs["rewards"], vals, np.zeros_like(Rs["rewards"]), vals[-1], GAMMA, LAM)
+        Mq = T * N
+        fl = {k: Rs[k].reshape((Mq,) + Rs[k].shape[2:]) for k in ("obs", "actions", "log_probs", "carries", "token_actions")}
+        fl["values"] = vals.reshape(Mq).astype(np.float32); fl["adv"], fl["ret"] = adv.reshape(Mq), ret.reshape(Mq).astype(np.float32)
+        mb = {k: jnp.asarray(v[:MB]) for k, v in fl.items()}
+        p2, _, _ = mb_step(params, opt_state, mb, popart.sigma, popart.mu, a.ps, TOK_ENT)
+        cb_fixed = all(np.array_equal(cb0[k], np.asarray(p2["params"][k]["embedding"])) for k in cb0)
+        head_moved = not np.array_equal(np.asarray(params["params"]["head_signal_slot0"]["kernel"]), np.asarray(p2["params"]["head_signal_slot0"]["kernel"]))
+        res = dict(unreachable_prob_max=unreach, broadcast_is_scaled_onehot=ok_bc, constant_codebook_mutant_caught=mut_caught,
+                   codebooks_fixed_after_update=cb_fixed, symbol_head_moved=head_moved)
+        ok = unreach < 1e-6 and ok_bc and mut_caught and cb_fixed and head_moved
+        print(json.dumps(res)); print("SELFTEST-SYM", "PASS" if ok else "FAIL", flush=True)
+        raise SystemExit(0 if ok else 1)
 
     if a.selftest_wireblind:
         """C1 apparatus: the sender's token distribution must be exactly unchanged when its heard wire is replaced by
