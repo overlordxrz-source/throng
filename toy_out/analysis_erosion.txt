@@ -1,0 +1,12 @@
+== wire OFF (manipulation check: MI < 0.5 bit at 2,000 in >= 2 of 3)
+   s80: MI@2000 0.099 | MI@1500 2.000 | plug-in trace 1000:2.00 1500:2.00 1600:1.79 1750:0.82 2000:0.08 | L dep 1.26 | wd from 2000
+   s81: MI@2000 0.009 | MI@1500 1.998 | plug-in trace 1000:1.99 1500:2.00 1600:1.70 1750:0.23 2000:0.01 | L dep 4.05 | wd from 2000
+   s82: MI@2000 0.002 | MI@1500 1.991 | plug-in trace 1000:1.99 1500:1.99 1600:1.12 1750:0.22 2000:0.01 | L dep 2.61 | wd from 2000
+   manipulation check: HOLDS (3/3); wire-off listener dep mean 2.64
+
+== wire ON (seed passes: MI >= 1.0 and reliance)
+   s70: MI@2000 0.000 (MI@1500 1.999) | trace 1000:1.96 1500:2.00 1600:1.07 1750:0.00 2000:0.00 | drop +4% paired 0.12 SE 0.05 | L dep 3.45 vs wire-off 2.64 -> fail
+   s71: MI@2000 0.001 (MI@1500 1.973) | trace 1000:1.99 1500:1.96 1600:1.47 1750:0.04 2000:0.00 | drop -0% paired -0.00 SE 0.07 | L dep 1.47 vs wire-off 2.64 -> fail
+   s72: MI@2000 0.000 (MI@1500 1.998) | trace 1000:2.00 1500:2.00 1600:1.68 1750:0.29 2000:0.00 | drop -2% paired -0.07 SE 0.08 | L dep 4.01 vs wire-off 2.64 -> fail
+
+== EROSION TEST: FAIL (wire-on seeds passing: 0/3)
