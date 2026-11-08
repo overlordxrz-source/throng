@@ -2127,6 +2127,22 @@ more expensive, because it produces publishable-looking nulls.
     arm's wire-off mean) in >= 2 of 3 wire-on at 2,000, **and** wire-off MI < 0.5 bit at 2,000 in both. Secondary:
     MI >= 0.5; retention vs 1,500.
 
+- **RESULTS -- T4 (2026-11-08): T4a FAIL, T4B FAIL as registered.** Modal CPU, data `comm-toy` `b5de53b`, output
+  `docs/data/toy_t4_2026-11-08_analysis.txt` (registered script, unmodified; all 10 runs complete, no restarts).
+  * **T4a (central V_shared baseline):** wire-on reliance at 2,000 is +55% / -2% / +19% (1/3 pass); MI 0.22 /
+    0.01 / 0.07. Wire-off MI **0.83** / 0.34, so the manipulation failed in one seed.
+  * **T4b (central Q_shared counterfactual):** wire-on reliance at 2,000 is **+66% / +62% / +71%, all three pass,
+    retention ~1.00**. Listener deposits 7.4 / 7.5 / 6.7 vs the NOSIG level 3.2; MI 1.29 / 0.86 / 1.03. **But
+    wire-off MI 1.29 / 0.70:** the code survives the decay with no listener at all, which counts as an artifact
+    (Cam's rule) -> FAIL.
+  * **Reading.** MEASURED: under T4b the channel stays fully intact through erosion, but wire-on and wire-off codes
+    survive alike (mean MI 1.06 vs 0.99), so there is no evidence that *use* is what protects the code.
+    CONJECTURED (not tested): the sender only ever emits its current code, so the counterfactual critic's values
+    for never-sent tokens are extrapolations. If they sit below the sent token's value, the counterfactual
+    advantage always favours the token in use, which entrenches any existing code whether or not anyone listens
+    (a known weak spot of COMA-style baselines when coverage is narrow). A test: the same arm with forced
+    exploration of off-code tokens (or a critic trained with token dropout), with the wire-off control.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
