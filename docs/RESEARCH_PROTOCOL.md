@@ -2686,6 +2686,64 @@ more expensive, because it produces publishable-looking nulls.
   - **Recommendation:** A (T3, declared NOSIG level) + B (E) ~ $0.83 + $2.1 = $2.9, plus 3b's VOI check $0.8 =
     **$3.7** (vs $2.9 approved). This waits for the credit check and Cam.
 
+- **RESULTS -- step 6, compositionality pilot (registered; `comm-toy` `e48e98f`; `scripts/analyze_step6.py`
+  unmodified; data `docs/data/step6/`): FAIL.**
+  - **Gates:**
+    - Gate 1 (topographic similarity) 5/5: passes, but trivially.
+    - Gate 2 (held-out generalisation) 0/5: success on the held-out pairs is 0.000-0.025 per attempt vs chance
+      1/16, and equals the shuffled-message null (only s214 differs from the shuffled null, and it is still below
+      chance).
+  - **Why gate 1 is hollow:** the sender uses only **4-7 distinct messages for 14 meanings**. rho is identical at
+    1,000 / 2,000 / 3,000 in every seed, so the code froze early. Meanings that share a fire share a message, which
+    alone gives rho > 0.
+  - **Diagnostic (not registered): the sender's token policy goes deterministic within 10-15 updates.** Token
+    entropy < 0.01 nats from update 10 / 11 / 10 / 10 / 15. MI(token; pair) is 0.65-0.91 bits at that point and
+    only 1.2-1.4 bits at 3,000, against log2 14 = 3.81 needed. Listener correct per attempt at the end: 0.34 /
+    0.34 / 0.07 / 0.23 / 0.27.
+  - **Reading:** with the vocabulary cut to 4 per slot and tau 0.08, the warm-started z_e sits deep in single
+    Voronoi cells. Sampling exploration ends immediately. PS can still move z_e across a boundary now and then
+    (MI 0.66 -> 1.25), but it never builds a code for the material. The failure is upstream of compositionality:
+    there is no complete code to compose.
+  - **Candidates (not run; Cam's call):**
+    - a token temperature calibrated to the vocab-4 codebook geometry (the same within-cell distance ratio as
+      vocab 8);
+    - or a token-entropy floor in the sender's first updates;
+    - re-registered as a step-6 rerun, with "distinct messages >= 12 of 14" as a precondition gate before
+      reading compositionality.
+  - Spend ~$0.65 (metered $24.13 -> $24.78; 5 x 3,000 updates; no restarts).
+- **North star: dictionary + "speak to them" (Cam's item 9.3; exploratory, $0, local; `comm-toy` `1873439`
+  `--speak-test`, `scripts/analyze_speak.py`; data `docs/data/speak/`).**
+  - **Method.** Frozen saved actor params. The dictionary maps fire -> the sender's modal triple ("dictionary") or
+    each slot's modal token ("slot dictionary"), built from 4 frozen control rollouts on their own keys.
+  - We then "speak": the listener hears our word for X = T + s instead of its sender, over 10 paired episodes. It
+    is compared with the control (real sender), the sender's own triples for X ("own words") and babble (uniform
+    random triples).
+  - Readouts: listener Crafts at X, and **specificity** = Crafts at X / Crafts at any fire. Specificity is needed
+    because babble makes listeners Craft everywhere: raw counts under babble reach 10-20 per world.
+  - "Understood" (descriptive): for every s in 1..3, dictionary Crafts at X >= 0.8x own words, specificity >= 0.5,
+    and specificity >= babble + 0.25.
+  - **Understood in 12 of 14 checkpoints:**
+    - C1-T3 x3 (u2000, pre-reset);
+    - step-2 VQ s190-193;
+    - C1-E x3 at u1500;
+    - C1-E s185 / s186 at u2000.
+    - **Saying "X" sends listeners to X:** ~18-27 Crafts at X per world (control 0.4-0.8), specificity 0.73-0.80
+      (babble 0.26-0.33). Our dictionary word works as well as the sender's own words; the per-slot dictionary
+      works as well as the modal triple.
+  - **Not understood:**
+    - C1-E s187 u2000 (eroded: triple MI 0.12 bit; no condition moves listeners);
+    - step-2 VQ s194: only "T+2" is understood (89 Crafts at X, specificity 0.98). For T+1 / T+3 our words and its
+      own words both give ~4.9 Crafts at specificity 0.67, so its listener barely acts on them.
+  - **Explains C1-E's puzzle.** In the eroded C1-E seeds s185 / s186 at u2000:
+    - per-slot MI is 0.0-0.54 and triple MI 0.57 / 0.63 bit;
+    - **our dictionary works *better* than the sender's own words** (18-20 vs 14.5-15.6 Crafts at X; specificity
+      0.57-0.62 vs 0.55-0.57 in s185, 0.79 vs 0.78 in s186).
+    - Erosion degrades the *sender's* use of the words. The *listener* still understands the original vocabulary.
+      Reliance survives because the sender still sometimes says the right word, and the listener integrates those
+      uses over steps.
+  - **Caveat:** the triples are diverse (363-4,076 distinct triples, modal-triple purity often < 1%) while each slot
+    is nearly pure. The words are per-slot tokens, and the three slots are redundant copies, not a composition.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under

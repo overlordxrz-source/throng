@@ -1,0 +1,84 @@
+C1E_s185_u1500.jsonl: slot MI [1.997, 1.997, 1.997] triple MI(MM) 1.997 (2031 distinct triples) | modal-triple purity [0.004, 0.28, 1.0, 1.0] | slot purity (mean) [0.133, 0.657, 1.0, 1.0]
+   s=0 (truth) deliveries: control 5.60 own_words 5.62 dictionary 5.62 slot_dictionary 5.60 babble 0.90
+   say T+1: crafts at X (specificity): control 0.49 (0.07) own_words 18.62 (0.78) dictionary 18.50 (0.78) slot_dictionary 18.49 (0.78) babble 1.61 (0.28)
+   say T+2: crafts at X (specificity): control 0.49 (0.07) own_words 18.61 (0.78) dictionary 18.55 (0.78) slot_dictionary 18.55 (0.78) babble 1.63 (0.28)
+   say T+3: crafts at X (specificity): control 0.44 (0.06) own_words 18.52 (0.78) dictionary 18.63 (0.78) slot_dictionary 18.62 (0.78) babble 1.80 (0.29)
+   -> understood: dictionary YES | slot dictionary YES
+C1E_s185_u2000.jsonl: slot MI [0.238, 0.0, 0.338] triple MI(MM) 0.573 (2018 distinct triples) | modal-triple purity [0.004, 0.009, 0.005, 0.006] | slot purity (mean) [0.153, 0.227, 0.151, 0.174]
+   s=0 (truth) deliveries: control 5.26 own_words 5.27 dictionary 5.52 slot_dictionary 5.50 babble 2.30
+   say T+1: crafts at X (specificity): control 3.14 (0.22) own_words 15.61 (0.57) dictionary 18.75 (0.61) slot_dictionary 19.66 (0.61) babble 3.26 (0.27)
+   say T+2: crafts at X (specificity): control 3.28 (0.23) own_words 15.23 (0.57) dictionary 18.87 (0.62) slot_dictionary 18.38 (0.64) babble 3.15 (0.27)
+   say T+3: crafts at X (specificity): control 2.90 (0.20) own_words 14.49 (0.55) dictionary 18.19 (0.57) slot_dictionary 17.82 (0.60) babble 3.18 (0.27)
+   -> understood: dictionary YES | slot dictionary YES
+C1E_s186_u1500.jsonl: slot MI [1.986, 1.986, 1.986] triple MI(MM) 1.986 (363 distinct triples) | modal-triple purity [0.008, 0.601, 1.0, 0.52] | slot purity (mean) [0.388, 0.867, 1.0, 0.84]
+   s=0 (truth) deliveries: control 6.91 own_words 6.76 dictionary 6.78 slot_dictionary 6.78 babble 1.68
+   say T+1: crafts at X (specificity): control 0.47 (0.06) own_words 21.60 (0.78) dictionary 21.82 (0.79) slot_dictionary 21.79 (0.79) babble 2.66 (0.26)
+   say T+2: crafts at X (specificity): control 0.49 (0.06) own_words 21.82 (0.79) dictionary 22.08 (0.79) slot_dictionary 22.09 (0.79) babble 2.85 (0.27)
+   say T+3: crafts at X (specificity): control 0.45 (0.05) own_words 21.62 (0.78) dictionary 21.89 (0.79) slot_dictionary 21.93 (0.79) babble 2.70 (0.27)
+   -> understood: dictionary YES | slot dictionary YES
+C1E_s186_u2000.jsonl: slot MI [0.376, 0.444, 0.539] triple MI(MM) 0.628 (2150 distinct triples) | modal-triple purity [0.003, 0.003, 0.003, 0.019] | slot purity (mean) [0.136, 0.135, 0.133, 0.267]
+   s=0 (truth) deliveries: control 5.21 own_words 5.18 dictionary 5.41 slot_dictionary 5.37 babble 3.43
+   say T+1: crafts at X (specificity): control 0.49 (0.07) own_words 14.98 (0.78) dictionary 19.77 (0.79) slot_dictionary 19.15 (0.79) babble 6.73 (0.28)
+   say T+2: crafts at X (specificity): control 0.72 (0.10) own_words 15.49 (0.79) dictionary 20.07 (0.80) slot_dictionary 19.47 (0.79) babble 7.13 (0.30)
+   say T+3: crafts at X (specificity): control 0.79 (0.11) own_words 15.20 (0.77) dictionary 19.62 (0.79) slot_dictionary 18.96 (0.78) babble 6.60 (0.27)
+   -> understood: dictionary YES | slot dictionary YES
+C1E_s187_u1500.jsonl: slot MI [1.995, 1.995, 1.995] triple MI(MM) 1.995 (1770 distinct triples) | modal-triple purity [0.002, 1.0, 0.497, 1.0] | slot purity (mean) [0.109, 1.0, 0.831, 1.0]
+   s=0 (truth) deliveries: control 6.16 own_words 6.16 dictionary 6.28 slot_dictionary 6.15 babble 3.88
+   say T+1: crafts at X (specificity): control 0.64 (0.08) own_words 19.48 (0.76) dictionary 19.58 (0.76) slot_dictionary 19.31 (0.76) babble 10.59 (0.31)
+   say T+2: crafts at X (specificity): control 0.56 (0.07) own_words 19.78 (0.76) dictionary 19.65 (0.76) slot_dictionary 19.66 (0.76) babble 9.89 (0.29)
+   say T+3: crafts at X (specificity): control 0.72 (0.09) own_words 19.82 (0.76) dictionary 19.75 (0.76) slot_dictionary 19.78 (0.75) babble 10.42 (0.29)
+   -> understood: dictionary YES | slot dictionary YES
+C1E_s187_u2000.jsonl: slot MI [0.035, 0.037, 0.009] triple MI(MM) 0.121 (2066 distinct triples) | modal-triple purity [0.003, 0.002, 0.003, 0.002] | slot purity (mean) [0.119, 0.113, 0.136, 0.111]
+   s=0 (truth) deliveries: control 3.31 own_words 3.25 dictionary 3.65 slot_dictionary 4.04 babble 3.26
+   say T+1: crafts at X (specificity): control 3.21 (0.24) own_words 3.90 (0.28) dictionary 5.99 (0.36) slot_dictionary 6.39 (0.38) babble 4.46 (0.26)
+   say T+2: crafts at X (specificity): control 3.63 (0.27) own_words 3.86 (0.29) dictionary 5.75 (0.38) slot_dictionary 5.74 (0.39) babble 4.32 (0.27)
+   say T+3: crafts at X (specificity): control 3.19 (0.24) own_words 4.15 (0.30) dictionary 6.71 (0.38) slot_dictionary 6.78 (0.40) babble 4.50 (0.27)
+   -> understood: dictionary no | slot dictionary no
+C1T3_s180_u2000.jsonl: slot MI [1.986, 1.986, 1.984] triple MI(MM) 1.986 (3131 distinct triples) | modal-triple purity [0.002, 0.438, 0.999, 0.51] | slot purity (mean) [0.092, 0.726, 1.0, 0.837]
+   s=0 (truth) deliveries: control 7.66 own_words 7.73 dictionary 7.65 slot_dictionary 7.71 babble 4.85
+   say T+1: crafts at X (specificity): control 0.50 (0.05) own_words 23.82 (0.76) dictionary 23.89 (0.76) slot_dictionary 23.93 (0.76) babble 18.07 (0.30)
+   say T+2: crafts at X (specificity): control 0.47 (0.05) own_words 26.66 (0.80) dictionary 26.68 (0.80) slot_dictionary 26.71 (0.80) babble 19.73 (0.33)
+   say T+3: crafts at X (specificity): control 0.53 (0.06) own_words 23.60 (0.76) dictionary 23.67 (0.76) slot_dictionary 23.77 (0.76) babble 17.50 (0.29)
+   -> understood: dictionary YES | slot dictionary YES
+C1T3_s181_u2000.jsonl: slot MI [1.97, 1.969, 1.972] triple MI(MM) 1.990 (1115 distinct triples) | modal-triple purity [0.007, 0.282, 0.547, 0.747] | slot purity (mean) [0.195, 0.677, 0.849, 0.868]
+   s=0 (truth) deliveries: control 7.26 own_words 7.22 dictionary 7.39 slot_dictionary 7.42 babble 4.59
+   say T+1: crafts at X (specificity): control 0.63 (0.07) own_words 18.32 (0.73) dictionary 18.71 (0.73) slot_dictionary 19.31 (0.74) babble 12.19 (0.29)
+   say T+2: crafts at X (specificity): control 0.50 (0.06) own_words 20.51 (0.76) dictionary 20.87 (0.76) slot_dictionary 21.30 (0.76) babble 13.13 (0.31)
+   say T+3: crafts at X (specificity): control 0.57 (0.06) own_words 18.33 (0.73) dictionary 18.71 (0.73) slot_dictionary 19.09 (0.73) babble 12.31 (0.29)
+   -> understood: dictionary YES | slot dictionary YES
+C1T3_s182_u2000.jsonl: slot MI [1.894, 1.989, 1.438] triple MI(MM) 2.000 (2897 distinct triples) | modal-triple purity [0.007, 0.019, 0.568, 0.59] | slot purity (mean) [0.168, 0.229, 0.856, 0.831]
+   s=0 (truth) deliveries: control 9.55 own_words 9.61 dictionary 9.93 slot_dictionary 9.93 babble 4.43
+   say T+1: crafts at X (specificity): control 0.66 (0.06) own_words 22.57 (0.75) dictionary 23.49 (0.75) slot_dictionary 23.67 (0.75) babble 14.40 (0.31)
+   say T+2: crafts at X (specificity): control 0.54 (0.05) own_words 23.31 (0.76) dictionary 23.73 (0.76) slot_dictionary 23.56 (0.76) babble 13.45 (0.29)
+   say T+3: crafts at X (specificity): control 0.65 (0.06) own_words 23.53 (0.75) dictionary 23.62 (0.75) slot_dictionary 23.67 (0.75) babble 13.57 (0.29)
+   -> understood: dictionary YES | slot dictionary YES
+S2VQ_s190_u2000.jsonl: slot MI [1.984, 1.984, 1.984] triple MI(MM) 1.984 (873 distinct triples) | modal-triple purity [0.007, 0.219, 0.291, 0.586] | slot purity (mean) [0.16, 0.74, 0.684, 0.862]
+   s=0 (truth) deliveries: control 7.66 own_words 7.68 dictionary 7.62 slot_dictionary 7.59 babble 4.30
+   say T+1: crafts at X (specificity): control 0.48 (0.05) own_words 23.08 (0.77) dictionary 23.08 (0.77) slot_dictionary 23.09 (0.77) babble 10.23 (0.29)
+   say T+2: crafts at X (specificity): control 0.58 (0.06) own_words 20.37 (0.74) dictionary 20.47 (0.74) slot_dictionary 20.48 (0.74) babble 9.76 (0.28)
+   say T+3: crafts at X (specificity): control 0.41 (0.05) own_words 21.93 (0.76) dictionary 21.82 (0.76) slot_dictionary 21.80 (0.76) babble 10.46 (0.29)
+   -> understood: dictionary YES | slot dictionary YES
+S2VQ_s191_u2000.jsonl: slot MI [1.992, 1.992, 1.992] triple MI(MM) 1.992 (1934 distinct triples) | modal-triple purity [0.003, 1.0, 0.664, 1.0] | slot purity (mean) [0.166, 1.0, 0.888, 1.0]
+   s=0 (truth) deliveries: control 8.19 own_words 8.14 dictionary 8.07 slot_dictionary 8.06 babble 2.39
+   say T+1: crafts at X (specificity): control 0.52 (0.05) own_words 21.94 (0.76) dictionary 21.90 (0.76) slot_dictionary 21.87 (0.75) babble 4.23 (0.28)
+   say T+2: crafts at X (specificity): control 0.47 (0.05) own_words 26.98 (0.80) dictionary 27.04 (0.80) slot_dictionary 27.02 (0.80) babble 4.44 (0.29)
+   say T+3: crafts at X (specificity): control 0.50 (0.05) own_words 22.28 (0.76) dictionary 22.35 (0.76) slot_dictionary 22.30 (0.76) babble 4.37 (0.28)
+   -> understood: dictionary YES | slot dictionary YES
+S2VQ_s192_u2000.jsonl: slot MI [2.0, 2.0, 2.0] triple MI(MM) 2.000 (2913 distinct triples) | modal-triple purity [0.002, 1.0, 0.331, 1.0] | slot purity (mean) [0.1, 1.0, 0.728, 1.0]
+   s=0 (truth) deliveries: control 9.41 own_words 9.42 dictionary 9.36 slot_dictionary 9.43 babble 4.12
+   say T+1: crafts at X (specificity): control 0.72 (0.06) own_words 22.45 (0.73) dictionary 22.52 (0.73) slot_dictionary 22.47 (0.73) babble 13.08 (0.30)
+   say T+2: crafts at X (specificity): control 0.68 (0.06) own_words 22.86 (0.73) dictionary 22.93 (0.73) slot_dictionary 22.88 (0.73) babble 13.08 (0.29)
+   say T+3: crafts at X (specificity): control 0.75 (0.06) own_words 22.78 (0.73) dictionary 22.78 (0.73) slot_dictionary 22.80 (0.73) babble 14.19 (0.32)
+   -> understood: dictionary YES | slot dictionary YES
+S2VQ_s193_u2000.jsonl: slot MI [2.0, 2.0, 2.0] triple MI(MM) 2.000 (771 distinct triples) | modal-triple purity [0.005, 1.0, 0.674, 1.0] | slot purity (mean) [0.229, 1.0, 0.891, 1.0]
+   s=0 (truth) deliveries: control 6.35 own_words 6.33 dictionary 6.30 slot_dictionary 6.28 babble 3.23
+   say T+1: crafts at X (specificity): control 0.60 (0.07) own_words 20.82 (0.76) dictionary 20.83 (0.76) slot_dictionary 20.84 (0.76) babble 5.74 (0.29)
+   say T+2: crafts at X (specificity): control 0.61 (0.07) own_words 20.15 (0.77) dictionary 20.15 (0.77) slot_dictionary 20.20 (0.77) babble 5.85 (0.29)
+   say T+3: crafts at X (specificity): control 0.55 (0.07) own_words 20.60 (0.76) dictionary 20.44 (0.76) slot_dictionary 20.44 (0.76) babble 5.37 (0.27)
+   -> understood: dictionary YES | slot dictionary YES
+S2VQ_s194_u2000.jsonl: slot MI [1.999, 1.999, 1.999] triple MI(MM) 1.999 (4076 distinct triples) | modal-triple purity [0.001, 0.511, 1.0, 1.0] | slot purity (mean) [0.08, 0.797, 1.0, 1.0]
+   s=0 (truth) deliveries: control 9.02 own_words 9.06 dictionary 9.03 slot_dictionary 9.04 babble 1.93
+   say T+1: crafts at X (specificity): control 0.33 (0.03) own_words 4.92 (0.67) dictionary 4.84 (0.67) slot_dictionary 4.91 (0.67) babble 4.87 (0.07)
+   say T+2: crafts at X (specificity): control 0.25 (0.02) own_words 89.39 (0.98) dictionary 89.21 (0.98) slot_dictionary 89.30 (0.98) babble 57.50 (0.83)
+   say T+3: crafts at X (specificity): control 0.34 (0.03) own_words 4.89 (0.67) dictionary 4.90 (0.67) slot_dictionary 4.94 (0.67) babble 4.80 (0.07)
+   -> understood: dictionary no | slot dictionary no
