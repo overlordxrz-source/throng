@@ -2217,6 +2217,37 @@ more expensive, because it produces publishable-looking nulls.
      while a fresh head in T2 never rebuilt a code, so copying plus use did something there.
   9. Spend: step B + T4b regeneration + steps 2 and 3 ~ $6.7 of ~$10.7 left; step 6's $1.7 fits in $15.
 
+- **RESULTS -- Step A (gradient-path audit, 2026-11-08, $0).** `comm-toy` `037266c` (`--selftest-leak`).
+  * **Shared parameters:** sender and listener share **every** parameter (one ToyNet; the role is set only by the
+    informed flag in the obs).
+  * **Paths into the message parameters** (`gwt_comms_1`, `head_signal_slot*`, `codebook_*`), from the code:
+    1. **The listener's own token policy gradient.** The listener's tokens are sampled from the same shared head
+       and enter the joint PPO ratio with the listener's advantage; its input includes the heard wire.
+    2. **The listener's VQ commitment and codebook loss.** It pulls the shared head **and the codebook** (the wire
+       content itself) toward the listener's z_e, computed from an obs that includes the wire.
+    3. **The listener's token-entropy bonus,** by the same route.
+    4. **Shared normalisation:** advantages are standardised over both roles and PopArt is shared, so the
+       listener's rewards rescale the sender's token credit (a scale coupling, not a gradient).
+    5. **None** from the movement or value losses (the message pathway is a separate branch).
+  * **Unit test** (token PPO term zeroed, listener rows of one wire-on rollout; gradient w.r.t. the message
+    parameters with the heard wire as recorded vs zeroed). At a **trained code** (PS0 final):
+    - VQ: 0.026 vs 0.179 (difference 0.179);
+    - token entropy: 0.054 vs 0.156 (0.166);
+    - the listener's token PG: 0.25 vs 196 (the zeroed wire is far off-distribution);
+    - movement / value: 0.0 / 0.0 / 0.0.
+    At ORACLE0 (start): differences 0.04 / 0.12 / 0.28 / 0.0. **Leaks exist**, through all three listener message
+    losses. The codebook gets 0.012 (trained) / 0.097 (start) from the listener's VQ loss.
+  * **Forward coupling (not a gradient) -- the largest effect.** `gwt_comms_1` reads the full obs, including the
+    heard wire, so the **sender's token depends on what the listener just broadcast**. At the trained code,
+    replacing the sender's heard wire with random tokens changes the sender's own argmax token in **53%** of slots
+    (TV 0.55), and zeroing it gives TV 0.90. At the warm start: 15%, TV 0.012. The dependence is learned with the
+    code. With the wire live, the sender's fire -> token mapping is partly a function of the listener's broadcast,
+    so any drift in the listener's tokens (learning, or a wire-input reset) moves the sender's code. With the wire
+    off this input is always zero. CONJECTURED: this is the active destabilising force behind T3 / erosion / the
+    real network's live-wire collapse; production's comms pathway also reads neighbour signals.
+  * Per the ruling, **step 2 is held** and Cam is told (a gradient path through the VQ wire exists). Step B's arm
+    (iii) needs his choice, because a stop-gradient alone would not cut the forward coupling.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
