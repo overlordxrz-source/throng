@@ -13,7 +13,7 @@ import modal
 
 _REQUIREMENTS = str(Path(__file__).resolve().parents[1] / "requirements.txt")
 
-PINNED_SHA = "24678d3dbc6eef89b623b403e1475704cb14f638"  # comm-jit branch
+PINNED_SHA = "326c8cb3f366c49b24be97dffbb2c419f2a525d0"  # comm-jit branch
 REPO_URL = "https://github.com/overlordxrz-source/throng.git"
 VOLUME_NAME = "throng-runs"
 VOLUME_MOUNT = "/mnt/throng-runs"
@@ -35,8 +35,7 @@ image = (
 )
 
 
-@app.function(image=image, gpu=GPU, timeout=6 * 60 * 60, retries=0, volumes={VOLUME_MOUNT: volume})
-def run_jit(tag: str, args: list) -> list[dict]:
+def _run_stream(tag: str, args: list) -> list[dict]:
     import json
     import os
     import subprocess
@@ -60,6 +59,11 @@ def run_jit(tag: str, args: list) -> list[dict]:
     if rc != 0:
         raise RuntimeError(f"{tag} exited {rc}")
     return recs
+
+
+@app.function(image=image, gpu=GPU, timeout=6 * 60 * 60, retries=0, volumes={VOLUME_MOUNT: volume})
+def run_jit(tag: str, args: list) -> list[dict]:
+    return _run_stream(tag, args)
 
 
 def _seq(tag: str, arg_lists: list) -> list[dict]:
@@ -101,7 +105,26 @@ def seq_l4(tag: str, arg_lists: list) -> list[dict]:
     return _seq(tag, arg_lists)
 
 
+@app.function(image=image, gpu="A10G", timeout=8 * 60 * 60, retries=0, volumes={VOLUME_MOUNT: volume})
+def run_a10(tag: str, args: list) -> list[dict]:
+    return _run_stream(tag, args)
+
+
 WARM = "{VOL}/testbed/params/comm_ORACLE0_run_b88fe7f_a2.msgpack"
+CONFIRM = [(f"confirm_PS{s}", ["--arm", "COMM", "--seed", str(s), "--updates", "450", "--tau", "0.08", "--craft-cost", "0.1",
+                               "--warm-start", "{VOL}/testbed/params/comm_ORACLE0_run_b88fe7f_a2.msgpack", "--ps", "2.015",
+                               "--apparatus-update", "2", "--mi-halt-k", "5", "--mi-floor", "0.92", "--mi-probe-halt",
+                               "--eval-at", *[str(u) for u in range(50, 450, 50)], "--swap-pairs", "10",
+                               "--swap-modes", "empirical", "--save-params", f"{{VOL}}/testbed/params/confirm_PS{s}.msgpack"])
+           for s in (50, 51)]
+
+
+@app.local_entrypoint()
+def confirm():
+    for (tag, _), recs in zip(CONFIRM, run_a10.starmap(CONFIRM)):
+        print(f"[{tag}] {len(recs)} records", flush=True)
+
+
 _RUN = ["--arm", "COMM", "--tau", "0.08", "--craft-cost", "0.1", "--warm-start", "{VOL}/testbed/params/comm_ORACLE0_run_b88fe7f_a2.msgpack",
         "--ps", "2.015", "--apparatus-update", "0", "--no-eval"]
 SCAN_CHECK = {

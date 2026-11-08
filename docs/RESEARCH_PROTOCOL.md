@@ -1956,6 +1956,28 @@ more expensive, because it produces publishable-looking nulls.
   still erodes; a maintained wire-off is an artifact (= fail of that fix). Gradient tests and mutants for both
   heads before any run. (5) **Toy/CPU allowance raised to $6 total.**
 
+- **REGISTRATION -- real-network PS confirmation (before launch).** `comm-jit` `326c8cb` (the jitted rollout,
+  exact-equivalent to the Python path; loop PPO path); launcher `scripts/modal_comm_jit.py::confirm`; analysis
+  `scripts/analyze_confirm.py` (master).
+  * **Arms:** PS x2, **fresh seeds 50 / 51**, A10G, everything as the final comm run except PS: ORACLE0 warm
+    start, tau 0.08, token entropy 0.01, C' + PopArt, vf 0.5, **craft cost 0.1**, 32 worlds, T = 512, **c_ps
+    2.015**. N_max = **450** updates. NOSIG moves to the replication stage (Cam).
+  * **Probes every 50 updates** (50 ... 450): 10 empirical-swap pairs (a full token triple from the sender's own
+    tokens for T' in the paired control rollout), plus MI vs a 1,000-perm block null.
+  * **PRIMARY (both seeds):** redirection on the probes at 350 / 400 / 450, pooled to 30 pairs. Listener Crafts at
+    the swapped hearth per world: mean(swap) >= 2 x mean(control) **and** the paired increase > 2 SE. **Chosen
+    after the toy** (Cam's ruling): the movement score misread 2 of 8 toy seeds that clearly redirected, and with
+    two seeds a joint pass on movement, if meaning is present, is only ~0.75^2 = 56%. Movement Delta is reported
+    alongside.
+  * **Halts:** the update-2 apparatus check (PS gradient on the message heads > 0, > 1 distinct sender message,
+    listener wire nonzero); **MI at K = 5 >= 0.92 bit** (Cam's rule on the smoke: half the lower seed's MI at 5,
+    above the null p95); MI under 0.92 at two consecutive probes. **No futility stop** on redirection.
+  * **Reported at every probe:** sender deliveries (crash = the window minimum), listener deliveries, reliance
+    (deposit drop under the swap), movement Delta, MI vs null, swap-token membership.
+  * **Cost and guard:** estimated ~5 h per seed (450 x ~36 s + 9 probes) at the measured ~$1.31/GPU-h, so ~$6.6
+    per seed and ~$13 total. Meter at launch $5.00. Runaway guard = meter + $15 confirmation + the remaining toy
+    allowance (~$4.4) = **$24.40**; the confirmation itself is held to $15 by monitoring its app.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
