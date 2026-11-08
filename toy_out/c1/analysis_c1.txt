@@ -1,0 +1,26 @@
+== C1T3: formation gate at 1,500
+   s180: drop +65% paired 3.67 SE 0.10 | L dep 5.12 vs NOSIG 2.34 -> ok | MI@1500 1.981
+   s181: drop +67% paired 5.16 SE 0.10 | L dep 7.87 vs NOSIG 2.34 -> ok | MI@1500 1.986
+   s182: drop +73% paired 6.75 SE 0.10 | L dep 9.29 vs NOSIG 2.34 -> ok | MI@1500 1.999
+   formation gate: PASS (3/3)
+== C1E: formation gate at 1,500
+   s185: drop +69% paired 3.83 SE 0.11 | L dep 5.73 vs NOSIG 2.13 -> ok | MI@1500 1.996
+   s186: drop +73% paired 5.20 SE 0.12 | L dep 7.07 vs NOSIG 2.13 -> ok | MI@1500 1.988
+   s187: drop +65% paired 4.08 SE 0.09 | L dep 6.46 vs NOSIG 2.13 -> ok | MI@1500 1.996
+   formation gate: PASS (3/3)
+
+== C1-T3 reading (continuity across the first reset >= 0.5 AND exact copy at 2,000 >= half post-imitation)
+   s180: continuity@2000 0.868 | copy exact post-imitation 0.781 -> @2000 0.500 -> yes | (reported) reliance@2000 -4%, MI@2000 1.975
+   s181: continuity@2000 0.957 | copy exact post-imitation 0.492 -> @2000 0.417 -> yes | (reported) reliance@2000 -15%, MI@2000 1.968
+   s182: continuity@2000 0.853 | copy exact post-imitation 0.384 -> @2000 0.309 -> yes | (reported) reliance@2000 +2%, MI@2000 1.784
+   wire-off s183: continuity@2000 0.957 | MI@2000 1.965
+   wire-off s184: continuity@2000 0.961 | MI@2000 1.993
+   C1-T3: coupling CONFIRMED as the destabiliser (3/3)
+
+== C1-E rung-3 bar at 2,000
+   wire-on s185: drop +39% paired 2.03 SE 0.08 | L dep 5.27 vs NOSIG 2.50 | MI@2000 0.184 -> pass
+   wire-on s186: drop +73% paired 3.81 SE 0.07 | L dep 5.48 vs NOSIG 2.50 | MI@2000 0.409 -> pass
+   wire-on s187: drop +17% paired 0.58 SE 0.06 | L dep 3.55 vs NOSIG 2.50 | MI@2000 0.028 -> fail
+   wire-off s188: MI@2000 0.001
+   wire-off s189: MI@2000 0.022
+   C1-E: PASS (reliance 2/3; wire-off erodes True)
