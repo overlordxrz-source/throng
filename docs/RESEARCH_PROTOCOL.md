@@ -2356,6 +2356,29 @@ more expensive, because it produces publishable-looking nulls.
     the time), so the message adds little "where" information; the wire may carry timing or proximity
     information instead. Not tested.
 
+- **RESULTS -- T4 check 3 (b)/(c) on the regenerated T4b seeds (2026-11-08): neither H1 nor H2 -> T5 not launched
+  (per the ruling).** Data `comm-toy` `e61c23a`, `docs/data/toy_t4b_check3_2026-11-08.txt`.
+  * **Regeneration fidelity:** s161 (on) and s164 (off) are **bit-identical** to the original T4b runs. s160 (on)
+    and s163 (off) differ at the float level from updates 1 / 3 (~1e-6) and then diverge, so they are replicates,
+    not replays. CONJECTURED cause: Modal CPU containers landing on hosts with different instruction sets (the
+    same mechanism would explain step B's 1e-6 offset); not confirmed. s163's container also restarted once (the
+    final complete attempt was used). **Regenerated s163 eroded to MI 0.0 / 0.91 / 0.38 at 2,000 (mean 0.43),
+    where the original kept 1.29**, so T4b's "wire-off code survives" is not robust across replicates.
+  * **(b) Q over all 64 tokens per slot, 500 sampled sender states,** sent-token top-Q share / Q spread (std over
+    tokens):
+    - wire-off s163: 0.248 / 2.08 at 1,500 -> **0.009 / 1.00** at 2,000;
+    - wire-off s164: 0.241 / 1.97 -> **0.108 / 2.75**;
+    - wire-on s160: 0.269 / 1.82 -> 0.001 / 3.61;
+    - wire-on s161: 0.308 / 4.80 -> 0.555 / 6.23.
+  * **(c) mean counterfactual advantage of the sent token:** wire-off +0.0000 / -0.0002 at 2,000 (+0.0000 /
+    +0.0000 at 1,500); wire-on -0.0093 / +0.0184.
+  * **Registered reading:**
+    - **H1 (entrenchment)** needs the sent token to top Q in >= 80% of states in both wire-off seeds: measured
+      0.9% and 10.8%, and the wire-off sent-token advantage is ~0. **Not supported.**
+    - **H2 (slow decay)** needs wire-off MI still falling (check (a): flat for T4b) **and** a wire-off spread under
+      a quarter of wire-on's (measured 1.88 / 4.92 = 0.38). **Not supported.**
+    -> **"Anything else": reported; T5 is not launched.**
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
