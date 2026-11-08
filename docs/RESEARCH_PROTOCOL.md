@@ -2700,16 +2700,23 @@ more expensive, because it produces publishable-looking nulls.
     entropy < 0.01 nats from update 10 / 11 / 10 / 10 / 15. MI(token; pair) is 0.65-0.91 bits at that point and
     only 1.2-1.4 bits at 3,000, against log2 14 = 3.81 needed. Listener correct per attempt at the end: 0.34 /
     0.34 / 0.07 / 0.23 / 0.27.
-  - **Reading:** with the vocabulary cut to 4 per slot and tau 0.08, the warm-started z_e sits deep in single
-    Voronoi cells. Sampling exploration ends immediately. PS can still move z_e across a boundary now and then
-    (MI 0.66 -> 1.25), but it never builds a code for the material. The failure is upstream of compositionality:
-    there is no complete code to compose.
-  - **Candidates (not run; Cam's call):**
-    - a token temperature calibrated to the vocab-4 codebook geometry (the same within-cell distance ratio as
-      vocab 8);
-    - or a token-entropy floor in the sender's first updates;
-    - re-registered as a step-6 rerun, with "distinct messages >= 12 of 14" as a precondition gate before
-      reading compositionality.
+  - **Comparison (free):** step-2 VQ and C1 (full vocabulary) start at 9.5 nats of sender token entropy
+    (3 slots), fall to 0.8-1.7 by update 20 and **never** go below 0.01. Step 6 starts at **1.09 nats at update 1**,
+    before any learning: the warm-started z_e already sits deep in single cells of the 4 retained codewords. The
+    early collapse is therefore specific to step 6's vocabulary cut against the warm-start codebook.
+  - **Two candidate causes, not separated yet:**
+    - **(i) Codebook geometry.** Vocab 4 at tau 0.08 leaves no sampling exploration, so PS moves z_e across a cell
+      boundary only rarely (MI 0.66 -> 1.25).
+    - **(ii) The material enters through the old noise slots.** In COMP the material is written into O_NOISE,
+      which carried pure Gaussian noise throughout ORACLE0 training. The warm-started pathway has no learned use for
+      it, and a saturated softmax gives PS little gradient to build one.
+    - Evidence on (ii): in s212 / s213 / s214 the 14 meanings map to exactly 4 messages, consistent with fire only
+      (rho > 0). In s210 / s211, 5 / 7 messages: the material splits a fire's message at most occasionally.
+  - The failure is upstream of compositionality: there is no complete code to compose.
+  - **Candidates for a rerun (not run; Cam's call):**
+    - for (i): a token temperature matched to the vocab-4 codebook geometry, or a token-entropy floor early;
+    - for (ii): the material on fresh dims (not the old noise slots), or no warm start for the comp pathway.
+    - Either way, with "distinct messages >= 12 of 14" as a precondition gate before compositionality is read.
   - Spend ~$0.65 (metered $24.13 -> $24.78; 5 x 3,000 updates; no restarts).
 - **North star: dictionary + "speak to them" (Cam's item 9.3; exploratory, $0, local; `comm-toy` `1873439`
   `--speak-test`, `scripts/analyze_speak.py`; data `docs/data/speak/`).**
@@ -2722,6 +2729,12 @@ more expensive, because it produces publishable-looking nulls.
     because babble makes listeners Craft everywhere: raw counts under babble reach 10-20 per world.
   - "Understood" (descriptive): for every s in 1..3, dictionary Crafts at X >= 0.8x own words, specificity >= 0.5,
     and specificity >= babble + 0.25.
+    - **Disclosure:** this is my own descriptive rule, **revised after the first pass**. The first version had only
+      the count (>= 0.8x own words, babble < 0.25x). The babble counts (10-20 per world) showed that a count is not
+      specific, so I added specificity and the rows were re-run with Crafts at any fire logged. No registered bar is
+      involved.
+    - **Not broken down by target fire:** fire 0's modal-triple purity is 0.1-0.8% in every checkpoint (shared warm
+      start). The per-slot dictionary covers it, but an average over targets could hide one word that fails.
   - **Understood in 12 of 14 checkpoints:**
     - C1-T3 x3 (u2000, pre-reset);
     - step-2 VQ s190-193;
@@ -2787,13 +2800,20 @@ more expensive, because it produces publishable-looking nulls.
        apparatus check at 2, MI halt K = 5 / floor 0.92 / two-probe halt, empirical-swap probes every 50 x 10
        pairs), **plus the wire-blind message pathway (`--wire-blind 1`, apparatus PASS earlier), `--log-diag`, and
        `--ckpt-every 50`** (params to `testbed/comm_jit/ckpt/`).
-     - Fresh seeds 52 / 53.
+     - Fresh seeds 52 / 53 (unused on the real net: not in the protocol, not on the volume).
      - Primary and analysis unchanged: `scripts/analyze_confirm.py` (redirection on probes 350 / 400 / 450,
        swap >= 2x control and paired > 2 SE). **PASS = primary in 2 of 2; 1 of 2 = partial** (the third seed and
        NOSIG on the next account; historical NOSIG reference 4.26).
-     - **Price:** the confirmation's runs took 4.4 h of training each on an A10G ($1.10/h), so ~$5.5-6 per run and
-       ~$11-12.5 for two, against the $13 cap. Price probe: `rep_PS52` alone for ~15 min, projected from its meter
-       and t_update; `rep_PS53` launches only if the projection for both is <= $13.
+     - **Price (from Modal's per-app billing report):** the confirmation's app cost **$11.26 for its two runs**
+       (A10G $10.86, memory $0.32, CPU $0.08), so **$5.63 per run** including evals and checks. `--log-diag` adds
+       un-jitted gradient passes inside `t_update` (unmeasured), which leaves ~15% headroom for two runs under $13.
+     - **Price probe and go rule:**
+       - `rep_PS52` runs alone until ~10 updates are logged.
+       - Projected per run = $5.63 x (its mean t_update over updates 3-10 / 35.2 s, the confirmation's).
+       - `rep_PS53` launches only if 2 x the projection <= $12.5, so both runs complete through the 450 probe:
+         one total-metered guard firing near update 430 would kill both primary windows.
+       - Otherwise I stop and put options to Cam (drop `--log-diag`, which the confirmation didn't have; or one seed).
+         The guard does not decide.
      - Spend guard on the jit app at baseline + $13.
      - **My prediction:** primary 1 of 2 (~45%), 2 of 2 (~35%), 0 of 2 (~20%). Wire-blind removes the coupling but
        not the sender crash seen in seed 50.
