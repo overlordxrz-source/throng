@@ -1677,6 +1677,27 @@ more expensive, because it produces publishable-looking nulls.
      wire-on keeps MI >= 1 bit and reliance in >= 2 of 3 while wire-off decays. It does not block the confirmation.
   * Order: step 0 and erosion in parallel; the confirmation on `rapidcrisp` (cap $15) once step 0 passes.
 
+- **REGISTRATION -- step 0 equivalence bar (fixed before any comparison is run).** Branch `comm-jit` (from
+  `comm-testbed` `ceadaf8`).
+  * **Reference:** `scripts/comm_testbed.py`'s Python-loop rollout, unchanged except a test-only `--dump-equiv`
+    hook. The hook injects the draws the Python world takes from numpy, from a file: initial positions and active
+    hearths; per step, the (N, 2) respawn candidates and the re-roll increments, used in world-index order. The
+    injected draws have the same distributions: uniform over cells not within radius 1 of a hearth, and uniform
+    on {1, 2, 3}. It dumps one 512-step rollout: obs, actions, rewards, tokens, log-probs.
+  * **Candidate:** `scripts/comm_testbed_jit.py`, the same world as a `lax.scan`, consuming the same injected
+    draws and the same JAX key schedule (`key, k_obs, k_act = split(key, 3)` per step).
+  * **Setup:** COMM arm (wire live), ORACLE0 params, 32 worlds, 32x32, CPU, **3 fixed seeds (0, 1, 2), 512 steps
+    each.**
+  * **PASS (exact):** actions, rewards and positions identical at every step for all 64 agents, all 3 seeds. Obs
+    and tokens also compared.
+  * **Pre-stated float fallback** (used only if exact identity fails, and only for float-level causes): (a) with
+    the dynamics teacher-forced (the jit step fed the reference's state, actions and draws), positions, rewards,
+    active hearths and the wire must match exactly for all 512 steps; and (b) at every step, the action logits
+    on identical inputs must agree within max |d logit| <= 1e-4 (float32); and (c) the first free-running
+    divergence must occur at a step whose obs are bitwise identical, with |d logit| <= 1e-4. Anything else fails.
+  * **Then one timing run on `rapidcrisp` (<= $0.50):** a few COMM updates at the real settings. Speed-up vs the
+    measured ~37 s/update on an A10. Under ~5x -> report before drafting arms.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
