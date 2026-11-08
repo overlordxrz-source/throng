@@ -1,0 +1,38 @@
+
+===== C1E
+  s185: MI(MM) 1500 1.996 -> 2000 0.184 | 1800-2000 slopes per 100 upd: plug-in MI -0.020 (0.248 -> 0.223), L dep +0.124 (5.05 -> 5.27), L wire-sens TV +0.0277 (0.2754 -> 0.3164)
+     @1500 (in-run): drop +69% paired 3.83 SE 0.11 | L dep 5.73 vs NOSIG 2.13 -> reliance ok | crafts@T' 0.48 -> 18.98 redirection ok
+     @2000 (in-run): drop +39% paired 2.03 SE 0.08 | L dep 5.27 vs NOSIG 2.50 -> reliance ok | crafts@T' 3.10 -> 15.39 redirection ok
+     @1500 (eval-only re-probe of saved params): drop +69% paired 3.84 SE 0.11 | L dep 5.73 vs NOSIG 2.13 -> reliance ok | crafts@T' 0.48 -> 18.81 redirection ok
+     @1750 (eval-only re-probe of saved params): drop +56% paired 2.87 SE 0.08 | L dep 5.75 vs NOSIG 1.32 -> reliance ok | crafts@T' 1.83 -> 13.47 redirection ok
+     @2000 (eval-only re-probe of saved params): drop +39% paired 2.05 SE 0.05 | L dep 5.27 vs NOSIG 2.50 -> reliance ok | crafts@T' 3.10 -> 15.41 redirection ok
+  s186: MI(MM) 1500 1.988 -> 2000 0.409 | 1800-2000 slopes per 100 upd: plug-in MI -0.034 (0.449 -> 0.400), L dep -0.148 (5.65 -> 5.48), L wire-sens TV -0.0649 (0.3925 -> 0.3010)
+     @1500 (in-run): drop +73% paired 5.20 SE 0.12 | L dep 7.07 vs NOSIG 2.13 -> reliance ok | crafts@T' 0.42 -> 21.72 redirection ok
+     @2000 (in-run): drop +73% paired 3.81 SE 0.07 | L dep 5.48 vs NOSIG 2.50 -> reliance ok | crafts@T' 0.49 -> 15.67 redirection ok
+     @1500 (eval-only re-probe of saved params): drop +72% paired 5.16 SE 0.11 | L dep 7.07 vs NOSIG 2.13 -> reliance ok | crafts@T' 0.42 -> 21.52 redirection ok
+     @1750 (eval-only re-probe of saved params): drop +68% paired 3.94 SE 0.05 | L dep 5.79 vs NOSIG 1.32 -> reliance ok | crafts@T' 0.70 -> 15.02 redirection ok
+     @2000 (eval-only re-probe of saved params): drop +72% paired 3.75 SE 0.10 | L dep 5.48 vs NOSIG 2.50 -> reliance ok | crafts@T' 0.49 -> 14.95 redirection ok
+  s187: MI(MM) 1500 1.996 -> 2000 0.028 | 1800-2000 slopes per 100 upd: plug-in MI -0.057 (0.125 -> 0.040), L dep -0.244 (3.95 -> 3.55), L wire-sens TV -0.0171 (0.2557 -> 0.2239)
+     @1500 (in-run): drop +65% paired 4.08 SE 0.09 | L dep 6.46 vs NOSIG 2.13 -> reliance ok | crafts@T' 0.65 -> 19.56 redirection ok
+     @2000 (in-run): drop +17% paired 0.58 SE 0.06 | L dep 3.55 vs NOSIG 2.50 -> reliance x | crafts@T' 3.12 -> 3.87 redirection x
+     @1500 (eval-only re-probe of saved params): drop +66% paired 4.13 SE 0.09 | L dep 6.46 vs NOSIG 2.13 -> reliance ok | crafts@T' 0.65 -> 19.45 redirection ok
+     @1750 (eval-only re-probe of saved params): drop +53% paired 2.11 SE 0.07 | L dep 3.85 vs NOSIG 1.32 -> reliance ok | crafts@T' 1.87 -> 6.22 redirection ok
+     @2000 (eval-only re-probe of saved params): drop +16% paired 0.55 SE 0.05 | L dep 3.55 vs NOSIG 2.50 -> reliance x | crafts@T' 3.12 -> 3.84 redirection x
+  wire-off s188: plug-in MI slope -0.002/100 (0.011 -> 0.007) | MI(MM)@2000 0.001
+  wire-off s189: plug-in MI slope -0.019/100 (0.062 -> 0.034) | MI(MM)@2000 0.022
+
+===== C1T3
+  s180: MI(MM) 1500 1.981 -> 2000 1.975 | 1800-2000 slopes per 100 upd: plug-in MI +0.002 (1.973 -> 1.975), L dep +0.043 (7.80 -> 7.88), L wire-sens TV -0.0012 (0.5001 -> 0.4982)
+     @1500 (in-run): drop +65% paired 3.67 SE 0.10 | L dep 5.12 vs NOSIG 2.34 -> reliance ok | crafts@T' 0.48 -> 18.47 redirection ok
+     @2000 (in-run, AFTER the 2,000 listener reset): drop -4% paired -0.11 SE 0.05 | L dep 7.88 vs NOSIG 3.06 -> reliance x | crafts@T' 18.74 -> 21.85 redirection x
+     @2000 (eval-only re-probe of saved params, PRE-reset): drop +67% paired 5.14 SE 0.10 | L dep 7.88 vs NOSIG 3.06 -> reliance ok | crafts@T' 0.48 -> 23.19 redirection ok
+  s181: MI(MM) 1500 1.986 -> 2000 1.968 | 1800-2000 slopes per 100 upd: plug-in MI +0.009 (1.950 -> 1.963), L dep +0.207 (7.41 -> 7.75), L wire-sens TV +0.0146 (0.5660 -> 0.5897)
+     @1500 (in-run): drop +67% paired 5.16 SE 0.10 | L dep 7.87 vs NOSIG 2.34 -> reliance ok | crafts@T' 0.59 -> 20.96 redirection ok
+     @2000 (in-run, AFTER the 2,000 listener reset): drop -15% paired -0.24 SE 0.06 | L dep 7.75 vs NOSIG 3.06 -> reliance x | crafts@T' 15.64 -> 9.75 redirection x
+     @2000 (eval-only re-probe of saved params, PRE-reset): drop +69% paired 4.99 SE 0.11 | L dep 7.75 vs NOSIG 3.06 -> reliance ok | crafts@T' 0.68 -> 18.61 redirection ok
+  s182: MI(MM) 1500 1.999 -> 2000 1.784 | 1800-2000 slopes per 100 upd: plug-in MI -0.082 (1.918 -> 1.792), L dep -0.053 (9.77 -> 9.65), L wire-sens TV +0.0142 (0.5171 -> 0.5387)
+     @1500 (in-run): drop +73% paired 6.75 SE 0.10 | L dep 9.29 vs NOSIG 2.34 -> reliance ok | crafts@T' 0.68 -> 24.05 redirection ok
+     @2000 (in-run, AFTER the 2,000 listener reset): drop +2% paired 0.03 SE 0.02 | L dep 9.65 vs NOSIG 3.06 -> reliance x | crafts@T' 7.31 -> 7.20 redirection x
+     @2000 (eval-only re-probe of saved params, PRE-reset): drop +73% paired 6.89 SE 0.16 | L dep 9.65 vs NOSIG 3.06 -> reliance ok | crafts@T' 0.67 -> 23.11 redirection ok
+  wire-off s183: plug-in MI slope -0.013/100 (1.980 -> 1.963) | MI(MM)@2000 1.965
+  wire-off s184: plug-in MI slope +0.009/100 (1.978 -> 1.994) | MI(MM)@2000 1.993

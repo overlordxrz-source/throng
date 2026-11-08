@@ -2632,6 +2632,60 @@ more expensive, because it produces publishable-looking nulls.
   - Toy items first (~$2.9), then the replication.
   - **Before any account switch, copy every checkpoint, snapshot and log off Modal.**
 
+- **C1 free checks (Cam's item 2; $0, exploratory; `comm-toy` `86bd9c6`, `scripts/analyze_c1_free.py`, output
+  `docs/data/c1_free/analysis_c1_free.txt`).** These are eval-only re-probes of the saved C1 actor params (local,
+  ~30 s each).
+  - **Re-probe validation:** controls and constructed swaps are bit-identical to the in-run probe. The empirical
+    replacement triple is a different draw (the eval RNG is seeded with the update number, and in-run MI consumes it
+    first). The re-probes reproduce the in-run 2,000 drops: C1-E 39 / 72 / 16% vs in-run 39 / 73 / 17%.
+  - **(c) C1-T3's 2,000 probe came after the listener wire-row reset: yes, a probe artifact.** The final
+    `evaluate(params, a.updates)` runs after the loop, and the loop's last step had already applied the 2,000
+    listener reset (newborn `enc_0` wire rows). The u2000 params were saved before that reset.
+    - Re-probed pre-reset at 2,000, **reliance passes in 3 of 3 wire-on seeds:** drop +67 / +69 / +73%, paired
+      5.1 / 5.0 / 6.9 (SE 0.10-0.16). Listener deliveries 7.9 / 7.8 / 9.7 vs NOSIG 3.06. Redirection ok 3/3
+      (crafts at T' 0.5-0.7 -> 18.6-23.2).
+    - The in-run post-reset numbers were -4 / -15 / +2%.
+    - The registered C1-T3 reading is unaffected. Continuity is recorded before the reset. `copy_acc` is emitted
+      after it, but the listener reset touches only `enc_0`'s wire rows, which the wire-blind message pathway never
+      reads.
+  - **(a) C1-E redirection at 2,000 (in-run): 2 of 3.**
+    - s185: crafts at T' 3.10 -> 15.39.
+    - s186: 0.49 -> 15.67.
+    - s187: 3.12 -> 3.87 (fails, as its reliance does).
+  - **(b) C1-E wire-on slopes: the code is decaying in 2 of 3 seeds.**
+    - Reliance (re-probes) at 1,500 / 1,750 / 2,000:
+      - s185: 69 / 56 / 39%;
+      - s186: 72 / 68 / 72% (stable);
+      - s187: 66 / 53 / 16%.
+    - Over 1,800-2,000, per 100 updates:
+      - plug-in MI: s185 -0.020 (0.25 -> 0.22), s186 -0.034 (0.45 -> 0.40), s187 -0.057 (0.13 -> 0.04);
+      - listener deliveries: s185 +0.12, s186 -0.15, s187 -0.24.
+    - Wire-on MI(MM) at 2,000 is 0.18 / 0.41 / 0.03, so even the passing seeds sit below the 0.5-bit "eroded" line.
+    - Per-slot sender MI is low while listeners still rely on the code. The wire carries the sampled tokens'
+      codebook vectors, so per-step information is capped by the token MI. The likely reading is that the
+      listener's GRU integrates a weak per-step signal over many steps, and the swap feeds it a misleading T' triple
+      at every step. **Not measured yet:** the dictionary work computes the information carried in the whole triple.
+  - **My prediction (registered before any continuation):** C1-E's 2,000 pass is a snapshot of a decaying code.
+    - s185 crosses 30% by ~2,100-2,300; s187 is already below.
+    - The 3,000 bar (>= 2 of 3) **fails** (~75%).
+- **Item 3 cannot run as written: C1 saved actor params only, not full-state snapshots.** There is no optimizer,
+  PopArt, environment or RNG state at 2,000. Options for Cam:
+  - **(A) Faithful regeneration.** Same seeds, rerun from 0 in one process (deterministic; a different host can
+    differ at the float level, as in step B), with extra eval points.
+    - C1-T3 wire-on x3 to 2,750 with `--reset-until 2500`. With `_T3` as written, the 2,750 probe would come after
+      the 2,750 sender reset: the same artifact as (c).
+    - NOSIG level declared now as C1-T3 wire-off at 2,000 (3.06), or regenerate the wire-off pair too (+$0.55).
+    - ~$0.83.
+  - **(B) For C1-E: fold it into item 4.** Run the replication's 5 + 2 fresh seeds to 3,000 with evals at 2,000 /
+    2,500. A mid-run eval leaves training bit-identical: tested locally, 60/60 train rows identical with vs without
+    `--eval-at 30`. So the registered 2,000 readout is unchanged, and the 3,000 question gets 5 seeds instead of 3.
+    About +$0.7 over item 4.
+  - **(C) Cheap but confounded:** warm-restart from the u2000 actor params (fresh Adam moments, PopArt
+    re-initialised, new environment state), ~$0.5. The optimizer restart perturbs exactly the slow drift under test.
+    I don't recommend it.
+  - **Recommendation:** A (T3, declared NOSIG level) + B (E) ~ $0.83 + $2.1 = $2.9, plus 3b's VOI check $0.8 =
+    **$3.7** (vs $2.9 approved). This waits for the credit check and Cam.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
