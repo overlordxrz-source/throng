@@ -133,6 +133,11 @@ def main():
     ap.add_argument("--imitate-steps", type=int, default=500)
     ap.add_argument("--imitate-lr", type=float, default=1e-3)
     ap.add_argument("--imitate-window", type=int, default=50)
+    ap.add_argument("--snapshot-at", type=int, default=None, help="step B: pickle the full training state after this update")
+    ap.add_argument("--snapshot-path", default=None)
+    ap.add_argument("--resume", default=None, help="step B: resume from a full-state snapshot")
+    ap.add_argument("--branch", default="none", choices=["none", "frozen_listener", "stopgrad", "wireblind"],
+                    help="step B arm, active after the resume point")
     ap.add_argument("--prox", type=int, default=None,
                     help="step 3: no assigned sender -- an agent sees the active fire only within this Chebyshev radius of it; "
                          "symmetric shared reward; PS on whoever is informed")
@@ -247,6 +252,8 @@ def main():
         p1, p2 = jax.nn.softmax(l1, -1), jax.nn.softmax(l2, -1)
         return 0.5 * jnp.abs(p1 - p2).sum(-1)
 
+    branch_hold = {"pL": None}
+
     @functools.partial(jax.jit, static_argnames=("swap",))
     def rollout(params, state, key, swap=False, table=None):
         """lax.scan over T steps. swap=True (eval): the listener hears what its sender WOULD broadcast for
@@ -258,6 +265,11 @@ def main():
             k_obs, k_act, k_rs, k_rr, k_rand = jax.random.split(k, 5)
             obs = build_obs(pos, active, wire, k_obs)
             new_c, logits, act, lp, val, lvq, toks, bc, ent, o_pol = policy(params, carries, obs, k_act)
+            if branch_hold["pL"] is not None:   # step B (ii): the listener acts with frozen params
+                outL = policy(branch_hold["pL"], carries, obs, k_act)
+                selL = lambda x, y: jnp.where(is_listener.reshape((N,) + (1,) * (x.ndim - 1)), y, x)  # noqa: E731
+                new_c, logits, act, lp, val, lvq, toks, bc, ent = [selL(x, y) for x, y in
+                                                                   zip((new_c, logits, act, lp, val, lvq, toks, bc, ent), outL[:9])]
             # credit A/B only: on the joint (default) path nothing extra is computed, so its compiled graph -- and
             # its results, bit for bit -- stay as before (an unconditional extra log_softmax changed them at 1e-7)
             lp_act = (jnp.take_along_axis(jax.nn.log_softmax(logits, -1), act[:, None], -1)[:, 0]
@@ -429,6 +441,7 @@ def main():
         loss, mets = ppo_loss(params, apply_fn, mb["obs"], mb["actions"], None, mb["log_probs"], mb["adv"],
                               mb["ret"], mb["carries"], 1, mb["values"], clip_eps=CLIP, vf_coef=VF, ent_coef=ENT,
                               vq_coef=VQC, value_scale=vs, value_clip=False, value_shift=vsh, popart_mode=True,
+                              alive=mb.get("alive"),
                               token_actions=mb["token_actions"], token_tau=TAU,
                               token_ent_coef=(te_c if a.erode_tok_ent is not None else TOK_ENT))
         ps = ps_term(params, mb["obs"], mb["carries"]) if a.ps else jnp.array(0.0)
@@ -456,6 +469,33 @@ def main():
         grads = {"params": g}
         upd, opt_state = opt.update(grads, opt_state, params)
         return optax.apply_updates(params, upd), opt_state, mets
+
+    MSGK = ("gwt_comms_1", "head_signal_slot0", "head_signal_slot1", "head_signal_slot2", "codebook_0", "codebook_1", "codebook_2")
+
+    @jax.jit
+    def mb_step_stopgrad(params, opt_state, mb, vs, vsh, ps_c, te_c):
+        """step B (iii): the message parameters get gradient from SENDER rows only (the listener's token PG, VQ and
+        token-entropy terms cannot reach them); every other parameter gets the usual all-row gradient. Sender-row
+        grads are rescaled by n_sender / n_rows so their magnitude matches the all-row mean."""
+        (loss, mets), g_all = jax.value_and_grad(total_loss, has_aux=True)(params, mb, vs, vsh, ps_c, te_c)
+        snd = (mb["obs"][:, O_INF] > 0.5).astype(jnp.float32)
+        mb_s = dict(mb, alive=snd)
+        g_snd = jax.grad(lambda p_: total_loss(p_, mb_s, vs, vsh, ps_c, te_c)[0])(params)
+        scale = snd.sum() / snd.shape[0]
+        g = dict(g_all["params"])
+        for k in MSGK:
+            g[k] = jax.tree_util.tree_map(lambda x: x * scale, g_snd["params"][k])
+        groups = [["head_action"], ["head_value"], [k for k in g if k not in ("head_action", "head_value")]]
+        for grp in groups:
+            g.update(_clip_group({k: g[k] for k in grp}))
+        upd, opt_state = opt.update({"params": g}, opt_state, params)
+        return optax.apply_updates(params, upd), opt_state, mets
+
+    def wireblind(params):
+        pp = dict(params["params"])
+        k0 = jnp.asarray(pp["gwt_comms_1"]["kernel"])
+        pp["gwt_comms_1"] = dict(pp["gwt_comms_1"], kernel=k0.at[O_WIRE:].set(0.0))
+        return {"params": pp}
 
     # ---------------------------------------------------------------- self-test of the aux losses
     if a.selftest:
@@ -1021,7 +1061,25 @@ def main():
     state = init_state(k_s)
     lis = np.asarray(is_listener)
     mi_buf_tok, mi_buf_T = deque(maxlen=10), deque(maxlen=10)
-    for u in range(1, a.updates + 1):
+    u_start = 1
+    elder_buf = None
+    if a.resume:
+        import pickle
+        snap = pickle.load(open(a.resume, "rb"))
+        params = jax.tree_util.tree_map(jnp.asarray, snap["params"])
+        opt_state = jax.tree_util.tree_map(jnp.asarray, snap["opt_state"])
+        popart.mu, popart.nu, popart.initialised = snap["popart"]
+        state = tuple(jnp.asarray(x) for x in snap["state"]); key = jnp.asarray(snap["key"])
+        np_rng.bit_generator.state = snap["np_rng"]
+        mi_buf_tok.extend(snap["mi_tok"]); mi_buf_T.extend(snap["mi_T"])
+        turn_state["maps"] = snap["maps"]; imit_buf.extend(snap["imit"]); elder_buf = snap["elder"]
+        u_start = snap["u"] + 1
+        if a.branch == "frozen_listener":
+            branch_hold["pL"] = jax.tree_util.tree_map(jnp.asarray, snap["params"])
+        if a.branch == "wireblind":
+            params = wireblind(params)
+        emit(dict(phase="resume", update=snap["u"], branch=a.branch))
+    for u in range(u_start, a.updates + 1):
         t0 = time.time()
         key, k_r, k_l = jax.random.split(key, 3)
         state, R = rollout(params, state, k_r)
@@ -1077,7 +1135,14 @@ def main():
             mb = {k: jnp.asarray(v[idx]) for k, v in flat.items()}
             if diag:
                 before = head_vec(params)
-            params, opt_state, mets = mb_step(params, opt_state, mb, popart.sigma, popart.mu, ps_c, te_c)
+            if a.resume and a.branch == "frozen_listener":
+                mb = dict(mb, alive=(mb["obs"][:, O_INF] > 0.5).astype(jnp.float32))   # the frozen listener does not train
+            if a.resume and a.branch == "stopgrad":
+                params, opt_state, mets = mb_step_stopgrad(params, opt_state, mb, popart.sigma, popart.mu, ps_c, te_c)
+            else:
+                params, opt_state, mets = mb_step(params, opt_state, mb, popart.sigma, popart.mu, ps_c, te_c)
+            if a.resume and a.branch == "wireblind":
+                params = wireblind(params)
             if CENTRAL:
                 snd_m = (mb["obs"][:, O_INF] > 0.5).astype(jnp.float32)
                 tgt = mb["ret_g"] if a.credit == "Ag" else mb["g_s"]
@@ -1152,8 +1217,26 @@ def main():
                 Path(f"{a.save_prefix}_u{u}_popart_g.json").write_text(json.dumps(dict(mu=popart_g.mu, nu=popart_g.nu)))
         if a.reset_from is not None and (u in a.eval_at or u == a.updates):
             turnover_record(u)
-        if a.reset_from is not None and u in reset_sched:
+        if a.reset_from is not None and u in reset_sched and not (a.resume and u == a.updates):
+            if u == a.snapshot_at:
+                elder_buf = [(np.array(o_), np.array(t_)) for o_, t_ in imit_buf]
             params, opt_state = do_reset(reset_sched[u], params, opt_state, u)
+        if a.snapshot_at is not None and u == a.snapshot_at:
+            import pickle
+            snap = dict(u=u, params=jax.tree_util.tree_map(np.asarray, params), opt_state=jax.tree_util.tree_map(np.asarray, opt_state),
+                        popart=(popart.mu, popart.nu, popart.initialised), state=tuple(np.asarray(x) for x in state),
+                        key=np.asarray(key), np_rng=np_rng.bit_generator.state, mi_tok=list(mi_buf_tok), mi_T=list(mi_buf_T),
+                        maps=turn_state["maps"], imit=list(imit_buf), elder=elder_buf)
+            Path(a.snapshot_path).parent.mkdir(parents=True, exist_ok=True)
+            pickle.dump(snap, open(a.snapshot_path, "wb"))
+            emit(dict(phase="snapshot", update=u, path=a.snapshot_path))
+        if a.resume and u == a.updates and elder_buf:   # step B readout: copy accuracy of the head vs the elder's pairs
+            X = np.concatenate([b[0] for b in elder_buf]); Y = np.concatenate([b[1] for b in elder_buf])
+            ix = np.random.default_rng(0).integers(0, len(X), 4096)
+            _, o = apply_fn(params, jnp.zeros((4096, H)), jnp.asarray(X[ix]))
+            pred = np.stack([np.asarray(jnp.argmax(lg, -1)) for lg in token_logits(params, o.z_e, TAU)], -1)
+            emit(dict(phase="copy_acc", update=u, branch=a.branch, copy_acc=float((pred == Y[ix]).all(1).mean()),
+                      copy_acc_slot=float((pred == Y[ix]).mean())))
 
     if a.save_params:
         Path(a.save_params).parent.mkdir(parents=True, exist_ok=True)
