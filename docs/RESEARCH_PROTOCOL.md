@@ -1580,6 +1580,50 @@ more expensive, because it produces publishable-looking nulls.
     positive signalling alone produced an informative code and listeners that measurably depend on it, in 3/3
     seeds by deposits-under-swap, and 2/3 by the registered movement metric. Next step is Cam's.
 
+- **Cam's ruling (2026-11-07, on the toy).** Registered primary failed (2/3); PL dropped; step 1 inconclusive rather
+  than contradicting. On the record: **PS makes the channel informative by design; listener use is the emergent
+  part, and that is the claim tested.** Before registering, check that swaps are in-distribution; then a free,
+  registered replication on fresh seeds.
+- **Swap check (exploratory, on the original PS seeds 0-2; `comm-toy` `a23eaf0`).** The three runs were regenerated
+  with identical arguments plus saved params; every training record is identical to the originals. New
+  *empirical* swap mode: the listener hears a full token triple drawn from the triples its sender actually emitted
+  for T' in the paired control rollout. Results (u1,000; empirical / constructed):
+  * The constructed swap tokens were already in-distribution: **98.5-99.5%** had been emitted by the sender for T'
+    in the control rollout. (The comms pathway is feed-forward from the obs and slots are sampled independently in
+    normal play too, so the constructed token is a normal T' token.) Off-distribution confusion is ruled out.
+  * Deposit drop under the swap: PS0 72% / 71%, PS1 67% / 67%, PS2 66% / 66%. Delta (movement toward T'): PS0
+    -0.026 / -0.029, PS1 +0.413 / +0.410, PS2 +0.348 / +0.342. **Unchanged, so the swap construction does not
+    explain PS0's negative score.**
+  * *Redirection (new measure, crafts at the T' hearth per world, empirical swap):* PS0 0.38 -> 14.16, PS1 0.56
+    -> 14.40, PS2 0.74 -> 20.27. **PS0's listeners do go to the hearth the swapped token names (37x).** The
+    movement-toward-T' score misreads how PS0's listeners travel: its control score toward the TRUE hearth is
+    also negative (-0.09) while it delivers 4.5 per world. Why is CONJECTURED (not investigated).
+
+- **REGISTRATION -- PS replication in the CPU toy (before any run).** `comm-toy` `a23eaf0`; launcher `run_rep.sh`;
+  analysis `scripts/analyze_rep.py`. Everything as the toy registration (ORACLE0-toy warm start sha256
+  `f5d01c19...4c32bdd84`, `--wire-init-scale 0.06`, cost 0.45) except as listed.
+  * **Arms, all seeds fresh, 2,000 updates, eval (MI + 10 swap pairs, both swap modes) at 1,000 and 2,000:**
+    PS x5 (seeds 10-14, c_ps 1.99); PS-anneal x3 (seeds 20-22, c_ps 1.99 decaying linearly to 0 over updates
+    1,000-1,500, then 0 to 2,000); NOSIG x3 (seeds 30-32). **c_ps is 1.99, not Cam's 1.96:** 1.96 was the
+    pre-rescale calibration; 1.99 is what the toy ran. Craft cost stays 0.45. Known limit: blind search still
+    pays (break-even 0.61-0.75 in the toy), logged again per NOSIG seed.
+  * **P1 reliance (all 5 PS seeds), empirical swap, update 2,000:** listener deposits drop >= 30% (1 - mean
+    swap / mean control over the pairs). **Added before running:** the paired drop must be > 2 SE, and the seed's
+    listener deposits (last 50 training updates) must be >= the NOSIG mean. Reliance on a channel that leaves
+    listeners worse off than no channel is not success.
+  * **P2 meaning (>= 4 of 5 PS seeds), empirical swap, update 2,000:** Delta = mu(T')_swap - mu(T')_control
+    >= +0.05 and > 2 SE. **Disclosed: this threshold was set after a 2/3 outcome; the seeds are fresh.**
+  * **P3 self-sustaining (>= 2 of 3 anneal seeds), update 2,000 (500 updates at c_ps = 0):** MI >= 1.0 bit
+    (Miller-Madow, mean over the 3 slots, sender tokens of updates 1,991-2,000) **and** P1's reliance conditions.
+  * **Secondary (registered, not decisive):** redirection. Listener Crafts at the T' hearth under the empirical
+    swap >= 2x control with a paired increase > 2 SE, in >= 4 of 5 PS seeds. Added because the movement score
+    misread PS0. If P2 fails and redirection passes, that is reported as such and the call is Cam's. Also
+    reported: the constructed-swap results, token membership rates, everything at update 1,000, per-role entropy,
+    and the NOSIG break-even.
+  * **Decision:** P1 and P2 pass -> draft the real-network PS confirmation (sub-cap $12; set up the `rapidcrisp`
+    volume and params first; an MI floor instead of the token-entropy halt; P3 decides whether it has an anneal
+    arm). Nothing launches until it is approved. Otherwise -> report; nothing goes to Modal.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
