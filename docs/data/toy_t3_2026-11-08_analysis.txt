@@ -1,0 +1,15 @@
+== T3: generational turnover + newborn imitation
+   wire-off s143: MI@1500 1.999 MI@2000 1.897 | MI by eval point: 1500:2.00 1750:2.00 2000:1.90 2250:1.64 2500:1.81 2750:1.88 3000:1.79
+   wire-off s144: MI@1500 1.999 MI@2000 1.974 | MI by eval point: 1500:2.00 1750:2.00 2000:1.97 2250:1.95 2500:1.84 2750:1.77 3000:1.76
+   manipulation check (wire-off MI < 0.5 at 2,000 in both): False  [not a gate for T3, registered in advance]
+   wire-on s140: @1500 drop +67% | 2250: drop +64% (ret 0.96) cont 0.26 Ldep 5.09/3.48 x | 2500: drop +63% (ret 0.95) cont 0.40 Ldep 4.49/3.74 x | 2750: drop +39% (ret 0.59) cont 0.34 Ldep 3.56/4.09 x -> fail
+      all eval points: 1500:cont nan/MI 1.96 1750:cont 1.00/MI 1.96 2000:cont 0.08/MI 0.84 2250:cont 0.26/MI 0.74 2500:cont 0.40/MI 0.34 2750:cont 0.34/MI 0.33 3000:cont 0.41/MI 0.34
+      imitation acc after: 1750:0.82 2250:0.54 2750:0.66
+   wire-on s141: @1500 drop +72% | 2250: drop +8% (ret 0.10) cont 0.25 Ldep 1.27/3.48 x | 2500: drop +6% (ret 0.08) cont 0.25 Ldep 0.69/3.74 x | 2750: drop +1% (ret 0.01) cont 0.26 Ldep 0.42/4.09 x -> fail
+      all eval points: 1500:cont nan/MI 1.99 1750:cont 1.00/MI 1.98 2000:cont 0.07/MI 0.02 2250:cont 0.25/MI 0.00 2500:cont 0.25/MI 0.00 2750:cont 0.26/MI 0.00 3000:cont 0.21/MI 0.00
+      imitation acc after: 1750:0.78 2250:0.98 2750:1.00
+   wire-on s142: @1500 drop +71% | 2250: drop +0% (ret 0.01) cont 0.23 Ldep 3.16/3.48 x | 2500: drop +1% (ret 0.01) cont 0.25 Ldep 3.99/3.74 x | 2750: drop +1% (ret 0.01) cont 0.26 Ldep 4.02/4.09 x -> fail
+      all eval points: 1500:cont nan/MI 1.99 1750:cont 1.00/MI 1.98 2000:cont 0.17/MI 0.00 2250:cont 0.23/MI 0.00 2500:cont 0.25/MI 0.00 2750:cont 0.26/MI 0.00 3000:cont 0.26/MI 0.00
+      imitation acc after: 1750:0.56 2250:1.00 2750:1.00
+   T3: FAIL (wire-on passing 0/3)
+

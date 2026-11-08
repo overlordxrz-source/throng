@@ -2171,6 +2171,25 @@ more expensive, because it produces publishable-looking nulls.
   a bit-identical regeneration of the T4b seeds with parameters saved at 1,500 and 2,000 (~$0.8) would give the
   exact states; that needs Cam's OK.
 
+- **RESULTS -- T3 (turnover + newborn imitation), 2026-11-08: FAIL (0/3 wire-on).** Registered (amended) script,
+  `docs/data/toy_t3_2026-11-08_analysis.txt`, data `comm-toy` `2ce9808`. *Disclosed:* wire-on seed 142's container
+  restarted 3 times and re-ran from update 1. All 4 attempts are identical over their shared updates
+  (deterministic); the final, complete attempt was kept (`t3_on_s142.clean.jsonl`; the raw file is kept). The
+  verdict is the same on the raw and the cleaned data.
+  * **Wire-off (reported, not gated):** imitation carried the code through every reset. MI 1.90 / 1.97 at 2,000 and
+    1.64-1.95 at every later eval point. Copying alone preserves an unused code, as expected.
+  * **Wire-on:** the code was **lost**, not carried. Continuity across the first sender reset was 0.08 / 0.07 /
+    0.17 (below the 0.25 chance level), even though imitation reproduced the old head at 0.82 / 0.78 / 0.56
+    exact-triple accuracy. By 2,250-2,750, MI was 0.00 in seeds 141 / 142 and 0.33-0.74 in seed 140.
+  * **Seed 140 (not registered):** its listeners kept relying on the channel at 2,250 / 2,500 (deposit drop 64% /
+    63%, retention 0.96 / 0.95, deliveries above NOSIG) with continuity only 0.26 / 0.40. The pair moved to a *new*
+    code instead of keeping the old one. Reliance passed the absolute bar at two of the three checkpoints;
+    continuity failed all three.
+  * **Reading (MEASURED, toy):** with the wire live, the code was not stable even when each newborn started as a
+    copy. With the wire off, it was. Same direction as the real network's live-wire collapse and the erosion test
+    (wire-on eroded as fast as or faster than wire-off). CONJECTURED: once a listener's responses feed back into
+    the sender's training, the copied mapping drifts within 250 updates.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
