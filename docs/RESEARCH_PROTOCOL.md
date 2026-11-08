@@ -1895,6 +1895,28 @@ more expensive, because it produces publishable-looking nulls.
   the lean core brain and the minibatch count, each validated separately, after the confirmation. Smoke and
   diagnostic proceed as registered; K, the floor and N go to Cam with the smoke curves before the paid launch.
 
+- **RESULTS -- MI-floor smoke (2026-11-08).** `comm-jit` `0a82f1e`, A10G, PS (c_ps 2.015), seeds 20/21, 120
+  updates each, ~36 s/update; data `docs/data/smoke_PS2{0,1}_0a82f1e.jsonl.gz`. Apparatus check at update 2
+  passed on both (PS gradient on the message heads 0.93 / 1.13; 593 / 613 distinct sender messages; listener wire
+  nonzero 100%).
+  * **Sender MI (Miller-Madow, mean over slots) vs block-null p95,** s20 / s21:
+    u1 0.006 / 0.007 (null 0.0008 / 0.0009); **u2 0.238 / 0.244 (0.004 / 0.005)**; u3 1.596 / 1.603 (0.024 /
+    0.024); u5 1.83 / 1.98; u10-50 1.84 / 1.99 (flat); u60-90 dips to 1.73-1.80 / 1.90-1.97; u100-120
+    1.99 / 1.99. Null p95 stays 0.01-0.10.
+  * **Listener deposits per world** (no swap eval in the smoke): s20 1.9 (u1) -> 3.2 (u20) -> 4.2 (u40) -> 1.0
+    (u60) -> 4.9 (u120); s21 1.9 -> 1.2 -> 3.4 (u40-50) -> 0.7 (u80-90) -> 1.8 (u120). References: the final
+    run's NOSIG0 4.26, COMM 3.4-4.8.
+  * **Instability:** sender deposits crashed from ~23 to ~2.5 (s20, u55-65) and to ~1.6 (s21, u80-90), then
+    recovered, with the MI null rising during the crash. The final run (no PS) also had sender-deposit drops
+    (COMM1 8.4 at u60).
+  * **Cam's rule gives N ~ 10:** MI levels off at update ~5 (>= 90% of its plateau by u3-5), so N = 2 x 5 = 10.
+    That measures the sender-side code that PS creates by design, not listener use, which in the toy took
+    hundreds of updates. **Not applied; sent to Cam with the curve.** If N stood: K <= 2.5 -> K = 2, floor =
+    0.5 x 0.238 = 0.119 bit (> null p95 0.005). For a longer N, K = 5 (both seeds ~80x their null): floor =
+    0.5 x 1.833 = 0.92 bit.
+  * **Budget arithmetic for Cam's N:** measured ~$1.31/GPU-h, so ~$0.013 per update per arm. Three arms (PS x2 +
+    NOSIG) at N updates cost ~$0.039 N, so under the $15 cap with a 30% margin N <= ~300.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
