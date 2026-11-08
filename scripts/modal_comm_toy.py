@@ -11,7 +11,7 @@ import modal
 
 _REQUIREMENTS = str(Path(__file__).resolve().parents[1] / "requirements.txt")
 
-PINNED_SHA = "07e8c342242a0b86df87672713fc93bb5208bf56"  # comm-toy branch
+PINNED_SHA = "037266c3166ed7007532efce638fbc85de7e6134"  # comm-toy branch
 REPO_URL = "https://github.com/overlordxrz-source/throng.git"
 VOLUME_NAME = "throng-runs"
 VOLUME_MOUNT = "/mnt/throng-runs"
@@ -41,6 +41,10 @@ def run_toy(tag: str, args: list) -> str:
     assert head == PINNED_SHA, f"box did not clone the pinned SHA (got {head})"
     os.makedirs(f"{VOLUME_MOUNT}/testbed/toy", exist_ok=True)
     out = f"{VOLUME_MOUNT}/testbed/toy/{tag}_{head[:7]}.jsonl"
+    args = [x.replace("{VOL}", VOLUME_MOUNT) for x in args]
+    if "--save-at" not in args:   # Cam 2026-11-08: every toy run saves actor (+ critic) params at 1,500 / 1,750 / 2,000
+        os.makedirs(f"{VOLUME_MOUNT}/testbed/toy/params", exist_ok=True)
+        args += ["--save-at", "1500", "1750", "2000", "--save-prefix", f"{VOLUME_MOUNT}/testbed/toy/params/{tag}_{head[:7]}"]
     cmd = ["python", "scripts/comm_toy.py", *args, "--out", out]
     proc = subprocess.run(cmd, capture_output=True, text=True)
     volume.commit()
@@ -60,6 +64,9 @@ _ERO_JOBS = ([(f"erosion_on_s{s}", ["--arm", "COMM", "--seed", str(s), *_ERO, "-
 PLANS: dict = {
     # registered erosion test (2026-11-08): probe one container first (Cam: fan out only if < $0.01/min/container)
     "erosion_probe": _ERO_JOBS[:1],
+    # approved T4b regeneration (2026-11-08): bit-identical re-runs of the T4b seeds with params saved, for check 3 (b)/(c)
+    "t4b_regen": [(f"t4b_regen_{w}_s{s}", ["--arm", arm, "--seed", str(s), *_ERO, "--credit", "Bg", "--tag", f"T4B_{w.upper()}"])
+                  for w, arm, ss in (("on", "COMM", (160, 161)), ("off", "NOSIG", (163, 164))) for s in ss],
     # registered T4 (2026-11-08): centralized critic for message credit, erosion protocol, reliance-first bar
     "t4": [(f"t4{fx[0].lower()}_{w}_s{s}", ["--arm", arm, "--seed", str(s), *_ERO, "--credit", fx, "--tag", f"T4{fx[0]}_{w.upper()}"])
            for fx, base in (("Ag", 150), ("Bg", 160))
