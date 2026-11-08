@@ -216,7 +216,10 @@ def main():
             k_obs, k_act, k_rs, k_rr, k_rand = jax.random.split(k, 5)
             obs = build_obs(pos, active, wire, k_obs)
             new_c, logits, act, lp, val, lvq, toks, bc, ent, o_pol = policy(params, carries, obs, k_act)
-            lp_act = jnp.take_along_axis(jax.nn.log_softmax(logits, -1), act[:, None], -1)[:, 0]
+            # credit A/B only: on the joint (default) path nothing extra is computed, so its compiled graph -- and
+            # its results, bit for bit -- stay as before (an unconditional extra log_softmax changed them at 1e-7)
+            lp_act = (jnp.take_along_axis(jax.nn.log_softmax(logits, -1), act[:, None], -1)[:, 0]
+                      if a.credit != "joint" else jnp.zeros(N))
             crit = o_pol.values_shared if a.credit == "A" else (
                 sum(jnp.take_along_axis(o_pol.q_slots[i], toks[:, i:i + 1], -1)[:, 0] for i in range(3))
                 if a.credit == "B" else jnp.zeros(N))
