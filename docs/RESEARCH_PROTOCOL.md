@@ -1724,6 +1724,26 @@ more expensive, because it produces publishable-looking nulls.
     minibatch step) x 2 calibration seeds (60, 61), on Modal CPU within the $2 toy allowance. Reported to Cam with
     the step-0 timing. Nothing is registered with it until he rules.
 
+- **RESULTS -- step 0 (2026-11-08).**
+  * **Equivalence: PASS (exact), on the pinned commit `comm-jit` `1d3b951`**
+    (`docs/data/step0_equiv_final_1d3b951.txt`): actions, rewards and positions are bitwise identical at all 512
+    steps for all 64 agents on seeds 0/1/2, and so are obs, tokens and log-probs (558-585 deposits per rollout,
+    so deposits, respawns and re-rolls were exercised). *Disclosed: the first attempt failed the registered bar on
+    rewards only* -- 1 float32 ulp (2.4e-7) at 2-3 steps per seed, because the reference sums rewards in float64
+    and casts while the port summed in float32. The candidate was fixed to reproduce the reference's float64
+    rounding (a reward table built in float64 in the reference's order); the bar was not changed. Attempt files
+    are on the branch (`docs/step0_equiv_attempt{1,2}.txt`).
+  * **Timing: speed-up ~1.07x -- under the ~5x gate, so this is reported before any arms are drafted.** A10, COMM,
+    6 updates: **34.3-34.9 s per update** (update 1: 63 s, with compile), vs ~37 s for the Python path. Split:
+    **rollout 8.3 s, PPO update 25.5 s**. The jit port removed most of the rollout cost, but the rollout was never
+    the bottleneck: `ppo_update` (64 minibatches of 512, each copied host->device, with per-minibatch host syncs
+    for metrics) is ~74% of the update. Apparatus check at update 2 passed (496 distinct sender messages,
+    listener wire nonzero 100%).
+  * **Spend on `rapidcrisp`: $1.16 metered.** That is the timing run (~$0.2) plus **~$0.9 wasted** on the
+    exploratory weight-decay calibration on Modal CPU: 8 containers x 8 cores cost ~$0.20/min, far above my
+    estimate. I stopped it before it finished (it writes results only at the end); nothing was returned. It now
+    runs on the laptop for free. Toy allowance left: ~$1.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under

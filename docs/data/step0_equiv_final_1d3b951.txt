@@ -1,0 +1,5 @@
+seed 0: actions identical | rewards identical | positions identical | obs identical | token_actions identical | log_probs identical | listener-or-sender deposits in rollout: 561
+seed 1: actions identical | rewards identical | positions identical | obs identical | token_actions identical | log_probs identical | listener-or-sender deposits in rollout: 558
+seed 2: actions identical | rewards identical | positions identical | obs identical | token_actions identical | log_probs identical | listener-or-sender deposits in rollout: 585
+EQUIVALENCE (registered bar: actions, rewards, positions exact): PASS
+/Users/overlord/CascadeProjects/throng/.venv/bin/python     2284.97s user 34.03s system 647% cpu 5:58.29 total
