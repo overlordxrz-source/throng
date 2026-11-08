@@ -2601,6 +2601,37 @@ more expensive, because it produces publishable-looking nulls.
        p < 0.01) in >= 3 of 5 seeds.
     PASS = both.
 
+- **Cam's rulings (2026-11-08 night).** C1 accepted: C1-T3 confirms the coupling (3/3) and C1-E passes the rung-3 bar as
+  registered (a registered pass, **not yet a result** until a replication passes). Free checks on C1 first:
+  - C1-E's redirection at 2,000;
+  - wire-on MI and reliance slopes over 1,800-2,000;
+  - whether C1-T3's 2,000 probe came after a listener wire-row reset.
+
+  Approved:
+  - C1-E wire-on x3 continued under erosion to 3,000 (reliance bar at 3,000 in >= 2 of 3);
+  - C1-T3 x3 continued to 2,750 (reliance at 2,250 and 2,750, after 250 updates of listener relearning, in >= 2 of
+    3; continuity >= 0.8 across each reset), together capped at $0.6;
+  - **a C1-E replication** (fresh seeds, wire-on x5 / wire-off x2, cap $1.5; pass = the reliance bar at 2,000 in
+    >= 3 of 5, pooled mean drop >= 30%, wire-off MI < 0.5 in both; redirection reported);
+  - **step 3b's value-of-information check** ($0.8): the non-lookout agent is fed the lit fire only while the other
+    agent stands at the lookout; report occupancy.
+
+  Step 2: VQ stays, SYM parked. Step 6's vocabulary cut accepted (pre-data, design-consistent). Step 3b layout
+  accepted. Toy allowance $18; guard $36.40.
+
+  North star: all four ideas agreed. When hearing reconnects, tie it to age, as songbirds do (learn, then
+  crystallise; a trait of their nature, so M's OK). Order: lookout -> two predator kinds -> what x where. Build the
+  dictionary and the "speak to them" test now. The culture test is drafted after the C1-E replication. Cam's own
+  proposal: separate brains in the toy next (2, then 4 with rotating partners; Rita et al., ICLR 2022).
+- **Cam (2026-11-08): M won't top up; use this account's remaining credit, then move to a new account.**
+  - Check the real remaining credit first; guard at $41.0 metered (or $1.5 under the real limit if lower).
+  - **The real-net replication is shrunk to fit:** wire-blind PS x2 on fresh seeds, cap $13, otherwise as registered
+    (450 updates, `--log-diag`, `--ckpt-every 50`, the confirmation's probes / halts / primary / bar). Pass = primary
+    in 2 of 2; 1 of 2 = partial (the third seed and NOSIG run on the next account). The final run's 4.26 is the
+    historical NOSIG reference.
+  - Toy items first (~$2.9), then the replication.
+  - **Before any account switch, copy every checkpoint, snapshot and log off Modal.**
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
