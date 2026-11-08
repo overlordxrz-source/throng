@@ -91,6 +91,21 @@ class ToyNet(nn.Module):
                            values_shared=vsh, q_slots=qs)
 
 
+class CentralCritic(nn.Module):
+    """T4 (Cam 2026-11-08): MAPPO-style centralized critic for message credit, TRAINING TIME ONLY. Input = global
+    features of a world at a step: sender obs, listener obs, listener GRU state, active-fire one-hot (positions are
+    inside both obs). mode "V": V_shared(g); mode "Q": per-slot q_i(g, m_i) over the 64 codes."""
+    mode: str = "V"
+
+    @nn.compact
+    def __call__(self, g):
+        x = nn.relu(nn.Dense(128, name="c0")(g))
+        x = nn.relu(nn.Dense(128, name="c1")(x))
+        if self.mode == "V":
+            return nn.Dense(1, name="out")(x)[..., 0]
+        return [nn.Dense(V, name=f"q{i}")(x) for i in range(3)]
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--arm", required=True, choices=["COMM", "NOSIG", "ORACLE"])
@@ -118,7 +133,7 @@ def main():
     ap.add_argument("--imitate-steps", type=int, default=500)
     ap.add_argument("--imitate-lr", type=float, default=1e-3)
     ap.add_argument("--imitate-window", type=int, default=50)
-    ap.add_argument("--credit", default="joint", choices=["joint", "A", "B"],
+    ap.add_argument("--credit", default="joint", choices=["joint", "A", "B", "Ag", "Bg"],
                     help="token credit: joint (baseline) | A separate V_shared stream | B COMA-style Q_shared(s, m)")
     ap.add_argument("--selftest-credit", action="store_true")
     ap.add_argument("--diag-from", type=int, default=None, help="erosion diagnostic (Cam 2026-11-08): log from this update")
@@ -178,6 +193,13 @@ def main():
     popart = PopArt(beta=0.1)
     popart_s = PopArt(beta=0.1, head_key="head_value_shared")   # credit A
     Q_SCALE = R_DEP                                                 # credit B: q targets in units of one delivery
+    CENTRAL = a.credit in ("Ag", "Bg")
+    if CENTRAL:                    # T4: centralized critic, separate params and optimizer, training time only
+        DG = D + D + H + 4
+        ccrit = CentralCritic("V" if a.credit == "Ag" else "Q")
+        cparams = ccrit.init(jax.random.PRNGKey(9_999 + a.seed), jnp.zeros((1, DG)))
+        copt = optax.adam(LR); cstate = copt.init(cparams)
+        popart_g = PopArt(beta=0.1, head_key="out")
 
     # ---------------------------------------------------------------- env (jnp)
     def near(pos):                                                     # (n, 4) Chebyshev radius 1, torus
@@ -347,11 +369,13 @@ def main():
         lp_new = sum(jnp.take_along_axis(lsm[i], mb["token_actions"][:, i:i + 1], -1)[:, 0] for i in range(3))
         ent = sum(-jnp.sum(jnp.exp(l_) * l_, -1) for l_ in lsm)
         snd = (mb["obs"][:, O_INF] > 0.5).astype(jnp.float32)
-        if a.credit == "A":
+        if a.credit in ("A", "Ag"):
             adv_t = mb["adv_tok"]
-            crit_loss = jnp.mean(huber(o.values_shared - (mb["ret_s"] - mb["mu_s"]) / mb["sig_s"]))
+            crit_loss = (jnp.mean(huber(o.values_shared - (mb["ret_s"] - mb["mu_s"]) / mb["sig_s"])) if a.credit == "A"
+                         else jnp.array(0.0))     # Ag: the central critic is trained separately (crit_step)
         else:
-            q = [jax.lax.stop_gradient(qq) for qq in o.q_slots]
+            q = ([jax.lax.stop_gradient(qq) for qq in o.q_slots] if a.credit == "B"
+                 else [jax.lax.stop_gradient(mb["qg"][:, i]) for i in range(3)])
             pi = [jax.lax.stop_gradient(jnp.exp(l_)) for l_ in lsm]
             A_i = [jnp.take_along_axis(q[i], mb["token_actions"][:, i:i + 1], -1)[:, 0] - jnp.sum(pi[i] * q[i], -1)
                    for i in range(3)]
@@ -359,8 +383,11 @@ def main():
             mu_ = (raw * snd).sum() / (snd.sum() + 1e-8)
             sd_ = jnp.sqrt((((raw - mu_) ** 2) * snd).sum() / (snd.sum() + 1e-8)) + 1e-8
             adv_t = jnp.clip((raw - mu_) / sd_, -10, 10) * snd
-            q_taken = sum(jnp.take_along_axis(o.q_slots[i], mb["token_actions"][:, i:i + 1], -1)[:, 0] for i in range(3))
-            crit_loss = (huber(q_taken - mb["g_s"] / Q_SCALE) * snd).sum() / (snd.sum() + 1e-8)
+            if a.credit == "B":
+                q_taken = sum(jnp.take_along_axis(o.q_slots[i], mb["token_actions"][:, i:i + 1], -1)[:, 0] for i in range(3))
+                crit_loss = (huber(q_taken - mb["g_s"] / Q_SCALE) * snd).sum() / (snd.sum() + 1e-8)
+            else:
+                crit_loss = jnp.array(0.0)
         ratio = jnp.clip(jnp.exp(lp_new - mb["lp_tok_old"]), 0.0, 10.0)
         pg = -jnp.minimum(ratio * adv_t, jnp.clip(ratio, 1 - CLIP, 1 + CLIP) * adv_t)
         return jnp.mean(pg), jnp.mean(ent), crit_loss, adv_t
@@ -572,11 +599,70 @@ def main():
             out.append(float((pj[nz] * np.log2(pj[nz] / (px @ py)[nz])).sum()))
         return float(np.mean(out))
 
+    def gfeat(obs, carries, active):
+        """global critic features for SENDER rows: sender obs, listener obs, listener GRU state, active-fire one-hot.
+        obs (..., N, D), carries (..., N, H), active (..., W) -> (..., W, DG)."""
+        return jnp.concatenate([obs[..., 0::2, :], obs[..., 1::2, :], carries[..., 1::2, :],
+                                jax.nn.one_hot(active, 4)], -1)
+
+    def central_streams(R, o_last, params, M, rew, mutant, cp=None, listener_blind=False):
+        cp = cparams if cp is None else cp
+        G = gfeat(jnp.asarray(R["obs"]), jnp.asarray(R["carries"]), jnp.asarray(R["active"]))       # (T, W, DG)
+        GL = gfeat(central_last["obs"][None], central_last["carries"][None], central_last["active"][None])[0]
+        if listener_blind:   # mutant for the self-test: a LOCAL critic (listener and fire inputs zeroed)
+            mask = jnp.concatenate([jnp.ones(D), jnp.zeros(D + H + 4)])
+            G, GL = G * mask, GL * mask
+        r_s = (rew if mutant in ("full_adv", "total_reward") else R["r_shared"])[:, 0::2]          # sender rows
+        out = {"lp_act": R["lp_act"].reshape(M).astype(np.float32),
+               "lp_tok_old": (R["log_probs"] - R["lp_act"]).reshape(M).astype(np.float32)}
+        Tn = R["obs"].shape[0]
+        gf = np.zeros((Tn, N, DG), np.float32); gf[:, 0::2] = np.asarray(G)
+        out["gfeat"] = gf.reshape(M, DG)
+        if a.credit == "Ag":
+            v = popart_g.denormalise(np.asarray(ccrit.apply(cp, G)))
+            v_last = popart_g.denormalise(np.asarray(ccrit.apply(cp, GL)))
+            adv_s, ret_s = gae_raw(r_s, v, v_last)
+            z = np.clip((adv_s - adv_s.mean()) / (adv_s.std() + 1e-8), -10, 10)
+            full = np.zeros((Tn, N)); full[:, 0::2] = z
+            rr = np.zeros((Tn, N)); rr[:, 0::2] = ret_s
+            out["adv_tok"] = full.reshape(M).astype(np.float32); out["ret_g"] = rr.reshape(M).astype(np.float32)
+            out["_ret_g_full"] = ret_s
+            out["_v_norm"] = np.asarray(ccrit.apply(cp, G))
+        else:
+            qs = [np.asarray(q) for q in ccrit.apply(cp, G)]                                         # 3 x (T, W, 64)
+            tok_s = R["token_actions"][:, 0::2]
+            q_taken = sum(np.take_along_axis(qs[i], tok_s[..., i:i + 1], -1)[..., 0] for i in range(3))
+            lg_last = token_logits(params, o_last.z_e, TAU)
+            ql = ccrit.apply(cp, GL)
+            boot = sum(np.asarray(jnp.sum(jax.nn.softmax(lg_last[i][0::2], -1) * ql[i], -1)) for i in range(3))
+            _, g_s = gae_raw(r_s, q_taken * Q_SCALE, boot * Q_SCALE)
+            qg = np.zeros((Tn, N, 3, V), np.float32); qg[:, 0::2] = np.stack(qs, -2)
+            gg = np.zeros((Tn, N), np.float32); gg[:, 0::2] = g_s
+            out["qg"] = qg.reshape(M, 3, V); out["g_s"] = gg.reshape(M)
+        return out
+
+    @jax.jit
+    def crit_step(cp, cst, gb, tokb, tgt, snd, mu, sig):
+        def loss(cp_):
+            if a.credit == "Ag":
+                e = ccrit.apply(cp_, gb) - (tgt - mu) / sig
+            else:
+                q = ccrit.apply(cp_, gb)
+                e = sum(jnp.take_along_axis(q[i], tokb[:, i:i + 1], -1)[:, 0] for i in range(3)) - tgt / Q_SCALE
+            return (huber(e) * snd).sum() / (snd.sum() + 1e-8)
+        l, g = jax.value_and_grad(loss)(cp)
+        upd, cst = copt.update(g, cst, cp)
+        return optax.apply_updates(cp, upd), cst, l
+
+    central_last = {}
+
     def credit_streams(R, o_last, params, M, rewards_override=None, mutant=None):
         """Flat per-row streams for credit A / B. rewards_override replaces the TOTAL rewards (test: the token streams
         must not change when only the sender's own rewards change). mutant (tests only): "full_adv" -> A's token
         advantage from the total reward; "total_reward" -> B's Q target from the total reward."""
         rew = R["rewards"] if rewards_override is None else rewards_override
+        if CENTRAL:
+            return central_streams(R, o_last, params, M, rew, mutant)
         out = {"lp_act": R["lp_act"].reshape(M).astype(np.float32),
                "lp_tok_old": (R["log_probs"] - R["lp_act"]).reshape(M).astype(np.float32)}
         snd_rows = np.broadcast_to(~lis, R["r_shared"].shape)
@@ -731,6 +817,56 @@ def main():
         pp = dict(params["params"]); pp.update(head)
         return {"params": pp}, a0, a1
 
+    def central_selftest(params, flat, R, o_last, M):
+        """T4 gradient tests + mutants (Cam 2026-11-08), first minibatch of update 1."""
+        ok = True
+        res = dict(credit=a.credit)
+        # actors unchanged: the actor param tree is exactly the joint (baseline) network's
+        base_keys = set(ToyNet(H).init(jax.random.PRNGKey(0), jnp.zeros((1, H)), jnp.zeros((1, D)))["params"])
+        res["actor_tree_unchanged"] = set(params["params"]) == base_keys
+        ok &= res["actor_tree_unchanged"]
+        mb = {k: jnp.asarray(v[np.arange(MB)]) for k, v in flat.items()}
+        MSG = ["gwt_comms_1", "head_signal_slot0", "head_signal_slot1", "head_signal_slot2"]
+        gn = lambda g, keys: float(np.sqrt(sum(float(jnp.sum(x ** 2)) for k in keys  # noqa: E731
+                                               for x in jax.tree_util.tree_leaves(g["params"][k]))))
+        g_tok = jax.grad(lambda p_: credit_terms(p_, mb)[0])(params)
+        res["tok_grad_message_heads"] = gn(g_tok, MSG); res["tok_grad_action_value"] = gn(g_tok, ["head_action", "head_value"])
+        ok &= res["tok_grad_message_heads"] > 0 and res["tok_grad_action_value"] == 0
+        # the critic learns from its own loss
+        snd_m = (mb["obs"][:, O_INF] > 0.5).astype(jnp.float32)
+        tgt = mb["ret_g"] if a.credit == "Ag" else mb["g_s"]
+        _, _, l0 = crit_step(cparams, cstate, mb["gfeat"], mb["token_actions"], tgt, snd_m, popart_g.mu, popart_g.sigma)
+        res["critic_loss_finite"] = bool(np.isfinite(float(l0)))
+        # the critic uses GLOBAL inputs: perturbing only the listener/fire part of g changes its output; the local
+        # (listener-blind) mutant does not react
+        G = gfeat(jnp.asarray(R["obs"][:4]), jnp.asarray(R["carries"][:4]), jnp.asarray(R["active"][:4]))
+        noise = jax.random.normal(jax.random.PRNGKey(5), G.shape) * jnp.concatenate([jnp.zeros(D), jnp.ones(D + H + 4)])
+        out = lambda g_: ccrit.apply(cparams, g_)  # noqa: E731
+        diff = lambda a_, b_: float(jnp.max(jnp.abs(a_ - b_))) if a.credit == "Ag" else max(  # noqa: E731
+            float(jnp.max(jnp.abs(x - y))) for x, y in zip(a_, b_))
+        res["critic_reacts_to_listener_inputs"] = diff(out(G), out(G + noise))
+        mask = jnp.concatenate([jnp.ones(D), jnp.zeros(D + H + 4)])
+        res["local_mutant_reacts"] = diff(out(G * mask), out((G + noise) * mask))
+        ok &= res["critic_reacts_to_listener_inputs"] > 1e-6 and res["local_mutant_reacts"] == 0.0
+        # token stream independent of the sender's own reward; the full-reward mutant is caught
+        own_noise = np.random.default_rng(0).normal(size=R["rewards"].shape).astype(np.float32) * (~lis)[None, :]
+        key_ = "adv_tok" if a.credit == "Ag" else "g_s"
+        b0 = central_streams(R, o_last, params, M, R["rewards"], None)[key_]
+        b1 = central_streams(R, o_last, params, M, R["rewards"] + own_noise, None)[key_]
+        m1 = central_streams(R, o_last, params, M, R["rewards"], "full_adv")[key_]
+        m2 = central_streams(R, o_last, params, M, R["rewards"] + own_noise, "full_adv")[key_]
+        res["stream_unchanged_by_own_reward"] = bool(np.array_equal(b0, b1)); res["mutant_caught"] = bool(not np.array_equal(m1, m2))
+        ok &= res["stream_unchanged_by_own_reward"] and res["mutant_caught"]
+        if a.credit == "Bg":
+            q = mb["qg"]; _, o = apply_fn(params, mb["carries"], mb["obs"]); lgs = token_logits(params, o.z_e, TAU)
+            ev = max(float(jnp.max(jnp.abs(jnp.sum(jax.nn.softmax(lgs[i], -1) * (q[:, i] - jnp.sum(jax.nn.softmax(lgs[i], -1) * q[:, i], -1, keepdims=True)), -1)))) for i in range(3))
+            evm = max(float(jnp.max(jnp.abs(jnp.sum(jax.nn.softmax(lgs[i], -1) * q[:, i], -1) * snd_m))) for i in range(3))
+            res["baseline_expectation_max"] = ev; res["no_baseline_mutant_expectation"] = evm
+            ok &= ev < 1e-5 and evm > 1e-6
+        print(json.dumps(res), flush=True)
+        print("SELFTEST-CENTRAL", "PASS" if ok else "FAIL", flush=True)
+        raise SystemExit(0 if ok else 1)
+
     def gae_raw(r, v, v_last):
         # GAE(lambda) with bootstrap, no normalisation (the credit streams; same recursion as gae_bootstrap)
         r = np.asarray(r, np.float64); v = np.asarray(v, np.float64)
@@ -765,7 +901,15 @@ def main():
         flat["values"] = values.reshape(M).astype(np.float32)
         flat["adv"], flat["ret"] = adv.reshape(M), ret.reshape(M).astype(np.float32)
         if a.credit != "joint":
+            if CENTRAL:
+                central_last.update(obs=jnp.asarray(obs_last), carries=state[4], active=state[1])
             flat.update(credit_streams(R, o_last, params, M))
+            if CENTRAL:
+                flat.pop("_v_norm", None)
+                if a.credit == "Ag":
+                    cparams = popart_g.update_and_preserve(flat.pop("_ret_g_full"), cparams)
+                if a.selftest_credit:
+                    central_selftest(params, flat, R, o_last, M)
             if a.credit == "A":
                 params = popart_s.update_and_preserve(flat.pop("_ret_s_full"), params)
                 flat["mu_s"] = np.full(M, popart_s.mu, np.float32); flat["sig_s"] = np.full(M, popart_s.sigma, np.float32)
@@ -797,6 +941,12 @@ def main():
             if diag:
                 before = head_vec(params)
             params, opt_state, mets = mb_step(params, opt_state, mb, popart.sigma, popart.mu, ps_c, te_c)
+            if CENTRAL:
+                snd_m = (mb["obs"][:, O_INF] > 0.5).astype(jnp.float32)
+                tgt = mb["ret_g"] if a.credit == "Ag" else mb["g_s"]
+                cparams, cstate, closs_ = crit_step(cparams, cstate, mb["gfeat"], mb["token_actions"], tgt, snd_m,
+                                                   popart_g.mu, popart_g.sigma)
+                mets = dict(mets, central_critic_loss=closs_)
             if diag:
                 mid = head_vec(params); opt_disp += mid - before
             if a.erode_wd is not None and u >= a.erode_from:
