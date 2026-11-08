@@ -2576,6 +2576,31 @@ more expensive, because it produces publishable-looking nulls.
     codes per VQ slot, 16 (fire x material) meanings do **not** outnumber one slot's codes, which the step-6 design
     requires.
 
+- **REGISTRATION -- build-order step 6, compositionality pilot (launches now: step 2 read out, winner VQ).**
+  `comm-toy` `e48e98f`; analysis `scripts/analyze_step6.py`; launcher plan `step6` (5 Modal CPU containers, ~$1.7).
+  * **World:** the target is a **(fire, material) pair**, 4 x 4 = 16 meanings. The sender sees the fire one-hot
+    (need dims) and the material one-hot (in the 4 former noise dims; the obs width and warm start are unchanged).
+    Craft is replaced by **4 Craft-material actions (5, 9, 10, 11)**; a delivery needs the active fire **and** the
+    target material's action. The pair re-rolls to a different training pair on a delivery or after 96 steps.
+    **Held out: pairs 1 = (fire 0, material 1) and 11 = (fire 2, material 3)** (one per fire family; fixed before
+    running), never active in training (asserted every rollout).
+  * **Channel: step 2's winner, VQ, with the wire-blind head**, and the **slot vocabulary cut to 4** (codes 4-63
+    unreachable; codes 0-3 stay learned VQ codewords), so the 16 meanings outnumber one slot's codes. *Disclosed:*
+    the draft specified the cut for symbols; it is applied to VQ here because the design requires meanings to
+    outnumber one slot's codes, which 64-code VQ slots would not.
+  * Base: the replication's PS recipe (PS on, labels = the 16 pairs), ORACLE0-toy warm start, wire-init 0.06,
+    cost 0.45 (any of the 4 Craft actions when not delivering), **3,000 updates**, eval at 1,000 / 2,000 / 3,000.
+    Seeds 210-214.
+  * **Apparatus self-test PASS:** every delivery is at the active fire with the target material's action; material
+    dims are present for informed rows only; no held-out pair is active. **The leak mutant trips the training
+    assertion at update 1.** The default path still reproduces PS0 bit for bit.
+  * **Gates (Cam):**
+    1. topographic similarity at 3,000 above a 1,000-permutation null (p95) in >= 4 of 5 seeds;
+    2. held-out generalisation: listener success per attempt (both parts right) above chance 1/16 (binomial p <
+       0.01) **and** above a **shuffled-message null** (each listener hears another world's sender; two-proportion
+       p < 0.01) in >= 3 of 5 seeds.
+    PASS = both.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under

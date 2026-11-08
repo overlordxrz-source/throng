@@ -11,7 +11,7 @@ import modal
 
 _REQUIREMENTS = str(Path(__file__).resolve().parents[1] / "requirements.txt")
 
-PINNED_SHA = "ec4be035f93bf8728e33ac815feaa0b21cbb6c64"  # comm-toy branch
+PINNED_SHA = "e48e98f9abdc6c790e6afd69812aba77a76db63c"  # comm-toy branch
 REPO_URL = "https://github.com/overlordxrz-source/throng.git"
 VOLUME_NAME = "throng-runs"
 VOLUME_MOUNT = "/mnt/throng-runs"
@@ -75,6 +75,11 @@ PLANS: dict = {
                                            "--resume", f"{{VOL}}/testbed/toy/snap/t3_s{s}_u1750.pkl", "--branch", br,
                                            "--tag", f"STEPB_{br.upper()}"])
                      for br in ("none", "frozen_listener", "stopgrad") for s in (140, 141, 142)],
+    # step 6 (2026-11-08): compositionality pilot on step 2's winner (VQ, wire-blind), vocabulary cut to 4 per slot
+    "step6": [(f"step6_comp_s{s}", ["--arm", "COMM", "--seed", str(s), "--updates", "3000", "--warm-start", _W,
+                                    "--wire-init-scale", "0.06", "--craft-cost", "0.45", "--ps", "1.99", "--wire-blind", "1",
+                                    "--comp", "--vq-vocab", "4", "--eval-at", "1000", "2000", "--tag", "S6_COMP"])
+              for s in range(210, 215)],
     # step 2 (2026-11-08): channel A/B, wire-blind head in both arms (C1-T3 confirmed the coupling); PS on, 2,000 updates
     "step2": [(f"step2_{tag.lower()}_s{s}", ["--arm", arm, "--seed", str(s), "--updates", "2000", "--warm-start", _W,
                                              "--wire-init-scale", "0.06", "--craft-cost", "0.45", "--ps", "1.99",
