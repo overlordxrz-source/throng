@@ -512,6 +512,30 @@ def _minibatch_step(
     return new_params, new_opt_state, metrics, grads
 
 
+@functools.partial(jax.jit, static_argnames=("apply_fn", "optimizer", "n_layers", "freeze_comms", "value_clip",
+                                             "popart_mode", "ps_cols"))
+def _scan_minibatch_steps(params, opt_state, apply_fn, optimizer, arrays, idx_all, mb_keys, n_layers, clip_eps,
+                          vf_coef, ent_coef, vq_coef, ignition_discount, alarm_ent_coef, freeze_comms,
+                          comms_lr_warmup, value_scale, value_clip, value_shift, popart_mode, token_tau,
+                          token_ent_coef, ps_coef, ps_cols):
+    take = lambda name, idx: None if arrays[name] is None else arrays[name][idx]  # noqa: E731
+
+    def body(carry, x):
+        p, o = carry
+        idx, k = x
+        p, o, mets, _ = _minibatch_step(
+            p, o, apply_fn, optimizer,
+            take("obs", idx), take("act", idx), take("alarm", idx), take("lp", idx), take("adv", idx),
+            take("ret", idx), take("c", idx), n_layers, take("v", idx), clip_eps, vf_coef, ent_coef, vq_coef,
+            take("vq", idx), take("al", idx), k, take("ig", idx), ignition_discount, alarm_ent_coef, freeze_comms,
+            comms_lr_warmup, value_scale, value_clip, value_shift, popart_mode,
+            take("tok", idx), token_tau, token_ent_coef, ps_coef, ps_cols)
+        return (p, o), mets
+
+    (params, opt_state), mets = jax.lax.scan(body, (params, opt_state), (idx_all, mb_keys))
+    return params, opt_state, mets
+
+
 def ppo_update(
     params: Dict,
     opt_state: Any,
@@ -539,6 +563,8 @@ def ppo_update(
     token_ent_coef: float = 0.0,
     ps_coef: float = 0.0,
     ps_cols: "Tuple[int, int] | None" = None,
+    scan_minibatches: bool = False,  # comm-jit speed path: batch on device, minibatches in one jitted lax.scan
+    perm_out: "list | None" = None,  # test hook: receives the minibatch permutation
 ) -> Tuple[Dict, Any, Dict]:
     """
     Single gradient update step using minibatches.
@@ -603,6 +629,8 @@ def ppo_update(
     # Shuffle on CPU (no GPU allocation for permutation array)
     rng = np.random.RandomState(int(jax.random.bits(key, dtype=jnp.uint32)))
     perm = rng.permutation(M)
+    if perm_out is not None:
+        perm_out.append(perm)
 
     # Minibatch loop — GPU only holds params + opt_state + one minibatch + backward workspace
     minibatch_size = int(minibatch_size)
@@ -622,6 +650,25 @@ def ppo_update(
             f"step would be taken. Reduce ppo_minibatch_size (or increase "
             f"population_size / ppo_rollout_steps) so M >= minibatch_size."
         )
+
+    if scan_minibatches:
+        # Same permutation, same per-minibatch keys (the loop below splits key once per minibatch), same
+        # _minibatch_step; the batch stays on the device and the minibatches run inside one jitted lax.scan.
+        idx_all = jnp.asarray(perm[: n_minibatches * minibatch_size].reshape(n_minibatches, minibatch_size))
+        mb_keys = []
+        for _ in range(n_minibatches):
+            key, mb_key = jax.random.split(key)
+            mb_keys.append(mb_key)
+        dev = lambda x: None if x is None else jnp.asarray(x)  # noqa: E731
+        arrays = dict(obs=dev(flat_obs), act=dev(flat_actions), alarm=dev(flat_alarm_actions), lp=dev(flat_log_probs),
+                      adv=dev(flat_adv), ret=dev(flat_ret), c=dev(flat_carries), v=dev(flat_values), al=dev(flat_alive),
+                      vq=dev(flat_loss_vq), ig=dev(flat_ignition), tok=dev(flat_tokens))
+        params, opt_state, mets = _scan_minibatch_steps(
+            params, opt_state, apply_fn, optimizer, arrays, idx_all, jnp.stack(mb_keys), n_layers, clip_eps, vf_coef,
+            ent_coef, vq_coef, ignition_discount, alarm_ent_coef, freeze_comms, comms_lr_warmup, value_scale,
+            value_clip, value_shift, popart_mode, token_tau, token_ent_coef, ps_coef, ps_cols)
+        metrics = {k: float(jnp.mean(v)) for k, v in mets.items()}
+        return params, opt_state, metrics
 
     # Accumulate metrics as Python floats (not 500 JAX scalar dicts)
     metric_sums = {}

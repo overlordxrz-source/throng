@@ -65,6 +65,11 @@ def main():
     ap.add_argument("--swap-pairs", type=int, default=10)
     ap.add_argument("--eval-at", type=int, nargs="*", default=[])
     ap.add_argument("--no-eval", action="store_true", help="skip the end-of-run MI/swap eval (timing)")
+    ap.add_argument("--ppo-scan", action="store_true", help="scanned-minibatch PPO update (batch on device)")
+    ap.add_argument("--calibrate-ps", action="store_true",
+                    help="c_ps = 0.25 x |grad PPO| / |grad PS| (full-param norms, pre-clip) on 4 minibatches of the update-1 rollout; print and exit")
+    ap.add_argument("--check-ppo-scan", action="store_true",
+                    help="after update-1 rollout: run the loop and the scanned PPO update from the same state, compare, exit")
     a = ap.parse_args()
 
     cfg = _normalize_config(yaml.safe_load((ROOT / "config.yaml").read_text()))
@@ -387,6 +392,69 @@ def main():
         rl_jax.compute_gae = lambda r_, v_, d_, gamma, lam, **kw: gae_bootstrap(r_, v_, d_, v_last, gamma, lam)
         _, targets = gae_bootstrap(rewards_np, values_np, np.zeros_like(rewards_np), v_last, gamma, lam)
         key, k_up = jax.random.split(key)
+        if a.calibrate_ps:
+            import copy
+            pa = copy.deepcopy(popart)
+            _, ret_c = gae_bootstrap(rewards_np, values_np, np.zeros_like(rewards_np), v_last, gamma, lam)
+            adv_c, _ = gae_bootstrap(rewards_np, values_np, np.zeros_like(rewards_np), v_last, gamma, lam)
+            pc = pa.update_and_preserve(ret_c, params)
+            Mf = T * N
+            fl = lambda x: jnp.asarray(np.asarray(x).reshape((Mf,) + np.asarray(x).shape[2:]))  # noqa: E731
+            F = dict(obs=fl(R["obs"]), act=fl(R["actions"]), alarm=fl(R["alarm_actions"]), lp=fl(R["log_probs"]),
+                     adv=fl(adv_c), ret=fl(ret_c), c=fl(R["carries"]), v=fl(values_np), vq=fl(R["loss_vq"]),
+                     tok=fl(R["token_actions"]))
+            perm = np.random.default_rng(0).permutation(Mf)
+            gn = lambda g: float(jnp.sqrt(sum(jnp.sum(x ** 2) for x in jax.tree_util.tree_leaves(g))))  # noqa: E731
+            ratios = []
+            for i in range(4):
+                ix = perm[i * 512:(i + 1) * 512]
+                mb = {k: v[ix] for k, v in F.items()}
+                g_ppo = jax.grad(lambda p_: rl_jax.ppo_loss(
+                    p_, apply_fn, mb["obs"], mb["act"], mb["alarm"], mb["lp"], mb["adv"], mb["ret"], mb["c"], nl,
+                    mb["v"], clip_eps=float(cfg.get("ppo_clip_eps", 0.2)), vf_coef=a.vf_coef,
+                    ent_coef=float(cfg.get("ppo_entropy_coef", 0.02)), vq_coef=float(cfg.get("vq_loss_coef", 0.1)),
+                    loss_vq_rollout=mb["vq"], value_scale=pa.sigma, value_clip=False, value_shift=pa.mu, popart_mode=True,
+                    token_actions=mb["tok"], token_tau=a.tau, token_ent_coef=a.token_ent_coef)[0])(pc)
+
+                def _ps(p_):
+                    _, o_ = apply_fn(p_, mb["c"], mb["obs"], nl)
+                    return rl_jax.positive_signalling_mi(p_, o_.z_e, mb["obs"], a.tau, (s0 + 12, s0 + 21))
+                ratios.append(gn(g_ppo) / gn(jax.grad(_ps)(pc)))
+            c_ps = 0.25 * float(np.mean(ratios))
+            emit(dict(base, phase="calibrate_ps", rule="0.25 x |grad ppo| / |grad ps|", c_ps=c_ps, ratios=ratios))
+            print(f"[CALIBRATE-PS] c_ps = {c_ps:.4g} (ratios {[round(r, 3) for r in ratios]})", flush=True)
+            return
+        if a.check_ppo_scan:
+            import copy
+            upd_kw = dict(clip_eps=float(cfg.get("ppo_clip_eps", 0.2)), vf_coef=a.vf_coef,
+                          ent_coef=float(cfg.get("ppo_entropy_coef", 0.02)), vq_coef=float(cfg.get("vq_loss_coef", 0.1)),
+                          minibatch_size=int(cfg["ppo_minibatch_size"]), gamma=gamma, lam=lam, team="blue",
+                          alarm_ent_coef=float(cfg.get("alarm_ent_coef", 0.0)), freeze_comms=False, value_clip=False,
+                          token_tau=a.tau, token_ent_coef=a.token_ent_coef, ps_coef=a.ps,
+                          ps_cols=((s0 + 12, s0 + 21) if a.ps > 0 else None))
+            out = {}
+            for name, scan in (("loop", False), ("scan", True)):
+                pa = copy.deepcopy(popart); perm = []
+                t1 = time.time()
+                p_, o_, m_ = ppo_update(params, opt_state, opt, apply_fn, batch, nl, k_up, popart=pa,
+                                        scan_minibatches=scan, perm_out=perm, **upd_kw)
+                jax.block_until_ready(p_)
+                out[name] = (p_, m_, perm[0], time.time() - t1)
+            la, lb = jax.tree_util.tree_leaves(out["loop"][0]), jax.tree_util.tree_leaves(out["scan"][0])
+            rel = max(float(jnp.max(jnp.abs(x - y)) / (jnp.max(jnp.abs(x)) + 1e-12)) for x, y in zip(la, lb))
+            same_perm = bool(np.array_equal(out["loop"][2], out["scan"][2]))
+            changed = max(float(jnp.max(jnp.abs(x - y))) for x, y in zip(jax.tree_util.tree_leaves(params), la))
+            stats = {k: (round(out["loop"][1][k], 6), round(out["scan"][1].get(k, float("nan")), 6))
+                     for k in sorted(out["loop"][1]) if k in out["scan"][1]}
+            ok = rel <= 1e-5 and same_perm
+            rec = dict(base, phase="ppo_scan_check", seed=a.seed, ps=a.ps, max_rel_param_diff=rel,
+                       identical_perm=same_perm, update_moved_params_by=changed, t_loop=round(out["loop"][3], 2),
+                       t_scan=round(out["scan"][3], 2), stats_loop_vs_scan=stats, ok=bool(ok))
+            emit(rec)
+            print(f"[PPO-SCAN CHECK] seed {a.seed} ps {a.ps}: max rel param diff {rel:.3g} (<= 1e-5), identical perm "
+                  f"{same_perm} -> {'PASS' if ok else 'FAIL'} | t_loop {out['loop'][3]:.1f}s t_scan {out['scan'][3]:.1f}s",
+                  flush=True)
+            return
         t1 = time.time()
         params, opt_state, mets = ppo_update(
             params, opt_state, opt, apply_fn, batch, nl, k_up, clip_eps=float(cfg.get("ppo_clip_eps", 0.2)),
@@ -394,7 +462,7 @@ def main():
             vq_coef=float(cfg.get("vq_loss_coef", 0.1)), minibatch_size=int(cfg["ppo_minibatch_size"]), gamma=gamma,
             lam=lam, team="blue", alarm_ent_coef=float(cfg.get("alarm_ent_coef", 0.0)), freeze_comms=False,
             value_clip=False, popart=popart, token_tau=a.tau, token_ent_coef=a.token_ent_coef,
-            ps_coef=a.ps, ps_cols=((s0 + 12, s0 + 21) if a.ps > 0 else None))
+            ps_coef=a.ps, ps_cols=((s0 + 12, s0 + 21) if a.ps > 0 else None), scan_minibatches=a.ppo_scan)
         rl_jax.compute_gae = _production_compute_gae
         t_ppo = time.time() - t1
         ev = 1 - np.var(targets - values_np) / (np.var(targets) + 1e-8)
