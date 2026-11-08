@@ -1546,6 +1546,39 @@ more expensive, because it produces publishable-looking nulls.
   * **Next step:** an arm passes -> draft one real-network confirmation run with a cost estimate for M (nothing
     launches). None passes -> report.
 
+- **RESULTS -- CPU comm toy (2026-11-07).** `comm-toy` `74e4d33`, 15 runs of 1,000 updates (laptop CPU, ~30 min
+  total, $0). Analysis output `docs/data/toy_comm_2026-11-07_analysis.txt` (registered script, unmodified).
+  * **(1) Precondition: PASS.** ORACLE-toy listener 12.44 deposits/world-update vs NOSIG 2.07 (6x).
+    Craft-cost check: NOSIG listener p(deposit | Craft) 0.19-0.22 -> break-even 0.61-0.75, so **blind search is
+    still profitable at 0.45** in the toy (reported, not retuned).
+  * **(2) Gate: PASS -- the toy reproduces the live-wire collapse.** Sender token entropy last-50 / first-5: BASE
+    0.979 / 0.013 / 0.000 (mean 0.33), NOSIG 1.011 / 1.010 / 1.024. Two of three BASE seeds collapsed to ~0;
+    NOSIG never did (real: COMM 0.11 / 0.49, NOSIG 1.12). The third clause held narrowly (0.979 < 1.010).
+  * **(3) Primary: no arm passes; the prediction "BOTH passes" fails.** Delta per seed:
+    BASE +0.002 / +0.017 / +0.000 (all fail); **PS -0.029 / +0.410 / +0.342 (2 of 3 pass, SE <= 0.006)**;
+    PL -0.000 / -0.000 / +0.000 (all fail); BOTH +0.077 / -0.098 / +0.168 (2 of 3 pass).
+  * **Secondaries (MEASURED):**
+    - *PS made the tokens a code for T, and listeners came to use it.* MI(token; T) 1.96-1.99 bits per slot of a
+      2-bit ceiling, in every PS seed (BASE <= 0.024). The swap changed the sender's token on 100% of steps.
+      **PS listeners delivered 4.8 / 5.2 / 7.0 per world-update vs NOSIG 1.5-2.9 (BASE 0.3-2.1).**
+    - *Not registered -- listener deposits under the swap* (same pairs): PS 4.53 -> 1.30, 4.97 -> 1.63,
+      6.77 -> 2.33; BOTH 2.21 -> 0.83, 0.06 -> 0.04, 2.06 -> 0.74; **BASE0 1.94 -> 1.95**. A wrong token costs PS
+      listeners 65-71% of their deposits in all three seeds, including PS0, whose registered movement metric was
+      negative (Delta -0.029; it also moves *away* from the true hearth under the swap, mu(T) -0.09 -> -0.15). So PS0's
+      listeners do depend on the token; the registered movement-toward-T' metric doesn't capture how. That reading
+      is CONJECTURED.
+    - *PS listener competence came late.* Deposits rose mainly after update ~400-700 (PS0: 0.06 at 700 -> 5.0 at
+      1,000) and were still climbing at 1,000.
+    - *PL alone broke listeners.* Deposits 0.01-0.07, Crafts ~20-44 per update; MI <= 0.008. Rewarding "act
+      differently from the no-wire policy" without an informative sender pushed listeners off the task. In BOTH it
+      cost one seed (BOTH1: deposits 0.04).
+    - *Step 1 inside the toy:* in BASE the listener's random-token sensitivity rose (0.014-0.023 -> 0.06-0.21),
+      unlike the real end params (fell). In the collapsed seeds this probe is off-distribution (a listener that
+      only ever hears one token is tested on others), so it is not a clean answer to "flat or growing".
+  * **Reading per the registration:** no arm passes -> report; nothing is drafted for funding. Not registered:
+    positive signalling alone produced an informative code and listeners that measurably depend on it, in 3/3
+    seeds by deposits-under-swap, and 2/3 by the registered movement metric. Next step is Cam's.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under

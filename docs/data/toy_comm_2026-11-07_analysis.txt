@@ -1,0 +1,59 @@
+== per run (last 50 updates)
+  BASE   s0 n=1000: L dep/world 2.14 | S dep/world 18.67 | L crafts/upd 716 | H_send 9.52->9.32 | H_list 7.04->9.43 | swap_diff 0.223->0.108 | L sens TV 0.0212->0.0654
+  BASE   s1 n=1000: L dep/world 0.32 | S dep/world 20.26 | L crafts/upd 184 | H_send 9.51->0.13 | H_list 7.34->0.26 | swap_diff 0.219->0.029 | L sens TV 0.0190->0.2089
+  BASE   s2 n=1000: L dep/world 0.63 | S dep/world 20.21 | L crafts/upd 262 | H_send 9.52->0.00 | H_list 7.18->0.00 | swap_diff 0.222->0.000 | L sens TV 0.0233->0.0627
+  BOTH   s0 n=1000: L dep/world 2.21 | S dep/world 19.17 | L crafts/upd 190 | H_send 9.23->2.00 | H_list 7.29->6.67 | swap_diff 0.513->1.000 | L sens TV 0.0506->0.4049
+  BOTH   s1 n=1000: L dep/world 0.04 | S dep/world 19.69 | L crafts/upd 31 | H_send 9.21->0.14 | H_list 7.54->0.06 | swap_diff 0.513->1.000 | L sens TV 0.0848->0.5535
+  BOTH   s2 n=1000: L dep/world 1.98 | S dep/world 19.41 | L crafts/upd 188 | H_send 9.20->2.47 | H_list 7.43->7.91 | swap_diff 0.521->1.000 | L sens TV 0.0925->0.7040
+  NOSIG  s0 n=1000: L dep/world 1.89 | S dep/world 19.46 | L crafts/upd 652 | H_send 9.52->9.62 | H_list 7.10->9.62 | swap_diff 0.230->0.163 | L sens TV 0.0000->0.0000
+  NOSIG  s1 n=1000: L dep/world 1.46 | S dep/world 19.10 | L crafts/upd 455 | H_send 9.52->9.61 | H_list 7.18->9.66 | swap_diff 0.229->0.206 | L sens TV 0.0000->0.0000
+  NOSIG  s2 n=1000: L dep/world 2.87 | S dep/world 19.02 | L crafts/upd 843 | H_send 9.51->9.74 | H_list 7.22->9.75 | swap_diff 0.230->0.146 | L sens TV 0.0000->0.0000
+  PL     s0 n=1000: L dep/world 0.01 | S dep/world 20.48 | L crafts/upd 19 | H_send 9.53->9.16 | H_list 7.24->9.23 | swap_diff 0.228->0.122 | L sens TV 0.0509->0.0030
+  PL     s1 n=1000: L dep/world 0.07 | S dep/world 20.57 | L crafts/upd 44 | H_send 9.51->9.60 | H_list 7.57->9.65 | swap_diff 0.221->0.153 | L sens TV 0.0717->0.0338
+  PL     s2 n=1000: L dep/world 0.07 | S dep/world 20.25 | L crafts/upd 20 | H_send 9.52->0.01 | H_list 7.26->0.01 | swap_diff 0.224->0.001 | L sens TV 0.0813->0.1265
+  PS     s0 n=1000: L dep/world 4.76 | S dep/world 17.51 | L crafts/upd 477 | H_send 9.18->0.52 | H_list 6.97->1.53 | swap_diff 0.524->1.000 | L sens TV 0.0202->0.2196
+  PS     s1 n=1000: L dep/world 5.17 | S dep/world 16.79 | L crafts/upd 552 | H_send 9.18->1.55 | H_list 7.21->6.93 | swap_diff 0.517->1.000 | L sens TV 0.0188->0.3461
+  PS     s2 n=1000: L dep/world 6.97 | S dep/world 16.08 | L crafts/upd 616 | H_send 9.23->0.11 | H_list 7.11->0.37 | swap_diff 0.517->1.000 | L sens TV 0.0215->0.4003
+
+== PRECONDITION (channel value): ORACLE listener dep/world 12.44 >= 2 x NOSIG 2.07 -> PASS
+   craft cost check NOSIG s0: listener p(deposit | Craft) 0.185 -> break-even 0.61 vs cost 0.45 -> blind search still PROFITABLE
+   craft cost check NOSIG s1: listener p(deposit | Craft) 0.205 -> break-even 0.70 vs cost 0.45 -> blind search still PROFITABLE
+   craft cost check NOSIG s2: listener p(deposit | Craft) 0.218 -> break-even 0.75 vs cost 0.45 -> blind search still PROFITABLE
+
+== GATE (sender token entropy, last-50 / first-5): BASE [0.979, 0.013, 0.0] (mean 0.331, need <= 0.6) | NOSIG [1.011, 1.01, 1.024] (each >= 0.9) | max BASE < min NOSIG -> PASS
+
+== PRIMARY (token swap, Delta = mu_Tprime_swap - mu_Tprime_control over 10 pairs; per seed Delta >= 0.05 and > 2 SE; arm passes iff all seeds pass)
+   BASE  s0: Delta +0.0018 (SE 0.0013, n=10) -> fail | swapped token differs on 18.0% of sender steps
+   BASE  s1: Delta +0.0168 (SE 0.0047, n=10) -> fail | swapped token differs on 13.2% of sender steps
+   BASE  s2: Delta +0.0000 (SE 0.0008, n=10) -> fail | swapped token differs on 8.9% of sender steps
+   BASE : FAIL
+   PS    s0: Delta -0.0290 (SE 0.0051, n=10) -> fail | swapped token differs on 100.0% of sender steps
+   PS    s1: Delta +0.4104 (SE 0.0064, n=10) -> pass | swapped token differs on 100.0% of sender steps
+   PS    s2: Delta +0.3418 (SE 0.0039, n=10) -> pass | swapped token differs on 100.0% of sender steps
+   PS   : FAIL
+   PL    s0: Delta -0.0004 (SE 0.0007, n=10) -> fail | swapped token differs on 11.7% of sender steps
+   PL    s1: Delta -0.0001 (SE 0.0007, n=10) -> fail | swapped token differs on 15.3% of sender steps
+   PL    s2: Delta +0.0003 (SE 0.0011, n=10) -> fail | swapped token differs on 7.9% of sender steps
+   PL   : FAIL
+   BOTH  s0: Delta +0.0772 (SE 0.0025, n=10) -> pass | swapped token differs on 100.0% of sender steps
+   BOTH  s1: Delta -0.0975 (SE 0.0037, n=10) -> fail | swapped token differs on 100.0% of sender steps
+   BOTH  s2: Delta +0.1683 (SE 0.0065, n=10) -> pass | swapped token differs on 100.0% of sender steps
+   BOTH : FAIL
+
+== SECONDARY: listener dep/world (last 50) vs NOSIG; MI(token; T) vs a plain (non-block) permutation null -- overstates significance under autocorrelation
+   BASE  listener dep/world [2.14, 0.32, 0.63] vs NOSIG [1.89, 1.46, 2.87]
+     s0 MI bits: slot0 0.0025 (null p99 0.0003) | slot1 0.0016 (null p99 0.0003) | slot2 0.0068 (null p99 0.0003)
+     s1 MI bits: slot0 0.0000 (null p99 0.0000) | slot1 0.0241 (null p99 0.0001) | slot2 0.0000 (null p99 0.0000)
+     s2 MI bits: slot0 0.0000 (null p99 0.0000) | slot1 0.0000 (null p99 0.0000) | slot2 0.0000 (null p99 0.0000)
+   PS    listener dep/world [4.76, 5.17, 6.97] vs NOSIG [1.89, 1.46, 2.87]
+     s0 MI bits: slot0 1.9562 (null p99 0.0002) | slot1 1.9562 (null p99 0.0003) | slot2 1.9562 (null p99 0.0002)
+     s1 MI bits: slot0 1.9944 (null p99 0.0003) | slot1 1.9944 (null p99 0.0002) | slot2 1.9944 (null p99 0.0002)
+     s2 MI bits: slot0 1.9879 (null p99 0.0001) | slot1 1.9879 (null p99 0.0001) | slot2 1.9879 (null p99 0.0001)
+   PL    listener dep/world [0.01, 0.07, 0.07] vs NOSIG [1.89, 1.46, 2.87]
+     s0 MI bits: slot0 0.0014 (null p99 0.0003) | slot1 0.0041 (null p99 0.0003) | slot2 0.0023 (null p99 0.0002)
+     s1 MI bits: slot0 0.0052 (null p99 0.0005) | slot1 0.0036 (null p99 0.0003) | slot2 0.0080 (null p99 0.0003)
+     s2 MI bits: slot0 0.0003 (null p99 0.0001) | slot1 0.0003 (null p99 0.0001) | slot2 0.0003 (null p99 0.0001)
+   BOTH  listener dep/world [2.21, 0.04, 1.98] vs NOSIG [1.89, 1.46, 2.87]
+     s0 MI bits: slot0 1.9941 (null p99 0.0003) | slot1 1.9941 (null p99 0.0004) | slot2 1.9941 (null p99 0.0003)
+     s1 MI bits: slot0 1.9998 (null p99 0.0002) | slot1 1.9992 (null p99 0.0001) | slot2 1.9948 (null p99 0.0002)
+     s2 MI bits: slot0 1.9969 (null p99 0.0004) | slot1 1.9969 (null p99 0.0004) | slot2 1.9969 (null p99 0.0004)
