@@ -121,6 +121,28 @@ def token_logits(params, z_e, tau):
     return out
 
 
+def positive_signalling_mi(params, z_e, obs, tau, ps_cols):
+    """Positive signalling (Eccles et al. 2019; CPU toy 2026-11-07): batch estimate of MI(token; active hearth) on
+    INFORMED rows, summed over the 3 token slots, in nats: H(mean p) - sum_T w_T H(mean p | T). The label is the argmax
+    of the informed agent's 4 need dims. Maximised (subtracted from the loss) with coefficient ps_coef."""
+    inf_col, need0 = ps_cols
+    snd = (obs[:, inf_col] > 0.5).astype(jnp.float32)
+    lab = jnp.argmax(obs[:, need0:need0 + 4], -1)
+    wsum = snd.sum() + 1e-8
+    mi = 0.0
+    for lg in token_logits(params, z_e, tau):
+        p = jax.nn.softmax(lg, -1)
+        pbar = (p * snd[:, None]).sum(0) / wsum
+        h_all = -(pbar * jnp.log(pbar + 1e-10)).sum()
+        h_cond = 0.0
+        for t in range(4):
+            wt = snd * (lab == t)
+            pt = (p * wt[:, None]).sum(0) / (wt.sum() + 1e-8)
+            h_cond = h_cond + (wt.sum() / wsum) * -(pt * jnp.log(pt + 1e-10)).sum()
+        mi = mi + h_all - h_cond
+    return mi
+
+
 def compute_gae(
     rewards,   # (T, N) — numpy or JAX
     values,    # (T, N)
@@ -191,6 +213,8 @@ def ppo_loss(
     token_actions: jnp.ndarray = None,  # (M, 3) int: sampled tokens (channel fix); None = production (no token policy)
     token_tau: float = 1.0,
     token_ent_coef: float = 0.0,
+    ps_coef: float = 0.0,             # positive signalling (comm-jit branch); used only when ps_cols is not None
+    ps_cols: Tuple[int, int] = None,  # (informed-flag column, first of the 4 need columns) -- static; None = off
 ) -> Tuple[jnp.ndarray, Dict]:
     """
     PPO loss evaluated with exact historical carries per timestep.
@@ -347,7 +371,13 @@ def ppo_loss(
         loss_vq_mean, nan=0.0, posinf=0.0, neginf=0.0
     )
 
+    ps_val = jnp.array(0.0)
+    if ps_cols is not None and token_actions is not None:
+        ps_val = positive_signalling_mi(params, outs.z_e, obs, token_tau, ps_cols)
+        total_loss = total_loss - ps_coef * ps_val
+
     metrics = {
+        "ppo_ps_mi": ps_val,
         "ppo_pg_loss":  loss_pg,
         "ppo_vf_loss":  loss_vf,
         "ppo_entropy":  total_entropy_val,
@@ -387,14 +417,14 @@ COMMS_SUBTREE_KEYS = (
 
 
 @functools.partial(jax.jit, static_argnames=("apply_fn", "optimizer", "n_layers", "freeze_comms", "value_clip",
-                                             "popart_mode"))
+                                             "popart_mode", "ps_cols"))
 def _minibatch_step(
     params, opt_state, apply_fn, optimizer,
     obs, actions, alarm_actions, old_log_probs, advantages, returns, carries,
     n_layers, old_values, clip_eps, vf_coef, ent_coef, vq_coef, loss_vq, alive, rng_key,
     ignition, ignition_discount, alarm_ent_coef, freeze_comms=False,
     comms_lr_warmup=1.0, value_scale=1.0, value_clip=True, value_shift=0.0, popart_mode=False,
-    token_actions=None, token_tau=1.0, token_ent_coef=0.0,
+    token_actions=None, token_tau=1.0, token_ent_coef=0.0, ps_coef=0.0, ps_cols=None,
 ):
     grad_fn = jax.value_and_grad(ppo_loss, has_aux=True)
     (loss, metrics), grads = grad_fn(
@@ -404,6 +434,7 @@ def _minibatch_step(
         ignition=ignition, ignition_discount=ignition_discount, alarm_ent_coef=alarm_ent_coef,
         value_scale=value_scale, value_clip=value_clip, value_shift=value_shift, popart_mode=popart_mode,
         token_actions=token_actions, token_tau=token_tau, token_ent_coef=token_ent_coef,
+        ps_coef=ps_coef, ps_cols=ps_cols,
     )
 
     # Phase 18: Per-Group Gradient Clipping
@@ -506,6 +537,8 @@ def ppo_update(
     popart: "PopArt | None" = None,
     token_tau: float = 1.0,
     token_ent_coef: float = 0.0,
+    ps_coef: float = 0.0,
+    ps_cols: "Tuple[int, int] | None" = None,
 ) -> Tuple[Dict, Any, Dict]:
     """
     Single gradient update step using minibatches.
@@ -625,7 +658,7 @@ def ppo_update(
             n_layers, mb_v, clip_eps, vf_coef, ent_coef, vq_coef, mb_vq, mb_al, mb_key,
             mb_ig, ignition_discount, alarm_ent_coef, freeze_comms,
             comms_lr_warmup, value_scale, value_clip, value_shift, popart_mode,
-            mb_tok, token_tau, token_ent_coef,
+            mb_tok, token_tau, token_ent_coef, ps_coef, ps_cols,
         )
 
         # Accumulate as Python floats to avoid holding 500 JAX arrays

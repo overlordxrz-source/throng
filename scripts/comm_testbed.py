@@ -92,6 +92,8 @@ def main():
     ap.add_argument("--save-params", default=None)
     ap.add_argument("--out", default=None)
     ap.add_argument("--timing-only", action="store_true")
+    ap.add_argument("--dump-equiv", default=None,
+                    help="TEST ONLY (step 0): run one rollout with the numpy draws injected from <path>.draws.npz and dump it to <path>.ref.npz")
     a = ap.parse_args()
 
     cfg = _normalize_config(yaml.safe_load((ROOT / "config.yaml").read_text()))
@@ -309,6 +311,28 @@ def main():
 
     base = dict(arm=a.arm, seed=a.seed, grid=G, gpu=gpu, tau=a.tau, warm_start=bool(a.warm_start),
                 craft_cost=a.craft_cost)
+    if a.dump_equiv:   # TEST ONLY: everything above is the normal setup; nothing below is touched
+        D = np.load(a.dump_equiv + ".draws.npz")
+        world = World(rng)
+        world.pos[:] = D["init_pos"]; world.active[:] = D["init_active"]
+        cnt = {"t": -1}
+
+        def _resp(n):            # called exactly once per step (np.where evaluates it every step)
+            cnt["t"] += 1
+            return D["resp"][cnt["t"]][:n].copy()
+
+        class _R:                # re-roll increments, consumed in world-index order, as integers(1, 4, k) is
+            def integers(self, lo, hi, size):
+                assert (lo, hi) == (1, 4)
+                return D["inc"][cnt["t"]][:size].copy()
+
+        world.respawn, world.r = _resp, _R()
+        B, st, _, _ = run_rollout(world, params, jnp.zeros((N, hidden)), jax.random.PRNGKey(int(D["key_seed"])),
+                                  collect=True)
+        np.savez(a.dump_equiv + ".ref.npz", **{k: np.stack(v) for k, v in B.items()})
+        print(f"[equiv] reference rollout dumped: {len(B['actions'])} steps", flush=True)
+        return
+
     halt_sdep = []
     world, carries = World(rng), jnp.zeros((N, hidden))
     mi_tok, mi_T, mi_ep = [], [], []

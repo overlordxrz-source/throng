@@ -1,0 +1,8 @@
+seed 0: actions identical | rewards DIFFER first@281 (3 steps; max|d| 2.38e-07) | positions identical | obs identical | token_actions identical | log_probs identical | listener-or-sender deposits in rollout: 561
+seed 1: actions identical | rewards DIFFER first@56 (3 steps; max|d| 2.38e-07) | positions identical | obs identical | token_actions identical | log_probs identical | listener-or-sender deposits in rollout: 558
+seed 2: actions identical | rewards DIFFER first@403 (2 steps; max|d| 2.38e-07) | positions identical | obs identical | token_actions identical | log_probs identical | listener-or-sender deposits in rollout: 585
+EQUIVALENCE (registered bar: actions, rewards, positions exact): FAIL
+/Users/overlord/CascadeProjects/throng/.venv/bin/python    2>&1  2064.23s user 55.76s system 152% cpu 23:09.79 total
+tail -8  0.00s user 0.00s system 0% cpu 23:09.79 total
+
+[exited with code 0]
