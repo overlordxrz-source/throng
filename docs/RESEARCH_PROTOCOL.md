@@ -1805,6 +1805,29 @@ more expensive, because it produces publishable-looking nulls.
   block-permutation null (p95). K, the floor and N are derived from it by Cam's rule and registered before the
   paid launch. Spend guard: the smoke's  on top of the toy allowance.
 
+- **Cam's ruling (2026-11-08): the scanned-PPO bar was ill-posed** (a per-leaf relative bar blows up on near-zero
+  parameters; Adam's first step turns float noise into ±lr steps on zero-gradient leaves). The hold was right.
+  Guard reset to the approved sum: meter $1.31 + smoke $4 + remaining toy allowance ~$3.0 + speed check $0.30 =
+  **$8.60** (a runaway guard; each job keeps its own allowance). c_ps 2.015 accepted. The user reports $41 left on
+  the account.
+- **REGISTRATION -- scanned-PPO equivalence bar (before the GPU check).** `comm-jit` (commit recorded with the
+  results), `--check-ppo-scan`, COMM, ORACLE0 params, **PS on (c_ps 2.015) so mutant (iii) is meaningful, fresh
+  seeds 40/41/42**; the loop path is the reference, and both run on the same GPU in one process from identical
+  params / optimizer state / PopArt state / key.
+  * (a) per-minibatch total losses equal within 1e-6 relative;
+  * (b) per-minibatch gradients (post-clip, as applied), every leaf, elementwise
+    |dg| <= 1e-4 |g_ref| + 1e-6 max|g_ref| (the max taken per leaf per minibatch);
+  * (c) parameters after the full update, every element, |dtheta| <= 0.05 lr (lr 3e-4 -> 1.5e-5);
+  * identical minibatch permutation;
+  * (d) mutants must each fail at least one of (a)-(c): (i) one minibatch dropped, (ii) minibatch order shuffled,
+    (iii) PS term zeroed. If any mutant passes, the bar is too loose and that is reported.
+  * No leaves are excluded. PASS = all three seeds pass (a)-(c) and every mutant fails on every seed.
+  * Timing, each GPU type in a single container: A10G (scan) and L4 (loop and scan), 3 updates each, compile
+    excluded (update 1 dropped). The scan path is used only if it passes **and** is >= 1.3x faster; the GPU is
+    whichever is cheaper per update at list price. Budget <= $0.30.
+  * Disclosed: two laptop dev checks. The first (per-leaf ratio, before this bar) is reported above. The second,
+    of this bar's code, hit the 10-minute laptop limit and was killed with no output.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
