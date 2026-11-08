@@ -1744,6 +1744,15 @@ more expensive, because it produces publishable-looking nulls.
     estimate. I stopped it before it finished (it writes results only at the end); nothing was returned. It now
     runs on the laptop for free. Toy allowance left: ~$1.
 
+- **Erosion calibration, force 2: weight decay on the message head -- calibrated (exploratory; awaiting Cam's
+  ruling before registration).** `comm-toy` `f005323`, laptop, wire off, the same schedule (PS 1.99 annealed over
+  1,000-1,500; decay from 1,500), calibration seeds 60/61. Wire-off MI at update 2,000 (plug-in, mean over
+  slots), and the first update below 0.5 bit:
+  1e-4: 0.71 (never) / 0.05 (1,896); **3e-4: 0.15 (1,788) / 0.01 (1,700)**; 1e-3: 0.003 (1,594) / 0.004 (1,584);
+  3e-3: 0.002 (1,536) / 0.003 (1,538). **The weakest strength that gets every calibration seed below 0.5 bit within
+  500 updates is 3e-4** (per minibatch step, decoupled, on `gwt_comms_1` + `head_signal_slot*`). Senders' own
+  deposits are unaffected (18.6-21.2 per world), so it erodes the code, not the agents.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
