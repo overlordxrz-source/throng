@@ -1698,6 +1698,20 @@ more expensive, because it produces publishable-looking nulls.
   * **Then one timing run on `rapidcrisp` (<= $0.50):** a few COMM updates at the real settings. Speed-up vs the
     measured ~37 s/update on an A10. Under ~5x -> report before drafting arms.
 
+- **Cam's rulings (2026-11-08, second set).**
+  1. **Update-2 halt is an apparatus check only.** Halt if the PS gradient does not reach the message head, if
+     messages are constant, or if the listener's wire input is zero. No MI criterion at update 2.
+  2. **MI floor from a CPU smoke** of the real network (free, or Modal CPU within the $2 toy allowance), PS arm,
+     2 seeds. Pick a check update K <= 25% of the run where both seeds are clearly above the shuffled-token null.
+     Floor = half the lower seed's MI at K, and above the null's p95. K and the floor are registered before the
+     paid launch. If MI is still near zero at the last smoke update, report it and don't guess.
+  3. **Erosion calibration:** the weakest setting that gets wire-off MI under 0.5 bits within 500 updates **on
+     every calibration seed**. If none does, report it; the window is not extended.
+  4. **Modal for the toy approved:** the timing run plus the 6 erosion runs in parallel CPU containers, within the
+     $2 toy cap. The two jobs already running finish on the laptop.
+  5. The roadmap is the reference: saved as `docs/THRONG_North_Star_Roadmap.md`. The copy received still says
+     "halt at update 2 on an MI floor"; that line is marked superseded by ruling 1 until the updated file arrives.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
