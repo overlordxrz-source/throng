@@ -11,7 +11,7 @@ import modal
 
 _REQUIREMENTS = str(Path(__file__).resolve().parents[1] / "requirements.txt")
 
-PINNED_SHA = "5f3da12eed94a0fccca43726b754177bc01a3987"  # comm-toy branch
+PINNED_SHA = "14fd2c7b0d352f7f6dd60503fa37499e3bc3880b"  # comm-toy branch
 REPO_URL = "https://github.com/overlordxrz-source/throng.git"
 VOLUME_NAME = "throng-runs"
 VOLUME_MOUNT = "/mnt/throng-runs"
@@ -60,6 +60,12 @@ _ERO_JOBS = ([(f"erosion_on_s{s}", ["--arm", "COMM", "--seed", str(s), *_ERO, "-
 PLANS: dict = {
     # registered erosion test (2026-11-08): probe one container first (Cam: fan out only if < $0.01/min/container)
     "erosion_probe": _ERO_JOBS[:1],
+    # registered credit fixes under the erosion protocol (2026-11-08): wire-on x3 + wire-off x2 per fix, fresh seeds
+    "credit": [(f"credit_{fx}_{w}_s{s}", ["--arm", arm, "--seed", str(s), *_ERO, "--credit", fx,
+                                          "--tag", f"CREDIT_{fx}_{w.upper()}"])
+               for fx, base in (("A", 100), ("B", 110))
+               for w, arm, ss in (("on", "COMM", (0, 1, 2)), ("off", "NOSIG", (3, 4)))
+               for s in [base + i for i in ss]],
     # registered erosion diagnostic (2026-11-08): fresh seeds 90 (wire on) / 91 (wire off), log 1,500-1,800
     "diag": [(f"diag_{tag}_s{s}", ["--arm", arm, "--seed", str(s), *[x if x != "2000" else "1800" for x in _ERO],
                                     "--diag-from", "1500", "--diag-to", "1800", "--diag-every", "10", "--diag-pairs", "4",

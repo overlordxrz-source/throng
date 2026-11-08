@@ -1978,6 +1978,37 @@ more expensive, because it produces publishable-looking nulls.
     per seed and ~$13 total. Meter at launch $5.00. Runaway guard = meter + $15 confirmation + the remaining toy
     allowance (~$4.4) = **$24.40**; the confirmation itself is held to $15 by monitoring its app.
 
+- **Reproducibility note (2026-11-08).** The first credit-fix commit (`ce3b7c1`) broke the toy's bit-reproducibility
+  on the default (joint) path: EV differed at 1e-7 from update 2, against the original PS0 run. A bisect showed
+  every earlier version reproduces PS0 exactly, including those the erosion test (`8469c90`) and the diagnostic
+  (`5f3da12`) ran on, so their results are unaffected. Cause: an unconditional extra `log_softmax` in the rollout,
+  which changed the compiled graph. It is now computed only for credit A/B (`14fd2c7`), and the joint path again
+  reproduces PS0 bit for bit over updates 1-30.
+- **REGISTRATION -- credit fixes A and B under the erosion protocol (before any run).** `comm-toy` `14fd2c7`;
+  analysis `scripts/analyze_credit.py`; launcher plan `credit` (Modal CPU, 2 cores / 4 GiB, ~$0.005/min per
+  container; 10 containers).
+  * **Fix A:** a separate value head V_shared(s) (PopArt-normalised) on the shared (listener-delivery) reward.
+    The token's PPO surrogate uses only that stream's GAE advantage (standardised over sender rows; listener rows
+    0). Movement keeps the full advantage via `ppo_loss`.
+  * **Fix B:** a message-conditioned critic, additive over slots, q_i(s, m_i), regressed (on sender rows) on the
+    shared lambda-return, in units of one delivery. The token's surrogate uses the COMA counterfactual advantage
+    sum_i [q_i(s, m_i) - sum_m pi_i(m) q_i(s, m)] (stop-grad, standardised over sender rows). Movement keeps the
+    full advantage.
+  * **Both:** joint token ratio, PPO clip 0.2, token entropy 0.01, critic loss weight vf 0.5, own clip group for the
+    new heads. **Self-tests pass, mutants caught:** the token term reaches only the message heads; the critic loss
+    reaches only its head; the movement loss touches neither; the token stream is unchanged when only the sender's
+    own reward changes (the full-reward mutant is caught); for B, the baseline has E_pi[A] = 1.9e-7 (the
+    no-baseline mutant 0.92).
+  * **Protocol (as the erosion test):** 2,000 updates; ORACLE0-toy warm start (new heads at init);
+    `--wire-init-scale 0.06`; cost 0.45; PS 1.99 annealed to 0 over 1,000-1,500; weight decay 3e-4 on the message
+    head from 1,500; eval at 1,500 and 2,000. **Fresh seeds:** A on 100/101/102, off 103/104; B on 110/111/112, off
+    113/114.
+  * **Pass per fix:** >= 2 of 3 wire-on seeds keep MI >= 1.0 bit at 2,000 **and** reliance (empirical-swap deposit
+    drop >= 30%, paired drop > 2 SE, listener deposits over the last 50 updates >= the fix's wire-off mean),
+    **and** wire-off still erodes: MI < 0.5 bit at 2,000 in **both** wire-off seeds. A wire-off code that is
+    maintained is an artifact, so it counts as a FAIL of that fix (Cam). Reference: the joint baseline went 0/3.
+  * **Spend:** toy/CPU allowance $6 total; ~$1.6 used before this; estimate ~$2 for the 10 runs.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
