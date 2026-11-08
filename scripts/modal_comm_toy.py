@@ -11,7 +11,7 @@ import modal
 
 _REQUIREMENTS = str(Path(__file__).resolve().parents[1] / "requirements.txt")
 
-PINNED_SHA = "f6f574e2954643d1666113aba527e65b2649ef27"  # comm-toy branch
+PINNED_SHA = "ec4be035f93bf8728e33ac815feaa0b21cbb6c64"  # comm-toy branch
 REPO_URL = "https://github.com/overlordxrz-source/throng.git"
 VOLUME_NAME = "throng-runs"
 VOLUME_MOUNT = "/mnt/throng-runs"
@@ -75,6 +75,13 @@ PLANS: dict = {
                                            "--resume", f"{{VOL}}/testbed/toy/snap/t3_s{s}_u1750.pkl", "--branch", br,
                                            "--tag", f"STEPB_{br.upper()}"])
                      for br in ("none", "frozen_listener", "stopgrad") for s in (140, 141, 142)],
+    # step 2 (2026-11-08): channel A/B, wire-blind head in both arms (C1-T3 confirmed the coupling); PS on, 2,000 updates
+    "step2": [(f"step2_{tag.lower()}_s{s}", ["--arm", arm, "--seed", str(s), "--updates", "2000", "--warm-start", _W,
+                                             "--wire-init-scale", "0.06", "--craft-cost", "0.45", "--ps", "1.99",
+                                             "--wire-blind", "1", "--eval-at", "1000", *extra, "--tag", tag])
+              for tag, arm, extra, ss in (("S2_VQ", "COMM", [], range(190, 195)),
+                                          ("S2_SYM", "COMM", ["--channel", "sym"], range(195, 200)),
+                                          ("S2_NOSIG", "NOSIG", [], (200, 201))) for s in ss],
     # C1 (2026-11-08): wire-blind message head from the start; T3 protocol (to 2,000) and erosion protocol
     "c1": ([(f"c1t3_{w}_s{s}", ["--arm", arm, "--seed", str(s), "--updates", "2000", *_T3, "--wire-blind", "1", "--tag", f"C1T3_{w.upper()}"])
             for w, arm, ss in (("on", "COMM", (180, 181, 182)), ("off", "NOSIG", (183, 184))) for s in ss]

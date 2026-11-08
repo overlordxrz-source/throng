@@ -2528,6 +2528,26 @@ more expensive, because it produces publishable-looking nulls.
   5. Rejected: making the informed agent unable to deliver (a role by rule; the lookout puts the pressure in the
      geography instead).
 
+- **REGISTRATION -- build-order step 2, channel A/B (launches now per Cam's ruling; C1-T3 confirmed the coupling, so
+  both arms use the wire-blind head).** `comm-toy` `ec4be03`; analysis `scripts/analyze_step2.py`; launcher plan
+  `step2` (12 Modal CPU containers, ~$2.4).
+  * **Base (both arms):** the replication's PS recipe (ORACLE0-toy warm start, wire-init 0.06, cost 0.45, c_ps 1.99
+    **on**, local critic, 2,000 updates, eval at 1,000 and 2,000), **plus the wire-blind message head** (C1).
+  * **S2_VQ (seeds 190-194):** today's channel (3 slots x 64 learned VQ codes, VQ loss 0.1).
+  * **S2_SYM (seeds 195-199):** 3 symbols from a vocabulary of **8**, broadcast one-hot. Implemented as a
+    codebook-distance policy over **fixed orthogonal codewords** c_k = 0.3 e_k (k < 8), with the other 56 rows pushed
+    unreachably far. -||z - c_k||^2 / tau = (2 x 0.3 / 0.08) z_k + const, i.e. a linear symbol head (temperature tau
+    / 0.6) on the same message pathway, and the broadcast is 0.3 x one-hot. No VQ loss, so the codewords never
+    change. Everything downstream (the joint PPO ratio, the PS term, the swaps, MI) is unchanged.
+  * **S2_NOSIG (seeds 200 / 201):** wire off (the NOSIG level).
+  * **Apparatus self-test PASS** (`--selftest-sym`): probability on unreachable symbols 0.0; broadcasts are exactly
+    0.3 x one-hot; the constant-codebook mutant is caught; after one real update the codebooks are bit-identical and
+    the symbol head moved. The default path still reproduces PS0 bit for bit.
+  * **Bars (as drafted):** SYM is **adopted** iff its reliance passes in >= 4 of 5 seeds **and** its mean deposit
+    drop is >= VQ's mean - 0.10. Otherwise VQ stays; if both arms fail their own reliance bar, the A/B is
+    uninformative. Redirection is co-reported (4 of 5). Secondary: MI, formation speed (first update with plug-in MI
+    > 1 bit), listener deliveries, message entropy.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
