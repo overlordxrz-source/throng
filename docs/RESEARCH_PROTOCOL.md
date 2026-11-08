@@ -2190,6 +2190,33 @@ more expensive, because it produces publishable-looking nulls.
     (wire-on eroded as fast as or faster than wire-off). CONJECTURED: once a listener's responses feed back into
     the sender's training, the copied mapping drifts within 250 updates.
 
+- **Cam's rulings (2026-11-08, T1-T3 and next steps).**
+  1. T1 / T2 / T3 FAIL accepted; seed 142's restarts accepted as disclosed.
+  2. **The finding that matters most:** copied codes survive every reset with the wire off but are pulled apart with
+     the wire on. With the erosion result and the real network's live-wire-only collapse: **the live wire is an
+     active destabilising force, not just a missing restoring one.** Finding it is now the top priority, ahead of
+     T5.
+  3. **Step A (free, code only):** list every gradient path from the wire into the sender's message head, the
+     codebook or any shared parameter. Say whether sender and listener share parameters in the toy. Add a unit test:
+     with the token's own PPO loss zeroed, the gradient of the listener's losses w.r.t. the sender's message
+     parameters, wire-on vs wire-off; a nonzero difference is a leak.
+  4. **Step B (diagnostic, cap $1.5, price probe first):** regenerate the T3 wire-on seeds to 1,750; after the first
+     sender reset and imitation, branch each for 250 updates: (i) as T3; (ii) listener frozen; (iii) stop-gradient
+     on the wire if step A finds a leak, else the sender's tokens frozen after imitation while the listener learns.
+     Readouts at 2,000: continuity, reliance, copy accuracy. Predictions written before launch. Cam's (~50%): the
+     pair chase each other, so (ii) lifts continuity above the copy level and (iii) keeps reliance >= 30%.
+  5. **Approved:** the T4b regeneration with params saved at 1,500 and 2,000 (~$0.8), then checks (b) and (c) as
+     registered. T5 waits for step B.
+  6. **Every toy run from now on saves actor and critic params at 1,500, 1,750 and 2,000.**
+  7. **Step 3 approved as drafted; launch now.** Step 2 launches once step A reads out. If step A finds a gradient
+     path through the VQ wire, Cam is told first (one-hot symbols as actions would then be a fix as well as an A/B,
+     and step 2 would gain a registered no-nudge survival phase). Step 6 launches when step 2 reads out, on its
+     winning channel. For step 6, chance on held-out pairs = both parts correct (1/16), checked against a
+     shuffled-message null.
+  8. Noted, unregistered and not scored: seed 140's pair moved to a new code and kept relying on it with no nudge,
+     while a fresh head in T2 never rebuilt a code, so copying plus use did something there.
+  9. Spend: step B + T4b regeneration + steps 2 and 3 ~ $6.7 of ~$10.7 left; step 6's $1.7 fits in $15.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
