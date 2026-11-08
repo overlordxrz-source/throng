@@ -142,6 +142,7 @@ def main():
     ap.add_argument("--imitate-lr", type=float, default=1e-3)
     ap.add_argument("--imitate-window", type=int, default=50)
     ap.add_argument("--wire-blind", type=int, default=0, help="C1: 1 = wire-blind message head from the start")
+    ap.add_argument("--prox-world-check", default=None, help="step 3 free check: saved actor params path; print and exit")
     ap.add_argument("--selftest-wireblind", action="store_true", help="C1 apparatus: token TV under random heard input")
     ap.add_argument("--snapshot-at", type=int, default=None, help="step B: pickle the full training state after this update")
     ap.add_argument("--snapshot-path", default=None)
@@ -1061,6 +1062,42 @@ def main():
         res["forward_sender_argmax_changed_frac_random_wire"] = am(p_rec, p_rand)
         res["shared_parameters_sender_listener"] = "all (one ToyNet; the role is set only by the informed flag in obs)"
         print(json.dumps(res, indent=1), flush=True)
+        raise SystemExit(0)
+
+    if a.prox_world_check:
+        """Cam 2026-11-08 (step 3): per fire period (active hearth until a delivery or a re-roll), who delivers, and
+        whether the partner of the first-informed agent became informed on its own before the delivery."""
+        assert a.prox is not None
+        params = flax.serialization.from_bytes(params, Path(a.prox_world_check).read_bytes())
+        n_ep = by_first = by_partner = partner_found = 0; delays = []
+        for k in range(4):
+            _, Rq = rollout(params, init_state(jax.random.PRNGKey(90_000 + k)), jax.random.PRNGKey(91_000 + k))
+            Rq = jax.tree_util.tree_map(np.asarray, Rq)
+            inf, dep, act = Rq["inf"], Rq["dep"], Rq["active"]
+            for w in range(W):
+                t0 = 0
+                for t in range(1, T + 1):
+                    end = t == T or dep[t - 1, 2 * w:2 * w + 2].any() or (t < T and act[t, w] != act[t - 1, w])
+                    if not end:
+                        continue
+                    seg = slice(t0, t)
+                    iA = np.nonzero(inf[seg, 2 * w])[0]; iB = np.nonzero(inf[seg, 2 * w + 1])[0]
+                    d = dep[seg, 2 * w:2 * w + 2]
+                    if d.any():   # a delivered period
+                        n_ep += 1
+                        tdel = np.nonzero(d.any(1))[0][0]; who = int(d[tdel].argmax())
+                        firsts = [iA[0] if len(iA) else 10**9, iB[0] if len(iB) else 10**9]
+                        first = int(np.argmin(firsts)); other = 1 - first
+                        by_first += who == first; by_partner += who == other
+                        partner_found += (firsts[other] <= tdel)
+                        if firsts[first] < 10**9:
+                            delays.append(tdel - firsts[first])
+                    t0 = t
+        print(json.dumps(dict(phase="prox_world_check", params=a.prox_world_check, delivered_periods=n_ep,
+                              frac_delivered_by_first_informed=by_first / max(n_ep, 1),
+                              frac_delivered_by_partner=by_partner / max(n_ep, 1),
+                              frac_partner_informed_on_its_own_before_delivery=partner_found / max(n_ep, 1),
+                              median_steps_first_informed_to_delivery=float(np.median(delays)) if delays else None)), flush=True)
         raise SystemExit(0)
 
     if a.selftest_wireblind:
