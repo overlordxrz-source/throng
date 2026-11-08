@@ -1,0 +1,8 @@
+on_s160 1500 sent-token top-Q share 0.269 | Q spread 1.8162 | mean sent-token counterfactual adv +0.0001
+on_s160 2000 sent-token top-Q share 0.001 | Q spread 3.6122 | mean sent-token counterfactual adv -0.0093
+on_s161 1500 sent-token top-Q share 0.308 | Q spread 4.7951 | mean sent-token counterfactual adv +0.0012
+on_s161 2000 sent-token top-Q share 0.555 | Q spread 6.2327 | mean sent-token counterfactual adv +0.0184
+off_s163 1500 sent-token top-Q share 0.248 | Q spread 2.0790 | mean sent-token counterfactual adv +0.0000
+off_s163 2000 sent-token top-Q share 0.009 | Q spread 1.0029 | mean sent-token counterfactual adv -0.0000
+off_s164 1500 sent-token top-Q share 0.241 | Q spread 1.9713 | mean sent-token counterfactual adv +0.0000
+off_s164 2000 sent-token top-Q share 0.108 | Q spread 2.7500 | mean sent-token counterfactual adv -0.0002
