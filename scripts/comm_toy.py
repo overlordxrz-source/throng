@@ -25,6 +25,7 @@ Arms: ORACLE (wire zeroed, both agents informed) | NOSIG (wire zeroed) | COMM (+
 from __future__ import annotations
 
 import argparse
+from collections import deque
 import functools
 import json
 import sys
@@ -110,6 +111,13 @@ def main():
     ap.add_argument("--eval-at", type=int, nargs="*", default=[], help="extra eval (MI + swaps) after these updates")
     ap.add_argument("--erode-tok-ent", type=float, default=None, help="erosion: token entropy coef from --erode-from on")
     ap.add_argument("--erode-from", type=int, default=1500)
+    ap.add_argument("--reset-from", type=int, default=None, help="T2/T3 turnover: first reset update")
+    ap.add_argument("--reset-every", type=int, default=250)
+    ap.add_argument("--reset-until", type=int, default=2750)
+    ap.add_argument("--imitate", action="store_true", help="T3: a reset sender head first imitates the previous head")
+    ap.add_argument("--imitate-steps", type=int, default=500)
+    ap.add_argument("--imitate-lr", type=float, default=1e-3)
+    ap.add_argument("--imitate-window", type=int, default=50)
     ap.add_argument("--credit", default="joint", choices=["joint", "A", "B"],
                     help="token credit: joint (baseline) | A separate V_shared stream | B COMA-style Q_shared(s, m)")
     ap.add_argument("--selftest-credit", action="store_true")
@@ -637,6 +645,92 @@ def main():
         print("SELFTEST-CREDIT", "PASS" if ok else "FAIL", flush=True)
         raise SystemExit(0 if ok else 1)
 
+    # ---- T2 / T3 generational turnover
+    reset_sched = {}
+    if a.reset_from is not None:
+        for j, uu in enumerate(range(a.reset_from, a.reset_until + 1, a.reset_every)):
+            reset_sched[uu] = "sender" if j % 2 == 0 else "listener"
+    turn_state = {"maps": []}
+    imit_buf = deque(maxlen=a.imitate_window)
+
+    def code_map(tok, lab):
+        """per-slot decoder token -> fire (argmax of co-occurrence counts); unseen tokens -> -1 (a miss)"""
+        maps = []
+        for i in range(3):
+            cnt = np.zeros((V, 4)); np.add.at(cnt, (tok[:, i], lab), 1)
+            mp = np.where(cnt.sum(1) > 0, cnt.argmax(1), -1); maps.append(mp)
+        return maps
+
+    def turnover_record(u):
+        tok, lab = np.concatenate(list(mi_buf_tok)), np.concatenate(list(mi_buf_T))
+        cur = code_map(tok, lab)
+        rec = dict(phase="turnover", update=u, mi_plugin=mi_plugin(tok, lab),
+                   next_reset=reset_sched.get(u), self_decode=float(np.mean([np.mean(cur[i][tok[:, i]] == lab) for i in range(3)])))
+        if turn_state["maps"]:
+            prev = turn_state["maps"][-1][1]
+            per = [float(np.mean(prev[i][tok[:, i]] == lab)) for i in range(3)]
+            rec.update(continuity=float(np.mean(per)), continuity_slots=per, continuity_vs_update=turn_state["maps"][-1][0])
+        turn_state["maps"].append((u, cur))
+        emit(rec)
+
+    def do_reset(kind, params, opt_state, u):
+        fresh = model.init(jax.random.fold_in(jax.random.PRNGKey(4242 + a.seed), u), jnp.zeros((1, H)), jnp.zeros((1, D)))["params"]
+        pp = {k: dict(v) if isinstance(v, dict) else v for k, v in params["params"].items()}
+        adam = opt_state[0]
+        mu = {k: dict(v) if isinstance(v, dict) else v for k, v in adam.mu["params"].items()}
+        nu = {k: dict(v) if isinstance(v, dict) else v for k, v in adam.nu["params"].items()}
+        if kind == "sender":       # the message head: gwt_comms_1 + head_signal_slot* (codebooks kept)
+            for hk in HEADS:
+                pp[hk] = fresh[hk]
+                mu[hk] = jax.tree_util.tree_map(jnp.zeros_like, mu[hk]); nu[hk] = jax.tree_util.tree_map(jnp.zeros_like, nu[hk])
+        else:                      # the listener's wire-input layer: enc_0 rows reading the wire (same 0.06 init scale)
+            k0 = jnp.asarray(pp["enc_0"]["kernel"])
+            pp["enc_0"] = dict(pp["enc_0"], kernel=k0.at[O_WIRE:].set(jnp.asarray(fresh["enc_0"]["kernel"])[O_WIRE:] * a.wire_init_scale))
+            for st in (mu, nu):
+                st["enc_0"] = dict(st["enc_0"], kernel=jnp.asarray(st["enc_0"]["kernel"]).at[O_WIRE:].set(0.0))
+        params = {"params": pp}
+        opt_state = (adam._replace(mu={"params": mu}, nu={"params": nu}),) + tuple(opt_state[1:])
+        info = dict(phase="reset", update=u, kind=kind)
+        if kind == "sender" and a.imitate and imit_buf:
+            params, acc0, acc1 = imitate(params)
+            info.update(imitation_acc_before=acc0, imitation_acc_after=acc1, imitation_rows=int(sum(len(b[1]) for b in imit_buf)))
+        emit(info)
+        return params, opt_state
+
+    def imitate(params):
+        """T3 newborn imitation: supervised cross-entropy of the new message head on the previous head's (obs, token)
+        pairs from its last imitate_window updates; only the message head moves; separate Adam."""
+        X = np.concatenate([b[0] for b in imit_buf]); Y = np.concatenate([b[1] for b in imit_buf])
+        head = {k: params["params"][k] for k in HEADS}
+        iopt = optax.adam(a.imitate_lr); ist = iopt.init(head)
+
+        def ce(hd, xb, yb):
+            pp_ = dict(params["params"]); pp_.update(hd)
+            _, o = apply_fn({"params": pp_}, jnp.zeros((xb.shape[0], H)), xb)
+            lsm = [jax.nn.log_softmax(lg, -1) for lg in token_logits({"params": pp_}, o.z_e, TAU)]
+            return -jnp.mean(sum(jnp.take_along_axis(lsm[i], yb[:, i:i + 1], -1)[:, 0] for i in range(3)))
+
+        @jax.jit
+        def step(hd, st, xb, yb):
+            g = jax.grad(ce)(hd, xb, yb)
+            upd, st = iopt.update(g, st, hd)
+            return optax.apply_updates(hd, upd), st
+
+        def acc(hd):
+            ix = np.random.default_rng(0).integers(0, len(X), 4096)
+            pp_ = dict(params["params"]); pp_.update(hd)
+            _, o = apply_fn({"params": pp_}, jnp.zeros((4096, H)), jnp.asarray(X[ix]))
+            pred = np.stack([np.asarray(jnp.argmax(lg, -1)) for lg in token_logits({"params": pp_}, o.z_e, TAU)], -1)
+            return float((pred == Y[ix]).all(1).mean())
+        a0 = acc(head)
+        rng_i = np.random.default_rng(777)
+        for _ in range(a.imitate_steps):
+            ix = rng_i.integers(0, len(X), 512)
+            head, ist = step(head, ist, jnp.asarray(X[ix]), jnp.asarray(Y[ix]))
+        a1 = acc(head)
+        pp = dict(params["params"]); pp.update(head)
+        return {"params": pp}, a0, a1
+
     def gae_raw(r, v, v_last):
         # GAE(lambda) with bootstrap, no normalisation (the credit streams; same recursion as gae_bootstrap)
         r = np.asarray(r, np.float64); v = np.asarray(v, np.float64)
@@ -648,13 +742,11 @@ def main():
 
     np_rng = np.random.default_rng(a.seed)
     if a.eval_only:            # exploratory: evaluate the loaded params (no training, no MI)
-        from collections import deque
         lis = np.asarray(is_listener); mi_buf_tok, mi_buf_T = deque(), deque()
         evaluate(params, 0); return
     key, k_s = jax.random.split(key)
     state = init_state(k_s)
     lis = np.asarray(is_listener)
-    from collections import deque
     mi_buf_tok, mi_buf_T = deque(maxlen=10), deque(maxlen=10)
     for u in range(1, a.updates + 1):
         t0 = time.time()
@@ -755,8 +847,14 @@ def main():
                    ppo_entropy=mets.get("ppo_entropy"), ps_coef=float(ps_c), t_update=round(time.time() - t0, 2))
         emit(rec)
         mi_buf_tok.append(R["token_actions"][:, ~lis].reshape(-1, 3)); mi_buf_T.append(R["active"].reshape(-1))
+        if a.reset_from is not None and a.imitate:
+            imit_buf.append((R["obs"][:, ~lis].reshape(-1, D), R["token_actions"][:, ~lis].reshape(-1, 3)))
         if u in a.eval_at and u != a.updates:
             evaluate(params, u)
+        if a.reset_from is not None and (u in a.eval_at or u == a.updates):
+            turnover_record(u)
+        if a.reset_from is not None and u in reset_sched:
+            params, opt_state = do_reset(reset_sched[u], params, opt_state, u)
 
     if a.save_params:
         Path(a.save_params).parent.mkdir(parents=True, exist_ok=True)
