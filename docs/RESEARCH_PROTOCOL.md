@@ -2248,6 +2248,27 @@ more expensive, because it produces publishable-looking nulls.
   * Per the ruling, **step 2 is held** and Cam is told (a gradient path through the VQ wire exists). Step B's arm
     (iii) needs his choice, because a stop-gradient alone would not cut the forward coupling.
 
+- **REGISTRATION -- build-order step 3, no assigned sender (approved as drafted; before any run).** `comm-toy`
+  `5100eb0`; analysis `scripts/analyze_step3.py`; launcher plan `step3` (10 Modal CPU containers, ~$2.0).
+  * **PROX (wire on), seeds 170-174:** both agents identical. An agent sees the active fire's one-hot (and its
+    informed flag is 1) only while within Chebyshev radius 2 of it. Both always speak and listen. The shared reward
+    is symmetric: either agent's delivery also pays its partner 2.7. PS (c_ps 1.99, **on**, no anneal) acts on
+    whichever rows are informed. Local (joint) critic. Otherwise the replication's PS recipe: ORACLE0-toy warm
+    start, wire-init 0.06, cost 0.45, 2,000 updates, eval at 1,000 and 2,000; params saved at 1,500 / 1,750 /
+    2,000.
+  * **ASSIGNED (today's sender / listener; the concurrent reference), seeds 175-177. PROX_NOSIG (wire off), seeds
+    178 / 179** (the NOSIG level).
+  * **Swap (PROX):** every currently informed speaker's broadcast is replaced by a full token triple drawn from the
+    triples informed agents emitted for T' in the paired control rollout. An apparatus check confirms the partner
+    hears it. **Redirection:** Crafts at the T' hearth by agents **uninformed at that step**, per world.
+  * **PASS:** at 2,000, PROX redirection (swap >= 2 x control, paired > 2 SE) in >= 4 of 5 seeds, **and** the PROX
+    mean redirection ratio >= 0.5 x the ASSIGNED mean ratio ("on a par").
+  * **Co-reported:** reliance (deposit drop under the swap), total deliveries vs PROX_NOSIG, the informed fraction
+    (~3.5% of agent-steps at the warm start), and the MI of informed agents' tokens.
+  * *Note:* step A found a forward coupling (sender tokens depend on the heard wire) and gradient leaks through the
+    listener's message losses. Both act in PROX too (everyone speaks and listens). Step 3 is run as approved; its
+    reading takes this into account.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under

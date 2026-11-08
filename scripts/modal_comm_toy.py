@@ -11,7 +11,7 @@ import modal
 
 _REQUIREMENTS = str(Path(__file__).resolve().parents[1] / "requirements.txt")
 
-PINNED_SHA = "037266c3166ed7007532efce638fbc85de7e6134"  # comm-toy branch
+PINNED_SHA = "5100eb0f691ab769dc891486bac63a68731f4813"  # comm-toy branch
 REPO_URL = "https://github.com/overlordxrz-source/throng.git"
 VOLUME_NAME = "throng-runs"
 VOLUME_MOUNT = "/mnt/throng-runs"
@@ -64,6 +64,13 @@ _ERO_JOBS = ([(f"erosion_on_s{s}", ["--arm", "COMM", "--seed", str(s), *_ERO, "-
 PLANS: dict = {
     # registered erosion test (2026-11-08): probe one container first (Cam: fan out only if < $0.01/min/container)
     "erosion_probe": _ERO_JOBS[:1],
+    # build-order step 3 (approved 2026-11-08): no assigned sender; PS on (formation), local critic
+    "step3": [(f"step3_{tag.lower()}_s{s}", ["--arm", arm, "--seed", str(s), "--updates", "2000", "--warm-start", _W,
+                                             "--wire-init-scale", "0.06", "--craft-cost", "0.45", "--ps", "1.99",
+                                             "--eval-at", "1000", *extra, "--tag", tag])
+              for tag, arm, extra, ss in (("PROX", "COMM", ["--prox", "2"], range(170, 175)),
+                                          ("ASSIGNED", "COMM", [], range(175, 178)),
+                                          ("PROX_NOSIG", "NOSIG", ["--prox", "2"], (178, 179))) for s in ss],
     # approved T4b regeneration (2026-11-08): bit-identical re-runs of the T4b seeds with params saved, for check 3 (b)/(c)
     "t4b_regen": [(f"t4b_regen_{w}_s{s}", ["--arm", arm, "--seed", str(s), *_ERO, "--credit", "Bg", "--tag", f"T4B_{w.upper()}"])
                   for w, arm, ss in (("on", "COMM", (160, 161)), ("off", "NOSIG", (163, 164))) for s in ss],
