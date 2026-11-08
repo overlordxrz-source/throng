@@ -1468,6 +1468,84 @@ more expensive, because it produces publishable-looking nulls.
     CONJECTURED: blind search at ~7 attempts per deposit is good enough that the channel's marginal value per
     listener is small, and the sender's credit for it is diluted. Budget for this line is spent; next step is Cam's.
 
+- **Cam's ruling (2026-11-07, after the final run).** The collapse is the finding: the classic emergent-comm
+  chicken-and-egg (a listener that doesn't yet use tokens feels them as noise, so the cheapest group fix is for
+  senders to go quiet). Known remedies: positive signalling / positive listening (Eccles et al. 2019). GPU spend
+  stays $0: (1) free log check, (2) CPU toy with the same env and `ppo_loss` code, gate first, four arms, (3) a
+  real-network confirmation is only drafted if a toy arm passes, for M to fund. M added $40 (new Modal account,
+  profile `rapidcrisp`); Cam's allocation: comm confirmation sub-cap $12, size curriculum ~$10, ~$20 reserve for a
+  3-seed replication. Toy on Modal allowed under $2 total if the laptop is too slow (it isn't: ~0.2 s/update).
+- **Step 1 -- free check (MEASURED; does not contradict the hypothesis, so no early report).**
+  * *Receiving range is undefined in the testbed:* the wire always reaches the partner (no distance), so the
+    "entropy falls faster in range" half cannot be asked of these runs.
+  * *Correction to the reading of the logs:* the logged `token_entropy` is the mean over BOTH roles (both agents
+    broadcast and both hear). Per-role entropy and listener sensitivity were measured afterwards on the saved params
+    (`scripts/probe_sensitivity.py` on `comm-toy`, 96-step COMM rollouts, 32 worlds, same obs builder): listener action TV
+    when the heard broadcast is replaced by a random token triple -- **ORACLE0 (start) 0.0156 -> COMM0 0.0046,
+    COMM1 0.0044 (NOSIG0 0.0060)**; replaced by the sender's T' broadcast -- 0.0022 -> 0.0005 / 0.0001 (0.0006).
+    Token entropy sender / listener: start 5.32 / 5.41; COMM0 0.39 / 1.13; COMM1 2.51 / 2.83; NOSIG0 6.06 / 6.11.
+    Sender token changes under T -> T': 18.1% -> 3.4% / 8.4% (NOSIG0 12.6%).
+  * Reading: listeners never came to use the tokens (sensitivity did not grow; it fell ~3x, and ~2.6x in NOSIG
+    too, so part of the fall is generic drift, n = 1 per arm). Both roles' tokens collapsed in COMM, not only the
+    senders' -- consistent with a shared comms pathway. The prediction "sensitivity stays flat" is not met
+    literally (it fell), but the contrary outcome (sensitivity growing, i.e. listeners starting to use tokens) did
+    not occur. Note the magnitude: at the start, a random token moves the listener's action distribution by TV
+    ~0.016 -- the "noise" the hypothesis needs is small.
+
+- **REGISTRATION -- CPU comm toy (before any registered arm is run).** Code `scripts/comm_toy.py`, analysis
+  `scripts/analyze_toy.py`, branch `comm-toy` (from `comm-testbed` `ceadaf8`) at **`74e4d33`**.
+  * **Toy = the testbed with the size cut, the same mechanisms.** Identical: world rules (four production hearths,
+    sender informed / listener not, one active hearth, Craft within radius 1 deposits 2.7, respawn away from
+    hearths, re-roll on ANY deposit or after REROLL steps, shared 2.7 to the sender on a listener deposit), the
+    symmetric one-step wire, the token policy (`token_logits`, tau 0.08, log-prob in the ratio, token entropy coef
+    0.01), VQ (`vector_quantize_signals`, beta 0.25, vq_coef 0.1), **`rl_jax.ppo_loss` itself**, C' (`gae_bootstrap`,
+    gamma 0.999, lambda 0.95), PopArt (beta 0.1), vf 0.5, ent 0.02, Adam 3e-4, the per-group gradient clip at 2.0,
+    minibatch 512, one epoch, a production-shaped comms pathway (separate feed-forward branch from the obs ->
+    per-slot heads -> codebooks, independent of the recurrent trunk), the /2 action-logit temperature, the paired
+    token-swap eval with its apparatus check. Changed: G = 12, REROLL = 96 (256 x 12/32), T = 128, 64 worlds,
+    MLP(64) + GRU(64) trunk, 59-dim obs, no alarm head, jitted `lax.scan` rollout. Craft cost **0.45** (Cam).
+  * **Disclosed pre-registration changes and peeks:**
+    (a) *v1 toy took z_e from the recurrent trunk; its ORACLE's token entropy collapsed to 0.35 with no wire at
+    all* (real ORACLE: 5.3). Fixed by giving the toy production's separate comms pathway (`network_jax`
+    `gwt_comms_1 -> head_signal_slot*`); the v2 ORACLE holds ~9.5. (b) *Wire-input weight rescale 0.06* (`--wire-init-scale`):
+    at ORACLE0-toy params the listener's random-token sensitivity was TV 0.31 vs **0.0156** on the real network (the
+    toy feeds the raw wire to a dense layer whose wire rows never trained). The wire was zero all through ORACLE
+    training, so those rows of `enc_0` and `gwt_comms_1` are still at init (verified bit-identical); after the warm
+    start they are multiplied by 0.06, giving TV 0.0156. The input stays at full scale -- a first try used an input
+    gain instead, rejected before any run because under Adam it would also slow the listener's learning ~16x
+    (a bias toward the null being tested). Calibrated on the pre-treatment state only.
+    (c) *An unregistered 300-update baseline COMM seed 0* ran by mistake (a flag was added before its code); only its
+    last two swap pairs were seen (Delta ~ +0.003 / -0.005, at gain 1). (d) A 12-update plumbing test of NOSIG, BASE and
+    BOTH (seed 0, unscaled wire, coefficients 1.0 / 0.19 from an earlier calibration) to check the analysis script;
+    its full output was seen: precondition 12.44 vs NOSIG 1.61, NOSIG break-even cost 0.40, BOTH MI ~0.5 bits per
+    slot, swap-diff 0.69 and 6,420 listener Crafts per update (PL drove Craft spam), primary Delta +0.002 (BASE) /
+    +0.005 (BOTH) on 2 pairs. Nothing was changed because of it; the coefficients follow the rule.
+  * **Warm start (as the final run):** ORACLE-toy seed 0, 1,500 updates from scratch (`toy_out/ORACLE0.msgpack`, committed, sha256
+    `f5d01c19...4c32bdd84`;
+    end: listener 12.4 deposits/world-update, 98% correct). Every arm below starts from it.
+  * **Runs:** 1,000 updates each, seeds 0/1/2, all from ORACLE0-toy, `--wire-init-scale 0.06`, cost 0.45: NOSIG;
+    BASE (COMM, no aux); PS (`--ps 1.99`); PL (`--pl 0.114`); BOTH (both). Coefficients by the registered rule c = 0.25 x
+    ||grad PPO|| / ||grad aux|| (full-parameter norms, pre-clip, 4 minibatches of one COMM rollout at ORACLE0-toy,
+    rescaled), computed once, not tuned. PS = sum over slots of the batch MI(token; active hearth) on sender rows;
+    PL = mean L1 between the listener's action distribution with the wire and (stop-grad) with the wire zeroed.
+    Self-test (`--selftest`): each term's gradient reaches only its own role's rows, one ascent step raises it, and
+    mutants without the role mask are caught.
+  * **(1) Precondition, channel value:** ORACLE0-toy listener deposits/world (its last 50 updates) >= 2 x the
+    NOSIG mean (last 50). Fail -> stop, toy unrepresentative. Reported alongside, never retuned: NOSIG listener
+    p(deposit | Craft) and the break-even cost p x 2.7 / (1 - p) vs 0.45.
+  * **(2) Gate, live-wire collapse:** sender token entropy, mean of the last 50 updates / mean of updates 1-5:
+    BASE seed-mean <= 0.6, every NOSIG seed >= 0.9, and max BASE < min NOSIG (real: COMM 0.11 / 0.49, NOSIG 1.12).
+    Fail -> stop, toy unrepresentative; PS/PL/BOTH are not run.
+  * **(3) Primary, per arm:** token swap, 10 pairs, Delta = mu(T')_swap - mu(T')_control; a seed passes with
+    Delta >= 0.05 and > 2 SE; **an arm passes iff all 3 seeds pass.** Prediction (Cam): BASE fails, BOTH passes.
+  * **Run order:** NOSIG and BASE (3 seeds each) first, then `analyze_toy.py` on those six; PS / PL / BOTH run only
+    if the precondition and the gate both pass.
+  * **Secondaries:** listener deposits vs NOSIG; MI(token; T) per slot vs a plain permutation null (the real
+    testbed permuted in epoch blocks; a plain null overstates significance when tokens are autocorrelated); per-role token
+    entropy, swap-diff and listener sensitivity over training (the step-1 questions, now per update).
+  * **Next step:** an arm passes -> draft one real-network confirmation run with a cost estimate for M (nothing
+    launches). None passes -> report.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
