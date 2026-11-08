@@ -2341,6 +2341,21 @@ more expensive, because it produces publishable-looking nulls.
     a live wire. A wire-blind-from-the-start message head (proposed) would separate the input path from the
     credit path.
 
+- **RESULTS -- build-order step 3, no assigned sender (2026-11-08): FAIL (PROX redirection 0/5).** Registered
+  script, `docs/data/toy_step3_2026-11-08_analysis.txt`, data `comm-toy` `39e4acb` (all 10 runs complete, 2,000
+  updates).
+  * **PROX:** Crafts at the swapped fire by uninformed agents, control -> swap: 0.30 -> 0.28, 0.28 -> 0.31, 0.36 ->
+    0.30, 0.29 -> 0.29, 0.28 -> 0.28 (ratio 0.84-1.12; no paired increase). Reliance drop +3% to +6%. MI of
+    informed agents' tokens **1.99-2.00 bits** (PS makes the code informative). Informed fraction 0.17-0.21.
+  * **ASSIGNED reference (rung 2 replicates again):** redirection ratios **25 / 44 / 33x**, reliance drop **71 / 73 /
+    73%** (3/3).
+  * PROX mean ratio 0.98 vs 0.5 x the ASSIGNED mean (16.9): not on a par.
+  * **Not registered:** PROX deliveries with the wire on are 20.8 / 15.5 / 19.1 / 20.5 / 21.0 per world vs 14.7 /
+    15.4 with it off, so the wire carries something useful, but not "which fire" in a form uninformed partners act
+    on under the swap. CONJECTURED: on a 12 x 12 map, a radius-2 view finds the lit fire quickly (informed ~20% of
+    the time), so the message adds little "where" information; the wire may carry timing or proximity
+    information instead. Not tested.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under

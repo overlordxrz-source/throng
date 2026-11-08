@@ -1,0 +1,12 @@
+== PROX_NOSIG total deliveries/world (last 50): [14.72, 15.42]
+   PROX s170: crafts@T' (uninformed) 0.30 -> 0.28 (ratio 0.94, paired +-0.02 SE 0.02) -> fail | reliance drop +4% | deliveries 20.77 vs NOSIG 15.07 | informed frac 0.210 | MI 2.000
+   PROX s171: crafts@T' (uninformed) 0.28 -> 0.31 (ratio 1.12, paired +0.03 SE 0.03) -> fail | reliance drop +3% | deliveries 15.48 vs NOSIG 15.07 | informed frac 0.170 | MI 2.000
+   PROX s172: crafts@T' (uninformed) 0.36 -> 0.30 (ratio 0.84, paired +-0.06 SE 0.02) -> fail | reliance drop +6% | deliveries 19.07 vs NOSIG 15.07 | informed frac 0.204 | MI 1.991
+   PROX s173: crafts@T' (uninformed) 0.29 -> 0.29 (ratio 0.97, paired +-0.01 SE 0.03) -> fail | reliance drop +4% | deliveries 20.52 vs NOSIG 15.07 | informed frac 0.206 | MI 1.999
+   PROX s174: crafts@T' (uninformed) 0.28 -> 0.28 (ratio 1.01, paired +0.00 SE 0.03) -> fail | reliance drop +3% | deliveries 21.00 vs NOSIG 15.07 | informed frac 0.211 | MI 2.000
+   ASSIGNED s175: crafts@T' 0.81 -> 20.17 (ratio 24.97) | reliance drop +71%
+   ASSIGNED s176: crafts@T' 0.50 -> 21.96 (ratio 43.51) | reliance drop +73%
+   ASSIGNED s177: crafts@T' 0.63 -> 20.78 (ratio 33.00) | reliance drop +73%
+
+   PROX mean ratio 0.98 vs 0.5 x ASSIGNED mean 16.91 -> on a par: False
+== STEP 3: FAIL (PROX redirection 0/5)
