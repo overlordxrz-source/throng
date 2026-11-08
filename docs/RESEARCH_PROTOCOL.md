@@ -1828,6 +1828,24 @@ more expensive, because it produces publishable-looking nulls.
   * Disclosed: two laptop dev checks. The first (per-leaf ratio, before this bar) is reported above. The second,
     of this bar's code, hit the 10-minute laptop limit and was killed with no output.
 
+- **RESULTS -- erosion test (2026-11-08): FAIL as registered.** Modal CPU (6 x 2-core containers, ~$0.005/min
+  each), data `comm-toy` `5d35f22`, output `docs/data/toy_erosion_2026-11-08_analysis.txt` (registered script,
+  unmodified).
+  * **Manipulation check holds (3/3):** wire-off MI at 2,000 = 0.099 / 0.009 / 0.002 bit (2.0 at 1,500).
+  * **Wire-on: 0/3 pass.** MI at 2,000 = 0.000 / 0.001 / 0.000. The plug-in trace reaches ~0 by update 1,750,
+    *as fast as or faster than wire-off*. Reliance at 2,000 is gone (deposit drop +4% / -0% / -2%).
+  * **Not registered (the registered eval at 1,500, before erosion), so the test is valid:** the wire-on channel
+    was in use when the decay began. Deposit drop under the empirical swap 72 / 67 / 74%; crafts at the swapped
+    hearth 0.8 -> 19.0, 1.1 -> 16.2, 0.6 -> 21.4. Listener deposits fell from 6.5 / 3.9 / 8.9 (updates 1,400-1,500)
+    to 3.5 / 1.0 / 4.0 (1,900-2,000), back to about the no-channel level (wire-off 2.6).
+  * **Reading.** MEASURED: in the toy, listeners' use of the code gives it no measurable protection against an
+    eroding force that kills an unused code within 500 updates. The code was worth ~3-5 deposits per
+    world-update to the listener, yet it decayed as fast as an unused one. CONJECTURED (not tested): the reward
+    gradient reaching the sender's message head through the token log-prob is weak next to the decay. The sender's
+    advantage is dominated by its own deposits, so the shared-reward credit for any one token is diluted. Rung 3
+    ("the code survives without the nudge") is not shown; the anneal arm stays out of the paid run. The
+    confirmation is not blocked (Cam).
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under

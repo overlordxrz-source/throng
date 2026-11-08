@@ -13,7 +13,7 @@ import modal
 
 _REQUIREMENTS = str(Path(__file__).resolve().parents[1] / "requirements.txt")
 
-PINNED_SHA = "0a82f1e89d86a5cc68c17e70fa97da0c3983921e"  # comm-jit branch
+PINNED_SHA = "24678d3dbc6eef89b623b403e1475704cb14f638"  # comm-jit branch
 REPO_URL = "https://github.com/overlordxrz-source/throng.git"
 VOLUME_NAME = "throng-runs"
 VOLUME_MOUNT = "/mnt/throng-runs"
@@ -62,7 +62,68 @@ def run_jit(tag: str, args: list) -> list[dict]:
     return recs
 
 
+def _seq(tag: str, arg_lists: list) -> list[dict]:
+    import json
+    import os
+    import subprocess
+
+    os.environ.setdefault("XLA_PYTHON_CLIENT_PREALLOCATE", "false")
+    os.chdir("/root/throng")
+    head = subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True, text=True, check=True).stdout.strip()
+    assert head == PINNED_SHA, f"box did not clone the pinned SHA (got {head})"
+    os.makedirs(f"{VOLUME_MOUNT}/testbed/comm_jit", exist_ok=True)
+    recs = []
+    for j, args in enumerate(arg_lists):
+        args = [x.replace("{VOL}", VOLUME_MOUNT) for x in args]
+        cmd = ["python", "scripts/comm_testbed_jit.py", *args, "--out",
+               f"{VOLUME_MOUNT}/testbed/comm_jit/{tag}_{j}_{head[:7]}.jsonl"]
+        print(f"[comm-jit] {tag}[{j}] {' '.join(cmd)}", flush=True)
+        proc = subprocess.run(cmd, capture_output=True, text=True)
+        for line in proc.stdout.splitlines():
+            if line.startswith("{"):
+                recs.append(json.loads(line))
+            elif "[PPO-SCAN CHECK]" in line or "APPARATUS" in line:
+                print(line, flush=True)
+        if proc.returncode != 0:
+            print(proc.stdout[-2000:], proc.stderr[-3000:], flush=True)
+            recs.append({"phase": "error", "job": j, "rc": proc.returncode})
+    volume.commit()
+    return recs
+
+
+@app.function(image=image, gpu="A10G", timeout=60 * 60, retries=0, volumes={VOLUME_MOUNT: volume})
+def seq_a10(tag: str, arg_lists: list) -> list[dict]:
+    return _seq(tag, arg_lists)
+
+
+@app.function(image=image, gpu="L4", timeout=60 * 60, retries=0, volumes={VOLUME_MOUNT: volume})
+def seq_l4(tag: str, arg_lists: list) -> list[dict]:
+    return _seq(tag, arg_lists)
+
+
 WARM = "{VOL}/testbed/params/comm_ORACLE0_run_b88fe7f_a2.msgpack"
+_RUN = ["--arm", "COMM", "--tau", "0.08", "--craft-cost", "0.1", "--warm-start", "{VOL}/testbed/params/comm_ORACLE0_run_b88fe7f_a2.msgpack",
+        "--ps", "2.015", "--apparatus-update", "0", "--no-eval"]
+SCAN_CHECK = {
+    "a10": [*[["--seed", str(s), "--updates", "1", "--check-ppo-scan", *_RUN] for s in (40, 41, 42)],
+            ["--seed", "43", "--updates", "4", "--ppo-scan", *_RUN]],
+    "l4": [["--seed", "43", "--updates", "4", *_RUN], ["--seed", "43", "--updates", "4", "--ppo-scan", *_RUN]],
+}
+
+
+@app.local_entrypoint()
+def scancheck():
+    ha = seq_a10.spawn("scancheck_a10", SCAN_CHECK["a10"]); hl = seq_l4.spawn("scantime_l4", SCAN_CHECK["l4"])
+    for name, h in (("A10G", ha), ("L4", hl)):
+        recs = h.get()
+        for r in recs:
+            if r.get("phase") == "ppo_scan_check":
+                print(f"[{name}] seed {r['seed']}: candidate_pass={r['candidate_pass']} mutants_fail={r['mutants_fail']}"
+                      f" ok={r['ok']} | {r['results']['candidate']}", flush=True)
+            elif r.get("phase") == "train":
+                print(f"[{name}] t_update {r['t_update']} (rollout {r['t_rollout']}, ppo {r['t_ppo']})", flush=True)
+            elif r.get("phase") == "error":
+                print(f"[{name}] ERROR job {r['job']} rc {r['rc']}", flush=True)
 PLANS = {
     # step 0 timing (<= $0.50): 6 COMM updates at the real settings; compile time is in update 1
     "timing": [("timing_COMM0", ["--arm", "COMM", "--seed", "0", "--updates", "6", "--tau", "0.08",
