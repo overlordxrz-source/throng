@@ -1887,6 +1887,14 @@ more expensive, because it produces publishable-looking nulls.
   * **GPU choice (cheaper per update at list price, ~$1.10/h A10G, ~$0.80/h L4):** loop path ~$0.0106/update
     on A10G vs ~**$0.0097 on L4** (about 9% cheaper, 26% slower wall-clock) -> **L4** for the confirmation.
 
+- **Cam's ruling (2026-11-08, speed check).** FAIL accepted; the `comm-jit` scanned path stays on its branch,
+  unmerged, and all speed work stops before the confirmation (the failing mutants show the bar works). Whether
+  the loop path reproduces itself on GPU is open and not blocking (check it, <= $0.10, only if a later result
+  depends on exact reproduction). **GPU for the confirmation: A10G**, the smoke's hardware, so the confirmation
+  matches the run that set K / floor / N (L4 would save < $1 for ~26% more wall-clock). The later speed levers are
+  the lean core brain and the minibatch count, each validated separately, after the confirmation. Smoke and
+  diagnostic proceed as registered; K, the floor and N go to Cam with the smoke curves before the paid launch.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
