@@ -11,7 +11,7 @@ import modal
 
 _REQUIREMENTS = str(Path(__file__).resolve().parents[1] / "requirements.txt")
 
-PINNED_SHA = "a746b643b2a73ae1516d552ed918b6b215c0eaff"  # comm-toy branch
+PINNED_SHA = "f6f574e2954643d1666113aba527e65b2649ef27"  # comm-toy branch
 REPO_URL = "https://github.com/overlordxrz-source/throng.git"
 VOLUME_NAME = "throng-runs"
 VOLUME_MOUNT = "/mnt/throng-runs"
@@ -75,6 +75,11 @@ PLANS: dict = {
                                            "--resume", f"{{VOL}}/testbed/toy/snap/t3_s{s}_u1750.pkl", "--branch", br,
                                            "--tag", f"STEPB_{br.upper()}"])
                      for br in ("none", "frozen_listener", "stopgrad") for s in (140, 141, 142)],
+    # C1 (2026-11-08): wire-blind message head from the start; T3 protocol (to 2,000) and erosion protocol
+    "c1": ([(f"c1t3_{w}_s{s}", ["--arm", arm, "--seed", str(s), "--updates", "2000", *_T3, "--wire-blind", "1", "--tag", f"C1T3_{w.upper()}"])
+            for w, arm, ss in (("on", "COMM", (180, 181, 182)), ("off", "NOSIG", (183, 184))) for s in ss]
+           + [(f"c1e_{w}_s{s}", ["--arm", arm, "--seed", str(s), *_ERO, "--wire-blind", "1", "--tag", f"C1E_{w.upper()}"])
+              for w, arm, ss in (("on", "COMM", (185, 186, 187)), ("off", "NOSIG", (188, 189))) for s in ss]),
     # build-order step 3 (approved 2026-11-08): no assigned sender; PS on (formation), local critic
     "step3": [(f"step3_{tag.lower()}_s{s}", ["--arm", arm, "--seed", str(s), "--updates", "2000", "--warm-start", _W,
                                              "--wire-init-scale", "0.06", "--craft-cost", "0.45", "--ps", "1.99",
@@ -119,9 +124,13 @@ PLANS: dict = {
 
 
 @app.local_entrypoint()
-def main(plan: str, outdir: str = "toy_out_modal"):
+def main(plan: str, outdir: str = "toy_out_modal", only: str = ""):
     Path(outdir).mkdir(exist_ok=True)
     jobs = PLANS[plan]
+    if only:   # comma-separated tags (e.g. a price probe of one job)
+        jobs = [j for j in jobs if j[0] in only.split(",")]
+    if not only and plan == "c1":
+        jobs = [j for j in jobs if j[0] != "c1t3_on_s180"]   # the probe job runs separately
     for (tag, _), text in zip(jobs, run_toy.starmap(jobs)):
         (Path(outdir) / f"{tag}.jsonl").write_text(text)
         print(f"[toy] {tag}: {len(text.splitlines())} records", flush=True)

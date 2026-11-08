@@ -2429,6 +2429,36 @@ more expensive, because it produces publishable-looking nulls.
   7. Spend: ~$8.4 left in the toy allowance; C1 ($2.5) + step 2 ($2.4) + step 6 ($1.7) = $6.6. Guard stays at
      $33.40.
 
+- **REGISTRATION -- C1, the wire-blind message head from the start (before any run).** `comm-toy` `f6f574e`; analysis
+  `scripts/analyze_c1.py`; launcher plan `c1` (Modal CPU, 2 cores / 4 GiB; cap $2.5; price probe = c1t3_on_s180
+  alone first; ~$0.2 per run, 10 runs ~ $2.0).
+  * **Wire-blind:** the message pathway (`gwt_comms_1` -> slot heads -> codebooks) is a feed-forward branch from the
+    obs that shares nothing with the trunk. Its input has the heard-wire dims zeroed, for both roles, from update 0
+    (the warm start's wire rows are simply ignored). The listener's *policy* still reads the wire through the trunk
+    (`enc_0`).
+  * **Apparatus check, passed before launch** (`--selftest-wireblind`): the sender's token distribution under
+    random heard input vs recorded is **exactly** unchanged (max |dp| = 0.0) at both a trained code (PS0 final) and
+    ORACLE0-toy. The one-live-row mutant changes it (max |dp| 0.42 / 0.0037) and fails, as required. The normal head
+    changes its argmax in 43% / 14% of slots. The default path still reproduces PS0 bit for bit.
+  * **C1-T3:** T3 protocol (PS 1.99 annealed over 1,000-1,500; sender / listener resets from 1,750; newborn
+    imitation), **run to 2,000** (the readout update; later resets are not needed). Wire-on seeds 180-182, wire-off
+    183 / 184.
+  * **C1-E:** erosion protocol (wd 3e-4 on the message head from 1,500; 2,000 updates). Wire-on 185-187, wire-off
+    188 / 189.
+  * **Bars (Cam):**
+    - **formation gate:** P1 reliance at 1,500 in >= 2 of 3 wire-on seeds per protocol, else stop and report;
+    - **C1-T3 reading:** the coupling is the destabiliser if, in >= 2 of 3 wire-on seeds, continuity across the
+      first reset (2,000 vs the 1,750 map) is >= 0.5 **and** exact-triple copy accuracy on the elder's inputs at
+      2,000 is >= half its post-imitation value (same 4,096 sampled rows);
+    - **C1-E:** the rung-3 bar (reliance at 2,000 in >= 2 of 3 wire-on; wire-off MI < 0.5 in both).
+  * **Predictions (before launch).**
+    - *Mine:* formation gate passes in both (~80%: PS builds the code, and listeners read it through the trunk).
+      **C1-T3 confirms the coupling** (~60%). With the head's inputs identical to the elder era, the copy should
+      hold as it did with the wire off in T3; the risk is that the sender's own token credit still overwrites it.
+      **C1-E fails the rung-3 bar** (~65%): erosion also tests credit, and the diagnostic showed the credit carries
+      no restoring direction.
+    - *Cam's (~55%):* C1-T3 passes its reading; C1-E still fails the rung-3 bar.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
