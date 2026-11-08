@@ -67,6 +67,9 @@ class Outs:
 class ToyNet(nn.Module):
     hidden: int = 64
     credit: str = "joint"     # "A": + V_shared(s) head; "B": + per-slot message-conditioned critic q_i(s, m_i)
+    wire_blind: int = 0       # C1: 1 = the message pathway's input has the heard wire zeroed (no path from the wire to the
+                              # tokens: the pathway is feed-forward from the obs and shares nothing with the trunk);
+                              # 2 = MUTANT for the apparatus check (one wire row left live)
 
     @nn.compact
     def __call__(self, carries, obs):
@@ -77,7 +80,12 @@ class ToyNet(nn.Module):
         v = nn.Dense(1, name="head_value")(h)[..., 0]
         # Comms pathway as in production (network_jax: gwt_comms_1 -> head_signal_slot{0,1,2}): a separate
         # feed-forward branch from the CURRENT obs, independent of the recurrent trunk; z_e[:, :8] = 0.
-        h_c = nn.relu(nn.Dense(self.hidden, name="gwt_comms_1")(obs))
+        obs_c = obs
+        if self.wire_blind == 1:
+            obs_c = obs.at[:, O_WIRE:].set(0.0)
+        elif self.wire_blind == 2:   # mutant: every wire dim zeroed except one (the first codebook dim)
+            obs_c = obs.at[:, O_WIRE:].set(0.0).at[:, O_WIRE + 8].set(obs[:, O_WIRE + 8])
+        h_c = nn.relu(nn.Dense(self.hidden, name="gwt_comms_1")(obs_c))
         zs, lvq = [jnp.zeros((obs.shape[0], 8))], []
         for i, (lo, hi, k) in enumerate(rl_jax.TOKEN_SLOTS):
             z = nn.Dense(hi - lo, name=f"head_signal_slot{i}")(h_c)
@@ -133,6 +141,8 @@ def main():
     ap.add_argument("--imitate-steps", type=int, default=500)
     ap.add_argument("--imitate-lr", type=float, default=1e-3)
     ap.add_argument("--imitate-window", type=int, default=50)
+    ap.add_argument("--wire-blind", type=int, default=0, help="C1: 1 = wire-blind message head from the start")
+    ap.add_argument("--selftest-wireblind", action="store_true", help="C1 apparatus: token TV under random heard input")
     ap.add_argument("--snapshot-at", type=int, default=None, help="step B: pickle the full training state after this update")
     ap.add_argument("--snapshot-path", default=None)
     ap.add_argument("--resume", default=None, help="step B: resume from a full-state snapshot")
@@ -177,7 +187,7 @@ def main():
     dd = np.abs(cells[:, None, :] - hn[None]); dd = np.minimum(dd, G - dd).max(-1)
     VALID = jnp.asarray(cells[(dd > 1).all(1)])           # respawn cells: not within radius 1 of any hearth
 
-    model = ToyNet(H, credit=a.credit)
+    model = ToyNet(H, credit=a.credit, wire_blind=a.wire_blind)
 
     def apply_fn(params, carries, obs, n_layers=1, detach_value=False, **kw):
         return model.apply(params, carries, obs)
@@ -1053,6 +1063,29 @@ def main():
         print(json.dumps(res, indent=1), flush=True)
         raise SystemExit(0)
 
+    if a.selftest_wireblind:
+        """C1 apparatus: the sender's token distribution must be exactly unchanged when its heard wire is replaced by
+        random token triples (wire-blind), while a mutant with one live wire row must change it."""
+        lisq = np.asarray(is_listener)
+        _, Rw = rollout(params, init_state(jax.random.PRNGKey(41)), jax.random.PRNGKey(42))
+        obsS = jnp.asarray(np.asarray(Rw["obs"])[:, ~lisq].reshape(-1, D))
+        cb = [params["params"][k]["embedding"] for _, _, k in rl_jax.TOKEN_SLOTS]
+        rt = jax.random.randint(jax.random.PRNGKey(3), (obsS.shape[0], 3), 0, V)
+        rbc = jnp.concatenate([jnp.zeros((obsS.shape[0], 8))] + [cb[i][rt[:, i]] for i in range(3)], -1)
+        res = {}
+        for name, wb in (("wire_blind", 1), ("mutant_one_live_row", 2), ("normal_head", 0)):
+            m_ = ToyNet(H, credit=a.credit, wire_blind=wb)
+            def dist(o_in):
+                _, o = m_.apply(params, jnp.zeros((o_in.shape[0], H)), o_in)
+                return [np.asarray(jax.nn.softmax(lg, -1)) for lg in token_logits(params, o.z_e, TAU)]
+            P, Q = dist(obsS), dist(obsS.at[:, O_WIRE:].set(rbc))
+            res[name] = dict(tv=float(np.mean([0.5 * np.abs(P[i] - Q[i]).sum(-1).mean() for i in range(3)])),
+                             max_abs=float(max(np.abs(P[i] - Q[i]).max() for i in range(3))),
+                             argmax_changed=float(np.mean([np.mean(P[i].argmax(-1) != Q[i].argmax(-1)) for i in range(3)])))
+        ok = res["wire_blind"]["max_abs"] == 0.0 and res["mutant_one_live_row"]["max_abs"] > 0.0
+        print(json.dumps(res, indent=1)); print("SELFTEST-WIREBLIND", "PASS" if ok else "FAIL", flush=True)
+        raise SystemExit(0 if ok else 1)
+
     np_rng = np.random.default_rng(a.seed)
     if a.eval_only:            # exploratory: evaluate the loaded params (no training, no MI)
         lis = np.asarray(is_listener); mi_buf_tok, mi_buf_T = deque(), deque()
@@ -1218,7 +1251,7 @@ def main():
         if a.reset_from is not None and (u in a.eval_at or u == a.updates):
             turnover_record(u)
         if a.reset_from is not None and u in reset_sched and not (a.resume and u == a.updates):
-            if u == a.snapshot_at:
+            if u == a.snapshot_at or (elder_buf is None and reset_sched[u] == "sender" and a.imitate):
                 elder_buf = [(np.array(o_), np.array(t_)) for o_, t_ in imit_buf]
             params, opt_state = do_reset(reset_sched[u], params, opt_state, u)
         if a.snapshot_at is not None and u == a.snapshot_at:
@@ -1230,7 +1263,8 @@ def main():
             Path(a.snapshot_path).parent.mkdir(parents=True, exist_ok=True)
             pickle.dump(snap, open(a.snapshot_path, "wb"))
             emit(dict(phase="snapshot", update=u, path=a.snapshot_path))
-        if a.resume and u == a.updates and elder_buf:   # step B readout: copy accuracy of the head vs the elder's pairs
+        if elder_buf and ((a.resume and u == a.updates) or (not a.resume and (u in a.eval_at or u == a.updates))):
+            # copy accuracy of the current head vs the elder's (obs, token) pairs from before the first sender reset
             X = np.concatenate([b[0] for b in elder_buf]); Y = np.concatenate([b[1] for b in elder_buf])
             ix = np.random.default_rng(0).integers(0, len(X), 4096)
             _, o = apply_fn(params, jnp.zeros((4096, H)), jnp.asarray(X[ix]))
