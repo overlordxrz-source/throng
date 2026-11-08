@@ -1660,6 +1660,23 @@ more expensive, because it produces publishable-looking nulls.
     it includes an anneal arm. Draft: `docs/drafts/2026-11-07_real_network_PS_confirmation_DRAFT.md`. Nothing
     launches until it is approved.
 
+- **Cam's ruling (2026-11-08, on the replication).** *P3 passed as registered; its interpretation is retracted:
+  the persistence is inertia, not self-maintenance* (the wire-off control). **Reliance 5/5 and meaning 4/5 on fresh
+  seeds stand as the first replicated channel result** (CPU toy; scope line as written above). M's roadmap
+  ("THRONG North Star Roadmap", Nov 8) now holds the plan, caps and standing rules. Where its next-30-days list and
+  this ruling differ, the ruling is newer and is followed, flagged to M: the roadmap says craft cost >= break-even,
+  swap primary, and an anneal arm if P3 passed.
+  1. **Paid run: redirection is the meaning primary, movement secondary.** Registered before launch, with the
+     power argument (movement misread 2 of 8 toy seeds that redirected; ~0.75^2 = 56% joint pass on two seeds) and
+     the disclosure that it was chosen after the toy.
+  2. **Craft cost stays 0.1**, so PS is the only difference from the final run's COMM and NOSIG.
+  3. **Step 0, jit-port of the testbed rollout: approved.** Equivalence bar fixed before running, then one timing
+     run (<= $0.50); if the speed-up is under ~5x, report before drafting arms.
+  4. **Erosion test (CPU toy, free, in parallel).** An eroding force, calibrated on separate seeds until a wire-off
+     code falls below 0.5 bits within 500 updates; then register wire-on vs wire-off, 3 fresh seeds each. Pass:
+     wire-on keeps MI >= 1 bit and reliance in >= 2 of 3 while wire-off decays. It does not block the confirmation.
+  * Order: step 0 and erosion in parallel; the confirmation on `rapidcrisp` (cap $15) once step 0 passes.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
