@@ -65,6 +65,7 @@ class Outs:
 
 class ToyNet(nn.Module):
     hidden: int = 64
+    credit: str = "joint"     # "A": + V_shared(s) head; "B": + per-slot message-conditioned critic q_i(s, m_i)
 
     @nn.compact
     def __call__(self, carries, obs):
@@ -83,7 +84,10 @@ class ToyNet(nn.Module):
             _, _, l = vector_quantize_signals(z, cb, beta=0.25)
             zs.append(z); lvq.append(l)
         z_e = jnp.concatenate(zs, -1)
-        return new_c, Outs(action_logits=logits, values=v, z_e=z_e, loss_vq=jnp.stack(lvq, -1), alarm_out=None)
+        vsh = nn.Dense(1, name="head_value_shared")(h)[..., 0] if self.credit == "A" else None
+        qs = [nn.Dense(V, name=f"head_q_slot{i}")(h) for i in range(3)] if self.credit == "B" else None
+        return new_c, Outs(action_logits=logits, values=v, z_e=z_e, loss_vq=jnp.stack(lvq, -1), alarm_out=None,
+                           values_shared=vsh, q_slots=qs)
 
 
 def main():
@@ -106,6 +110,9 @@ def main():
     ap.add_argument("--eval-at", type=int, nargs="*", default=[], help="extra eval (MI + swaps) after these updates")
     ap.add_argument("--erode-tok-ent", type=float, default=None, help="erosion: token entropy coef from --erode-from on")
     ap.add_argument("--erode-from", type=int, default=1500)
+    ap.add_argument("--credit", default="joint", choices=["joint", "A", "B"],
+                    help="token credit: joint (baseline) | A separate V_shared stream | B COMA-style Q_shared(s, m)")
+    ap.add_argument("--selftest-credit", action="store_true")
     ap.add_argument("--diag-from", type=int, default=None, help="erosion diagnostic (Cam 2026-11-08): log from this update")
     ap.add_argument("--diag-to", type=int, default=None)
     ap.add_argument("--diag-every", type=int, default=10, help="reliance probe every N updates in the window")
@@ -135,7 +142,7 @@ def main():
     dd = np.abs(cells[:, None, :] - hn[None]); dd = np.minimum(dd, G - dd).max(-1)
     VALID = jnp.asarray(cells[(dd > 1).all(1)])           # respawn cells: not within radius 1 of any hearth
 
-    model = ToyNet(H)
+    model = ToyNet(H, credit=a.credit)
 
     def apply_fn(params, carries, obs, n_layers=1, detach_value=False, **kw):
         return model.apply(params, carries, obs)
@@ -144,7 +151,12 @@ def main():
     key, k_init = jax.random.split(key)
     params = model.init(k_init, jnp.zeros((1, H)), jnp.zeros((1, D)))
     if a.warm_start:
-        params = flax.serialization.from_bytes(params, Path(a.warm_start).read_bytes())
+        if a.credit == "joint":
+            params = flax.serialization.from_bytes(params, Path(a.warm_start).read_bytes())
+        else:   # the warm start has no credit heads: load the shared structure, keep the new heads at init
+            base = ToyNet(H).init(k_init, jnp.zeros((1, H)), jnp.zeros((1, D)))
+            base = flax.serialization.from_bytes(base, Path(a.warm_start).read_bytes())
+            pp = dict(params["params"]); pp.update(base["params"]); params = {"params": pp}
         if a.wire_init_scale != 1.0:
             # The wire was zero throughout ORACLE training, so these rows are still at init (verified bit-identical).
             # Rescaling them sets the listener's start sensitivity to the real network's without scaling the input
@@ -156,6 +168,8 @@ def main():
     opt = optax.adam(LR)
     opt_state = opt.init(params)
     popart = PopArt(beta=0.1)
+    popart_s = PopArt(beta=0.1, head_key="head_value_shared")   # credit A
+    Q_SCALE = R_DEP                                                 # credit B: q targets in units of one delivery
 
     # ---------------------------------------------------------------- env (jnp)
     def near(pos):                                                     # (n, 4) Chebyshev radius 1, torus
@@ -185,7 +199,7 @@ def main():
             ent.append(-jnp.sum(jnp.exp(lsm) * lsm, -1))
             toks.append(t); bc.append(p[rl_jax.TOKEN_SLOTS[i][2]]["embedding"][t])
         return (new_c, logits, act, lp, o.values, o.loss_vq.sum(-1), jnp.stack(toks, -1),
-                jnp.concatenate(bc, -1), jnp.stack(ent, -1).sum(-1))
+                jnp.concatenate(bc, -1), jnp.stack(ent, -1).sum(-1), o)
 
     def tv(l1, l2):
         p1, p2 = jax.nn.softmax(l1, -1), jax.nn.softmax(l2, -1)
@@ -201,10 +215,14 @@ def main():
             pos, active, since, wire, carries = st
             k_obs, k_act, k_rs, k_rr, k_rand = jax.random.split(k, 5)
             obs = build_obs(pos, active, wire, k_obs)
-            new_c, logits, act, lp, val, lvq, toks, bc, ent = policy(params, carries, obs, k_act)
+            new_c, logits, act, lp, val, lvq, toks, bc, ent, o_pol = policy(params, carries, obs, k_act)
+            lp_act = jnp.take_along_axis(jax.nn.log_softmax(logits, -1), act[:, None], -1)[:, 0]
+            crit = o_pol.values_shared if a.credit == "A" else (
+                sum(jnp.take_along_axis(o_pol.q_slots[i], toks[:, i:i + 1], -1)[:, 0] for i in range(3))
+                if a.credit == "B" else jnp.zeros(N))
             # sender's counterfactual broadcast for T' (paired key) -- used by the swap eval and the swap-diff metric
             obs_sw = build_obs(pos, (active + 1) % 4, wire, k_obs)
-            _, _, _, _, _, _, toks_sw, bc_sw, _ = policy(params, carries, obs_sw, k_act)
+            _, _, _, _, _, _, toks_sw, bc_sw, _, _ = policy(params, carries, obs_sw, k_act)
             swap_diff = jnp.any(toks_sw != toks, -1) & ~is_listener
             # listener sensitivity: received wire replaced by a uniform random token triple (diagnostic only)
             rt = jax.random.randint(k_rand, (N, 3), 0, V)
@@ -254,7 +272,7 @@ def main():
             wire2 = bc_out if live_wire else jnp.zeros_like(bc_out)
             heard_next = wire2.reshape(W, 2, -1)[:, ::-1].reshape(N, -1)
             r_shared = jnp.where(~is_listener, R_DEP * jnp.repeat(ldep_w, 2), 0.0)
-            rec = dict(r_shared=r_shared.astype(jnp.float32), obs=obs, actions=act, log_probs=lp, rewards=r.astype(jnp.float32), values=val,
+            rec = dict(lp_act=lp_act, crit=crit, r_shared=r_shared.astype(jnp.float32), obs=obs, actions=act, log_probs=lp, rewards=r.astype(jnp.float32), values=val,
                        carries=carries, loss_vq=lvq, token_actions=toks, ent=ent, dep=dep, att=att,
                        swap_diff=swap_diff, sens=sens, att_Tp=att_Tp, mu_sw=mu_sw, m_sw=m_sw, mu_tr=mu_tr, m_tr=m_tr,
                        active=active, heard_next=heard_next, bc_sw=bc_used, toks_sw=toks_sw, trip_used=trip_used)
@@ -306,7 +324,50 @@ def main():
             lst = jnp.ones_like(lst)
         return (jnp.abs(p - p0).sum(-1) * lst).sum() / (lst.sum() + 1e-8)
 
+    def huber(e, d=0.5):
+        e = jnp.abs(e)
+        return jnp.where(e < d, 0.5 * e * e, d * (e - 0.5 * d))
+
+    def credit_terms(params, mb):
+        """Credit fixes A / B: the token's own clipped surrogate on its own advantage, + the credit critic's loss."""
+        _, o = apply_fn(params, mb["carries"], mb["obs"])
+        lgs = token_logits(params, o.z_e, TAU)
+        lsm = [jax.nn.log_softmax(lg, -1) for lg in lgs]
+        lp_new = sum(jnp.take_along_axis(lsm[i], mb["token_actions"][:, i:i + 1], -1)[:, 0] for i in range(3))
+        ent = sum(-jnp.sum(jnp.exp(l_) * l_, -1) for l_ in lsm)
+        snd = (mb["obs"][:, O_INF] > 0.5).astype(jnp.float32)
+        if a.credit == "A":
+            adv_t = mb["adv_tok"]
+            crit_loss = jnp.mean(huber(o.values_shared - (mb["ret_s"] - mb["mu_s"]) / mb["sig_s"]))
+        else:
+            q = [jax.lax.stop_gradient(qq) for qq in o.q_slots]
+            pi = [jax.lax.stop_gradient(jnp.exp(l_)) for l_ in lsm]
+            A_i = [jnp.take_along_axis(q[i], mb["token_actions"][:, i:i + 1], -1)[:, 0] - jnp.sum(pi[i] * q[i], -1)
+                   for i in range(3)]
+            raw = sum(A_i)                                            # COMA counterfactual, additive over slots
+            mu_ = (raw * snd).sum() / (snd.sum() + 1e-8)
+            sd_ = jnp.sqrt((((raw - mu_) ** 2) * snd).sum() / (snd.sum() + 1e-8)) + 1e-8
+            adv_t = jnp.clip((raw - mu_) / sd_, -10, 10) * snd
+            q_taken = sum(jnp.take_along_axis(o.q_slots[i], mb["token_actions"][:, i:i + 1], -1)[:, 0] for i in range(3))
+            crit_loss = (huber(q_taken - mb["g_s"] / Q_SCALE) * snd).sum() / (snd.sum() + 1e-8)
+        ratio = jnp.clip(jnp.exp(lp_new - mb["lp_tok_old"]), 0.0, 10.0)
+        pg = -jnp.minimum(ratio * adv_t, jnp.clip(ratio, 1 - CLIP, 1 + CLIP) * adv_t)
+        return jnp.mean(pg), jnp.mean(ent), crit_loss, adv_t
+
     def total_loss(params, mb, vs, vsh, ps_c, te_c):
+        if a.credit != "joint":
+            loss, mets = ppo_loss(params, apply_fn, mb["obs"], mb["actions"], None, mb["lp_act"], mb["adv"],
+                                  mb["ret"], mb["carries"], 1, mb["values"], clip_eps=CLIP, vf_coef=VF, ent_coef=ENT,
+                                  vq_coef=VQC, value_scale=vs, value_clip=False, value_shift=vsh, popart_mode=True,
+                                  token_actions=None)
+            tpg, tent, closs, _ = credit_terms(params, mb)
+            tec = te_c if a.erode_tok_ent is not None else TOK_ENT
+            loss = loss + tpg - tec * tent + VF * closs
+            mets = dict(mets, tok_pg=tpg, tok_ent=tent, credit_critic_loss=closs)
+            ps = ps_term(params, mb["obs"], mb["carries"]) if a.ps else jnp.array(0.0)
+            ps_coef = ps_c if a.ps_anneal else a.ps
+            mets = dict(mets, aux_ps=ps, aux_pl=jnp.array(0.0), ps_coef=ps_coef)
+            return loss - ps_coef * ps, mets
         loss, mets = ppo_loss(params, apply_fn, mb["obs"], mb["actions"], None, mb["log_probs"], mb["adv"],
                               mb["ret"], mb["carries"], 1, mb["values"], clip_eps=CLIP, vf_coef=VF, ent_coef=ENT,
                               vq_coef=VQC, value_scale=vs, value_clip=False, value_shift=vsh, popart_mode=True,
@@ -328,7 +389,9 @@ def main():
     def mb_step(params, opt_state, mb, vs, vsh, ps_c, te_c):
         (loss, mets), grads = jax.value_and_grad(total_loss, has_aux=True)(params, mb, vs, vsh, ps_c, te_c)
         g = dict(grads["params"])
-        groups = [["head_action"], ["head_value"], [k for k in g if k not in ("head_action", "head_value")]]
+        crit_keys = [k for k in g if k == "head_value_shared" or k.startswith("head_q_slot")]
+        groups = [["head_action"], ["head_value"], *([crit_keys] if crit_keys else []),
+                  [k for k in g if k not in ("head_action", "head_value", *crit_keys)]]
         for grp in groups:
             c = _clip_group({k: g[k] for k in grp})
             g.update(c)
@@ -498,6 +561,88 @@ def main():
             out.append(float((pj[nz] * np.log2(pj[nz] / (px @ py)[nz])).sum()))
         return float(np.mean(out))
 
+    def credit_streams(R, o_last, params, M, rewards_override=None, mutant=None):
+        """Flat per-row streams for credit A / B. rewards_override replaces the TOTAL rewards (test: the token streams
+        must not change when only the sender's own rewards change). mutant (tests only): "full_adv" -> A's token
+        advantage from the total reward; "total_reward" -> B's Q target from the total reward."""
+        rew = R["rewards"] if rewards_override is None else rewards_override
+        out = {"lp_act": R["lp_act"].reshape(M).astype(np.float32),
+               "lp_tok_old": (R["log_probs"] - R["lp_act"]).reshape(M).astype(np.float32)}
+        snd_rows = np.broadcast_to(~lis, R["r_shared"].shape)
+        r_stream = rew if mutant in ("full_adv", "total_reward") else R["r_shared"]
+        if a.credit == "A":
+            vs_den = popart_s.denormalise(R["crit"])
+            vs_last = popart_s.denormalise(np.asarray(o_last.values_shared))
+            adv_s, ret_s = gae_raw(r_stream, vs_den, vs_last)
+            m_, sd_ = adv_s[snd_rows].mean(), adv_s[snd_rows].std() + 1e-8
+            out["adv_tok"] = np.where(snd_rows, np.clip((adv_s - m_) / sd_, -10, 10), 0.0).reshape(M).astype(np.float32)
+            out["ret_s"] = ret_s.reshape(M).astype(np.float32)
+            out["_ret_s_full"] = ret_s
+        else:
+            lg_last = token_logits(params, o_last.z_e, TAU)
+            boot = sum(np.asarray(jnp.sum(jax.nn.softmax(lg_last[i], -1) * o_last.q_slots[i], -1)) for i in range(3))
+            _, g_s = gae_raw(r_stream, R["crit"] * Q_SCALE, boot * Q_SCALE)
+            out["g_s"] = g_s.reshape(M).astype(np.float32)
+        return out
+
+    def credit_selftest(params, flat, R, o_last, M):
+        """Gradient tests + mutants for credit A / B (Cam 2026-11-08), on the first minibatch of update 1."""
+        idx = np.arange(MB)
+        mb = {k: jnp.asarray(v[idx]) for k, v in flat.items()}
+        gn = lambda g, keys: float(np.sqrt(sum(float(jnp.sum(x ** 2)) for k in keys  # noqa: E731
+                                               for x in jax.tree_util.tree_leaves(g["params"][k]))))
+        MSG = ["gwt_comms_1", "head_signal_slot0", "head_signal_slot1", "head_signal_slot2"]
+        CRIT = ["head_value_shared"] if a.credit == "A" else [f"head_q_slot{i}" for i in range(3)]
+        ok = True
+        g_tok = jax.grad(lambda p_: credit_terms(p_, mb)[0])(params)
+        g_crit = jax.grad(lambda p_: credit_terms(p_, mb)[2])(params)
+        g_mov = jax.grad(lambda p_: ppo_loss(p_, apply_fn, mb["obs"], mb["actions"], None, mb["lp_act"], mb["adv"],
+                         mb["ret"], mb["carries"], 1, mb["values"], clip_eps=CLIP, vf_coef=VF, ent_coef=ENT, vq_coef=0.0,
+                         value_scale=popart.sigma, value_clip=False, value_shift=popart.mu, popart_mode=True,
+                         token_actions=None)[0])(params)
+        res = dict(credit=a.credit,
+                   tok_grad_message_heads=gn(g_tok, MSG), tok_grad_action_value_heads=gn(g_tok, ["head_action", "head_value"]),
+                   tok_grad_critic=gn(g_tok, CRIT), crit_grad_critic=gn(g_crit, CRIT), crit_grad_message=gn(g_crit, MSG),
+                   move_grad_message=gn(g_mov, MSG), move_grad_critic=gn(g_mov, CRIT))
+        ok &= res["tok_grad_message_heads"] > 0 and res["tok_grad_action_value_heads"] == 0 and res["tok_grad_critic"] == 0
+        ok &= res["crit_grad_critic"] > 0 and res["crit_grad_message"] == 0
+        ok &= res["move_grad_message"] == 0 and res["move_grad_critic"] == 0
+        # own-reward independence of the token stream, and its mutant
+        rng_t = np.random.default_rng(0)
+        own_noise = rng_t.normal(size=R["rewards"].shape).astype(np.float32) * (~lis)[None, :]
+        alt = credit_streams(R, o_last, params, M, rewards_override=R["rewards"] + own_noise)
+        base_ = credit_streams(R, o_last, params, M)
+        key_ = "adv_tok" if a.credit == "A" else "g_s"
+        res["stream_unchanged_by_own_reward"] = bool(np.array_equal(alt[key_], base_[key_]))
+        mut = "full_adv" if a.credit == "A" else "total_reward"
+        m1 = credit_streams(R, o_last, params, M, rewards_override=R["rewards"], mutant=mut)
+        m2 = credit_streams(R, o_last, params, M, rewards_override=R["rewards"] + own_noise, mutant=mut)
+        res["mutant_caught"] = bool(not np.array_equal(m1[key_], m2[key_]))
+        ok &= res["stream_unchanged_by_own_reward"] and res["mutant_caught"]
+        if a.credit == "B":   # counterfactual baseline: E_pi[A_i] = 0 per row and slot; mutant without baseline
+            _, o = apply_fn(params, mb["carries"], mb["obs"])
+            lgs = token_logits(params, o.z_e, TAU)
+            ev, ev_mut = 0.0, 0.0
+            for i in range(3):
+                pi = jax.nn.softmax(lgs[i], -1); q = o.q_slots[i]
+                Aall = q - jnp.sum(pi * q, -1, keepdims=True)
+                ev = max(ev, float(jnp.max(jnp.abs(jnp.sum(pi * Aall, -1)))))
+                ev_mut = max(ev_mut, float(jnp.max(jnp.abs(jnp.sum(pi * q, -1)))))
+            res["baseline_expectation_max"] = ev; res["no_baseline_mutant_expectation"] = ev_mut
+            ok &= ev < 1e-5 and ev_mut > 1e-3
+        print(json.dumps(res), flush=True)
+        print("SELFTEST-CREDIT", "PASS" if ok else "FAIL", flush=True)
+        raise SystemExit(0 if ok else 1)
+
+    def gae_raw(r, v, v_last):
+        # GAE(lambda) with bootstrap, no normalisation (the credit streams; same recursion as gae_bootstrap)
+        r = np.asarray(r, np.float64); v = np.asarray(v, np.float64)
+        adv_ = np.zeros_like(r); c = np.zeros(r.shape[1]); nv = np.asarray(v_last, np.float64)
+        for t in range(r.shape[0] - 1, -1, -1):
+            c = r[t] + GAMMA * nv - v[t] + GAMMA * LAM * c
+            adv_[t] = c; nv = v[t]
+        return adv_, adv_ + v
+
     np_rng = np.random.default_rng(a.seed)
     if a.eval_only:            # exploratory: evaluate the loaded params (no training, no MI)
         from collections import deque
@@ -524,6 +669,13 @@ def main():
                                                                   "token_actions")}
         flat["values"] = values.reshape(M).astype(np.float32)
         flat["adv"], flat["ret"] = adv.reshape(M), ret.reshape(M).astype(np.float32)
+        if a.credit != "joint":
+            flat.update(credit_streams(R, o_last, params, M))
+            if a.credit == "A":
+                params = popart_s.update_and_preserve(flat.pop("_ret_s_full"), params)
+                flat["mu_s"] = np.full(M, popart_s.mu, np.float32); flat["sig_s"] = np.full(M, popart_s.sigma, np.float32)
+            if a.selftest_credit:
+                credit_selftest(params, flat, R, o_last, M)
         perm = np_rng.permutation(M)
         ps_c = a.ps
         te_c = a.erode_tok_ent if (a.erode_tok_ent is not None and u >= a.erode_from) else TOK_ENT
