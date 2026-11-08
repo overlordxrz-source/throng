@@ -104,6 +104,10 @@ def main():
     ap.add_argument("--ps-anneal", type=int, nargs=2, default=None, metavar=("START", "END"),
                     help="c_ps decays linearly from --ps to 0 over updates START..END, then stays 0")
     ap.add_argument("--eval-at", type=int, nargs="*", default=[], help="extra eval (MI + swaps) after these updates")
+    ap.add_argument("--erode-tok-ent", type=float, default=None, help="erosion: token entropy coef from --erode-from on")
+    ap.add_argument("--erode-from", type=int, default=1500)
+    ap.add_argument("--erode-wd", type=float, default=None,
+                    help="erosion: decoupled weight decay on the message head (gwt_comms_1, head_signal_slot*) per minibatch step from --erode-from on")
     ap.add_argument("--out", default=None)
     ap.add_argument("--tag", default="")
     ap.add_argument("--selftest", action="store_true")
@@ -297,11 +301,12 @@ def main():
             lst = jnp.ones_like(lst)
         return (jnp.abs(p - p0).sum(-1) * lst).sum() / (lst.sum() + 1e-8)
 
-    def total_loss(params, mb, vs, vsh, ps_c):
+    def total_loss(params, mb, vs, vsh, ps_c, te_c):
         loss, mets = ppo_loss(params, apply_fn, mb["obs"], mb["actions"], None, mb["log_probs"], mb["adv"],
                               mb["ret"], mb["carries"], 1, mb["values"], clip_eps=CLIP, vf_coef=VF, ent_coef=ENT,
                               vq_coef=VQC, value_scale=vs, value_clip=False, value_shift=vsh, popart_mode=True,
-                              token_actions=mb["token_actions"], token_tau=TAU, token_ent_coef=TOK_ENT)
+                              token_actions=mb["token_actions"], token_tau=TAU,
+                              token_ent_coef=(te_c if a.erode_tok_ent is not None else TOK_ENT))
         ps = ps_term(params, mb["obs"], mb["carries"]) if a.ps else jnp.array(0.0)
         pl = pl_term(params, mb["obs"], mb["carries"]) if a.pl else jnp.array(0.0)
         mets = dict(mets, aux_ps=ps, aux_pl=pl)
@@ -315,8 +320,8 @@ def main():
         return jax.tree_util.tree_map(lambda x: x * s, g)
 
     @jax.jit
-    def mb_step(params, opt_state, mb, vs, vsh, ps_c):
-        (loss, mets), grads = jax.value_and_grad(total_loss, has_aux=True)(params, mb, vs, vsh, ps_c)
+    def mb_step(params, opt_state, mb, vs, vsh, ps_c, te_c):
+        (loss, mets), grads = jax.value_and_grad(total_loss, has_aux=True)(params, mb, vs, vsh, ps_c, te_c)
         g = dict(grads["params"])
         groups = [["head_action"], ["head_value"], [k for k in g if k not in ("head_action", "head_value")]]
         for grp in groups:
@@ -451,6 +456,15 @@ def main():
                           listener_crafts_at_Tprime_control=ctrl[3],
                           listener_crafts_at_Tprime_swap=float(Rk["att_Tp"][:, lis].sum() / W)))
 
+    def mi_plugin(tok, Tl):
+        # plug-in MI(token; T), mean over the 3 slots, bits (cheap per-update trace; numpy only, no RNG)
+        out = []
+        for i in range(3):
+            j = np.zeros((V, 4)); np.add.at(j, (tok[:, i], Tl), 1); pj = j / j.sum()
+            px, py = pj.sum(1, keepdims=True), pj.sum(0, keepdims=True); nz = pj > 0
+            out.append(float((pj[nz] * np.log2(pj[nz] / (px @ py)[nz])).sum()))
+        return float(np.mean(out))
+
     np_rng = np.random.default_rng(a.seed)
     if a.eval_only:            # exploratory: evaluate the loaded params (no training, no MI)
         from collections import deque
@@ -479,6 +493,7 @@ def main():
         flat["adv"], flat["ret"] = adv.reshape(M), ret.reshape(M).astype(np.float32)
         perm = np_rng.permutation(M)
         ps_c = a.ps
+        te_c = a.erode_tok_ent if (a.erode_tok_ent is not None and u >= a.erode_from) else TOK_ENT
         if a.ps_anneal:
             s0_, e0_ = a.ps_anneal
             ps_c = a.ps * float(np.clip((e0_ - u) / (e0_ - s0_), 0.0, 1.0)) if u > s0_ else a.ps
@@ -486,7 +501,12 @@ def main():
         for i in range(M // MB):
             idx = perm[i * MB:(i + 1) * MB]
             mb = {k: jnp.asarray(v[idx]) for k, v in flat.items()}
-            params, opt_state, mets = mb_step(params, opt_state, mb, popart.sigma, popart.mu, ps_c)
+            params, opt_state, mets = mb_step(params, opt_state, mb, popart.sigma, popart.mu, ps_c, te_c)
+            if a.erode_wd is not None and u >= a.erode_from:
+                pp = dict(params["params"])
+                for hk in ("gwt_comms_1", "head_signal_slot0", "head_signal_slot1", "head_signal_slot2"):
+                    pp[hk] = jax.tree_util.tree_map(lambda x: x * (1.0 - a.erode_wd), pp[hk])
+                params = {"params": pp}
             for k, v in mets.items():
                 msum[k] = msum.get(k, 0.0) + float(v)
         mets = {k: v / (M // MB) for k, v in msum.items()}
@@ -498,6 +518,8 @@ def main():
                    listener_crafts=int((R["actions"][:, lis] == ACTION_CRAFT).sum()),
                    listener_correct_frac=float(dep[:, lis].sum() / max(att[:, lis].sum(), 1)),
                    token_entropy_sender=float(ent[:, ~lis].mean()), token_entropy_listener=float(ent[:, lis].mean()),
+                   mi_plugin=mi_plugin(R["token_actions"][:, ~lis].reshape(-1, 3), R["active"].reshape(-1)),
+                   tok_ent_coef=float(te_c),
                    swap_diff=float(R["swap_diff"][:, ~lis].mean()), listener_sens_tv=float(R["sens"][:, lis].mean()),
                    ev=float(ev), aux_ps=mets.get("aux_ps", 0.0), aux_pl=mets.get("aux_pl", 0.0),
                    ppo_entropy=mets.get("ppo_entropy"), ps_coef=float(ps_c), t_update=round(time.time() - t0, 2))
