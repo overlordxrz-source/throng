@@ -11,7 +11,7 @@ import modal
 
 _REQUIREMENTS = str(Path(__file__).resolve().parents[1] / "requirements.txt")
 
-PINNED_SHA = "75323c4fbcd328c7409d515e7eb3c16364bf1fa8"  # comm-toy branch
+PINNED_SHA = "8469c90bdaead44df79ad18c6c0db40b675f8714"  # comm-toy branch
 REPO_URL = "https://github.com/overlordxrz-source/throng.git"
 VOLUME_NAME = "throng-runs"
 VOLUME_MOUNT = "/mnt/throng-runs"
@@ -31,7 +31,7 @@ image = (
 )
 
 
-@app.function(image=image, cpu=8, memory=8192, timeout=3 * 60 * 60, retries=0, volumes={VOLUME_MOUNT: volume})
+@app.function(image=image, cpu=2.0, memory=4096, timeout=6 * 60 * 60, retries=0, volumes={VOLUME_MOUNT: volume})
 def run_toy(tag: str, args: list) -> str:
     import os
     import subprocess
@@ -53,7 +53,14 @@ def run_toy(tag: str, args: list) -> str:
 _W = "toy_out/ORACLE0.msgpack"
 _BASE = ["--updates", "2000", "--warm-start", _W, "--wire-init-scale", "0.06", "--craft-cost", "0.45", "--ps", "1.99",
          "--ps-anneal", "1000", "1500", "--erode-from", "1500"]
+_ERO = ["--updates", "2000", "--warm-start", _W, "--wire-init-scale", "0.06", "--craft-cost", "0.45", "--ps", "1.99",
+        "--ps-anneal", "1000", "1500", "--erode-from", "1500", "--erode-wd", "3e-4", "--eval-at", "1500"]
+_ERO_JOBS = ([(f"erosion_on_s{s}", ["--arm", "COMM", "--seed", str(s), *_ERO, "--tag", "EROSION_ON"]) for s in (70, 71, 72)]
+             + [(f"erosion_off_s{s}", ["--arm", "NOSIG", "--seed", str(s), *_ERO, "--tag", "EROSION_OFF"]) for s in (80, 81, 82)])
 PLANS: dict = {
+    # registered erosion test (2026-11-08): probe one container first (Cam: fan out only if < $0.01/min/container)
+    "erosion_probe": _ERO_JOBS[:1],
+    "erosion_rest": _ERO_JOBS[1:],
     # exploratory (2026-11-08): weight-decay erosion calibration, wire OFF, 2 calibration seeds per strength.
     # The token-entropy force failed calibration (none < 0.5 bit); this is reported to Cam, not registered.
     "wdcal": [(f"wdcal_wd{wd}_s{s}", ["--arm", "NOSIG", "--seed", str(s), *_BASE, "--erode-wd", wd, "--tag", "WDCAL"])

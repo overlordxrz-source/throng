@@ -1774,6 +1774,22 @@ more expensive, because it produces publishable-looking nulls.
   * Roadmap re-saved (`docs/THRONG_North_Star_Roadmap.md`). Its item 4 still says the smoke is an "overnight CPU
     smoke run"; ruling 4 (Modal GPU) is newer and is followed.
 
+- **REGISTRATION -- erosion test, CPU toy (before any run).** `comm-toy` `8469c90`; analysis
+  `scripts/analyze_erosion.py`; launcher `scripts/modal_comm_toy.py` (plans `erosion_probe` + `erosion_rest`;
+  Modal CPU, 2 cores / 4 GiB per container).
+  * **Arms (never-used seeds), 2,000 updates, everything as the replication's PS-anneal arm** (ORACLE0-toy warm
+    start, `--wire-init-scale 0.06`, cost 0.45, c_ps 1.99 annealed linearly to 0 over 1,000-1,500) **plus weight
+    decay 3e-4 per minibatch step on the message head (`gwt_comms_1`, `head_signal_slot*`) from update 1,500**:
+    wire ON (COMM) seeds 70/71/72; wire OFF (NOSIG) seeds 80/81/82. Eval (MI + 10 swap pairs) at 1,500 and 2,000.
+  * **Manipulation check:** wire-off MI (Miller-Madow, mean over slots, updates 1,991-2,000) < 0.5 bit in >= 2 of 3
+    seeds. If not, the test is **uninformative** (reported; neither pass nor fail).
+  * **Wire-on seed passes:** MI >= 1.0 bit at 2,000 **and** reliance at 2,000. Reliance means the empirical-swap
+    deposit drop is >= 30%, the paired drop is > 2 SE, and the listener's deposits over the last 50 updates are >=
+    the wire-off arm's mean (the matched no-channel level).
+  * **PASS:** the manipulation check holds and >= 2 of 3 wire-on seeds pass. **FAIL:** it holds and < 2 pass.
+  * **Spend:** within the $4 toy/CPU allowance (~$0.9 spent). Probe one container for >= 2 min and fan out only if
+    it costs < $0.01/min (list estimate for 2 cores / 4 GiB: ~$0.002/min).
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
