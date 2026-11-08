@@ -1,0 +1,18 @@
+== T4A (centralized V_shared baseline)
+   wire-off s153: MI@1500 1.997 -> MI@2000 0.832
+   wire-off s154: MI@1500 1.994 -> MI@2000 0.338
+   wire-on s150: drop@1500 +77% -> @2000 +55% (paired 1.43 SE 0.06; retention 0.72) | L dep 3.47 vs NOSIG 1.75 | MI@2000 0.218 (secondary >= 0.5: False) -> pass
+   wire-on s151: drop@1500 +68% -> @2000 -2% (paired -0.10 SE 0.05; retention -0.03) | L dep 2.05 vs NOSIG 1.75 | MI@2000 0.008 (secondary >= 0.5: False) -> fail
+   wire-on s152: drop@1500 +70% -> @2000 +19% (paired 0.37 SE 0.08; retention 0.28) | L dep 3.91 vs NOSIG 1.75 | MI@2000 0.067 (secondary >= 0.5: False) -> fail
+   wire-off erodes (both < 0.5): False
+   T4A: FAIL (reliance 1/3)
+
+== T4B (centralized Q_shared counterfactual)
+   wire-off s163: MI@1500 1.991 -> MI@2000 1.288
+   wire-off s164: MI@1500 1.999 -> MI@2000 0.701
+   wire-on s160: drop@1500 +66% -> @2000 +66% (paired 4.05 SE 0.10; retention 1.00) | L dep 7.43 vs NOSIG 3.15 | MI@2000 1.289 (secondary >= 0.5: True) -> pass
+   wire-on s161: drop@1500 +62% -> @2000 +62% (paired 4.02 SE 0.08; retention 0.99) | L dep 7.51 vs NOSIG 3.15 | MI@2000 0.864 (secondary >= 0.5: True) -> pass
+   wire-on s162: drop@1500 +72% -> @2000 +71% (paired 4.70 SE 0.09; retention 0.99) | L dep 6.66 vs NOSIG 3.15 | MI@2000 1.034 (secondary >= 0.5: True) -> pass
+   wire-off erodes (both < 0.5): False
+   T4B: FAIL (reliance 3/3)
+
