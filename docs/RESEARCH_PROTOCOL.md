@@ -3701,6 +3701,24 @@ more expensive, because it produces publishable-looking nulls.
   - **Option (i) shorter lives** (lifetime 1,000, stagger 250, sensitive period 500, settle 250; generation 4 at ~4,000
     updates): ~$0.63 per run, **~$5.0 for 8**, within the cap. A design change, so Cam's call.
 
+- **(c) Rung-3 rerun at wd 1e-3: RESULT (registered `analyze_rung3.py`; `docs/data/rung3/`). 15/15 complete.**
+  - **C1 baseline: FAIL, 2/5 hold** (reliance + gain at both u2500 and u3000): s290 (+46% / +49%, listener window
+    4.91 / 5.17 vs gain bar 4.25 / 4.13) and s294 (+49% / +53%, 4.40 / 4.42). The other three show no reliance
+    (drops -4 to +2%); s293's listener window collapsed to 0.44 at u2500.
+  - **Stop-grad: FAIL, 0/5 hold.** Only s298 relies (+42% at u2500, +30% at u3000, missing the gain bar at 3,000:
+    3.97 < 4.13). s297's listener window collapsed (0.13 / 0.35).
+  - **Wire-off: PASS.** Shuffle-corrected joint MI at u3000: 0.002 / 0.000 / -0.000 / -0.000 / 0.001 (all < 0.05).
+    **The calibrated erosion works: unused codes die, so the control now discriminates.** The NOSIG listener level is
+    3.25 / 3.13.
+  - **Stop-grad NOT adopted** (registered rule: 0 < 2). So the population's message-head rule is the all-rows default.
+  - **The registered stop condition did NOT fire** (it needs 0/5 in BOTH wire-on arms; baseline has 2).
+  - **Reading:** at an erosion strength that reliably kills an unused code, a used code survives to 3,000 in 2 of 5
+    baseline seeds. That is below the 3/5 bar, so **the toy does not show that use keeps a code alive at this
+    strength**. Where it does survive, it is real (strong reliance and gain with the control at zero).
+    - Removing listener-row gradients from the message head made survival worse, not better (0/5 vs 2/5). This is
+      against the "listener noise erodes the code" hypothesis; it is one comparison of 5 vs 5.
+  - Next per plan: (e). It is held on price (Cam's call); not held by (c).
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under

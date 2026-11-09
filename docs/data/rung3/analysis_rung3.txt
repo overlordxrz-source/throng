@@ -1,0 +1,31 @@
+
+== u2500: wire-off listener window mean (NOSIG level) 3.25; gain bar 4.25
+   base s290: drop +46% paired 1.96 SE 0.11 | L window 4.91 -> reliance ok gain ok
+   base s291: drop +2% paired 0.08 SE 0.04 | L window 3.72 -> reliance x gain x
+   base s292: drop -4% paired -0.09 SE 0.05 | L window 2.47 -> reliance x gain x
+   base s293: drop +2% paired 0.03 SE 0.02 | L window 0.44 -> reliance x gain x
+   base s294: drop +49% paired 2.07 SE 0.06 | L window 4.40 -> reliance ok gain ok
+   sg s295: drop +1% paired 0.03 SE 0.05 | L window 3.31 -> reliance x gain x
+   sg s296: drop -2% paired -0.07 SE 0.04 | L window 4.17 -> reliance x gain x
+   sg s297: drop +2% paired 0.00 SE 0.00 | L window 0.13 -> reliance x gain x
+   sg s298: drop +42% paired 1.87 SE 0.07 | L window 4.48 -> reliance ok gain ok
+   sg s299: drop +1% paired 0.04 SE 0.04 | L window 4.46 -> reliance x gain ok
+
+== u3000: wire-off listener window mean (NOSIG level) 3.13; gain bar 4.13
+   base s290: drop +49% paired 2.53 SE 0.08 | L window 5.17 -> reliance ok gain ok
+   base s291: drop +2% paired 0.05 SE 0.02 | L window 2.38 -> reliance x gain x
+   base s292: drop +1% paired 0.03 SE 0.02 | L window 2.97 -> reliance x gain x
+   base s293: drop +0% paired 0.01 SE 0.04 | L window 2.57 -> reliance x gain x
+   base s294: drop +53% paired 1.95 SE 0.08 | L window 4.42 -> reliance ok gain ok
+   sg s295: drop +1% paired 0.04 SE 0.03 | L window 3.69 -> reliance x gain x
+   sg s296: drop +0% paired 0.01 SE 0.05 | L window 4.14 -> reliance x gain ok
+   sg s297: drop -3% paired -0.00 SE 0.01 | L window 0.35 -> reliance x gain x
+   sg s298: drop +30% paired 1.10 SE 0.06 | L window 3.97 -> reliance x gain x
+   sg s299: drop -1% paired -0.05 SE 0.07 | L window 4.48 -> reliance x gain ok
+
+== base: 2/5 seeds hold at both readouts -> FAIL
+
+== sg: 0/5 seeds hold at both readouts -> FAIL
+
+== wire-off shuffle-corrected joint MI at u3000: {300: 0.002, 301: 0.0, 302: -0.0, 303: -0.0, 304: 0.001} -> PASS (all < 0.05)
+== stop-grad NOT adopted (does worse than baseline) (sg 0 vs base 2)
