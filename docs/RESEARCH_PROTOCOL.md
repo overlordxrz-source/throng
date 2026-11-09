@@ -2998,6 +2998,45 @@ more expensive, because it produces publishable-looking nulls.
     spawn area) *and* route agents past the lookout. That is Cam's design call. No 3b arms on this account.
   - Cost ~$0.35 (per-app billing report not yet posted).
 
+- **Cam, Nov 9 (VoI follow-up).** (1) The export for M goes to M's Drive folder `My Drive/CascadeProjects/throng/for_m/`
+  with a combined `for_m_all.json`. Built in `docs/data/for_m/` (+ `docs/data/for_m.zip`). **This session cannot
+  write the synced Drive folder** (macOS denies access to `~/Library/CloudStorage`, "Operation not permitted"), so the
+  user copies it. (2) and (3) below.
+- **Culture tests (Cam, recorded):** toy seeds converge on the same words because they share the ORACLE0 start, though
+  ORACLE0 itself has no code. A shared starting brain acts like a shared body that makes some words easier. **The
+  separate-brains and culture tests need different starting weights**, or newborns' words will match elders' by
+  default.
+- **REGISTERED (before data), for the next account: step 3b VoI, retuned world (Cam: retune the world, not the
+  agents).**
+  - World: G 24, fires (3,3) (3,9) (9,3) (9,9), lookout Chebyshev 1 around (18,18), reroll 10, as before, plus:
+    - **spawn box 1,1-11,11** (`--spawn-box 1,1,11,11`, new flag; start and respawn cells restricted to the fire
+      cluster's region; 85 cells);
+    - **craft cost 0.381 = half the blind-search break-even.**
+  - **Free calculation** (`throng-toy/scripts/calc_s3b_world.py`; scripted agents in the exact world rules, 1,024
+    worlds x 128 steps):
+    - Blind searcher (tours the fires, one Craft at each): P(success per Craft) q = 0.220, so break-even
+      **c\* = R q / (1 - q) = 2.7 x 0.220 / 0.780 = 0.762**.
+    - At c = 0.381: blind net reward +48 per world per episode (11.9 deliveries); informed scripted 30.5 deliveries,
+      2.56x blind.
+    - Geometry rule kept: lookout to any fire 14 steps (+1 Craft) > reroll 10, so walking loses. A told partner in the
+      spawn box needs 7.4 steps on average (max 16, so far corners can miss).
+    - Every spawn cell is >= 12 steps from the lookout.
+  - Arms as registered: LOOKOUT-ORACLE (informed while self or partner at the lookout) x2 vs NOSIG x2, 2,000 updates,
+    ORACLE0 warm start, PS off, wire off. Analysis `analyze_step3b_voi.py`, with one extra condition.
+  - **QUALIFIES iff ORACLE >= 1.5x NOSIG AND every ORACLE seed > every NOSIG seed AND ORACLE >= 0.5 per world AND
+    (new, Cam) NOSIG >= 0.5 per world** (base-task floor; deliveries by either agent per world, mean over 1,801-2,000).
+  - **Smoke gate before paying (<= 10 min, laptop):** both arms, 50 updates. **Pass iff mean Craft attempts per world
+    over updates 41-50 >= 0.5x the mean over updates 1-10, in both arms.** Otherwise stop and report.
+  - **Risks flagged before data:**
+    - **Occupancy by chance is now ~0.** Every spawn cell is >= 12 steps from the lookout, so ORACLE gains only if
+      agents learn to walk out. That is the real question, but a hard exploration problem.
+    - **Warm-start navigation may not transfer to G 24.** The calculation shows the *old* VoI world was not over
+      the blind break-even either (cost 0.45 vs c\* 0.78 with spawns anywhere), so its collapse was not the cost.
+      Candidate cause: ORACLE0 learned on G 12, and the observation scales positions and fire offsets by G (pos / G,
+      offset / (G/2)), so on G 24 every fire looks half as far. A free diagnostic (ORACLE arm, everyone informed,
+      G 24 vs G 12, a few updates) follows and is reported as such; if navigation is broken, the remedy is Cam's call
+      (it touches the observation, i.e. the body).
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
