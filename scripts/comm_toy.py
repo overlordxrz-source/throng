@@ -195,6 +195,7 @@ def main():
                     help="north star (Cam, 2026-11-08): build a dictionary (fire -> modal sender triple) from frozen control "
                          "rollouts, then 'speak to them': replace the sender's broadcast by the dictionary word for fire "
                          "X = T + s and count listener Crafts at X, vs the control and vs the sender's own words for X")
+    ap.add_argument("--mi-null", type=int, default=0, help="with --same-spot: joint-MI shuffle null (N label permutations); skips the swaps")
     ap.add_argument("--same-spot", action="store_true", help="Cam Nov 9: same-spot vs cross-spot empirical swap + joint / pre-Craft MI")
     ap.add_argument("--spawn-box", default=None, help="x0,y0,x1,y1 inclusive: start / respawn cells restricted to this box")
     ap.add_argument("--export-m", default=None, help="for M: write dictionary + one episode transcript (CSV/JSON) to this dir")
@@ -1452,7 +1453,7 @@ def main():
                         pre_tok.append(trip_c[t_, w_]); pre_lab.append(lab[t_, w_])
                     if craftL[t_, w_]:
                         seen = True
-            if a.arm != "COMM":
+            if a.arm != "COMM" or a.mi_null:
                 continue
             table = np.zeros((4, 512, 3), np.int32)
             for t in range(4):
@@ -1474,6 +1475,13 @@ def main():
                   joint_mi_plugin=jm, joint_mi_mm=jmm, distinct_triples=nd,
                   pre_craft_n=int(len(plab)), pre_craft_slot_mi_mm=[float(mi_miller_madow(ptok[:, i], plab, V, NCLS)) for i in range(3)],
                   pre_craft_joint_mi_plugin=pm, pre_craft_joint_mi_mm=pmm, pre_craft_distinct=pnd))
+        if a.mi_null:          # Cam Nov 9 ~02:55: spot labels permuted at the same N, same estimators
+            nrng = np.random.default_rng(6_000 + a.seed); et = enc(tok)
+            nl_ = np.array([joint_mi(et, nrng.permutation(lab))[:2] for _ in range(a.mi_null)])
+            emit(dict(phase="mi_null", perms=a.mi_null, n=int(len(lab)), joint_mi_plugin=jm, joint_mi_mm=jmm,
+                      null_plugin_mean=float(nl_[:, 0].mean()), null_plugin_p95=float(np.percentile(nl_[:, 0], 95)),
+                      null_mm_mean=float(nl_[:, 1].mean()), null_mm_p95=float(np.percentile(nl_[:, 1], 95)),
+                      null_mm_max=float(nl_[:, 1].max())))
         raise SystemExit(0)
 
     if a.export_m:             # for M (Cam, Nov 9): dictionary table + one episode transcript; frozen params, $0
