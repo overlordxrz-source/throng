@@ -57,6 +57,9 @@ def main():
     ap.add_argument("--save-params", default=None)
     ap.add_argument("--out", default=None)
     ap.add_argument("--timing-only", action="store_true")
+    ap.add_argument("--export-m", default=None, help="for M: dictionary + one episode transcript (CSV/JSON) to this dir; inference only")
+    ap.add_argument("--export-rollouts", type=int, default=4)
+    ap.add_argument("--export-steps", type=int, default=128, help="transcript length (steps of one world)")
     ap.add_argument("--equiv", default=None, help="TEST ONLY: one rollout with injected draws -> PATH.jit.npz")
     ap.add_argument("--ps", type=float, default=0.0, help="positive signalling coefficient (0 = off)")
     ap.add_argument("--apparatus-update", type=int, default=2,
@@ -228,6 +231,80 @@ def main():
         _, R = rollout(params, st0, None, jnp.asarray(D["resp"]), jnp.asarray(D["inc"]))
         np.savez(a.equiv + ".jit.npz", **{k: np.asarray(v) for k, v in R.items()})
         print(f"[equiv] jit rollout saved: {R['actions'].shape[0]} steps", flush=True)
+        return
+
+    if a.export_m:   # for M (Cam, Nov 9): dictionary + one episode transcript from frozen params; inference only, $0
+        import csv
+        outd = Path(a.export_m); outd.mkdir(parents=True, exist_ok=True)
+        snd = ~is_listener_np; V_ = int(cfg["vocab_size"])
+        def st_of(seed_):
+            k_ = jax.random.PRNGKey(seed_); k_, ka, kb = jax.random.split(k_, 3)
+            return (VALID[jax.random.randint(ka, (N,), 0, VALID.shape[0])], jax.random.randint(kb, (W,), 0, 4),
+                    jnp.zeros(W, jnp.int32), jnp.zeros((N, int(cfg["signal_dim"])), jnp.float32), jnp.zeros((N, hidden)), k_)
+        toks, labs = [], []
+        for k in range(a.export_rollouts):
+            _, R = rollout(params, st_of(70_000 + k), None, *env_draws(jax.random.PRNGKey(71_000 + k)))
+            toks.append(np.asarray(R["token_actions"])[:, snd].reshape(-1, 3)); labs.append(np.asarray(R["active"]).reshape(-1))
+        tok, lab = np.concatenate(toks), np.concatenate(labs)
+        slotw = np.array([[np.bincount(tok[lab == t, i], minlength=V_).argmax() for i in range(3)] for t in range(4)])
+        cnt = np.stack([np.stack([np.bincount(tok[lab == t, i], minlength=V_) for i in range(3)]) for t in range(4)]) + 0.5
+        logp = np.log(cnt / cnt.sum(-1, keepdims=True)); prior = np.log(np.maximum(np.bincount(lab, minlength=4), 1) / len(lab))
+        def read(tr):
+            s_ = prior + np.array([sum(logp[t, i, tr[i]] for i in range(3)) for t in range(4)])
+            p_ = np.exp(s_ - s_.max()); p_ /= p_.sum(); return int(p_.argmax()), float(p_.max())
+        rows = []
+        for t in range(4):
+            m = lab == t; vals, cnts = np.unique(tok[m], axis=0, return_counts=True); o = np.argsort(-cnts)
+            other = [u for u in range(4) if u != t]
+            rows.append(dict(lit_spot=t, spot_xy=HEARTHS_NP[t].tolist(), messages_sampled=int(m.sum()),
+                             most_common_triple=vals[o[0]].tolist(), most_common_triple_share=float(cnts[o[0]] / m.sum()),
+                             distinct_triples=int(len(vals)),
+                             top5_triples=[dict(triple=vals[j].tolist(), share=float(cnts[j] / m.sum())) for j in o[:5]],
+                             slot_words=slotw[t].tolist(), slot_word_share=[float(np.mean(tok[m, i] == slotw[t, i])) for i in range(3)],
+                             slot_uses_other_spots_word=[float(np.mean(np.isin(tok[m, i], slotw[other, i]))) for i in range(3)],
+                             read_back_correct=float(np.mean([read(x)[0] == t for x in tok[m][:4000]]))))
+        meta = dict(checkpoint=a.warm_start, net="real (comm-jit)", grid=G, worlds=W, steps=T, vocab_per_slot=V_,
+                    wire_blind=a.wire_blind, rollouts=a.export_rollouts,
+                    note="sender = the informed agent (sees which spot is lit); listener = uninformed partner, hears the "
+                    "sender's 3-token message one step later. slot words = each slot's most common token for that spot. "
+                    "read_back_correct = how often a simple reader (per-slot frequencies) recovers the lit spot from one message.")
+        json.dump(dict(meta=meta, dictionary=rows), open(outd / "dictionary.json", "w"), indent=1)
+        with open(outd / "dictionary.csv", "w", newline="") as f:
+            wr = csv.writer(f)
+            wr.writerow(["lit_spot", "spot_x", "spot_y", "most_common_triple", "share_of_messages", "distinct_triples",
+                         "slot1_word", "slot1_share", "slot2_word", "slot2_share", "slot3_word", "slot3_share", "read_back_correct"])
+            for r_ in rows:
+                wr.writerow([r_["lit_spot"], *r_["spot_xy"], "-".join(map(str, r_["most_common_triple"])), round(r_["most_common_triple_share"], 4),
+                             r_["distinct_triples"], *sum(([r_["slot_words"][i], round(r_["slot_word_share"][i], 4)] for i in range(3)), []),
+                             round(r_["read_back_correct"], 4)])
+        _, Re = rollout(params, st_of(95_000), None, *env_draws(jax.random.PRNGKey(95_001)))
+        Re = {k: np.asarray(v) for k, v in Re.items()}
+        lisn = is_listener_np; dl = Re["dep"][:, lisn].sum(0); w = int(dl.argmax()); si, li = 2 * w, 2 * w + 1
+        NAMES = {0: "stay", 1: "move x-1", 2: "move x+1", 3: "move y+1", 4: "move y-1", ACTION_CRAFT: "craft"}
+        posf = lambda t_, i_: [int(round(Re["obs"][t_, i_, s0 + 4] * G)), int(round(Re["obs"][t_, i_, s0 + 5] * G))]  # noqa: E731
+        def dist(p_, h_):
+            d_ = np.abs(np.asarray(p_) - h_); d_ = np.minimum(d_, G - d_); return int(max(d_.max() - hr, 0))
+        nT = min(T, a.export_steps); steps = []
+        for t_ in range(nT):
+            lit = int(Re["active"][t_, w]); h = HEARTHS_NP[lit]; sp, lp_ = posf(t_, si), posf(t_, li)
+            trip = Re["token_actions"][t_, si].tolist(); heard = Re["token_actions"][t_ - 1, si].tolist() if t_ > 0 else None
+            rd = read(trip); hr_ = read(heard) if heard is not None else (None, None)
+            la, sa = int(Re["actions"][t_, li]), int(Re["actions"][t_, si])
+            steps.append(dict(step=t_, lit_spot=lit, lit_spot_xy=h.tolist(), sender_xy=sp, sender_saw=f"spot {lit} is lit",
+                              sender_sent=trip, sender_message_reads_as=rd[0], reader_confidence=round(rd[1], 3),
+                              sender_action=NAMES.get(sa, f"idle ({sa})"), listener_xy=lp_, listener_heard=heard,
+                              heard_reads_as=hr_[0], listener_action=NAMES.get(la, f"idle ({la})"),
+                              listener_steps_to_lit_spot=dist(lp_, h), listener_delivered=bool(Re["dep"][t_, li]),
+                              sender_delivered=bool(Re["dep"][t_, si]),
+                              listener_next_xy=posf(t_ + 1, li) if t_ + 1 < T else None))
+        json.dump(dict(meta=dict(meta, world=w, listener_deliveries_in_rollout=int(dl[w]), steps_exported=nT, key="95000/95001",
+                                 note=meta["note"] + " 'idle (k)' = an action with no movement in this world."), steps=steps),
+                  open(outd / "transcript.json", "w"), indent=1)
+        with open(outd / "transcript.csv", "w", newline="") as f:
+            wr = csv.writer(f); keys = list(steps[0].keys()); wr.writerow(keys)
+            for s_ in steps:
+                wr.writerow([("-".join(map(str, v)) if isinstance(v, list) else ("" if v is None else v)) for v in (s_[k] for k in keys)])
+        print(f"[export-m] {outd}: world {w}, listener deliveries {int(dl[w])}, words {[r_['most_common_triple'] for r_ in rows]}", flush=True)
         return
 
     # ---- eval rollout (MI / swaps); the TRAINING rollout above is untouched
