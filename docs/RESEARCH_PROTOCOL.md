@@ -3848,6 +3848,15 @@ more expensive, because it produces publishable-looking nulls.
     - No inclusive vs k = 0 difference yet over 200 updates (no comm; kin rarely meet in this short run).
     - 0.35 s per update on the laptop (~47k agent-steps/s with learning).
 
+- **W2 first paid smoke (A10G, deployed app `throng-w2`, spawned; Cam cap $0.5): DONE.**
+  - **Timing:** 64 worlds x 8 agents, T 256, per-agent PPO: **0.19 s per update = ~690k agent-steps/s with learning**
+    (target >= 100k).
+  - **No-comm run** (120 updates, inclusive on): births per 1,000 steps per world 4.78 / 4.63 / 4.81 / 4.70 / 4.96 by
+    quintile. Extinctions 76 / 0 / 0 / 0 / 0 (all in the first 24 updates, while the navigator-start agents learn to
+    reproduce). Alive 6.7 / 8. The turnover target holds on the GPU too.
+  - Cost: well under $0.5 (it ran ~1 min of A10G plus image build; the per-app figure follows).
+- **DRAFT for Cam's sign-off: the first W2 communication run** (`docs/W2_COMM_RUN_PLAN.md`).
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
