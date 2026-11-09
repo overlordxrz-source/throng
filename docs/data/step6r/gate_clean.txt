@@ -1,0 +1,7 @@
+(f) gate on restart-cleaned runs (segments split at each update-1 train row; last complete segment used)
+step6r_comp_s310_bc63ba0.jsonl: 1 segments, 1 complete; distinct@1000 per segment [[6]] -> used 6 -> x
+step6r_comp_s311_bc63ba0.jsonl: 3 segments, 2 complete; distinct@1000 per segment [[5], [5], [5]] -> used 5 -> x
+step6r_comp_s312_bc63ba0.jsonl: 2 segments, 2 complete; distinct@1000 per segment [[6], [6]] -> used 6 -> x
+step6r_comp_s313_bc63ba0.jsonl: 2 segments, 2 complete; distinct@1000 per segment [[6], [6]] -> used 6 -> x
+step6r_comp_s314_bc63ba0.jsonl: 2 segments, 2 complete; distinct@1000 per segment [[6], [6]] -> used 6 -> x
+== GATE: 0/5 -> FAIL: stop and report before reading compositionality

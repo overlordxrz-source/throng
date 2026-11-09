@@ -3884,6 +3884,21 @@ more expensive, because it produces publishable-looking nulls.
     - Secondary: K vs K0; shuffle-corrected joint MI per candidate variable; per-generation dictionaries.
     - Then price it. Arms K x5 / K0 x5 / OFF x3.
 
+- **(f) step-6 rerun: precondition gate FAILS, 0/5. Stopped before reading compositionality, as registered**
+  (`docs/data/step6r/gate_clean.txt`).
+  - Distinct messages at u1000 (of 14 training meanings): **6 / 5 / 6 / 6 / 6** (the gate needs >= 12 in >= 4/5).
+  - Update-1 summed sender entropy 3.24-3.62 nats, on the 3.18 target, so the starting-entropy fix worked. Yet the
+    sender still settles on ~5-6 messages, about one per fire plus one or two: **the material isn't being encoded**.
+    The collapse is not set by the starting entropy.
+  - Bookkeeping: the volume files held repeated segments. The first (killed) launch had completed s312-314, a
+    preemption restarted s311, and the spawned relaunch appended again. Segments were split at each update-1 row;
+    every complete segment gives identical values (deterministic). The analysis uses the last complete segment
+    (`.clean.jsonl`). The duplication cost ~$0.4 extra.
+  - Next is Cam's call. Candidates (not run):
+    - material on its own input dims (not the old noise slots) with stronger signal;
+    - a larger vocabulary (8);
+    - a curriculum where material matters before fire.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
