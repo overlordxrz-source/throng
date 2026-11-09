@@ -3631,6 +3631,33 @@ more expensive, because it produces publishable-looking nulls.
   - Cost: grow + calibration ~$0.6 (billing report to confirm).
   - **(c) launched at wd 1e-3** (`RUNG3_WD=1e-3`, plan `rung3`, 15 runs).
 
+- **(e) Population: wired and apparatus-checked (laptop, $0); launch HELD on price (Cam's 25% overrun rule).**
+  - `scripts/pop_toy.py` (comm-toy 5c205a0). The toy's world with B brains:
+    - per-brain PPO / vmapped Adam / PopArt, per-brain clip;
+    - the sender rule (sender-row gradient at c_ps = 0 x the sender fraction + PS unscaled, as `--msg-grad sender`);
+    - founders-only PS (annealed 1,000-1,500); message-head weight decay from 1,500;
+    - staggered newborns from navigators no living brain started from, with a fresh Adam / PopArt;
+    - copying (cross-entropy on elder senders' tokens for their observations, message head only, during the sensitive
+      period); plasticity by age; lineage learning speeds;
+    - evals: cross-spot and same-spot empirical swaps with per-brain tables, per-brain words, token dumps.
+  - **`--selftest`: PASS in all four configurations** (COMM / NOSIG x `--msg-grad sender` / `all`):
+    - perturbing brain 0's rows leaves brains 1-3's gradients bit-identical and changes brain 0's;
+    - under `sender`, perturbing listener rows leaves every message head's gradient bit-identical (under `all` it
+      changes: the mutant has power);
+    - imitation moves only the message head; the PS term is exactly 0 without founder rows;
+    - NOSIG heard wire = 0.
+    - Plus a 6-update end-to-end smoke with forced births.
+  - **Price:** laptop 0.60 s per update at W 48 / T 128 / B 4, vs the toy's 0.21 s (2.8x, the compute-and-select
+    factor). At the toy's billed rate, **~$1.9 per 9,000-update run; 5 POP + 3 control = ~$15** vs the $6 cap.
+    Over by more than 25%, so **held for Cam.**
+    - Options:
+      - (i) shorter lives: 1,000-update lifetimes and a stagger of 250 reach generation 4 at ~4,000 updates, ~$0.85
+        per run, ~$6.8 for 8;
+      - (ii) 3 POP + 2 control at full length, ~$9.5;
+      - (iii) a 2-minute L4 GPU timing probe (~$0.05), in case the small batched nets run cheaper per update on GPU.
+    - **Projected account total if (e) ran as specified: ~$1.5 now + (c) ~$3.7 + G0 ~$0.3 + (e) ~$15 + (f) ~$1 =
+      ~$21.5**, under the $25 hold line but not under (e)'s cap.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
