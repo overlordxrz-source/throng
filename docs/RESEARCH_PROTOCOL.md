@@ -3477,6 +3477,15 @@ more expensive, because it produces publishable-looking nulls.
   2 dictionary rollouts + 1 transcript rollout, with compile, in ~8.5 min), and the probe needs 20 rollouts (10
   pairs x control + swap). **Next account, cap $0.5.**
 
+- **New account `roadtoagi111` (2026-11-09 ~02:10).**
+  - The user set the profile in their own terminal; the agent never handled the token. A token had first been
+    pasted into chat; the user was advised to revoke it and set a fresh one.
+  - Verified: $0 metered, no apps; `throng-runs` volume created (empty). The toy warm start `toy_out/ORACLE0.msgpack`
+    is in git, so toy runs need no upload. Real-net params stay in the backup (real-net work deferred).
+  - Mac guard `~/throng-smoke/cap_guard_r2.sh` at CAP 15.0, started with the first launch, until the Modal guard
+    is live (M's secret `throng-guard-token`).
+  - **Nothing paid until Cam confirms whether the $14 allowance means credits only.**
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
