@@ -3787,6 +3787,30 @@ more expensive, because it produces publishable-looking nulls.
   - **Runtime:** ~8 h per run on 2-CPU containers; function timeout raised to 12 h (Cam's option). **Price ~$8-11.3**
     (cap $12).
 
+- **Cam, Nov 9 ~17:50: W2 v1 SIGNED OFF**, with three changes before the first paid smoke. (e) / (f) launches accepted
+  (the zero-row navigator expansion + its identical-output selftest is the right way); (f)'s gate is read first, as
+  registered.
+  1. **Aligned interests: inclusive-fitness reward** r_i = own drive reduction + k x mean drive reduction of living kin.
+     - k = relatedness: parent / offspring / sibling 0.5; the founders' cluster 0.5 at the start; tracked by lineage.
+     - Nothing is rewarded for messages.
+     - Behind a flag, default on; the k = 0 arm is the control.
+  2. **Founding:** PS for founders only, annealed as in the toy, then off for everyone born after. Founding without PS
+     is a later stretch goal.
+  3. **Reproduction vs the setpoint:** choose between triggering at the setpoint and a one-sided drive. The smoke
+     reports births per 1,000 steps; target: every slot turns over at least once per ~3 lifetimes.
+  - Newborns need **W2 navigators** (independent seeds, learned in W2 at k = 0, no comm), with a gate like N1 (>= 0.7x
+    the best one's lifespan).
+  - Approved next: per-agent brains + PPO on the laptop; then the first paid smoke (2-min A10G timing + ~10-min no-comm
+    run), cap $0.5; then a registered plan for the first communication run (k on vs k = 0, PS for founders, swap /
+    same-spot / joint-MI probes, food location as the thing worth saying), for sign-off, with its price.
+  - **Choice (3): reproduction triggered at the setpoint**: E >= 0.8 held for 50 consecutive steps; the parent pays 0.3;
+    the newborn starts at 0.5.
+    - Why not a one-sided drive: the symmetric Keramati-Gutkin drive stays as published, and it penalises
+      over-eating. With rival food patches, a one-sided drive would make hoarding free.
+    - Risk: agents could learn to hover just under 0.8 to avoid paying for reproduction. Inclusive fitness counts
+      the offspring's drive reductions (k 0.5), which works against that, and the smoke's births-per-1,000-steps
+      readout will show it. If births fall short of the turnover target, the fallback is the one-sided drive.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
