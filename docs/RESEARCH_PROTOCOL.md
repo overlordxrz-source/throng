@@ -3658,6 +3658,24 @@ more expensive, because it produces publishable-looking nulls.
     - **Projected account total if (e) ran as specified: ~$1.5 now + (c) ~$3.7 + G0 ~$0.3 + (e) ~$15 + (f) ~$1 =
       ~$21.5**, under the $25 hold line but not under (e)'s cap.
 
+- **W2 prototype (laptop, $0; comm-toy 0df7a03).**
+  - **Generative physics** `w2/physics.py`: materials as property vectors `[heat, mass, nutrition, hardness,
+    moisture]`, five rules (combine, burn, grow, decay, break), products are materials. **5/5 tests:** closure,
+    compounding (depth-2 materials the depth-1 set can't make), rule effects incl. mass conservation on break,
+    jit / vmap, no object names in code.
+  - **World core** `w2/env.py`: **6/6 tests**, incl. the same local scene giving an identical observation at L 64 and
+    L 256.
+  - **P2 premise (scripted, before learning):** first world (L 64, 6 patches sigma 2, drain 0.005): oracle / blind =
+    1.20x, too much food to need telling. **Retuned the world (not the agents):** L 96, 6 patches sigma 1.0, drain
+    0.008.
+    - Mean lifespan of 3,000 steps (16 worlds x 64 agents): random 60.7, blind forager 187.3 (SE 15.5), oracle
+      forager 994.8 (SE 41.6).
+    - **Oracle / blind = 5.31x (P2 premise OK, >= 2x); blind / random = 3.09x** (room for P1).
+  - **P3 throughput:** env + observation, laptop CPU, 64 worlds x 64 agents: **~7.9-9.8 million agent-steps/s**. The
+    brains, not the world, will set the speed.
+  - Next (laptop): per-agent brains + PPO for the learned P1 / P2. Then the 2-minute A10G smoke (~$0.3) after Cam's
+    sign-off.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
