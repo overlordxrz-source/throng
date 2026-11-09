@@ -3899,6 +3899,20 @@ more expensive, because it produces publishable-looking nulls.
     - a larger vocabulary (8);
     - a curriculum where material matters before fire.
 
+- **CORRECTION (W2): navigator lifespans are bimodal; the gates used means.** A frozen W2 navigator (s1005), 16
+  worlds, 3,000 steps: **median lifespan 62** (N 64 random starts), 62 (N 8), 66 (N 8 clustered); **means 754 / 911 /
+  653**.
+  - Most newborns starve in ~60 steps (E0 0.6 / drain ~0.011 = ~55 steps without food). A minority that start near a
+    patch live to the cap.
+  - The navigator gate (>= 0.7x best), P1 (645 vs 61) and P2 (2.34x) were computed on **means**, which this minority
+    dominates. They remain true as stated (mean lifespan) but overstate the typical life.
+  - For the learnability gate this is decisive: **a typical newborn lives about one 64-step update**, too short to learn
+    anything in its own life.
+- **Learnability gate (laptop), first read:** baseline (no juvenile period), 4 worlds x 20 updates: **0/75 lives pass;
+  median lifespan 66** (identical with learning off). FAIL, as expected from the above. Running at full scale (16
+  worlds x 150 updates) alongside Cam's fallback (a), a juvenile period of J = 500 provisioned steps within hearing
+  range.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
