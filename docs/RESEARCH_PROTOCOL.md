@@ -3673,6 +3673,12 @@ more expensive, because it produces publishable-looking nulls.
     - **Oracle / blind = 5.31x (P2 premise OK, >= 2x); blind / random = 3.09x** (room for P1).
   - **P3 throughput:** env + observation, laptop CPU, 64 worlds x 64 agents: **~7.9-9.8 million agent-steps/s**. The
     brains, not the world, will set the speed.
+  - **Learned gates (laptop, `w2/learn.py`; a shared-brain PPO, MLP 2 x 128, homeostatic reward only, 400
+    updates, 1 seed; frozen-policy lifespan test as the scripted one):**
+    - **P1 PASS:** learned blind 645.3 (SE 36.6) vs random 60.7 (SE 0.2);
+    - **P2 PASS:** learned oracle 1,512.9 (SE 44.3) = **2.34x** learned blind (>= 2x).
+    - The learned blind forager beats the scripted one (187), so the learner finds a better foraging strategy.
+    - Caveat: one seed, shared brain; per-agent brains (spec option A) are the next build step.
   - Next (laptop): per-agent brains + PPO for the learned P1 / P2. Then the 2-minute A10G smoke (~$0.3) after Cam's
     sign-off.
 
