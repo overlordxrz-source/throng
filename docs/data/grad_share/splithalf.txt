@@ -1,0 +1,7 @@
+split-half noise check (exploratory, after the registered result): 2 rollouts each half (r0 = 0 / 2), same seeds as the registered run
+s185 u1500: split-half cos  c_L +0.202  c_S +0.228  g_all +0.287 | within-half cos(c_L,c_S) -0.021 / -0.057
+s186 u1500: split-half cos  c_L +0.033  c_S -0.345  g_all +0.014 | within-half cos(c_L,c_S) -0.226 / +0.169
+s187 u1500: split-half cos  c_L +0.002  c_S -0.258  g_all +0.098 | within-half cos(c_L,c_S) -0.050 / -0.060
+s185 u2000: split-half cos  c_L +0.412  c_S +0.217  g_all -0.068 | within-half cos(c_L,c_S) -0.029 / -0.399
+s186 u2000: split-half cos  c_L -0.160  c_S +0.077  g_all +0.198 | within-half cos(c_L,c_S) +0.323 / +0.111
+s187 u2000: split-half cos  c_L -0.360  c_S +0.020  g_all +0.086 | within-half cos(c_L,c_S) -0.043 / -0.386

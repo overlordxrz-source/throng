@@ -2895,8 +2895,8 @@ more expensive, because it produces publishable-looking nulls.
   - `rep_PS52` on c242635 crashed in update 1, **in `--log-diag`, not in training**: the PPO update completed
     (64 minibatches); the eager (un-jitted) gradient of the loss on the 2,048-row diag sample then exhausted the A10G
     (`RESOURCE_EXHAUSTED`, every allocator chunk in use, so not fragmentation).
-  - **Never tested on the GPU before.** The "verified" in c242635 was a CPU check. A first-update GPU smoke of every
-    new flag belongs in the config audit from now on.
+  - **Apparently never run on the GPU before:** its verification (training bit-identical, smoke values) was recorded as
+    free work, i.e. a local CPU run. A first-update GPU smoke of every new flag belongs in the config audit from now on.
   - **Fix (comm-jit 7366052, launcher re-pinned):** the same loss on the same sample, jitted once; the KL forward is
     jitted; an unused eager loss evaluation was removed. **Update-1 self-check:** the jitted vs the eager gradient on a
     256-row sub-sample, relative difference <= 1e-3, otherwise the run stops (exit 4). The training path is untouched.
@@ -2925,11 +2925,17 @@ more expensive, because it produces publishable-looking nulls.
 
   - **>= 0.30 in 3/3 seeds at both registered checkpoints.** The split is exact (residual ~2e-7). Without the
     codebooks the shares are the same to 3 decimals: the listener-row gradient lands on gwt_comms_1 and the slot heads.
-  - **Reading:** the listener's own losses (token PG with its own advantages, token entropy, VQ) push the message head
-    with 0.7-1.7x the sender rows' magnitude, in a direction **orthogonal to or against** the sender's (cosine -0.32 to
-    +0.05). That is a credit-unrelated force on the very weights that carry the code, present during erosion. **It does
-    not show that this force causes the erosion**; the stop-grad arm tests that.
-  - Caveat: PopArt stats are fitted (actor-only saves); the exact cross-check on the c1rep u2000 snapshots follows.
+  - **Descriptive only:** listener rows contribute 0.7-1.7x the sender rows' gradient magnitude on the message head,
+    cosine with the sender rows' gradient -0.32 to +0.05.
+  - **Split-half noise check (exploratory, after the result; `splithalf.txt`):** c_L and c_S each recomputed from two
+    independent halves (2 rollouts each). The halves barely agree: split-half cosine of c_L -0.36 to +0.41, of c_S
+    -0.35 to +0.23, of g_all -0.07 to +0.29. **At this sample size the message-head gradient is noise-dominated on both
+    sides**, so the share measures the relative size of the two sides' sampling noise, and a near-zero cosine is what
+    independent noise gives. **No mechanism claim** ("the listener pushes against the sender") is supported. What
+    stands: about half of the per-step random walk on the code-carrying weights comes from listener rows, whose tokens
+    nobody reads under the wire-blind head. The stop-grad arm removes exactly that half; it remains a fair test.
+  - Caveat: PopArt stats are fitted (actor-only saves). The exact cross-check on the c1rep u2000 snapshots (seeds
+    230-234) validates the fitting method; it does not re-measure seeds 185-187.
   - **Registered for the next account (Cam's trigger):** C1-E with the message head trained by sender rows only (step
     B (iii): the MSGK keys take the sender-row gradient rescaled by the sender row fraction, i.e. exactly c_S), wire-on
     x3 / wire-off x2, fresh seeds, the C1-E protocol otherwise, the C1-E replication's 2,000 bar (and its 3,000 bar).
