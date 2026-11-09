@@ -592,17 +592,30 @@ def main():
                 del eager, jitd
                 if not ok_:
                     raise SystemExit(4)
-            g_tot = diag_grad(params_before, Sd, a.ps)
+            # 2026-11-09 (second OOM: the jitted 2,048-row gradient needs one 15.3 GiB buffer): the diag gradient is the
+            # MEAN of the gradients on the sample's four 512-row chunks (the training minibatch size, which fits). The PS
+            # term is a batch statistic, so this is the mean training-minibatch gradient, not the 2,048-row gradient.
+            def diag_grad_mean(p_, ps_c):
+                acc_ = None
+                for j_ in range(4):
+                    Sj = {k: (v if k in ("sig", "mu") else v[j_ * 512:(j_ + 1) * 512]) for k, v in Sd.items()}
+                    g_ = diag_grad(p_, Sj, ps_c)
+                    acc_ = g_ if acc_ is None else jax.tree_util.tree_map(lambda x, y: x + y, acc_, g_)
+                return jax.tree_util.tree_map(lambda x: x / 4.0, acc_)
+            g_tot = diag_grad_mean(params_before, a.ps)
             diag["grad_norm"] = gnorm(g_tot)
             if a.ps > 0:
-                g_nops = diag_grad(params_before, Sd, 0.0)
+                g_nops = diag_grad_mean(params_before, 0.0)
                 g_ps = jax.tree_util.tree_map(lambda x, y: x - y, g_tot, g_nops)
                 diag["ps_grad_norm"] = gnorm(g_ps); diag["ps_grad_share"] = diag["ps_grad_norm"] / max(diag["grad_norm"], 1e-12)
                 del g_nops, g_ps
             del g_tot
             # KL and clip fraction of the update, on the sample: old = rollout log-probs, new = params after the update
             # (2026-11-09: the unused eager loss evaluation that stood here was removed; the forward is jitted)
-            _, o_new = diag_fwd(params, S["c"], S["obs"])
+            outs_ = [diag_fwd(params, S["c"][j_ * 512:(j_ + 1) * 512], S["obs"][j_ * 512:(j_ + 1) * 512])[1] for j_ in range(4)]
+            from types import SimpleNamespace as _NS
+            o_new = _NS(**{f_: jnp.concatenate([getattr(o_, f_) for o_ in outs_], 0) for f_ in ("action_logits", "alarm_out", "z_e")})
+            del outs_
             from jax_sim.action_space import mask_disabled_actions as _mask
             lp_new = jnp.take_along_axis(jax.nn.log_softmax(_mask(o_new.action_logits, axis=-1), -1), S["act"][:, None], -1)[:, 0]
             lp_new = lp_new + jnp.take_along_axis(jax.nn.log_softmax(o_new.alarm_out, -1), S["alarm"][:, None], -1)[:, 0]
