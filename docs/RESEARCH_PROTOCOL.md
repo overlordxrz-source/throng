@@ -3268,6 +3268,32 @@ more expensive, because it produces publishable-looking nulls.
   6. (b), (d), (e) noted. **s232 is recorded as rising reliance on a weaker base (control 10.2 → ~4), not a rebuilt
      code.** The separate-brains design continues, code + tests only.
 
+- **Joint-MI shuffle null: RESULT (registered rule applied; `docs/data/mi_null/analysis_mi_null.txt`; $0, laptop).**
+  Miller-Madow joint MI over the 3 slots (same 10 control rollouts, N = 81,920) vs 100 spot-label permutations:
+
+  | checkpoint | MM joint MI | null mean | null p95 | shuffle-corrected |
+  |---|---|---|---|---|
+  | wire-on s231 u3000 (survivor) | 0.787 | 0.122 | 0.126 | **0.665** |
+  | wire-on s232 u3000 (survivor) | 0.266 | 0.029 | 0.031 | **0.237** |
+  | wire-on s234 u3000 (survivor) | 0.225 | 0.013 | 0.014 | **0.212** |
+  | wire-on s230 u3000 (dead) | 0.033 | 0.030 | 0.033 | 0.003 |
+  | wire-on s233 u3000 (dead) | 0.131 | 0.102 | 0.105 | 0.029 |
+  | wire-off s235 u3000 | 0.017 | 0.016 | 0.018 | 0.001 |
+  | **wire-off s236 u3000** | **0.253** | 0.025 | **0.027** | **0.228** |
+  | wire-off s236 u2500 | 0.485 | 0.007 | 0.008 | 0.478 |
+
+  - The u3000 values for the 5 seeds in the earlier check reproduce exactly (same rollouts).
+  - **Rule: s236's u3000 joint MI (0.253) clears its null p95 (0.027), so the verdict becomes "bar passed on the
+    letter; the claim that use keeps the code alive is not shown."**
+  - With no listener, s236 keeps 0.228 corrected bits, as much as survivors s232 (0.237) and s234 (0.212). Only
+    s231 (0.665) is clearly above it. The erosion pressure (wd 3e-4) is too weak to remove an unused code by 3,000,
+    so survival under use isn't separated from survival without use. Hence the erosion calibration first on the next
+    account (Cam's item 4).
+  - Dead wire-on seeds: s230 0.003 and s233 0.029 corrected (s233's raw MM 0.131 is mostly estimator bias, null mean
+    0.102).
+  - The diffuse-code inflation Cam suspected is real but small at this N: null means 0.007-0.122 MM (largest where the
+    triples are most diverse, s231 / s233).
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
