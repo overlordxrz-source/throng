@@ -2942,6 +2942,22 @@ more expensive, because it produces publishable-looking nulls.
     **Code needed:** the (iii) flag currently runs only as a branch from a resumed snapshot (`--resume --branch
     stopgrad`); a from-scratch flag plus its apparatus check (listener-row message-head gradient = 0; mutant caught).
 
+- **Real-net probe, third attempt (80e3d6e, app ap-IUr76MOVkalziEh1gJv8WC): running.** Diag self-check PASS (rel. diff
+  2.0e-5), apparatus PASS at update 2, no OOM. **Analyse only `rep_PS52_80e3d6e.jsonl`** (the volume also holds the two
+  failed starts' files).
+  - **Go rule: PS53 NOT launched.** t_update over updates 3-10 = 39.5 s, plateau 39.7 s from update 10 (the
+    confirmation: 35.2-35.5 s over the same windows), so the projection is $5.63 x 39.7 / 35.2 = **$6.35 per run; 2x =
+    $12.7 > $12.5.** With the failed starts ($0.135 by the per-app billing report) option (a) totals ~$12.8 of Cam's $13.
+  - Options put to Cam: (a) PS53 as configured (~$12.8 of $13; total metered ~$39 of $41); (b) PS53 without
+    `--log-diag` (~$12.1): the same experiment, because the diag branch draws its own sample from
+    `np.random.default_rng(u)`, calls pure jitted functions, and writes nothing back into params, optimizer, PopArt or
+    any RNG that training uses; (c) PS53 dropped (PS52 alone = partial at best). **Recommend (b).**
+- **C1-E replication launched** (plan `c1rep`, 7 runs straight to 3,000; pin 1f8e51d), after the probe, per Cam's order.
+- **3b VoI launched** (plan `s3b_voi`, 4 runs). Room: metered $25.1 + PS52 rest ~$6.2 + c1rep ~$1.0 + PS53 if
+  approved ~$6.35 + VoI ~$0.4 = ~$39 < $41.
+- **If the Mac sleeps the local guard stops.** Worst case without it: the runs end on their own (PS52 projected ~$6.35;
+  its function timeout is 8 h = ~$9; toy runs ~$0.05 per 1,000 updates), so metered stays < ~$36 without PS53.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
