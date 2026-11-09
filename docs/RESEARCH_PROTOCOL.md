@@ -3857,6 +3857,33 @@ more expensive, because it produces publishable-looking nulls.
   - Cost: well under $0.5 (it ran ~1 min of A10G plus image build; the per-app figure follows).
 - **DRAFT for Cam's sign-off: the first W2 communication run** (`docs/W2_COMM_RUN_PLAN.md`).
 
+- **Cam, Nov 9 ~20:15: W2 comm-run ruling.**
+  - Accepted: setpoint reproduction (the fallback is fine), lineage relatedness, the kin flag, 8/8 W2 navigators, the
+    per-agent trainer, the paid smoke, deploy + spawn.
+  - **The guard is still Mac-only while runs now outlive the Mac,** so the Modal guard is M's priority. Until it's
+    live, **keep every spawned job's timeout tight.**
+  - **FOUNDING PHASE APPROVED,** with two changes:
+    1. the energy floor is near zero (0.05), so hunger and food still matter during founding;
+    2. **PS in its generic form only** (message entropy across states up, entropy given the speaker's own observation
+       down, as in the toy), never MI with a variable we pick. **Food direction is a READOUT, not a target.** Also
+       report MI with other candidates (nearest-kin direction, own energy, at-lookout), to see what they choose to
+       talk about.
+  - **The bigger problem: learning per life.** ~1,400 steps of own data (~5-22 updates) may be too little for a newborn
+    to learn to listen, so the transmission test could fail for a reason unrelated to language.
+  - **LEARNABILITY GATE before any paid comm run** (laptop, or cap $0.5):
+    - newborns (fresh W2 navigators) live among senders frozen with a fixed code (scripted, or the founders' frozen
+      code once it exists);
+    - **pass: newborn reliance >= 30% (cross-direction swap) within one lifetime, in >= 50% of lives**;
+    - if it fails, add in order, re-gating after each: (a) a juvenile period (the parent provisions the newborn's
+      energy for the first J steps and pays it; the young stays within hearing range); (b) longer lives (raise the
+      age cap / lower the drain) while P2 (oracle >= 2x blind) still holds;
+    - if it still fails, report; Cam will ask M about copying elders' actions as another inborn trait.
+  - **Register the bars before the comm run.**
+    - Primary, in >= 3/5 K runs, among agents born after founding: cross-direction reliance >= 30% (paired > 2 SE);
+      food gain vs OFF >= a margin proposed from the smoke; same-direction swap clean (< half the cross drop).
+    - Secondary: K vs K0; shuffle-corrected joint MI per candidate variable; per-generation dictionaries.
+    - Then price it. Arms K x5 / K0 x5 / OFF x3.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
