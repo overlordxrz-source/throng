@@ -3226,6 +3226,48 @@ more expensive, because it produces publishable-looking nulls.
     its own tokens**: the shared ORACLE0-start words are gone.
   - **(f)** The original C1-E seeds ran to 2,000 only, so there is no u3000 pooled count.
 
+- **Cam, Nov 9 ~02:55: free-check ruling.**
+  1. (a) accepted: the same-spot control is clean (0/3); the listener reads which spot the message names.
+  2. **The lead caution changes the verdict, pending one free check. REGISTERED (before computing):**
+     - **Shuffle null for joint MI.** All 7 replication seeds at u3000, plus s236 at u2500. Same 10 control rollouts
+       as the u3000 checks (keys 10_000+k / 20_000+k, n = 81,920 sender steps). Spot labels permuted 100x at the same
+       N. Report the null mean and 95th percentile next to the Miller-Madow joint MI. Rationale: diffuse codes (modal
+       triple <= 1.4%) over 64^3 triples can inflate MI beyond what Miller-Madow removes.
+     - **Decision rule:** if s236's u3000 joint MI is <= its null 95th percentile, the control did its job and "met,
+       fragile" stands. If s236 clears its null, the verdict becomes **"bar passed on the letter; the claim that use
+       keeps the code alive is not shown."**
+     - Either way: how far each wire-on survivor sits above its own null, and the joint MI of the dead wire-on seeds
+       s230 / s233 at u3000.
+     - Estimator applied: MM joint MI and plug-in, with the null computed with the same estimator on permuted
+       labels. Shuffle-corrected MI = MI - null mean.
+  3. **Protocol changes from now on:**
+     - MI bars use **shuffle-corrected joint MI over all slots**, never the per-slot mean.
+     - Reliance bars also require **a real gain: true-message deliveries >= NOSIG + 1.0 per world**, so misdirection
+       alone can't pass.
+     - An erosion test is valid only at an **erosion strength calibrated so that unused codes reliably die within the
+       read window**.
+  4. **Next account, new first toy item (before stop-grad): erosion calibration.**
+     - Wire-off only. Start from the u1500 snapshots of s235 / s236 plus any other saved wire-off u1500 snapshot;
+       regrow if fewer than 3 exist. (Today only u2000 full-state snapshots exist for s235 / s236, so **regrow is
+       needed**: 3 wire-off seeds with `--snapshot-at 1500`.)
+     - Message-head weight decay 3e-4 / 1e-3 / 3e-3, to u3000, shuffle-corrected joint MI every 250 updates.
+     - **Registered pick:** the smallest strength at which every wire-off seed is below 0.05 bits shuffle-corrected
+       joint MI by u2500.
+     - Cap $1 after the 2-minute price probe.
+     - **Then the rung-3 rerun at that strength:** C1 baseline wire-on x5, stop-grad wire-on x5, wire-off x3
+       (stop-grad on).
+       - Bars: reliance >= 30% at both u2500 and u3000 in >= 3/5 per arm; the gain bar above; wire-off below 0.05
+         bits joint at u3000 in all three.
+       - Adopt stop-grad unless it does worse than baseline. Price first; cap $3.
+  5. **Stop-grad PS fix accepted:** the sender-row part at c_ps = 0, scaled; the PS gradient added unscaled.
+     Apparatus check before any run:
+     - the listener-row contribution to the message-head gradient is exactly 0;
+     - the PS-term gradient on the message head is allclose to flag-off at update 1 (rtol 1e-4,
+       atol 1e-6 x max|g|);
+     - the old scaled-PS version must fail that check.
+  6. (b), (d), (e) noted. **s232 is recorded as rising reliance on a weaker base (control 10.2 → ~4), not a rebuilt
+     code.** The separate-brains design continues, code + tests only.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
