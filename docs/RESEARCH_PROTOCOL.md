@@ -3576,6 +3576,30 @@ more expensive, because it produces publishable-looking nulls.
     flagged, not changed.
   - Price: ~$3.7 (Cam's cap $3.4 + 25% = $4.25).
 
+- **Cam, Nov 9 ~07:50: overnight mode (M asleep ~7 h).** Proceed (b) → (c) → (d) → (e) and (f) by the registered
+  rules without waiting; the own-world spec and prototype code (code + tests) in parallel. **HOLD and wait for M if:**
+  - a registered stop condition fires (e.g. (c) leaves 0/5 survivors in both wire-on arms);
+  - **G0 fails** (hold (e));
+  - a result needs a judgment call no registered rule covers;
+  - **projected spend passes $25.**
+
+  Leave a short morning summary for M: results against each bar, spend, and what's waiting on Cam.
+- **Cam, Nov 9 ~08:00: own-world spec addendum (open-endedness).** The spec must leave room for all of these;
+  prototype only (1), design hooks for the rest.
+  1. **Generative physics, not a fixed object list:** materials are property vectors (heat, mass, nutrition,
+     hardness, ...) with a small set of interaction rules (combine, burn, grow, decay, break). Products are materials
+     again, so combinations compound. No named objects in any code path the agents see.
+  2. Unbounded map: chunks generated on demand from a seed (hash-based), no edge; only nearby chunks simulated.
+  3. World change by agents: place, store, build; changes persist.
+  4. Channel flag for variable-length messages (symbol sequences with an end symbol), off for now.
+  5. Drives: homeostatic energy, plus a curiosity drive behind a flag (reward = learning progress of the agent's own
+     world model, not raw prediction error); inborn traits stay heritable ranges.
+  6. Dreaming hook: each brain's world model trains on real data, and a sleep phase does policy updates inside it.
+     Off until the rung-6 gates pass: it predicts real change, it beats no-dreaming, and no imagined action is ever
+     executed.
+  - Metrics to plan for: novelty (distinct material combinations per life); vocabulary in use; whether new words
+    appear for new things without PS.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
