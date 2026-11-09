@@ -3294,6 +3294,32 @@ more expensive, because it produces publishable-looking nulls.
   - The diffuse-code inflation Cam suspected is real but small at this N: null means 0.007-0.122 MM (largest where the
     triples are most diverse, s231 / s233).
 
+- **Stop-grad from scratch: built and apparatus-checked (comm-toy, laptop, $0).**
+  - Flag `--msg-grad sender`. Every parameter takes the usual all-row gradient, except the message head (MSGK), which
+    takes (sender-row fraction) x the sender-row gradient of the loss **at c_ps = 0**, plus the PS term's gradient
+    **unscaled** (Cam's fix).
+  - **Bug found by the check:** `total_loss` ignores its c_ps argument unless `--ps-anneal` is set (it then uses
+    `--ps`). Added an explicit `ps_force` override (never set on the default path). The self-test asserts the
+    protocol config (`--ps-anneal` on).
+  - **Apparatus check `--selftest-sg2`: PASS** (ORACLE0 start, update-1 minibatch, c_ps 1.99, sender-row fraction
+    0.52):
+    - perturbing every listener row's advantage / return / value / log-prob / actions / tokens leaves the MSGK
+      gradient **bit-identical**;
+    - flag-off changes it, and the one-listener-row-leak mutant changes it;
+    - the PS gradient on MSGK is allclose to flag-off (rtol 1e-4, atol 1e-6 x max|g|; norm ratio 1.0000);
+    - **the old scaled-PS composition FAILS** (norm ratio 0.523 = the sender fraction).
+  - **Default path bit-identical** to the committed code (12 updates, 19/19 rows). The flag changes training as
+    intended.
+  - Cost: 1.19x the default update time (laptop, sequential).
+- **Prices for the next account** (from the replication's billed cost):
+  - c1rep: $1.019 posted for 20:13-21:00 → ~$1.55 for 72 min, i.e. **~$0.22 per 3,000-update run** (~$0.074 per
+    1,000 updates, evals included). Firm figure when the 21:00 hour posts.
+  - Erosion calibration (regrow 3 wire-off seeds to 1,500 with `--snapshot-at 1500`, then 3 strengths x 3 seeds
+    1,500 → 3,000): ~$1.3, over the $1 cap. **To fit: stop at u2500**, where the registered pick is read (~$1.0).
+  - Rung-3 rerun (baseline x5 + stop-grad x5 + wire-off x3 with stop-grad, to 3,000): 5 x 0.22 + 8 x 0.22 x 1.19 =
+    **~$3.2, over the $3 cap.** Options: wire-off x2, or stop at u3000 without the u2500 eval. Cam's call.
+  - Stop-grad alone as first specified (x7): ~$1.85 vs its $1.5 cap; superseded by the rung-3 rerun plan.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
