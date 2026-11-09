@@ -1,6 +1,6 @@
 # For M: what the agents say (dictionary + one episode), exported 2026-11-09
 
-Free (frozen checkpoints, laptop). Four folders, each with `dictionary.csv/json` and `transcript.csv/json`:
+Free (frozen checkpoints, laptop). Seven folders, each with `dictionary.csv/json` and `transcript.csv/json`:
 
 | folder | checkpoint | what it is |
 |---|---|---|
@@ -30,6 +30,17 @@ what it heard (the sender's previous triple), what it did, how many moves it was
 128 steps (the real net's rollout is 512 steps long; the first 128 are exported). In the toy, the listener often
 waits near a spot and Crafts only after hearing that spot's word (e.g. S2VQ steps 14-16, 34-36). "idle (k)" = an
 action with no movement in this world.
+
+## Added Nov 9: the C1-E replication's surviving codes at update 3,000 (`C1REP_s231/s232/s234_u3000`)
+
+These are the three toy seeds that still have a code the listener relies on, 1,500 updates after the training
+nudge was removed (Cam's verdict: a self-sustaining code, met but fragile).
+- **Diffuse:** each spot's most common message is at most 1.4% of its messages, and a slot's word for a spot covers
+  8-23%. A simple reader recovers the spot from one message 4-95% of the time, depending on spot and seed.
+- **Their own words:** the shared starting-point words (63-1-24 etc.) are gone. Each seed now uses different
+  tokens.
+- **Still read:** swapping in another spot's message costs listeners 49-80% of deliveries, while swapping in
+  another message for the same spot costs nothing.
 
 **Caveats.**
 - Seed 51 predates the wire-blind fix: its sender's words depend on the fire *and* on what the partner just said

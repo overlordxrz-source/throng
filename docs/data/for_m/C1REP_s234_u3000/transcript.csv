@@ -1,0 +1,129 @@
+step,lit_spot,lit_spot_xy,sender_xy,sender_saw,sender_sent,sender_message_reads_as,reader_confidence,sender_action,listener_xy,listener_heard,heard_reads_as,listener_action,listener_steps_to_lit_spot,listener_delivered,sender_delivered,listener_next_xy
+0,0,3-3,0-7,spot 0 is lit,15-60-37,0,0.437,move y-1,11-3,,,move x+1,3,False,False,0-3
+1,0,3-3,0-6,spot 0 is lit,15-54-47,0,0.538,move y-1,0-3,15-60-37,0,move x+1,2,False,False,1-3
+2,0,3-3,0-5,spot 0 is lit,47-54-44,0,0.508,move y-1,1-3,15-54-47,0,move x+1,1,False,False,2-3
+3,0,3-3,0-4,spot 0 is lit,47-22-44,0,0.552,move y-1,2-3,47-54-44,0,craft,0,True,False,8-7
+4,2,9-3,0-3,spot 2 is lit,15-63-40,0,0.548,move x-1,8-7,47-22-44,0,move x-1,3,False,False,7-7
+5,2,9-3,11-3,spot 2 is lit,21-54-18,2,0.433,move x-1,7-7,15-63-40,0,move x-1,3,False,False,6-7
+6,2,9-3,10-3,spot 2 is lit,21-6-47,0,0.388,move x-1,6-7,21-54-18,2,craft,3,False,False,6-7
+7,2,9-3,9-3,spot 2 is lit,62-39-41,1,0.624,craft,6-7,21-6-47,0,move x-1,3,False,True,5-7
+8,1,3-9,10-1,spot 1 is lit,28-62-37,2,0.34,move x-1,5-7,62-39-41,1,stay,1,False,False,5-7
+9,1,3-9,9-1,spot 1 is lit,62-28-45,1,0.584,move y-1,5-7,28-62-37,2,move x-1,1,False,False,4-7
+10,1,3-9,9-0,spot 1 is lit,55-17-45,1,0.399,move y-1,4-7,62-28-45,1,move x-1,1,False,False,3-7
+11,1,3-9,9-11,spot 1 is lit,63-6-24,1,0.684,craft,3-7,55-17-45,1,move y+1,1,False,False,3-8
+12,1,3-9,9-11,spot 1 is lit,63-4-3,1,0.694,move y-1,3-8,63-6-24,1,craft,0,True,False,3-0
+13,3,9-9,9-10,spot 3 is lit,62-24-45,1,0.547,move y-1,3-0,63-4-3,1,move y-1,5,False,False,3-11
+14,3,9-9,9-9,spot 3 is lit,63-31-24,1,0.732,craft,3-11,62-24-45,1,craft,5,False,True,3-11
+15,1,3-9,11-4,spot 1 is lit,15-6-37,0,0.394,move y+1,3-11,63-31-24,1,move y-1,1,False,False,3-10
+16,1,3-9,11-5,spot 1 is lit,55-18-17,1,0.401,move x+1,3-10,15-6-37,0,move y-1,0,False,False,3-9
+17,1,3-9,0-5,spot 1 is lit,18-59-35,0,0.492,move x+1,3-9,55-18-17,1,craft,0,True,False,11-7
+18,3,9-9,1-5,spot 3 is lit,15-44-35,0,0.551,move x-1,11-7,18-59-35,0,idle (9),1,False,False,11-7
+19,3,9-9,0-5,spot 3 is lit,15-44-35,0,0.551,move x-1,11-7,15-44-35,0,move x+1,1,False,False,0-7
+20,3,9-9,11-5,spot 3 is lit,15-32-40,0,0.564,move x-1,0-7,15-44-35,0,move x+1,2,False,False,1-7
+21,3,9-9,10-5,spot 3 is lit,20-32-35,0,0.537,move x-1,1-7,15-32-40,0,move y+1,3,False,False,1-8
+22,3,9-9,9-5,spot 3 is lit,55-0-17,1,0.567,move y+1,1-8,20-32-35,0,move y+1,3,False,False,1-9
+23,3,9-9,9-6,spot 3 is lit,28-62-18,2,0.309,move y+1,1-9,55-0-17,1,move x+1,3,False,False,2-9
+24,3,9-9,9-7,spot 3 is lit,62-44-3,3,0.503,move y+1,2-9,28-62-18,2,stay,4,False,False,2-9
+25,3,9-9,9-8,spot 3 is lit,63-39-24,1,0.76,craft,2-9,62-44-3,3,craft,4,False,True,2-9
+26,1,3-9,3-6,spot 1 is lit,62-56-41,1,0.598,move y+1,2-9,63-39-24,1,craft,0,True,False,2-7
+27,2,9-3,3-7,spot 2 is lit,55-0-45,1,0.609,move y-1,2-7,62-56-41,1,move y+1,4,False,False,2-8
+28,2,9-3,3-6,spot 2 is lit,15-17-37,0,0.434,move y-1,2-8,55-0-45,1,craft,4,False,False,2-8
+29,2,9-3,3-5,spot 2 is lit,18-18-47,0,0.397,move y-1,2-8,15-17-37,0,move x-1,4,False,False,1-8
+30,2,9-3,3-4,spot 2 is lit,20-28-35,2,0.398,move y-1,1-8,18-18-47,0,move x+1,4,False,False,2-8
+31,2,9-3,3-3,spot 2 is lit,62-59-17,1,0.469,move x+1,2-8,20-28-35,2,move y+1,4,False,False,2-9
+32,2,9-3,4-3,spot 2 is lit,20-17-35,0,0.488,move x+1,2-9,62-59-17,1,idle (11),5,False,False,2-9
+33,2,9-3,5-3,spot 2 is lit,47-60-40,0,0.527,move x+1,2-9,20-17-35,0,stay,5,False,False,2-9
+34,2,9-3,6-3,spot 2 is lit,21-17-47,0,0.429,move x+1,2-9,47-60-40,0,idle (5),5,False,False,2-9
+35,2,9-3,7-3,spot 2 is lit,28-63-18,2,0.401,move x+1,2-9,21-17-47,0,move y+1,5,False,False,2-10
+36,2,9-3,8-3,spot 2 is lit,55-6-17,1,0.35,craft,2-10,28-63-18,2,move x+1,4,False,True,3-10
+37,0,3-3,2-7,spot 0 is lit,21-60-47,0,0.431,move y-1,3-10,55-6-17,1,move y-1,4,False,False,3-9
+38,0,3-3,2-6,spot 0 is lit,21-32-40,0,0.509,move y-1,3-9,21-60-47,0,move x+1,5,False,False,4-9
+39,0,3-3,2-5,spot 0 is lit,15-32-47,0,0.546,move y-1,4-9,21-32-40,0,move x-1,5,False,False,3-9
+40,0,3-3,2-4,spot 0 is lit,20-43-35,2,0.527,move y-1,3-9,15-32-47,0,move y+1,5,False,False,3-10
+41,0,3-3,2-3,spot 0 is lit,21-44-47,0,0.481,craft,3-10,20-43-35,2,idle (11),4,False,True,3-10
+42,3,9-9,5-9,spot 3 is lit,28-60-17,2,0.311,move y+1,3-10,21-44-47,0,idle (5),5,False,False,3-10
+43,3,9-9,5-10,spot 3 is lit,18-17-35,0,0.516,move y-1,3-10,28-60-17,2,stay,5,False,False,3-10
+44,3,9-9,5-9,spot 3 is lit,28-32-37,2,0.413,move x+1,3-10,18-17-35,0,idle (5),5,False,False,3-10
+45,3,9-9,6-9,spot 3 is lit,28-44-17,2,0.359,move x+1,3-10,28-32-37,2,move y+1,5,False,False,3-11
+46,3,9-9,7-9,spot 3 is lit,62-23-45,1,0.527,move x+1,3-11,28-44-17,2,idle (11),5,False,False,3-11
+47,3,9-9,8-9,spot 3 is lit,63-4-3,1,0.694,craft,3-11,62-23-45,1,move y-1,5,False,True,3-10
+48,0,3-3,6-0,spot 0 is lit,25-32-40,0,0.56,move y+1,3-10,63-4-3,1,move y-1,4,False,False,3-9
+49,0,3-3,6-1,spot 0 is lit,20-36-40,0,0.545,move x-1,3-9,25-32-40,0,move y+1,5,False,False,3-10
+50,0,3-3,5-1,spot 0 is lit,20-17-48,2,0.469,move x-1,3-10,20-36-40,0,idle (9),4,False,False,3-10
+51,0,3-3,4-1,spot 0 is lit,47-55-35,0,0.522,move x-1,3-10,20-17-48,2,idle (9),4,False,False,3-10
+52,0,3-3,3-1,spot 0 is lit,21-8-37,0,0.413,move y+1,3-10,47-55-35,0,idle (5),4,False,False,3-10
+53,0,3-3,3-2,spot 0 is lit,21-32-17,2,0.399,craft,3-10,21-8-37,0,idle (11),4,False,True,3-10
+54,1,3-9,11-10,spot 1 is lit,55-28-45,1,0.545,move y-1,3-10,21-32-17,2,move y+1,0,False,False,3-11
+55,1,3-9,11-9,spot 1 is lit,63-4-24,1,0.74,move x+1,3-11,55-28-45,1,idle (11),1,False,False,3-11
+56,1,3-9,0-9,spot 1 is lit,55-24-45,1,0.499,move x+1,3-11,63-4-24,1,move y-1,1,False,False,3-10
+57,1,3-9,1-9,spot 1 is lit,62-18-3,1,0.586,move x+1,3-10,55-24-45,1,move y-1,0,False,False,3-9
+58,1,3-9,2-9,spot 1 is lit,63-4-24,1,0.74,craft,3-9,62-18-3,1,craft,0,True,True,6-5
+59,0,3-3,2-6,spot 0 is lit,28-60-17,2,0.311,move y-1,6-5,63-4-24,1,move x-1,2,False,False,5-5
+60,0,3-3,2-5,spot 0 is lit,15-17-47,0,0.489,move y-1,5-5,28-60-17,2,move x-1,1,False,False,4-5
+61,0,3-3,2-4,spot 0 is lit,20-63-48,0,0.483,move y-1,4-5,15-17-47,0,move x-1,1,False,False,3-5
+62,0,3-3,2-3,spot 0 is lit,21-6-17,2,0.353,craft,3-5,20-63-48,0,stay,1,False,True,3-5
+63,1,3-9,11-8,spot 1 is lit,62-0-41,1,0.63,move x+1,3-5,21-6-17,2,move y-1,3,False,False,3-4
+64,1,3-9,0-8,spot 1 is lit,55-18-45,1,0.466,move x+1,3-4,62-0-41,1,move y-1,4,False,False,3-3
+65,1,3-9,1-8,spot 1 is lit,62-60-41,1,0.486,move x+1,3-3,55-18-45,1,idle (5),5,False,False,3-3
+66,1,3-9,2-8,spot 1 is lit,62-24-41,1,0.56,craft,3-3,62-60-41,1,move y+1,5,False,True,3-4
+67,0,3-3,8-5,spot 0 is lit,28-6-37,2,0.39,move y-1,3-4,62-24-41,1,move y-1,0,False,False,3-3
+68,0,3-3,8-4,spot 0 is lit,15-18-47,0,0.374,move y-1,3-3,28-6-37,2,move y+1,0,False,False,3-4
+69,0,3-3,8-3,spot 0 is lit,28-44-17,2,0.359,move x-1,3-4,15-18-47,0,stay,0,False,False,3-4
+70,0,3-3,7-3,spot 0 is lit,21-62-37,2,0.357,craft,3-4,28-44-17,2,move y-1,0,False,False,3-3
+71,0,3-3,7-3,spot 0 is lit,55-59-45,1,0.449,move x-1,3-3,21-62-37,2,idle (11),0,False,False,3-3
+72,0,3-3,6-3,spot 0 is lit,21-55-37,2,0.427,move x-1,3-3,55-59-45,1,move y+1,0,False,False,3-4
+73,0,3-3,5-3,spot 0 is lit,18-55-40,0,0.554,move x-1,3-4,21-55-37,2,move y-1,0,False,False,3-3
+74,0,3-3,4-3,spot 0 is lit,18-59-47,0,0.477,move x-1,3-3,18-55-40,0,craft,0,True,False,8-6
+75,2,9-3,3-3,spot 2 is lit,28-23-18,2,0.319,move x+1,8-6,18-59-47,0,idle (5),2,False,False,8-6
+76,2,9-3,4-3,spot 2 is lit,18-32-35,0,0.566,move x+1,8-6,28-23-18,2,move y+1,2,False,False,8-7
+77,2,9-3,5-3,spot 2 is lit,21-17-37,2,0.405,move x+1,8-7,18-32-35,0,idle (5),3,False,False,8-7
+78,2,9-3,6-3,spot 2 is lit,15-59-40,0,0.477,move x+1,8-7,21-17-37,2,move x-1,3,False,False,7-7
+79,2,9-3,7-3,spot 2 is lit,28-59-37,2,0.356,idle (11),7-7,15-59-40,0,idle (11),3,False,False,7-7
+80,2,9-3,7-3,spot 2 is lit,28-63-18,2,0.401,move x+1,7-7,28-59-37,2,move x-1,3,False,False,6-7
+81,2,9-3,8-3,spot 2 is lit,55-24-45,1,0.499,craft,6-7,28-63-18,2,move y+1,3,False,True,6-8
+82,1,3-9,5-11,spot 1 is lit,28-24-18,2,0.289,move x-1,6-8,55-24-45,1,move x-1,2,False,False,5-8
+83,1,3-9,4-11,spot 1 is lit,21-17-18,2,0.397,move x-1,5-8,28-24-18,2,idle (9),1,False,False,5-8
+84,1,3-9,3-11,spot 1 is lit,62-6-41,1,0.518,move y-1,5-8,21-17-18,2,move y+1,1,False,False,5-9
+85,1,3-9,3-10,spot 1 is lit,62-59-45,1,0.512,move y-1,5-9,62-6-41,1,craft,1,False,False,5-9
+86,1,3-9,3-9,spot 1 is lit,63-39-24,1,0.76,craft,5-9,62-59-45,1,move x-1,1,False,True,4-9
+87,0,3-3,5-6,spot 0 is lit,25-32-40,0,0.56,move x-1,4-9,63-39-24,1,move x-1,5,False,False,3-9
+88,0,3-3,4-6,spot 0 is lit,20-44-48,0,0.497,move y-1,3-9,25-32-40,0,move y+1,5,False,False,3-10
+89,0,3-3,4-5,spot 0 is lit,47-27-44,0,0.535,move y-1,3-10,20-44-48,0,stay,4,False,False,3-10
+90,0,3-3,4-4,spot 0 is lit,47-43-59,2,0.54,move y-1,3-10,47-27-44,0,idle (9),4,False,False,3-10
+91,0,3-3,4-3,spot 0 is lit,18-60-35,0,0.525,move x-1,3-10,47-43-59,2,move y+1,4,False,False,3-11
+92,0,3-3,3-3,spot 0 is lit,28-18-17,3,0.319,craft,3-11,18-60-35,0,idle (9),3,False,True,3-11
+93,3,9-9,0-6,spot 3 is lit,18-8-48,0,0.521,move x-1,3-11,28-18-17,3,move x-1,5,False,False,2-11
+94,3,9-9,11-6,spot 3 is lit,55-0-17,1,0.567,move x-1,2-11,18-8-48,0,idle (5),4,False,False,2-11
+95,3,9-9,10-6,spot 3 is lit,21-6-47,0,0.388,idle (11),2-11,55-0-17,1,stay,4,False,False,2-11
+96,3,9-9,10-6,spot 3 is lit,15-6-18,2,0.382,move x-1,2-11,21-6-47,0,move y-1,4,False,False,2-10
+97,3,9-9,9-6,spot 3 is lit,55-6-45,1,0.426,move y+1,2-10,15-6-18,2,move y-1,4,False,False,2-9
+98,3,9-9,9-7,spot 3 is lit,62-31-41,1,0.584,move y+1,2-9,55-6-45,1,craft,4,False,False,2-9
+99,3,9-9,9-8,spot 3 is lit,63-6-3,1,0.633,craft,2-9,62-31-41,1,idle (11),4,False,True,2-9
+100,1,3-9,5-9,spot 1 is lit,62-24-45,1,0.547,move x-1,2-9,63-6-3,1,move y+1,0,False,False,2-10
+101,1,3-9,4-9,spot 1 is lit,28-28-17,1,0.395,move x-1,2-10,62-24-45,1,move y-1,0,False,False,2-9
+102,1,3-9,3-9,spot 1 is lit,63-31-24,1,0.732,craft,2-9,28-28-17,1,craft,0,True,True,0-3
+103,0,3-3,7-1,spot 0 is lit,21-59-47,0,0.392,move x-1,0-3,63-31-24,1,move x+1,2,False,False,1-3
+104,0,3-3,6-1,spot 0 is lit,15-8-35,0,0.542,move x-1,1-3,21-59-47,0,move x+1,1,False,False,2-3
+105,0,3-3,5-1,spot 0 is lit,9-43-44,2,0.641,move x-1,2-3,15-8-35,0,craft,0,True,False,7-5
+106,1,3-9,4-1,spot 1 is lit,20-28-47,0,0.377,move x-1,7-5,9-43-44,2,stay,3,False,False,7-5
+107,1,3-9,3-1,spot 1 is lit,28-44-17,2,0.359,move y-1,7-5,20-28-47,0,idle (11),3,False,False,7-5
+108,1,3-9,3-0,spot 1 is lit,21-17-47,0,0.429,move y-1,7-5,28-44-17,2,move y+1,3,False,False,7-6
+109,1,3-9,3-11,spot 1 is lit,62-6-41,1,0.518,move y-1,7-6,21-17-47,0,stay,3,False,False,7-6
+110,1,3-9,3-10,spot 1 is lit,62-63-3,1,0.532,move y-1,7-6,62-6-41,1,move x-1,3,False,False,6-6
+111,1,3-9,3-9,spot 1 is lit,63-24-3,1,0.666,craft,6-6,62-63-3,1,move x-1,2,False,True,5-6
+112,3,9-9,6-0,spot 3 is lit,18-6-35,0,0.481,move y-1,5-6,63-24-3,1,idle (11),3,False,False,5-6
+113,3,9-9,6-11,spot 3 is lit,21-59-47,0,0.392,move x+1,5-6,18-6-35,0,move x-1,3,False,False,4-6
+114,3,9-9,7-11,spot 3 is lit,55-31-18,1,0.45,move y-1,4-6,21-59-47,0,move x-1,4,False,False,3-6
+115,3,9-9,7-10,spot 3 is lit,55-6-17,1,0.35,move y-1,3-6,55-31-18,1,move y+1,5,False,False,3-7
+116,3,9-9,7-9,spot 3 is lit,62-60-45,1,0.465,move x+1,3-7,55-6-17,1,move y+1,5,False,False,3-8
+117,3,9-9,8-9,spot 3 is lit,62-60-3,1,0.545,craft,3-8,62-60-45,1,craft,5,False,True,3-8
+118,1,3-9,8-1,spot 1 is lit,55-10-18,1,0.622,move x-1,3-8,62-60-3,1,craft,0,True,False,5-5
+119,0,3-3,7-1,spot 0 is lit,15-17-37,0,0.434,move x-1,5-5,55-10-18,1,move y-1,1,False,False,5-4
+120,0,3-3,6-1,spot 0 is lit,20-36-35,0,0.529,move x-1,5-4,15-17-37,0,move x-1,1,False,False,4-4
+121,0,3-3,5-1,spot 0 is lit,20-22-48,0,0.529,move x-1,4-4,20-36-35,0,move x-1,0,False,False,3-4
+122,0,3-3,4-1,spot 0 is lit,25-22-48,0,0.537,move x-1,3-4,20-22-48,0,craft,0,True,False,2-0
+123,3,9-9,3-1,spot 3 is lit,18-59-40,0,0.497,move x+1,2-0,25-22-48,0,idle (5),4,False,False,2-0
+124,3,9-9,4-1,spot 3 is lit,25-54-48,0,0.492,move x+1,2-0,18-59-40,0,move x+1,4,False,False,3-0
+125,3,9-9,5-1,spot 3 is lit,15-44-40,0,0.559,move y-1,3-0,25-54-48,0,move y-1,5,False,False,3-11
+126,3,9-9,5-0,spot 3 is lit,20-55-48,0,0.473,move x+1,3-11,15-44-40,0,craft,5,False,False,3-11
+127,3,9-9,6-0,spot 3 is lit,18-60-35,0,0.525,move y-1,3-11,20-55-48,0,move x+1,5,False,False,

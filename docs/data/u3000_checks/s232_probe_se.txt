@@ -1,0 +1,8 @@
+s232 in-run empirical-swap probes (10 pairs each): paired control - swap listener deliveries per world
+u1500: control 10.15 swap 2.86 drop +72% | paired 7.29 SE 0.10 (z 72.3) | per-pair range 6.88..7.77
+u2000: control 3.91 swap 3.40 drop +13% | paired 0.51 SE 0.11 (z 4.8) | per-pair range 0.00..1.20
+u2500: control 4.12 swap 2.79 drop +32% | paired 1.32 SE 0.09 (z 14.1) | per-pair range 1.08..2.05
+u3000: control 4.37 swap 1.83 drop +58% | paired 2.55 SE 0.07 (z 35.9) | per-pair range 2.12..2.89
+change u2000 -> u2500: paired effect 0.51 -> 1.32, diff +0.81 SE 0.14 (z 5.7)
+change u2500 -> u3000: paired effect 1.32 -> 2.55, diff +1.22 SE 0.12 (z 10.4)
+change u2000 -> u3000: paired effect 0.51 -> 2.55, diff +2.03 SE 0.13 (z 15.9)

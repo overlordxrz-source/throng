@@ -1,0 +1,10 @@
+ss_on_s231.jsonl: control 5.56 | cross-spot 1.11 (drop +80%, paired 4.45 SE 0.08) | same-spot 5.50 (drop +1%, paired 0.06 SE 0.09) | same >= 0.5 x cross: False | swapped triple differs: cross 1.000 same 0.999
+   MI: slots (MM) [0.045, 0.003, 0.704] | joint plug-in 0.901 MM 0.787 (9969 triples, n 81920) | pre-Craft slots [0.046, 0.003, 0.71] joint plug-in 0.926 MM 0.805 (n 74277)
+ss_on_s232.jsonl: control 4.37 | cross-spot 1.86 (drop +58%, paired 2.52 SE 0.07) | same-spot 4.41 (drop -1%, paired -0.04 SE 0.09) | same >= 0.5 x cross: False | swapped triple differs: cross 0.999 same 0.999
+   MI: slots (MM) [0.019, 0.003, 0.24] | joint plug-in 0.318 MM 0.266 (3224 triples, n 81920) | pre-Craft slots [0.02, 0.003, 0.248] joint plug-in 0.333 MM 0.276 (n 72841)
+ss_on_s234.jsonl: control 3.83 | cross-spot 1.95 (drop +49%, paired 1.87 SE 0.06) | same-spot 3.83 (drop -0%, paired -0.01 SE 0.07) | same >= 0.5 x cross: False | swapped triple differs: cross 0.998 same 0.997
+   MI: slots (MM) [0.2, 0.084, 0.202] | joint plug-in 0.250 MM 0.225 (1472 triples, n 81920) | pre-Craft slots [0.195, 0.083, 0.197] joint plug-in 0.253 MM 0.223 (n 65721)
+
+== SAME-SPOT CONTROL: same-spot drop >= half the cross-spot drop in 0/3 seeds -> verdict STANDS
+wire-off_s235 slots (MM) [0.001, 0.001, 0.0] joint plug-in 0.056 MM 0.017 (1990 triples, n 81920) | pre-Craft slots [0.001, 0.001, 0.0] joint plug-in 0.070 MM 0.021 n 61954
+wire-off_s236 slots (MM) [0.051, 0.191, 0.153] joint plug-in 0.303 MM 0.253 (2812 triples, n 81920) | pre-Craft slots [0.046, 0.174, 0.14] joint plug-in 0.294 MM 0.239 n 70526

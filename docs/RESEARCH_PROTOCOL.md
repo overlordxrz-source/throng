@@ -3183,6 +3183,49 @@ more expensive, because it produces publishable-looking nulls.
      - Rotating pairs, newborn copying, speech that settles with age, varied learning speeds.
      - Gates and a cost estimate. No paid runs until Cam signs off on the next account.
 
+- **Free checks on the C1-E replication's u3000 params ($0, laptop; `docs/data/u3000_checks/`).**
+  - **(a) Same-spot swap control (registered): the verdict STANDS** (0/3 seeds have same-spot drop >= 0.5x
+    cross-spot).
+
+    | seed | cross-spot drop (paired, SE) | same-spot drop (paired, SE) |
+    |---|---|---|
+    | s231 | +80% (4.45, 0.08) | +1% (0.06, 0.09) |
+    | s232 | +58% (2.52, 0.07) | -1% (-0.04, 0.09) |
+    | s234 | +49% (1.87, 0.06) | 0% (-0.01, 0.07) |
+
+    Swapped triples differ from the original in >= 99.7% of steps in both modes. The listener reads which spot the
+    message names, not merely whether it is an ordinary-looking message.
+  - **(c) MI** (Miller-Madow, bits; 10 control rollouts, n = 81,920 sender steps):
+
+    | | slots | joint (3 slots) | joint, steps before the listener's first Craft in the period |
+    |---|---|---|---|
+    | wire-on s231 | 0.05 / 0.00 / 0.70 | 0.79 | 0.81 |
+    | wire-on s232 | 0.02 / 0.00 / 0.24 | 0.27 | 0.28 |
+    | wire-on s234 | 0.20 / 0.08 / 0.20 | 0.23 | 0.22 |
+    | wire-off s235 | 0.00 / 0.00 / 0.00 | 0.02 | 0.02 |
+    | wire-off s236 | 0.05 / 0.19 / 0.15 | **0.25** | 0.24 |
+
+    - **Explaining 0.09-0.26 bits per slot against 51-80% drops:**
+      - (i) The per-slot mean hides concentration: s231's code sits in slot 3 (0.70 bits).
+      - (ii) **The swap measures misdirection, not information.** A message for the wrong spot sends the listener
+        there. With control deliveries only 3.8-5.6 against the NOSIG level 2.8, the code adds little, but a wrong
+        message removes more than the code adds.
+      - Restricting to steps before the listener's first Craft changes nothing (the information is not concentrated
+        at decision moments).
+    - **Caution for future bars: wire-off s236 keeps 0.25 bits jointly at 3,000**, as much as wire-on s232 / s234. Its
+      per-slot mean (0.13) is under the 0.5 bar, but only reliance separates the arms, not MI.
+  - **(b) Speak test at u3000:** our dictionary word steers listeners in all three (Crafts at X 5.6-17.9 vs control
+    1.3-3.4) and equals or beats the sender's own word (s232 17.9 vs 7.6; s234 8.2 vs 5.0; s231 5.6-8.7 vs
+    6.3-8.9). The descriptive "understood" rule passes 1/3 (s232): s231 fails on T+3, where babble is also specific
+    (0.70); s234 is just under the 0.5 specificity line (0.42-0.50).
+  - **(d) s232's recovery is real at the probe level.** Paired effect 0.51 (SE 0.11) → 1.32 (0.09) → 2.55 (0.07)
+    deliveries per world at 2,000 / 2,500 / 3,000; steps of +0.81 (z 5.7) and +1.22 (z 10.4). The SEs are probe noise
+    on one seed's params, not seed-level chance. The base also fell: control deliveries 10.2 at 1,500 → 3.9-4.4.
+  - **(e)** Dictionaries exported to `docs/data/for_m/C1REP_s23{1,2,4}_u3000/` (README and `for_m_all.json` updated).
+    The codes are diffuse (modal triple <= 1.4%, slot words 8-23%, read-back 4-95% by spot), and **each seed now uses
+    its own tokens**: the shared ORACLE0-start words are gone.
+  - **(f)** The original C1-E seeds ran to 2,000 only, so there is no u3000 pooled count.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
