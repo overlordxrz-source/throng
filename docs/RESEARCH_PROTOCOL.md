@@ -3458,6 +3458,25 @@ more expensive, because it produces publishable-looking nulls.
     the control population (+2 runs ~$2.1) = ~$7.4 vs the $6 cap, so **(e) needs re-pricing or one fewer seed**, to
     be timed after integration + (f) ~$1 = ~$13.9 against the $14 allowance. (e) is the item to re-price first.
 
+- **BILLING FINDING (Nov 9 ~07:10; Modal `billing summary --json`, rapidcrisp): credits -$30.00, billed cost
+  $8.43**, metered $38.44.
+  - At 19:33 on Nov 8 the summary showed credits = metered ($24.72), billed $0.00. So the account's credits were $30
+    (it looks like the plan's monthly credit), and **$8.43 has been billed to the payment method**.
+  - The "$17.8 left" / "~$42.3 limit" reading was a spending limit, not credit.
+  - Spend stayed within Cam's $41.0 guard throughout; this is a fact for M, not a rule breach. The next account's
+    allowance ($14, guard $15) should state whether it means credits or billed money.
+- **(a) Guard on Modal: code ready, not deployed** (`scripts/modal_guard.py`; M's steps in `docs/GUARD_ON_MODAL.md`).
+  - A scheduled function (every 2 min, 0.25 CPU) reads `modal billing summary --json` → `metered_cost`, lists live
+    apps, and stops every app except itself when metered >= GUARD_CAP (default 15.0).
+  - The CLI runs with only the secret's token (the container's own MODAL_* identity is dropped).
+  - `::check` = a dry run that stops nothing.
+  - The token lives only in M's Modal secret `throng-guard-token`.
+  - Cost ~$0.03 / day.
+  - Next account: the dry check first, then deploy. The Mac guard runs until the dry check passes.
+- **Probe-400 post-mortem (Cam 2):** not laptop-feasible. On CPU a real-net rollout takes ~2-3 min (the M export:
+  2 dictionary rollouts + 1 transcript rollout, with compile, in ~8.5 min), and the probe needs 20 rollouts (10
+  pairs x control + swap). **Next account, cap $0.5.**
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
