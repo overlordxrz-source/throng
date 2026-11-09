@@ -3143,6 +3143,46 @@ more expensive, because it produces publishable-looking nulls.
   - **So the C1-E 185-187 shares are approximate to about +-0.2, and the trigger stands.** The cosine is not robust to
     the fit (s231: exact -0.22, fitted +0.19), in line with the split-half finding.
 
+- **Cam, Nov 9 ~02:40: C1-E replication ruling.**
+  1. **Verdict: toy self-sustaining code MET, FRAGILE.** The u3000 readout decides, as agreed at 00:40. It passed
+     at the minimum (reliance 3/5, pooled 47%, wire-off MI 0.001 / 0.13, redirection 3/5). Also recorded:
+     - the u2000 primary FAILED (2/5), so the original C1-E pass at 2,000 does not replicate;
+     - 2/5 seeds lost the code for good, so **a used code and silence are both stable end states**;
+     - **this is not ladder rung 3**, which needs reliance across >= 3 generations of separate brains.
+     - **New protocol rule: erosion tests read no earlier than 1,500 updates after PS ends** (s236 kept 0.93 bits
+       through 500 erosion updates with no listener).
+  2. **Free checks on the u3000 params** (laptop if each < 10 min, else Modal CPU; cap $0.30). Report-only except (a).
+     - **(a) REGISTERED: same-spot swap control** on s231 / s232 / s234 (tool `comm_toy.py --same-spot`; analysis
+       `analyze_same_spot.py`).
+       - 10 pairs per seed (keys 10_000+k / 20_000+k, as the in-run probe).
+       - The table is built per pair from the control rollout, as the in-run empirical swap.
+       - **Cross-spot swap:** the listener hears a random triple the sender used for T' = T + 1, exactly the in-run
+         probe; the empirical draw differs from the in-run one (disclosed before).
+       - **Same-spot swap:** the same table, shift 0 (a random triple the sender used for the same lit spot T).
+       - Drop = 1 - sum(swap deliveries) / sum(control deliveries) over the 10 pairs.
+       - **The verdict is WITHDRAWN iff same-spot drop >= 0.5 x cross-spot drop in >= 2 of the 3 seeds.**
+     - (b) Speak test at u3000 on the same three, as before.
+     - (c) MI over all three slots jointly (plug-in and Miller-Madow), wire-on (s231 / s232 / s234) vs wire-off
+       (s235 / s236) side by side; and MI restricted to steps before the listener's first Craft in each lit period.
+       From the same control rollouts.
+     - (d) Probe SEs for s232 at 2,000 / 2,500 / 3,000 (from the in-run swap rows).
+     - (e) Export the s231 / s232 / s234 u3000 dictionaries to `docs/data/for_m/`.
+     - (f) The original C1-E seeds have no u3000 readouts (they ran to 2,000), so there is no pooled count. No new
+       runs.
+  3. Grad-share cross-check accepted: the C1-E shares stand at +-0.2. **Cosines are dropped from future reports.**
+  4. Spend on this account: nothing new beyond PS52 / PS53. Cam's projection is ~$38.4 at their finish; report if mine
+     passes $40.5.
+  5. **Next-account queue:** stop-grad moves up to right after the guard move.
+     - Spec: wire-on x5 + wire-off x2 to 3,000, same protocol and bars as this replication.
+     - **Adopt unless it does worse:** adopt iff >= 3/5 hold >= 30% reliance at both 2,500 and 3,000 (this
+       baseline: 3/5) AND wire-off MI < 0.5 in both.
+     - Price it from this replication's billed cost first; cap $1.5.
+     - The result decides how the separate brains train their message heads.
+  6. **Start now (code + unit tests only, laptop-sized): a registered design for the separate-brains toy.**
+     - 4 brains with different starting weights: their own navigation warm starts, so no shared ORACLE0 word bias.
+     - Rotating pairs, newborn copying, speech that settles with age, varied learning speeds.
+     - Gates and a cost estimate. No paid runs until Cam signs off on the next account.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
