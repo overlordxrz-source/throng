@@ -3913,6 +3913,19 @@ more expensive, because it produces publishable-looking nulls.
   worlds x 150 updates) alongside Cam's fallback (a), a juvenile period of J = 500 provisioned steps within hearing
   range.
 
+- **Learnability gate: first full reads, and an apparatus fix.**
+  - Full scale (16 worlds x 150 updates, T 64, 2 epochs), test 4 paired episodes per life:
+    - baseline: 15/2,090 lives pass (0.7%), median life 67;
+    - (a) juvenile J = 500: 15/662 (2.3%), median life 572, **median drop 0.2%**;
+    - (a) + (b) juvenile + drain halved: 4/553 (0.7%), median life 641, median drop 0.0.
+  - **Positive control** (`--sanity`: a scripted listener that walks the heard sector when no food is visible): eaten
+    9.6 (true) vs 4.1 (swapped), median drop 67%, **yet only 8/74 lives passed with 4 episodes**. My added
+    "paired > 2 SE" condition was underpowered at n = 4.
+  - **Fix:** 16 paired episodes per life. The positive control then **passes the gate: 48/74 = 65% of lives, median
+    drop 63%**. The rest are lives where food is visible near the beacons, so the message doesn't matter.
+  - The learned newborns' median drop is ~0 in every variant, so the fail looks genuine. Both fallbacks are being
+    re-run on the 16-episode test before any verdict.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
