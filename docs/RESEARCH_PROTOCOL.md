@@ -3811,6 +3811,18 @@ more expensive, because it produces publishable-looking nulls.
       the offspring's drive reductions (k 0.5), which works against that, and the smoke's births-per-1,000-steps
       readout will show it. If births fall short of the turnover target, the fallback is the one-sided drive.
 
+- **Incident (Nov 9 ~12:54): a network drop on the Mac stopped (e) and (f) mid-run.**
+  - The `modal run --detach` clients died with `[Errno 8] nodename nor servname provided`. Modal's detached mode keeps
+    only the last-triggered function alive, so both apps were stopped at ~12:59. The Mac guard also exited.
+  - Lost: the 8 population runs ~45 min in (~$0.8); step-6 rerun seeds 311-314 partway. **Step-6 seed 310 had
+    completed** (its JSONL is saved).
+  - **Fix: deploy the apps and spawn each job** (`scripts/spawn_jobs.py`), so runs no longer depend on the Mac's
+    connection. Results go to the volume.
+  - Relaunched 13:36: the 8 population runs (same registered args and seeds), step-6 seeds 311-314. s310 is kept:
+    same code, config and pin.
+  - Spend at relaunch $5.35 (all credit). (e) with the lost partial: ~$12.1 vs cap $12, inside the 25% allowance.
+  - The Mac guard still depends on the Mac. The Modal guard (waiting on M's secret) removes that.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
