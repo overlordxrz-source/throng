@@ -18,6 +18,7 @@ drift. Emits JSONL like the toy. Laptop smoke first; Modal via scripts/modal_com
 from __future__ import annotations
 
 import argparse
+import functools
 import json
 import sys
 import time
@@ -77,13 +78,25 @@ def main():
     ap.add_argument("--save-prefix", default=None)
     ap.add_argument("--tag", default="")
     ap.add_argument("--selftest", action="store_true")
+    ap.add_argument("--fifth-fire", action="store_true", help="a 5th fire (centre), in the obs from update 0, lit only from --lit-from")
+    ap.add_argument("--lit-from", type=int, default=7500)
     ap.add_argument("--out", required=True)
     a = ap.parse_args()
 
     G, W, T, B, H = a.grid, a.worlds, a.steps, a.brains, 64
+    NF = 5 if a.fifth_fire else 4
+    if a.fifth_fire:   # obs: pos 2 | fire offsets 10 | informed 1 | need 5 | noise 4 | wire 40 -> D 62
+        import comm_toy
+        O_INF_, O_NEED_, O_WIRE_, D_ = 12, 13, 22, 62
+        comm_toy.O_WIRE = O_WIRE_          # ToyNet's wire-blind pathway reads this module global at trace time
+    else:
+        O_INF_, O_NEED_, O_WIRE_, D_ = O_INF, O_NEED, O_WIRE, D
     N = 2 * W
     assert len(a.lr_mults) == B and len(a.navs) >= 2 * B
-    HEARTHS = jnp.asarray(np.asarray(generate_hearth_positions(G)))
+    HEARTHS = np.asarray(generate_hearth_positions(G))
+    if a.fifth_fire:
+        HEARTHS = np.concatenate([HEARTHS, [[G // 2, G // 2]]], 0)
+    HEARTHS = jnp.asarray(HEARTHS)
     cells = np.stack(np.meshgrid(np.arange(G), np.arange(G), indexing="ij"), -1).reshape(-1, 2)
     dd = np.abs(cells[:, None, :] - np.asarray(HEARTHS)[None]); dd = np.minimum(dd, G - dd).max(-1)
     VALID = jnp.asarray(cells[(dd > 1).all(1)])
@@ -96,13 +109,27 @@ def main():
         out_f.write(json.dumps(dict(arm=a.arm, seed=a.seed, tag=a.tag, **rec)) + "\n"); out_f.flush()
 
     model = ToyNet(H, wire_blind=1)
-    templ = model.init(jax.random.PRNGKey(0), jnp.zeros((1, H)), jnp.zeros((1, D)))
+    templ0 = model.init(jax.random.PRNGKey(0), jnp.zeros((1, H)), jnp.zeros((1, D)))     # the navigators' 4-fire shape
+    templ = model.init(jax.random.PRNGKey(0), jnp.zeros((1, H)), jnp.zeros((1, D_)))
+
+    def expand(p):
+        """4-fire input rows -> 5-fire layout; the new rows (fire-5 offset, fire-5 need) are ZERO, so the expanded
+        navigator computes exactly what the original did on the shared dims"""
+        if not a.fifth_fire:
+            return p
+        pp = {k: dict(v) for k, v in p["params"].items()}
+        for n in ("enc_0", "gwt_comms_1"):
+            k0 = np.asarray(pp[n]["kernel"]); z = np.zeros((1, k0.shape[1]), k0.dtype)
+            k1 = np.concatenate([k0[0:10], z, z, k0[10:11], k0[11:15], z, k0[15:19], k0[19:59]], 0)
+            assert k1.shape[0] == D_
+            pp[n]["kernel"] = jnp.asarray(k1)
+        return {"params": pp}
 
     def nav_params(i):
-        p = flax.serialization.from_bytes(templ, Path(a.navs[i]).read_bytes())
+        p = expand(flax.serialization.from_bytes(templ0, Path(a.navs[i]).read_bytes()))
         pp = {k: dict(v) for k, v in p["params"].items()}
         for n in ("enc_0", "gwt_comms_1"):     # the wire rows were never trained (navigators ran wire-off)
-            pp[n]["kernel"] = jnp.asarray(pp[n]["kernel"]).at[O_WIRE:].multiply(a.wire_init_scale)
+            pp[n]["kernel"] = jnp.asarray(pp[n]["kernel"]).at[O_WIRE_:].multiply(a.wire_init_scale)
         return {"params": pp}
 
     S = brains.stack([nav_params(b) for b in range(B)])
@@ -132,9 +159,9 @@ def main():
 
     def build_obs(pos, active, wire, k):
         diff = (HEARTHS[None] - pos[:, None, :] + G / 2) % G - G / 2
-        hr = (diff / (G / 2.0)).reshape(N, 8)
+        hr = (diff / (G / 2.0)).reshape(N, 2 * NF)
         inf_ = ~lis
-        need = jax.nn.one_hot(jnp.repeat(active, 2), 4) * inf_[:, None]
+        need = jax.nn.one_hot(jnp.repeat(active, 2), NF) * inf_[:, None]
         heard = wire.reshape(W, 2, -1)[:, ::-1].reshape(N, -1) if live_wire else jnp.zeros((N, SIG))
         noise = jax.random.normal(k, (N, 4))
         return jnp.concatenate([pos / G, hr, inf_[:, None].astype(jnp.float32), need, noise, heard], -1)
@@ -144,8 +171,8 @@ def main():
         return (VALID[jax.random.randint(k1, (N,), 0, VALID.shape[0])], jax.random.randint(k2, (W,), 0, 4),
                 jnp.zeros(W, jnp.int32), jnp.zeros((N, SIG)), jnp.zeros((N, H)))
 
-    @jax.jit
-    def rollout(S_, ids, state, key, swap_table=None, shift=1):
+    @functools.partial(jax.jit, static_argnames=("nlit", "fixed"))
+    def rollout(S_, ids, state, key, swap_table=None, shift=1, nlit=4, fixed=-1):
         def step(st, k):
             pos, active, since, wire, carries = st
             k_obs, k_act, k_rs, k_rr, k_tab = jax.random.split(k, 5)
@@ -164,7 +191,8 @@ def main():
             if swap_table is not None:    # eval: each sender's broadcast replaced by one of ITS OWN triples for (T+shift)%4
                 sb = jnp.asarray(ids)[0::2]                                            # sender brain per world
                 idx = jax.random.randint(k_tab, (W,), 0, swap_table.shape[2])
-                trip = swap_table[sb, (active + shift) % 4, idx]                       # (W, 3)
+                tgt = jnp.full_like(active, fixed) if fixed >= 0 else (active + shift) % nlit
+                trip = swap_table[sb, tgt, idx]                                        # (W, 3)
                 cbs_s = [c[0::2] for c in cbs]
                 bsw = jnp.concatenate([jnp.zeros((W, 8))] + [jnp.take_along_axis(cbs_s[i], trip[:, i][:, None, None], 1)[:, 0]
                                                               for i in range(3)], -1)
@@ -172,18 +200,19 @@ def main():
             near = jnp.abs(pos[:, None, :] - HEARTHS[None]); near = jnp.minimum(near, G - near).max(-1) <= 1
             craft = act == ACTION_CRAFT
             dep = craft & near[jnp.arange(N), jnp.repeat(active, 2)]
-            att_Tp = craft & near[jnp.arange(N), jnp.repeat((active + shift) % 4, 2)]
+            att_Tp = craft & near[jnp.arange(N), jnp.repeat((active + shift) % nlit, 2)]
+            att_last = craft & near[:, NF - 1]                                         # Crafts at the last fire (fire 5)
             r = jnp.where(dep, R_DEP, 0.0) - a.craft_cost * (craft & ~dep)
             ldep = dep[lis]
             r = r + jnp.where(~lis, R_DEP * jnp.repeat(ldep, 2), 0.0)
             pos2 = jnp.where(dep[:, None], VALID[jax.random.randint(k_rs, (N,), 0, VALID.shape[0])], (pos + DEL[act]) % G)
             dep_w = dep.reshape(W, 2).any(1); since2 = since + 1
             reroll = dep_w | (since2 >= a.reroll)
-            active2 = jnp.where(reroll, (active + jax.random.randint(k_rr, (W,), 1, 4)) % 4, active)
+            active2 = jnp.where(reroll, (active + jax.random.randint(k_rr, (W,), 1, nlit)) % nlit, active)
             since2 = jnp.where(reroll, 0, since2)
             wire2 = bc if live_wire else jnp.zeros_like(bc)
             rec = dict(obs=obs, actions=act, log_probs=lp, rewards=r.astype(jnp.float32), values=vals, carries=carries,
-                       token_actions=toks, dep=dep, att_Tp=att_Tp, active=active)
+                       token_actions=toks, dep=dep, att_Tp=att_Tp, att_last=att_last, active=active)
             return (pos2, active2, since2, wire2, new_c), rec
         st, R = jax.lax.scan(step, state, jax.random.split(key, T))
         return st, R
@@ -191,8 +220,8 @@ def main():
     def ps_term(S_, ids, obs, carries, w_rows):
         """MI(token; active fire) on sender rows of the brains with w_rows > 0 (founders in formation), per brain, summed"""
         _, _, _, _, tl, _ = fwd(S_, ids, carries, obs)
-        snd = (obs[:, O_INF] > 0.5).astype(jnp.float32) * w_rows
-        Tl = jnp.argmax(obs[:, O_NEED:O_NEED + 4], -1)
+        snd = (obs[:, O_INF_] > 0.5).astype(jnp.float32) * w_rows
+        Tl = jnp.argmax(obs[:, O_NEED_:O_NEED_ + NF], -1)
         tot = 0.0
         for b in range(B):
             wb = snd * (jnp.asarray(ids) == b)
@@ -239,7 +268,7 @@ def main():
         ones = jnp.ones(mb["obs"].shape[0])
         g = jax.grad(loss_fn)(S_, mb, sig, mu, ps_c, ones, ps_w)
         if a.msg_grad == "sender":
-            snd = (mb["obs"][:, O_INF] > 0.5).astype(jnp.float32)
+            snd = (mb["obs"][:, O_INF_] > 0.5).astype(jnp.float32)
             g0 = jax.grad(loss_fn)(S_, mb, sig, mu, 0.0, snd, ps_w)                       # sender rows, no PS
             gps = jax.grad(lambda s_: -ps_c * ps_term(s_, mb["ids"], mb["obs"], mb["carries"], ps_w))(S_) if a.ps else None
             sc = snd.sum() / snd.shape[0]
@@ -275,24 +304,30 @@ def main():
 
     def evaluate(S_, u):
         ev_rng = np.random.default_rng(1000 + 7919 * a.seed + u)
+        nlit = NF if (a.fifth_fire and u >= a.lit_from) else 4
         res = []
         for k in range(a.swap_pairs):
             sch = brains.pair_schedule(W, B, np.random.default_rng(30_000 + k))
             ids = brains.agent_brain_map(*sch)
             st0 = init_state(jax.random.PRNGKey(10_000 + k))
-            _, Rc = rollout(S_, ids, st0, jax.random.PRNGKey(20_000 + k))
+            _, Rc = rollout(S_, ids, st0, jax.random.PRNGKey(20_000 + k), nlit=nlit)
             Rc = jax.tree_util.tree_map(np.asarray, Rc)
             trip = Rc["token_actions"][:, 0::2]; lab = Rc["active"]; sb = np.asarray(ids)[0::2]
-            table = np.zeros((B, 4, 256, 3), np.int32)
+            table = np.zeros((B, NF, 256, 3), np.int32)
             for b in range(B):
-                for t in range(4):
+                for t in range(nlit):
                     tt = trip[(lab == t) & (sb[None, :] == b)]
                     table[b, t] = tt[ev_rng.integers(0, len(tt), 256)] if len(tt) else 0
-            row = dict(phase="pop_swap", update=u, pair=k, dep_control=float(Rc["dep"][:, is_lis].sum() / W),
-                       crafts_Tp_control=float(Rc["att_Tp"][:, is_lis].sum() / W))
+            row = dict(phase="pop_swap", update=u, pair=k, nlit=nlit, dep_control=float(Rc["dep"][:, is_lis].sum() / W),
+                       crafts_Tp_control=float(Rc["att_Tp"][:, is_lis].sum() / W),
+                       crafts_last_control=float(Rc["att_last"][:, is_lis].sum() / W))
             if live_wire:
+                if nlit == NF and a.fifth_fire:   # redirection to fire 5: every sender's message replaced by its own fire-5 word
+                    _, Rk = rollout(S_, ids, st0, jax.random.PRNGKey(20_000 + k), jnp.asarray(table), 1, nlit=nlit, fixed=NF - 1)
+                    Rk = jax.tree_util.tree_map(np.asarray, Rk)
+                    row["crafts_last_to5"] = float(Rk["att_last"][:, is_lis].sum() / W)
                 for nm, sh in (("cross", 1), ("same", 0)):
-                    _, Rk = rollout(S_, ids, st0, jax.random.PRNGKey(20_000 + k), jnp.asarray(table), sh)
+                    _, Rk = rollout(S_, ids, st0, jax.random.PRNGKey(20_000 + k), jnp.asarray(table), sh, nlit=nlit)
                     Rk = jax.tree_util.tree_map(np.asarray, Rk)
                     row[f"dep_{nm}"] = float(Rk["dep"][:, is_lis].sum() / W)
                     if nm == "cross":
@@ -300,7 +335,7 @@ def main():
             emit(row); res.append((trip.reshape(-1, 3), lab.reshape(-1), np.repeat(sb[None], T, 0).reshape(-1)))
         tok = np.concatenate([r[0] for r in res]); lab = np.concatenate([r[1] for r in res]); bb = np.concatenate([r[2] for r in res])
         words = [[[int(np.bincount(tok[(lab == t) & (bb == b), i], minlength=V).argmax()) if ((lab == t) & (bb == b)).any() else -1
-                   for i in range(3)] for t in range(4)] for b in range(B)]
+                   for i in range(3)] for t in range(NF)] for b in range(B)]
         emit(dict(phase="pop_words", update=u, words=words, gen=gen.tolist(), born=born.tolist(), nav_of=nav_of))
         np.savez_compressed(f"{a.out}.u{u}.tok.npz", tok=tok, lab=lab, brain=bb)
 
@@ -337,7 +372,7 @@ def main():
         g_b0 = grads(S, pert(np.asarray(mb["ids"]) == 0), one, 0 * one, 0.5, fw)
         res = dict(isolation_other_brains_identical=all(np.array_equal(vec(g, b), vec(g_b0, b)) for b in range(1, B)),
                    isolation_brain0_changes=not np.array_equal(vec(g, 0), vec(g_b0, 0)))
-        lis_rows = np.asarray(mb["obs"][:, O_INF] < 0.5)
+        lis_rows = np.asarray(mb["obs"][:, O_INF_] < 0.5)
         g_l = grads(S, pert(lis_rows), one, 0 * one, 0.5, fw)
         same = all(np.array_equal(vec(g, b, MSGK), vec(g_l, b, MSGK)) for b in range(B))
         res["sender_rule_listener_rows_no_msg_grad"] = bool(same) if a.msg_grad == "sender" else (not same)
@@ -348,8 +383,19 @@ def main():
         res["imitation_moves_msg_head"] = any(float(jnp.abs(x).sum()) > 0 for k in MSGK for x in jax.tree_util.tree_leaves(gi["params"][k]))
         res["ps_zero_without_founders"] = float(ps_term(S, mb["ids"], mb["obs"], mb["carries"], 0 * fw)) == 0.0
         res["ps_nonzero_with_founders"] = float(ps_term(S, mb["ids"], mb["obs"], mb["carries"], fw)) != 0.0
+        if a.fifth_fire:   # the expanded navigator computes what the original did, whatever the new fire-5 dims hold
+            p0 = flax.serialization.from_bytes(templ0, Path(a.navs[0]).read_bytes()); p1 = expand(p0)
+            r_ = np.random.default_rng(4); o59 = r_.normal(size=(64, 59)).astype(np.float32); o59[:, 19:] = 0.0
+            o62 = np.concatenate([o59[:, :10], r_.normal(size=(64, 2)), o59[:, 10:15], r_.normal(size=(64, 1)),
+                                  o59[:, 15:19], o59[:, 19:]], 1).astype(np.float32)
+            c = jnp.zeros((64, H))
+            _, q0 = model.apply(p0, c, jnp.asarray(o59)); _, q1 = model.apply(p1, c, jnp.asarray(o62))
+            res["expand_preserves_navigator"] = bool(np.allclose(q0.action_logits, q1.action_logits, atol=1e-5)
+                                                     and np.allclose(q0.values, q1.values, atol=1e-5)
+                                                     and np.allclose(q0.z_e, q1.z_e, atol=1e-5))
+            res["fifth_fire_need_reaches_msg_path"] = bool(O_WIRE_ == 22 and O_NEED_ + NF <= O_WIRE_)
         if not live_wire:
-            res["wire_off_heard_zero"] = bool(np.all(R["obs"][:, :, O_WIRE:] == 0.0))
+            res["wire_off_heard_zero"] = bool(np.all(R["obs"][:, :, O_WIRE_:] == 0.0))
         res["PASS"] = bool(all(res.values()))
         print(json.dumps(res, indent=1), flush=True); emit(dict(phase="selftest", **res))
         raise SystemExit(0 if res["PASS"] else 1)
@@ -373,7 +419,7 @@ def main():
         sch = brains.pair_schedule(W, B, rng)
         ids = brains.agent_brain_map(*sch)
         key, kr = jax.random.split(key)
-        state, R = rollout(S, ids, state, kr)
+        state, R = rollout(S, ids, state, kr, nlit=NF if (a.fifth_fire and u >= a.lit_from) else 4)
         R = jax.tree_util.tree_map(np.asarray, R)
         idsT = np.broadcast_to(ids, (T, N))
         # per-brain PopArt: denormalise each row with its brain's stats, update each brain's stats on its own returns
