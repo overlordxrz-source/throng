@@ -3093,6 +3093,17 @@ more expensive, because it produces publishable-looking nulls.
     2,000), then the VoI on top at 0.381 as accepted. Alternatively cost 0 for the navigator only. Next account
     (the gate failed, so nothing launches here).
 
+- **Cam, Nov 9 (navigator).** Smoke FAIL and diagnosis accepted.
+  - **REGISTERED for the next account: the G 24 navigator at the density-matched craft cost 0.11**, not 0 (which
+    risks teaching craft-spam that then collapses at 0.381). Otherwise as the `nav24` registration: arm ORACLE, from
+    scratch, PS off, G 24, the four fires, spawn box 1,1-11,11, reroll 10, seed 250, 2,000 updates. Gates unchanged:
+    no Craft collapse by update 50 (local smoke first), and >= 15.3 deliveries per world (both agents, mean over
+    1,951-2,000).
+  - **The VoI on top stays at 0.381, with its own <= 10-minute smoke first.** That smoke must also show **no Craft
+    collapse when the navigator moves from 0.11 to 0.381**. Same rule: mean Craft attempts per world over updates
+    41-50 >= 0.5x updates 1-10, in both VoI arms, warm-started from the navigator's u2000 params. If it collapses,
+    report before anything paid.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
