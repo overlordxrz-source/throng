@@ -195,6 +195,10 @@ def main():
                     help="north star (Cam, 2026-11-08): build a dictionary (fire -> modal sender triple) from frozen control "
                          "rollouts, then 'speak to them': replace the sender's broadcast by the dictionary word for fire "
                          "X = T + s and count listener Crafts at X, vs the control and vs the sender's own words for X")
+    ap.add_argument("--tau", type=float, default=None, help="token temperature override (default 0.08)")
+    ap.add_argument("--reinit-msg", action="store_true",
+                    help="step-6 rerun: after the warm start, re-initialise the message head (gwt_comms_1, head_signal_slot*) "
+                         "and the material input rows (O_NOISE..+4) of enc_0 / gwt_comms_1 to fresh init")
     ap.add_argument("--msg-grad", default="all", choices=["all", "sender"],
                     help="Cam Nov 9: 'sender' = from-scratch stop-grad: the message head trains on sender rows only (PS unscaled)")
     ap.add_argument("--selftest-sg2", action="store_true", help="apparatus check of --msg-grad sender at update 1 (Cam Nov 9)")
@@ -214,6 +218,9 @@ def main():
                     help="after warm start, scale the (never-trained) wire-input rows of enc_0 and gwt_comms_1 (fidelity calibration)")
     ap.add_argument("--measure-sens", action="store_true", help="print listener sensitivity at the loaded params and exit")
     a = ap.parse_args()
+    global TAU
+    if a.tau is not None:          # step-6 rerun (Cam Nov 9): token temperature override; default path keeps 0.08
+        TAU = a.tau
 
     G, W, T, H = a.grid, a.worlds, a.steps, 64
     N = 2 * W
@@ -249,6 +256,7 @@ def main():
     key = jax.random.PRNGKey(a.seed)
     key, k_init = jax.random.split(key)
     params = model.init(k_init, jnp.zeros((1, H)), jnp.zeros((1, D)))
+    fresh_init = params
     if a.warm_start:
         if a.credit == "joint":
             params = flax.serialization.from_bytes(params, Path(a.warm_start).read_bytes())
@@ -264,6 +272,14 @@ def main():
             for n in ("enc_0", "gwt_comms_1"):
                 pp[n]["kernel"] = jnp.asarray(pp[n]["kernel"]).at[O_WIRE:].multiply(a.wire_init_scale)
             params = {"params": pp}
+    if a.reinit_msg:
+        fp = fresh_init["params"]
+        pp = {k: dict(v) if isinstance(v, dict) else v for k, v in params["params"].items()}
+        for k in ("gwt_comms_1", "head_signal_slot0", "head_signal_slot1", "head_signal_slot2"):
+            pp[k] = jax.tree_util.tree_map(jnp.asarray, fp[k])
+        for n in ("enc_0",):
+            pp[n] = dict(pp[n], kernel=jnp.asarray(pp[n]["kernel"]).at[O_NOISE:O_NOISE + 4].set(fp[n]["kernel"][O_NOISE:O_NOISE + 4]))
+        params = {"params": pp}
     if a.channel == "sym":
         # Symbols as actions with a codebook-distance policy over FIXED orthogonal codewords c_k = a e_k (k < vocab):
         # -||z - c_k||^2 / tau = (2a/tau) z_k + const, i.e. a linear symbol head with temperature tau / (2a); the
