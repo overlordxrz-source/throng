@@ -1,0 +1,274 @@
+{
+ "meta": {
+  "checkpoint": "toy_out_modal/params/c1t3_on_s180_f6f574e_u2000_actor.msgpack",
+  "arm": "COMM",
+  "wire_blind": 1,
+  "grid": 12,
+  "worlds": 64,
+  "steps": 128,
+  "vocab_per_slot": 64,
+  "note": "sender = the informed agent (sees which spot is lit); listener = uninformed partner, hears the sender's 3-token message one step later. slot words = each slot's most common token for that spot. read_back_correct = how often a simple reader (per-slot frequencies) recovers the lit spot from a single message."
+ },
+ "dictionary": [
+  {
+   "lit_spot": 0,
+   "spot_xy": [
+    3,
+    3
+   ],
+   "messages_sampled": 7493,
+   "most_common_triple": [
+    33,
+    63,
+    63
+   ],
+   "most_common_triple_share": 0.0018684105164820499,
+   "distinct_triples": 3120,
+   "top5_triples": [
+    {
+     "triple": [
+      33,
+      63,
+      63
+     ],
+     "share": 0.0018684105164820499
+    },
+    {
+     "triple": [
+      19,
+      54,
+      22
+     ],
+     "share": 0.0014680368343787534
+    },
+    {
+     "triple": [
+      62,
+      54,
+      37
+     ],
+     "share": 0.0014680368343787534
+    },
+    {
+     "triple": [
+      46,
+      55,
+      63
+     ],
+     "share": 0.0013345789403443214
+    },
+    {
+     "triple": [
+      33,
+      55,
+      47
+     ],
+     "share": 0.0013345789403443214
+    }
+   ],
+   "slot_words": [
+    46,
+    54,
+    28
+   ],
+   "slot_word_share": [
+    0.06245829440811424,
+    0.13572667823301748,
+    0.07860669958628053
+   ],
+   "slot_uses_other_spots_word": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "read_back_correct": 1.0
+  },
+  {
+   "lit_spot": 1,
+   "spot_xy": [
+    3,
+    9
+   ],
+   "messages_sampled": 9589,
+   "most_common_triple": [
+    63,
+    1,
+    24
+   ],
+   "most_common_triple_share": 0.43758473250599644,
+   "distinct_triples": 4,
+   "top5_triples": [
+    {
+     "triple": [
+      63,
+      1,
+      24
+     ],
+     "share": 0.43758473250599644
+    },
+    {
+     "triple": [
+      63,
+      39,
+      13
+     ],
+     "share": 0.25894253832516423
+    },
+    {
+     "triple": [
+      63,
+      39,
+      24
+     ],
+     "share": 0.20857232245281052
+    },
+    {
+     "triple": [
+      63,
+      1,
+      13
+     ],
+     "share": 0.09490040671602878
+    }
+   ],
+   "slot_words": [
+    63,
+    1,
+    24
+   ],
+   "slot_word_share": [
+    1.0,
+    0.5324851392220252,
+    0.6461570549588069
+   ],
+   "slot_uses_other_spots_word": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "read_back_correct": 1.0
+  },
+  {
+   "lit_spot": 2,
+   "spot_xy": [
+    9,
+    3
+   ],
+   "messages_sampled": 6724,
+   "most_common_triple": [
+    28,
+    50,
+    40
+   ],
+   "most_common_triple_share": 0.9986615110053539,
+   "distinct_triples": 5,
+   "top5_triples": [
+    {
+     "triple": [
+      28,
+      50,
+      40
+     ],
+     "share": 0.9986615110053539
+    },
+    {
+     "triple": [
+      28,
+      50,
+      37
+     ],
+     "share": 0.000892325996430696
+    },
+    {
+     "triple": [
+      28,
+      50,
+      12
+     ],
+     "share": 0.000148720999405116
+    },
+    {
+     "triple": [
+      28,
+      50,
+      31
+     ],
+     "share": 0.000148720999405116
+    },
+    {
+     "triple": [
+      55,
+      50,
+      40
+     ],
+     "share": 0.000148720999405116
+    }
+   ],
+   "slot_words": [
+    28,
+    50,
+    40
+   ],
+   "slot_word_share": [
+    0.9998512790005949,
+    1.0,
+    0.998810232004759
+   ],
+   "slot_uses_other_spots_word": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "read_back_correct": 1.0
+  },
+  {
+   "lit_spot": 3,
+   "spot_xy": [
+    9,
+    9
+   ],
+   "messages_sampled": 8962,
+   "most_common_triple": [
+    49,
+    10,
+    3
+   ],
+   "most_common_triple_share": 0.5098192367775051,
+   "distinct_triples": 2,
+   "top5_triples": [
+    {
+     "triple": [
+      49,
+      10,
+      3
+     ],
+     "share": 0.5098192367775051
+    },
+    {
+     "triple": [
+      49,
+      10,
+      11
+     ],
+     "share": 0.490180763222495
+    }
+   ],
+   "slot_words": [
+    49,
+    10,
+    3
+   ],
+   "slot_word_share": [
+    1.0,
+    1.0,
+    0.5098192367775051
+   ],
+   "slot_uses_other_spots_word": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "read_back_correct": 1.0
+  }
+ ]
+}

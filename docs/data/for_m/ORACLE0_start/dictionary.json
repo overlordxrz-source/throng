@@ -1,0 +1,306 @@
+{
+ "meta": {
+  "checkpoint": "toy_out/ORACLE0.msgpack",
+  "arm": "COMM",
+  "wire_blind": 1,
+  "grid": 12,
+  "worlds": 64,
+  "steps": 128,
+  "vocab_per_slot": 64,
+  "note": "sender = the informed agent (sees which spot is lit); listener = uninformed partner, hears the sender's 3-token message one step later. slot words = each slot's most common token for that spot. read_back_correct = how often a simple reader (per-slot frequencies) recovers the lit spot from a single message."
+ },
+ "dictionary": [
+  {
+   "lit_spot": 0,
+   "spot_xy": [
+    3,
+    3
+   ],
+   "messages_sampled": 8318,
+   "most_common_triple": [
+    16,
+    17,
+    14
+   ],
+   "most_common_triple_share": 0.0006011060351045924,
+   "distinct_triples": 6470,
+   "top5_triples": [
+    {
+     "triple": [
+      16,
+      17,
+      14
+     ],
+     "share": 0.0006011060351045924
+    },
+    {
+     "triple": [
+      33,
+      22,
+      41
+     ],
+     "share": 0.0006011060351045924
+    },
+    {
+     "triple": [
+      62,
+      28,
+      31
+     ],
+     "share": 0.0006011060351045924
+    },
+    {
+     "triple": [
+      62,
+      24,
+      22
+     ],
+     "share": 0.0006011060351045924
+    },
+    {
+     "triple": [
+      30,
+      32,
+      45
+     ],
+     "share": 0.00048088482808367395
+    }
+   ],
+   "slot_words": [
+    16,
+    17,
+    31
+   ],
+   "slot_word_share": [
+    0.050372685741764844,
+    0.04339985573455157,
+    0.05494109160855975
+   ],
+   "slot_uses_other_spots_word": [
+    0.1370521760038471,
+    0.12130319788410676,
+    0.12214474633325319
+   ],
+   "read_back_correct": 0.36175
+  },
+  {
+   "lit_spot": 1,
+   "spot_xy": [
+    3,
+    9
+   ],
+   "messages_sampled": 7430,
+   "most_common_triple": [
+    62,
+    31,
+    32
+   ],
+   "most_common_triple_share": 0.0006729475100942127,
+   "distinct_triples": 5871,
+   "top5_triples": [
+    {
+     "triple": [
+      62,
+      31,
+      32
+     ],
+     "share": 0.0006729475100942127
+    },
+    {
+     "triple": [
+      51,
+      63,
+      28
+     ],
+     "share": 0.0006729475100942127
+    },
+    {
+     "triple": [
+      6,
+      31,
+      5
+     ],
+     "share": 0.0006729475100942127
+    },
+    {
+     "triple": [
+      2,
+      56,
+      12
+     ],
+     "share": 0.0006729475100942127
+    },
+    {
+     "triple": [
+      46,
+      60,
+      48
+     ],
+     "share": 0.0006729475100942127
+    }
+   ],
+   "slot_words": [
+    6,
+    20,
+    13
+   ],
+   "slot_word_share": [
+    0.053566621803499324,
+    0.045895020188425305,
+    0.05720053835800808
+   ],
+   "slot_uses_other_spots_word": [
+    0.1288021534320323,
+    0.08331090174966353,
+    0.13445491251682368
+   ],
+   "read_back_correct": 0.22725
+  },
+  {
+   "lit_spot": 2,
+   "spot_xy": [
+    9,
+    3
+   ],
+   "messages_sampled": 8643,
+   "most_common_triple": [
+    51,
+    39,
+    54
+   ],
+   "most_common_triple_share": 0.0006942034015966678,
+   "distinct_triples": 6656,
+   "top5_triples": [
+    {
+     "triple": [
+      51,
+      39,
+      54
+     ],
+     "share": 0.0006942034015966678
+    },
+    {
+     "triple": [
+      19,
+      47,
+      56
+     ],
+     "share": 0.0005785028346638898
+    },
+    {
+     "triple": [
+      51,
+      0,
+      32
+     ],
+     "share": 0.0005785028346638898
+    },
+    {
+     "triple": [
+      15,
+      63,
+      28
+     ],
+     "share": 0.0005785028346638898
+    },
+    {
+     "triple": [
+      46,
+      54,
+      47
+     ],
+     "share": 0.0005785028346638898
+    }
+   ],
+   "slot_words": [
+    33,
+    54,
+    12
+   ],
+   "slot_word_share": [
+    0.05426356589147287,
+    0.043503413166724514,
+    0.051602452852018976
+   ],
+   "slot_uses_other_spots_word": [
+    0.14254309846118246,
+    0.08492421612865902,
+    0.13247714913803077
+   ],
+   "read_back_correct": 0.34875
+  },
+  {
+   "lit_spot": 3,
+   "spot_xy": [
+    9,
+    9
+   ],
+   "messages_sampled": 8377,
+   "most_common_triple": [
+    46,
+    17,
+    3
+   ],
+   "most_common_triple_share": 0.0005968723886832995,
+   "distinct_triples": 6451,
+   "top5_triples": [
+    {
+     "triple": [
+      46,
+      17,
+      3
+     ],
+     "share": 0.0005968723886832995
+    },
+    {
+     "triple": [
+      62,
+      0,
+      13
+     ],
+     "share": 0.0005968723886832995
+    },
+    {
+     "triple": [
+      57,
+      44,
+      14
+     ],
+     "share": 0.0005968723886832995
+    },
+    {
+     "triple": [
+      33,
+      20,
+      22
+     ],
+     "share": 0.0005968723886832995
+    },
+    {
+     "triple": [
+      14,
+      63,
+      14
+     ],
+     "share": 0.0005968723886832995
+    }
+   ],
+   "slot_words": [
+    51,
+    17,
+    14
+   ],
+   "slot_word_share": [
+    0.051808523337710397,
+    0.04536230153993076,
+    0.05252477020413036
+   ],
+   "slot_uses_other_spots_word": [
+    0.1420556285066253,
+    0.1283275635669094,
+    0.14277187537304525
+   ],
+   "read_back_correct": 0.24
+  }
+ ]
+}

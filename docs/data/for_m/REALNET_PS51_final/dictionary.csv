@@ -1,0 +1,5 @@
+lit_spot,spot_x,spot_y,most_common_triple,share_of_messages,distinct_triples,slot1_word,slot1_share,slot2_word,slot2_share,slot3_word,slot3_share,read_back_correct
+0,8,8,8-25-55,0.9889,21,8,0.9892,25,0.994,55,0.9942,0.997
+1,8,24,57-23-63,0.9886,10,57,0.9886,23,0.9921,63,0.9921,1.0
+2,24,8,47-12-22,0.9956,20,47,0.9957,12,0.9971,22,0.9969,0.9975
+3,24,24,41-43-35,0.812,19,41,0.9903,43,0.8673,35,0.8751,0.9962

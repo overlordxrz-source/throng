@@ -1,0 +1,5002 @@
+{
+ "meta": {
+  "checkpoint": "toy_out/ORACLE0.msgpack",
+  "arm": "COMM",
+  "wire_blind": 1,
+  "grid": 12,
+  "worlds": 64,
+  "steps": 128,
+  "vocab_per_slot": 64,
+  "note": "sender = the informed agent (sees which spot is lit); listener = uninformed partner, hears the sender's 3-token message one step later. slot words = each slot's most common token for that spot. read_back_correct = how often a simple reader (per-slot frequencies) recovers the lit spot from a single message. A delivery respawns the agent elsewhere and re-lights a different spot; an unlit-for-too-long spot also re-rolls. 'idle (k)' = an action with no effect in this world. listener_steps_to_lit_spot = moves needed to stand next to the lit spot (0 = can craft there).",
+  "world": 9,
+  "listener_deliveries_in_episode": 5,
+  "key": "95000/95001"
+ },
+ "steps": [
+  {
+   "step": 0,
+   "lit_spot": 3,
+   "lit_spot_xy": [
+    9,
+    9
+   ],
+   "sender_xy": [
+    4,
+    5
+   ],
+   "sender_saw": "spot 3 is lit",
+   "sender_sent": [
+    42,
+    43,
+    45
+   ],
+   "sender_message_reads_as": 0,
+   "reader_confidence": 0.272,
+   "sender_action": "move y-1",
+   "listener_xy": [
+    7,
+    1
+   ],
+   "listener_heard": null,
+   "heard_reads_as": null,
+   "listener_action": "idle (5)",
+   "listener_steps_to_lit_spot": 3,
+   "listener_delivered": false,
+   "sender_delivered": false,
+   "listener_next_xy": [
+    7,
+    1
+   ]
+  },
+  {
+   "step": 1,
+   "lit_spot": 3,
+   "lit_spot_xy": [
+    9,
+    9
+   ],
+   "sender_xy": [
+    4,
+    4
+   ],
+   "sender_saw": "spot 3 is lit",
+   "sender_sent": [
+    18,
+    4,
+    56
+   ],
+   "sender_message_reads_as": 1,
+   "reader_confidence": 0.399,
+   "sender_action": "move x+1",
+   "listener_xy": [
+    7,
+    1
+   ],
+   "listener_heard": [
+    42,
+    43,
+    45
+   ],
+   "heard_reads_as": 0,
+   "listener_action": "move x-1",
+   "listener_steps_to_lit_spot": 3,
+   "listener_delivered": false,
+   "sender_delivered": false,
+   "listener_next_xy": [
+    6,
+    1
+   ]
+  },
+  {
+   "step": 2,
+   "lit_spot": 3,
+   "lit_spot_xy": [
+    9,
+    9
+   ],
+   "sender_xy": [
+    5,
+    4
+   ],
+   "sender_saw": "spot 3 is lit",
+   "sender_sent": [
+    6,
+    6,
+    11
+   ],
+   "sender_message_reads_as": 1,
+   "reader_confidence": 0.303,
+   "sender_action": "move x+1",
+   "listener_xy": [
+    6,
+    1
+   ],
+   "listener_heard": [
+    18,
+    4,
+    56
+   ],
+   "heard_reads_as": 1,
+   "listener_action": "move x+1",
+   "listener_steps_to_lit_spot": 3,
+   "listener_delivered": false,
+   "sender_delivered": false,
+   "listener_next_xy": [
+    7,
+    1
+   ]
+  },
+  {
+   "step": 3,
+   "lit_spot": 3,
+   "lit_spot_xy": [
+    9,
+    9
+   ],
+   "sender_xy": [
+    6,
+    4
+   ],
+   "sender_saw": "spot 3 is lit",
+   "sender_sent": [
+    42,
+    28,
+    31
+   ],
+   "sender_message_reads_as": 0,
+   "reader_confidence": 0.285,
+   "sender_action": "move x-1",
+   "listener_xy": [
+    7,
+    1
+   ],
+   "listener_heard": [
+    6,
+    6,
+    11
+   ],
+   "heard_reads_as": 1,
+   "listener_action": "move y-1",
+   "listener_steps_to_lit_spot": 3,
+   "listener_delivered": false,
+   "sender_delivered": false,
+   "listener_next_xy": [
+    7,
+    0
+   ]
+  },
+  {
+   "step": 4,
+   "lit_spot": 3,
+   "lit_spot_xy": [
+    9,
+    9
+   ],
+   "sender_xy": [
+    5,
+    4
+   ],
+   "sender_saw": "spot 3 is lit",
+   "sender_sent": [
+    51,
+    0,
+    22
+   ],
+   "sender_message_reads_as": 3,
+   "reader_confidence": 0.284,
+   "sender_action": "move x+1",
+   "listener_xy": [
+    7,
+    0
+   ],
+   "listener_heard": [
+    42,
+    28,
+    31
+   ],
+   "heard_reads_as": 0,
+   "listener_action": "move y-1",
+   "listener_steps_to_lit_spot": 2,
+   "listener_delivered": false,
+   "sender_delivered": false,
+   "listener_next_xy": [
+    7,
+    11
+   ]
+  },
+  {
+   "step": 5,
+   "lit_spot": 3,
+   "lit_spot_xy": [
+    9,
+    9
+   ],
+   "sender_xy": [
+    6,
+    4
+   ],
+   "sender_saw": "spot 3 is lit",
+   "sender_sent": [
+    57,
+    17,
+    32
+   ],
+   "sender_message_reads_as": 2,
+   "reader_confidence": 0.271,
+   "sender_action": "move x+1",
+   "listener_xy": [
+    7,
+    11
+   ],
+   "listener_heard": [
+    51,
+    0,
+    22
+   ],
+   "heard_reads_as": 3,
+   "listener_action": "move x+1",
+   "listener_steps_to_lit_spot": 1,
+   "listener_delivered": false,
+   "sender_delivered": false,
+   "listener_next_xy": [
+    8,
+    11
+   ]
+  },
+  {
+   "step": 6,
+   "lit_spot": 3,
+   "lit_spot_xy": [
+    9,
+    9
+   ],
+   "sender_xy": [
+    7,
+    4
+   ],
+   "sender_saw": "spot 3 is lit",
+   "sender_sent": [
+    14,
+    59,
+    32
+   ],
+   "sender_message_reads_as": 2,
+   "reader_confidence": 0.276,
+   "sender_action": "move y-1",
+   "listener_xy": [
+    8,
+    11
+   ],
+   "listener_heard": [
+    57,
+    17,
+    32
+   ],
+   "heard_reads_as": 2,
+   "listener_action": "stay",
+   "listener_steps_to_lit_spot": 1,
+   "listener_delivered": false,
+   "sender_delivered": false,
+   "listener_next_xy": [
+    8,
+    11
+   ]
+  },
+  {
+   "step": 7,
+   "lit_spot": 3,
+   "lit_spot_xy": [
+    9,
+    9
+   ],
+   "sender_xy": [
+    7,
+    3
+   ],
+   "sender_saw": "spot 3 is lit",
+   "sender_sent": [
+    26,
+    43,
+    41
+   ],
+   "sender_message_reads_as": 0,
+   "reader_confidence": 0.3,
+   "sender_action": "move y+1",
+   "listener_xy": [
+    8,
+    11
+   ],
+   "listener_heard": [
+    14,
+    59,
+    32
+   ],
+   "heard_reads_as": 2,
+   "listener_action": "move x+1",
+   "listener_steps_to_lit_spot": 1,
+   "listener_delivered": false,
+   "sender_delivered": false,
+   "listener_next_xy": [
+    9,
+    11
+   ]
+  },
+  {
+   "step": 8,
+   "lit_spot": 3,
+   "lit_spot_xy": [
+    9,
+    9
+   ],
+   "sender_xy": [
+    7,
+    4
+   ],
+   "sender_saw": "spot 3 is lit",
+   "sender_sent": [
+    62,
+    17,
+    3
+   ],
+   "sender_message_reads_as": 3,
+   "reader_confidence": 0.306,
+   "sender_action": "move y+1",
+   "listener_xy": [
+    9,
+    11
+   ],
+   "listener_heard": [
+    26,
+    43,
+    41
+   ],
+   "heard_reads_as": 0,
+   "listener_action": "idle (9)",
+   "listener_steps_to_lit_spot": 1,
+   "listener_delivered": false,
+   "sender_delivered": false,
+   "listener_next_xy": [
+    9,
+    11
+   ]
+  },
+  {
+   "step": 9,
+   "lit_spot": 3,
+   "lit_spot_xy": [
+    9,
+    9
+   ],
+   "sender_xy": [
+    7,
+    5
+   ],
+   "sender_saw": "spot 3 is lit",
+   "sender_sent": [
+    42,
+    55,
+    45
+   ],
+   "sender_message_reads_as": 0,
+   "reader_confidence": 0.271,
+   "sender_action": "move y+1",
+   "listener_xy": [
+    9,
+    11
+   ],
+   "listener_heard": [
+    62,
+    17,
+    3
+   ],
+   "heard_reads_as": 3,
+   "listener_action": "move y-1",
+   "listener_steps_to_lit_spot": 1,
+   "listener_delivered": false,
+   "sender_delivered": false,
+   "listener_next_xy": [
+    9,
+    10
+   ]
+  },
+  {
+   "step": 10,
+   "lit_spot": 3,
+   "lit_spot_xy": [
+    9,
+    9
+   ],
+   "sender_xy": [
+    7,
+    6
+   ],
+   "sender_saw": "spot 3 is lit",
+   "sender_sent": [
+    46,
+    17,
+    24
+   ],
+   "sender_message_reads_as": 3,
+   "reader_confidence": 0.296,
+   "sender_action": "move x+1",
+   "listener_xy": [
+    9,
+    10
+   ],
+   "listener_heard": [
+    42,
+    55,
+    45
+   ],
+   "heard_reads_as": 0,
+   "listener_action": "move y-1",
+   "listener_steps_to_lit_spot": 0,
+   "listener_delivered": false,
+   "sender_delivered": false,
+   "listener_next_xy": [
+    9,
+    9
+   ]
+  },
+  {
+   "step": 11,
+   "lit_spot": 3,
+   "lit_spot_xy": [
+    9,
+    9
+   ],
+   "sender_xy": [
+    8,
+    6
+   ],
+   "sender_saw": "spot 3 is lit",
+   "sender_sent": [
+    62,
+    36,
+    63
+   ],
+   "sender_message_reads_as": 0,
+   "reader_confidence": 0.295,
+   "sender_action": "move y+1",
+   "listener_xy": [
+    9,
+    9
+   ],
+   "listener_heard": [
+    46,
+    17,
+    24
+   ],
+   "heard_reads_as": 3,
+   "listener_action": "move x+1",
+   "listener_steps_to_lit_spot": 0,
+   "listener_delivered": false,
+   "sender_delivered": false,
+   "listener_next_xy": [
+    10,
+    9
+   ]
+  },
+  {
+   "step": 12,
+   "lit_spot": 3,
+   "lit_spot_xy": [
+    9,
+    9
+   ],
+   "sender_xy": [
+    8,
+    7
+   ],
+   "sender_saw": "spot 3 is lit",
+   "sender_sent": [
+    30,
+    6,
+    5
+   ],
+   "sender_message_reads_as": 3,
+   "reader_confidence": 0.284,
+   "sender_action": "move y+1",
+   "listener_xy": [
+    10,
+    9
+   ],
+   "listener_heard": [
+    62,
+    36,
+    63
+   ],
+   "heard_reads_as": 0,
+   "listener_action": "move x+1",
+   "listener_steps_to_lit_spot": 0,
+   "listener_delivered": false,
+   "sender_delivered": false,
+   "listener_next_xy": [
+    11,
+    9
+   ]
+  },
+  {
+   "step": 13,
+   "lit_spot": 3,
+   "lit_spot_xy": [
+    9,
+    9
+   ],
+   "sender_xy": [
+    8,
+    8
+   ],
+   "sender_saw": "spot 3 is lit",
+   "sender_sent": [
+    51,
+    36,
+    31
+   ],
+   "sender_message_reads_as": 0,
+   "reader_confidence": 0.298,
+   "sender_action": "craft",
+   "listener_xy": [
+    11,
+    9
+   ],
+   "listener_heard": [
+    30,
+    6,
+    5
+   ],
+   "heard_reads_as": 3,
+   "listener_action": "move x-1",
+   "listener_steps_to_lit_spot": 1,
+   "listener_delivered": false,
+   "sender_delivered": true,
+   "listener_next_xy": [
+    10,
+    9
+   ]
+  },
+  {
+   "step": 14,
+   "lit_spot": 0,
+   "lit_spot_xy": [
+    3,
+    3
+   ],
+   "sender_xy": [
+    7,
+    6
+   ],
+   "sender_saw": "spot 0 is lit",
+   "sender_sent": [
+    30,
+    32,
+    24
+   ],
+   "sender_message_reads_as": 3,
+   "reader_confidence": 0.306,
+   "sender_action": "move x-1",
+   "listener_xy": [
+    10,
+    9
+   ],
+   "listener_heard": [
+    51,
+    36,
+    31
+   ],
+   "heard_reads_as": 0,
+   "listener_action": "move x-1",
+   "listener_steps_to_lit_spot": 5,
+   "listener_delivered": false,
+   "sender_delivered": false,
+   "listener_next_xy": [
+    9,
+    9
+   ]
+  },
+  {
+   "step": 15,
+   "lit_spot": 0,
+   "lit_spot_xy": [
+    3,
+    3
+   ],
+   "sender_xy": [
+    6,
+    6
+   ],
+   "sender_saw": "spot 0 is lit",
+   "sender_sent": [
+    18,
+    62,
+    28
+   ],
+   "sender_message_reads_as": 1,
+   "reader_confidence": 0.315,
+   "sender_action": "move x-1",
+   "listener_xy": [
+    9,
+    9
+   ],
+   "listener_heard": [
+    30,
+    32,
+    24
+   ],
+   "heard_reads_as": 3,
+   "listener_action": "move x+1",
+   "listener_steps_to_lit_spot": 5,
+   "listener_delivered": false,
+   "sender_delivered": false,
+   "listener_next_xy": [
+    10,
+    9
+   ]
+  },
+  {
+   "step": 16,
+   "lit_spot": 0,
+   "lit_spot_xy": [
+    3,
+    3
+   ],
+   "sender_xy": [
+    5,
+    6
+   ],
+   "sender_saw": "spot 0 is lit",
+   "sender_sent": [
+    33,
+    6,
+    22
+   ],
+   "sender_message_reads_as": 2,
+   "reader_confidence": 0.289,
+   "sender_action": "move x-1",
+   "listener_xy": [
+    10,
+    9
+   ],
+   "listener_heard": [
+    18,
+    62,
+    28
+   ],
+   "heard_reads_as": 1,
+   "listener_action": "move x-1",
+   "listener_steps_to_lit_spot": 5,
+   "listener_delivered": false,
+   "sender_delivered": false,
+   "listener_next_xy": [
+    9,
+    9
+   ]
+  },
+  {
+   "step": 17,
+   "lit_spot": 0,
+   "lit_spot_xy": [
+    3,
+    3
+   ],
+   "sender_xy": [
+    4,
+    6
+   ],
+   "sender_saw": "spot 0 is lit",
+   "sender_sent": [
+    42,
+    23,
+    21
+   ],
+   "sender_message_reads_as": 1,
+   "reader_confidence": 0.295,
+   "sender_action": "move x-1",
+   "listener_xy": [
+    9,
+    9
+   ],
+   "listener_heard": [
+    33,
+    6,
+    22
+   ],
+   "heard_reads_as": 2,
+   "listener_action": "move x+1",
+   "listener_steps_to_lit_spot": 5,
+   "listener_delivered": false,
+   "sender_delivered": false,
+   "listener_next_xy": [
+    10,
+    9
+   ]
+  },
+  {
+   "step": 18,
+   "lit_spot": 0,
+   "lit_spot_xy": [
+    3,
+    3
+   ],
+   "sender_xy": [
+    3,
+    6
+   ],
+   "sender_saw": "spot 0 is lit",
+   "sender_sent": [
+    6,
+    20,
+    24
+   ],
+   "sender_message_reads_as": 1,
+   "reader_confidence": 0.36,
+   "sender_action": "craft",
+   "listener_xy": [
+    10,
+    9
+   ],
+   "listener_heard": [
+    42,
+    23,
+    21
+   ],
+   "heard_reads_as": 1,
+   "listener_action": "move x-1",
+   "listener_steps_to_lit_spot": 5,
+   "listener_delivered": false,
+   "sender_delivered": false,
+   "listener_next_xy": [
+    9,
+    9
+   ]
+  },
+  {
+   "step": 19,
+   "lit_spot": 0,
+   "lit_spot_xy": [
+    3,
+    3
+   ],
+   "sender_xy": [
+    3,
+    6
+   ],
+   "sender_saw": "spot 0 is lit",
+   "sender_sent": [
+    6,
+    54,
+    11
+   ],
+   "sender_message_reads_as": 1,
+   "reader_confidence": 0.301,
+   "sender_action": "move y-1",
+   "listener_xy": [
+    9,
+    9
+   ],
+   "listener_heard": [
+    6,
+    20,
+    24
+   ],
+   "heard_reads_as": 1,
+   "listener_action": "move x+1",
+   "listener_steps_to_lit_spot": 5,
+   "listener_delivered": false,
+   "sender_delivered": false,
+   "listener_next_xy": [
+    10,
+    9
+   ]
+  },
+  {
+   "step": 20,
+   "lit_spot": 0,
+   "lit_spot_xy": [
+    3,
+    3
+   ],
+   "sender_xy": [
+    3,
+    5
+   ],
+   "sender_saw": "spot 0 is lit",
+   "sender_sent": [
+    9,
+    22,
+    56
+   ],
+   "sender_message_reads_as": 1,
+   "reader_confidence": 0.301,
+   "sender_action": "move y-1",
+   "listener_xy": [
+    10,
+    9
+   ],
+   "listener_heard": [
+    6,
+    54,
+    11
+   ],
+   "heard_reads_as": 1,
+   "listener_action": "move x-1",
+   "listener_steps_to_lit_spot": 5,
+   "listener_delivered": false,
+   "sender_delivered": false,
+   "listener_next_xy": [
+    9,
+    9
+   ]
+  },
+  {
+   "step": 21,
+   "lit_spot": 0,
+   "lit_spot_xy": [
+    3,
+    3
+   ],
+   "sender_xy": [
+    3,
+    4
+   ],
+   "sender_saw": "spot 0 is lit",
+   "sender_sent": [
+    2,
+    20,
+    22
+   ],
+   "sender_message_reads_as": 1,
+   "reader_confidence": 0.262,
+   "sender_action": "move y-1",
+   "listener_xy": [
+    9,
+    9
+   ],
+   "listener_heard": [
+    9,
+    22,
+    56
+   ],
+   "heard_reads_as": 1,
+   "listener_action": "move x+1",
+   "listener_steps_to_lit_spot": 5,
+   "listener_delivered": false,
+   "sender_delivered": false,
+   "listener_next_xy": [
+    10,
+    9
+   ]
+  },
+  {
+   "step": 22,
+   "lit_spot": 0,
+   "lit_spot_xy": [
+    3,
+    3
+   ],
+   "sender_xy": [
+    3,
+    3
+   ],
+   "sender_saw": "spot 0 is lit",
+   "sender_sent": [
+    55,
+    31,
+    22
+   ],
+   "sender_message_reads_as": 3,
+   "reader_confidence": 0.303,
+   "sender_action": "craft",
+   "listener_xy": [
+    10,
+    9
+   ],
+   "listener_heard": [
+    2,
+    20,
+    22
+   ],
+   "heard_reads_as": 1,
+   "listener_action": "move x-1",
+   "listener_steps_to_lit_spot": 5,
+   "listener_delivered": false,
+   "sender_delivered": true,
+   "listener_next_xy": [
+    9,
+    9
+   ]
+  },
+  {
+   "step": 23,
+   "lit_spot": 1,
+   "lit_spot_xy": [
+    3,
+    9
+   ],
+   "sender_xy": [
+    0,
+    9
+   ],
+   "sender_saw": "spot 1 is lit",
+   "sender_sent": [
+    46,
+    4,
+    12
+   ],
+   "sender_message_reads_as": 2,
+   "reader_confidence": 0.283,
+   "sender_action": "move x+1",
+   "listener_xy": [
+    9,
+    9
+   ],
+   "listener_heard": [
+    55,
+    31,
+    22
+   ],
+   "heard_reads_as": 3,
+   "listener_action": "move x+1",
+   "listener_steps_to_lit_spot": 5,
+   "listener_delivered": false,
+   "sender_delivered": false,
+   "listener_next_xy": [
+    10,
+    9
+   ]
+  },
+  {
+   "step": 24,
+   "lit_spot": 1,
+   "lit_spot_xy": [
+    3,
+    9
+   ],
+   "sender_xy": [
+    1,
+    9
+   ],
+   "sender_saw": "spot 1 is lit",
+   "sender_sent": [
+    15,
+    0,
+    13
+   ],
+   "sender_message_reads_as": 1,
+   "reader_confidence": 0.317,
+   "sender_action": "move x+1",
+   "listener_xy": [
+    10,
+    9
+   ],
+   "listener_heard": [
+    46,
+    4,
+    12
+   ],
+   "heard_reads_as": 2,
+   "listener_action": "move x-1",
+   "listener_steps_to_lit_spot": 4,
+   "listener_delivered": false,
+   "sender_delivered": false,
+   "listener_next_xy": [
+    9,
+    9
+   ]
+  },
+  {
+   "step": 25,
+   "lit_spot": 1,
+   "lit_spot_xy": [
+    3,
+    9
+   ],
+   "sender_xy": [
+    2,
+    9
+   ],
+   "sender_saw": "spot 1 is lit",
+   "sender_sent": [
+    19,
+    28,
+    63
+   ],
+   "sender_message_reads_as": 2,
+   "reader_confidence": 0.311,
+   "sender_action": "craft",
+   "listener_xy": [
+    9,
+    9
+   ],
+   "listener_heard": [
+    15,
+    0,
+    13
+   ],
+   "heard_reads_as": 1,
+   "listener_action": "move x+1",
+   "listener_steps_to_lit_spot": 5,
+   "listener_delivered": false,
+   "sender_delivered": true,
+   "listener_next_xy": [
+    10,
+    9
+   ]
+  },
+  {
+   "step": 26,
+   "lit_spot": 0,
+   "lit_spot_xy": [
+    3,
+    3
+   ],
+   "sender_xy": [
+    7,
+    6
+   ],
+   "sender_saw": "spot 0 is lit",
+   "sender_sent": [
+    18,
+    22,
+    5
+   ],
+   "sender_message_reads_as": 1,
+   "reader_confidence": 0.314,
+   "sender_action": "move x-1",
+   "listener_xy": [
+    10,
+    9
+   ],
+   "listener_heard": [
+    19,
+    28,
+    63
+   ],
+   "heard_reads_as": 2,
+   "listener_action": "move x-1",
+   "listener_steps_to_lit_spot": 5,
+   "listener_delivered": false,
+   "sender_delivered": false,
+   "listener_next_xy": [
+    9,
+    9
+   ]
+  },
+  {
+   "step": 27,
+   "lit_spot": 0,
+   "lit_spot_xy": [
+    3,
+    3
+   ],
+   "sender_xy": [
+    6,
+    6
+   ],
+   "sender_saw": "spot 0 is lit",
+   "sender_sent": [
+    51,
+    20,
+    56
+   ],
+   "sender_message_reads_as": 1,
+   "reader_confidence": 0.295,
+   "sender_action": "idle (5)",
+   "listener_xy": [
+    9,
+    9
+   ],
+   "listener_heard": [
+    18,
+    22,
+    5
+   ],
+   "heard_reads_as": 1,
+   "listener_action": "move x+1",
+   "listener_steps_to_lit_spot": 5,
+   "listener_delivered": false,
+   "sender_delivered": false,
+   "listener_next_xy": [
+    10,
+    9
+   ]
+  },
+  {
+   "step": 28,
+   "lit_spot": 0,
+   "lit_spot_xy": [
+    3,
+    3
+   ],
+   "sender_xy": [
+    6,
+    6
+   ],
+   "sender_saw": "spot 0 is lit",
+   "sender_sent": [
+    19,
+    43,
+    21
+   ],
+   "sender_message_reads_as": 2,
+   "reader_confidence": 0.27,
+   "sender_action": "move y-1",
+   "listener_xy": [
+    10,
+    9
+   ],
+   "listener_heard": [
+    51,
+    20,
+    56
+   ],
+   "heard_reads_as": 1,
+   "listener_action": "move x-1",
+   "listener_steps_to_lit_spot": 5,
+   "listener_delivered": false,
+   "sender_delivered": false,
+   "listener_next_xy": [
+    9,
+    9
+   ]
+  },
+  {
+   "step": 29,
+   "lit_spot": 0,
+   "lit_spot_xy": [
+    3,
+    3
+   ],
+   "sender_xy": [
+    6,
+    5
+   ],
+   "sender_saw": "spot 0 is lit",
+   "sender_sent": [
+    6,
+    20,
+    56
+   ],
+   "sender_message_reads_as": 1,
+   "reader_confidence": 0.365,
+   "sender_action": "move y-1",
+   "listener_xy": [
+    9,
+    9
+   ],
+   "listener_heard": [
+    19,
+    43,
+    21
+   ],
+   "heard_reads_as": 2,
+   "listener_action": "move x+1",
+   "listener_steps_to_lit_spot": 5,
+   "listener_delivered": false,
+   "sender_delivered": false,
+   "listener_next_xy": [
+    10,
+    9
+   ]
+  },
+  {
+   "step": 30,
+   "lit_spot": 0,
+   "lit_spot_xy": [
+    3,
+    3
+   ],
+   "sender_xy": [
+    6,
+    4
+   ],
+   "sender_saw": "spot 0 is lit",
+   "sender_sent": [
+    19,
+    31,
+    11
+   ],
+   "sender_message_reads_as": 3,
+   "reader_confidence": 0.29,
+   "sender_action": "move x-1",
+   "listener_xy": [
+    10,
+    9
+   ],
+   "listener_heard": [
+    6,
+    20,
+    56
+   ],
+   "heard_reads_as": 1,
+   "listener_action": "move x-1",
+   "listener_steps_to_lit_spot": 5,
+   "listener_delivered": false,
+   "sender_delivered": false,
+   "listener_next_xy": [
+    9,
+    9
+   ]
+  },
+  {
+   "step": 31,
+   "lit_spot": 0,
+   "lit_spot_xy": [
+    3,
+    3
+   ],
+   "sender_xy": [
+    5,
+    4
+   ],
+   "sender_saw": "spot 0 is lit",
+   "sender_sent": [
+    30,
+    0,
+    49
+   ],
+   "sender_message_reads_as": 3,
+   "reader_confidence": 0.299,
+   "sender_action": "move y-1",
+   "listener_xy": [
+    9,
+    9
+   ],
+   "listener_heard": [
+    19,
+    31,
+    11
+   ],
+   "heard_reads_as": 3,
+   "listener_action": "move x+1",
+   "listener_steps_to_lit_spot": 5,
+   "listener_delivered": false,
+   "sender_delivered": false,
+   "listener_next_xy": [
+    10,
+    9
+   ]
+  },
+  {
+   "step": 32,
+   "lit_spot": 0,
+   "lit_spot_xy": [
+    3,
+    3
+   ],
+   "sender_xy": [
+    5,
+    3
+   ],
+   "sender_saw": "spot 0 is lit",
+   "sender_sent": [
+    42,
+    62,
+    54
+   ],
+   "sender_message_reads_as": 3,
+   "reader_confidence": 0.296,
+   "sender_action": "move x-1",
+   "listener_xy": [
+    10,
+    9
+   ],
+   "listener_heard": [
+    30,
+    0,
+    49
+   ],
+   "heard_reads_as": 3,
+   "listener_action": "move x-1",
+   "listener_steps_to_lit_spot": 5,
+   "listener_delivered": false,
+   "sender_delivered": false,
+   "listener_next_xy": [
+    9,
+    9
+   ]
+  },
+  {
+   "step": 33,
+   "lit_spot": 0,
+   "lit_spot_xy": [
+    3,
+    3
+   ],
+   "sender_xy": [
+    4,
+    3
+   ],
+   "sender_saw": "spot 0 is lit",
+   "sender_sent": [
+    51,
+    20,
+    41
+   ],
+   "sender_message_reads_as": 0,
+   "reader_confidence": 0.298,
+   "sender_action": "move x-1",
+   "listener_xy": [
+    9,
+    9
+   ],
+   "listener_heard": [
+    42,
+    62,
+    54
+   ],
+   "heard_reads_as": 3,
+   "listener_action": "move x+1",
+   "listener_steps_to_lit_spot": 5,
+   "listener_delivered": false,
+   "sender_delivered": false,
+   "listener_next_xy": [
+    10,
+    9
+   ]
+  },
+  {
+   "step": 34,
+   "lit_spot": 0,
+   "lit_spot_xy": [
+    3,
+    3
+   ],
+   "sender_xy": [
+    3,
+    3
+   ],
+   "sender_saw": "spot 0 is lit",
+   "sender_sent": [
+    0,
+    4,
+    47
+   ],
+   "sender_message_reads_as": 2,
+   "reader_confidence": 0.321,
+   "sender_action": "craft",
+   "listener_xy": [
+    10,
+    9
+   ],
+   "listener_heard": [
+    51,
+    20,
+    41
+   ],
+   "heard_reads_as": 0,
+   "listener_action": "move x-1",
+   "listener_steps_to_lit_spot": 5,
+   "listener_delivered": false,
+   "sender_delivered": true,
+   "listener_next_xy": [
+    9,
+    9
+   ]
+  },
+  {
+   "step": 35,
+   "lit_spot": 2,
+   "lit_spot_xy": [
+    9,
+    3
+   ],
+   "sender_xy": [
+    0,
+    4
+   ],
+   "sender_saw": "spot 2 is lit",
+   "sender_sent": [
+    0,
+    23,
+    13
+   ],
+   "sender_message_reads_as": 2,
+   "reader_confidence": 0.281,
+   "sender_action": "move x-1",
+   "listener_xy": [
+    9,
+    9
+   ],
+   "listener_heard": [
+    0,
+    4,
+    47
+   ],
+   "heard_reads_as": 2,
+   "listener_action": "move x+1",
+   "listener_steps_to_lit_spot": 5,
+   "listener_delivered": false,
+   "sender_delivered": false,
+   "listener_next_xy": [
+    10,
+    9
+   ]
+  },
+  {
+   "step": 36,
+   "lit_spot": 2,
+   "lit_spot_xy": [
+    9,
+    3
+   ],
+   "sender_xy": [
+    11,
+    4
+   ],
+   "sender_saw": "spot 2 is lit",
+   "sender_sent": [
+    9,
+    47,
+    51
+   ],
+   "sender_message_reads_as": 2,
+   "reader_confidence": 0.27,
+   "sender_action": "move y-1",
+   "listener_xy": [
+    10,
+    9
+   ],
+   "listener_heard": [
+    0,
+    23,
+    13
+   ],
+   "heard_reads_as": 2,
+   "listener_action": "move x-1",
+   "listener_steps_to_lit_spot": 5,
+   "listener_delivered": false,
+   "sender_delivered": false,
+   "listener_next_xy": [
+    9,
+    9
+   ]
+  },
+  {
+   "step": 37,
+   "lit_spot": 2,
+   "lit_spot_xy": [
+    9,
+    3
+   ],
+   "sender_xy": [
+    11,
+    3
+   ],
+   "sender_saw": "spot 2 is lit",
+   "sender_sent": [
+    49,
+    20,
+    12
+   ],
+   "sender_message_reads_as": 2,
+   "reader_confidence": 0.288,
+   "sender_action": "move x-1",
+   "listener_xy": [
+    9,
+    9
+   ],
+   "listener_heard": [
+    9,
+    47,
+    51
+   ],
+   "heard_reads_as": 2,
+   "listener_action": "move x+1",
+   "listener_steps_to_lit_spot": 5,
+   "listener_delivered": false,
+   "sender_delivered": false,
+   "listener_next_xy": [
+    10,
+    9
+   ]
+  },
+  {
+   "step": 38,
+   "lit_spot": 2,
+   "lit_spot_xy": [
+    9,
+    3
+   ],
+   "sender_xy": [
+    10,
+    3
+   ],
+   "sender_saw": "spot 2 is lit",
+   "sender_sent": [
+    14,
+    17,
+    54
+   ],
+   "sender_message_reads_as": 2,
+   "reader_confidence": 0.294,
+   "sender_action": "move x-1",
+   "listener_xy": [
+    10,
+    9
+   ],
+   "listener_heard": [
+    49,
+    20,
+    12
+   ],
+   "heard_reads_as": 2,
+   "listener_action": "move x-1",
+   "listener_steps_to_lit_spot": 5,
+   "listener_delivered": false,
+   "sender_delivered": false,
+   "listener_next_xy": [
+    9,
+    9
+   ]
+  },
+  {
+   "step": 39,
+   "lit_spot": 2,
+   "lit_spot_xy": [
+    9,
+    3
+   ],
+   "sender_xy": [
+    9,
+    3
+   ],
+   "sender_saw": "spot 2 is lit",
+   "sender_sent": [
+    2,
+    44,
+    17
+   ],
+   "sender_message_reads_as": 0,
+   "reader_confidence": 0.352,
+   "sender_action": "craft",
+   "listener_xy": [
+    9,
+    9
+   ],
+   "listener_heard": [
+    14,
+    17,
+    54
+   ],
+   "heard_reads_as": 2,
+   "listener_action": "move x+1",
+   "listener_steps_to_lit_spot": 5,
+   "listener_delivered": false,
+   "sender_delivered": true,
+   "listener_next_xy": [
+    10,
+    9
+   ]
+  },
+  {
+   "step": 40,
+   "lit_spot": 1,
+   "lit_spot_xy": [
+    3,
+    9
+   ],
+   "sender_xy": [
+    2,
+    0
+   ],
+   "sender_saw": "spot 1 is lit",
+   "sender_sent": [
+    9,
+    62,
+    31
+   ],
+   "sender_message_reads_as": 0,
+   "reader_confidence": 0.285,
+   "sender_action": "move y-1",
+   "listener_xy": [
+    10,
+    9
+   ],
+   "listener_heard": [
+    2,
+    44,
+    17
+   ],
+   "heard_reads_as": 0,
+   "listener_action": "move x-1",
+   "listener_steps_to_lit_spot": 4,
+   "listener_delivered": false,
+   "sender_delivered": false,
+   "listener_next_xy": [
+    9,
+    9
+   ]
+  },
+  {
+   "step": 41,
+   "lit_spot": 1,
+   "lit_spot_xy": [
+    3,
+    9
+   ],
+   "sender_xy": [
+    2,
+    11
+   ],
+   "sender_saw": "spot 1 is lit",
+   "sender_sent": [
+    62,
+    60,
+    3
+   ],
+   "sender_message_reads_as": 2,
+   "reader_confidence": 0.287,
+   "sender_action": "idle (5)",
+   "listener_xy": [
+    9,
+    9
+   ],
+   "listener_heard": [
+    9,
+    62,
+    31
+   ],
+   "heard_reads_as": 0,
+   "listener_action": "move x+1",
+   "listener_steps_to_lit_spot": 5,
+   "listener_delivered": false,
+   "sender_delivered": false,
+   "listener_next_xy": [
+    10,
+    9
+   ]
+  },
+  {
+   "step": 42,
+   "lit_spot": 1,
+   "lit_spot_xy": [
+    3,
+    9
+   ],
+   "sender_xy": [
+    2,
+    11
+   ],
+   "sender_saw": "spot 1 is lit",
+   "sender_sent": [
+    16,
+    18,
+    12
+   ],
+   "sender_message_reads_as": 2,
+   "reader_confidence": 0.28,
+   "sender_action": "move y-1",
+   "listener_xy": [
+    10,
+    9
+   ],
+   "listener_heard": [
+    62,
+    60,
+    3
+   ],
+   "heard_reads_as": 2,
+   "listener_action": "move x-1",
+   "listener_steps_to_lit_spot": 4,
+   "listener_delivered": false,
+   "sender_delivered": false,
+   "listener_next_xy": [
+    9,
+    9
+   ]
+  },
+  {
+   "step": 43,
+   "lit_spot": 1,
+   "lit_spot_xy": [
+    3,
+    9
+   ],
+   "sender_xy": [
+    2,
+    10
+   ],
+   "sender_saw": "spot 1 is lit",
+   "sender_sent": [
+    62,
+    39,
+    18
+   ],
+   "sender_message_reads_as": 0,
+   "reader_confidence": 0.314,
+   "sender_action": "move y-1",
+   "listener_xy": [
+    9,
+    9
+   ],
+   "listener_heard": [
+    16,
+    18,
+    12
+   ],
+   "heard_reads_as": 2,
+   "listener_action": "move x+1",
+   "listener_steps_to_lit_spot": 5,
+   "listener_delivered": false,
+   "sender_delivered": false,
+   "listener_next_xy": [
+    10,
+    9
+   ]
+  },
+  {
+   "step": 44,
+   "lit_spot": 1,
+   "lit_spot_xy": [
+    3,
+    9
+   ],
+   "sender_xy": [
+    2,
+    9
+   ],
+   "sender_saw": "spot 1 is lit",
+   "sender_sent": [
+    46,
+    18,
+    35
+   ],
+   "sender_message_reads_as": 0,
+   "reader_confidence": 0.322,
+   "sender_action": "move y+1",
+   "listener_xy": [
+    10,
+    9
+   ],
+   "listener_heard": [
+    62,
+    39,
+    18
+   ],
+   "heard_reads_as": 0,
+   "listener_action": "move x-1",
+   "listener_steps_to_lit_spot": 4,
+   "listener_delivered": false,
+   "sender_delivered": false,
+   "listener_next_xy": [
+    9,
+    9
+   ]
+  },
+  {
+   "step": 45,
+   "lit_spot": 1,
+   "lit_spot_xy": [
+    3,
+    9
+   ],
+   "sender_xy": [
+    2,
+    10
+   ],
+   "sender_saw": "spot 1 is lit",
+   "sender_sent": [
+    15,
+    56,
+    45
+   ],
+   "sender_message_reads_as": 0,
+   "reader_confidence": 0.279,
+   "sender_action": "move y-1",
+   "listener_xy": [
+    9,
+    9
+   ],
+   "listener_heard": [
+    46,
+    18,
+    35
+   ],
+   "heard_reads_as": 0,
+   "listener_action": "move x+1",
+   "listener_steps_to_lit_spot": 5,
+   "listener_delivered": false,
+   "sender_delivered": false,
+   "listener_next_xy": [
+    10,
+    9
+   ]
+  },
+  {
+   "step": 46,
+   "lit_spot": 1,
+   "lit_spot_xy": [
+    3,
+    9
+   ],
+   "sender_xy": [
+    2,
+    9
+   ],
+   "sender_saw": "spot 1 is lit",
+   "sender_sent": [
+    41,
+    48,
+    63
+   ],
+   "sender_message_reads_as": 0,
+   "reader_confidence": 0.286,
+   "sender_action": "craft",
+   "listener_xy": [
+    10,
+    9
+   ],
+   "listener_heard": [
+    15,
+    56,
+    45
+   ],
+   "heard_reads_as": 0,
+   "listener_action": "move x-1",
+   "listener_steps_to_lit_spot": 4,
+   "listener_delivered": false,
+   "sender_delivered": true,
+   "listener_next_xy": [
+    9,
+    9
+   ]
+  },
+  {
+   "step": 47,
+   "lit_spot": 2,
+   "lit_spot_xy": [
+    9,
+    3
+   ],
+   "sender_xy": [
+    9,
+    11
+   ],
+   "sender_saw": "spot 2 is lit",
+   "sender_sent": [
+    46,
+    60,
+    47
+   ],
+   "sender_message_reads_as": 0,
+   "reader_confidence": 0.324,
+   "sender_action": "move y+1",
+   "listener_xy": [
+    9,
+    9
+   ],
+   "listener_heard": [
+    41,
+    48,
+    63
+   ],
+   "heard_reads_as": 0,
+   "listener_action": "move x+1",
+   "listener_steps_to_lit_spot": 5,
+   "listener_delivered": false,
+   "sender_delivered": false,
+   "listener_next_xy": [
+    10,
+    9
+   ]
+  },
+  {
+   "step": 48,
+   "lit_spot": 2,
+   "lit_spot_xy": [
+    9,
+    3
+   ],
+   "sender_xy": [
+    9,
+    0
+   ],
+   "sender_saw": "spot 2 is lit",
+   "sender_sent": [
+    42,
+    22,
+    51
+   ],
+   "sender_message_reads_as": 3,
+   "reader_confidence": 0.298,
+   "sender_action": "move y+1",
+   "listener_xy": [
+    10,
+    9
+   ],
+   "listener_heard": [
+    46,
+    60,
+    47
+   ],
+   "heard_reads_as": 0,
+   "listener_action": "idle (9)",
+   "listener_steps_to_lit_spot": 5,
+   "listener_delivered": false,
+   "sender_delivered": false,
+   "listener_next_xy": [
+    10,
+    9
+   ]
+  },
+  {
+   "step": 49,
+   "lit_spot": 2,
+   "lit_spot_xy": [
+    9,
+    3
+   ],
+   "sender_xy": [
+    9,
+    1
+   ],
+   "sender_saw": "spot 2 is lit",
+   "sender_sent": [
+    9,
+    31,
+    51
+   ],
+   "sender_message_reads_as": 2,
+   "reader_confidence": 0.289,
+   "sender_action": "move x+1",
+   "listener_xy": [
+    10,
+    9
+   ],
+   "listener_heard": [
+    42,
+    22,
+    51
+   ],
+   "heard_reads_as": 3,
+   "listener_action": "idle (5)",
+   "listener_steps_to_lit_spot": 5,
+   "listener_delivered": false,
+   "sender_delivered": false,
+   "listener_next_xy": [
+    10,
+    9
+   ]
+  },
+  {
+   "step": 50,
+   "lit_spot": 2,
+   "lit_spot_xy": [
+    9,
+    3
+   ],
+   "sender_xy": [
+    10,
+    1
+   ],
+   "sender_saw": "spot 2 is lit",
+   "sender_sent": [
+    20,
+    32,
+    45
+   ],
+   "sender_message_reads_as": 3,
+   "reader_confidence": 0.262,
+   "sender_action": "move x-1",
+   "listener_xy": [
+    10,
+    9
+   ],
+   "listener_heard": [
+    9,
+    31,
+    51
+   ],
+   "heard_reads_as": 2,
+   "listener_action": "move x-1",
+   "listener_steps_to_lit_spot": 5,
+   "listener_delivered": false,
+   "sender_delivered": false,
+   "listener_next_xy": [
+    9,
+    9
+   ]
+  },
+  {
+   "step": 51,
+   "lit_spot": 2,
+   "lit_spot_xy": [
+    9,
+    3
+   ],
+   "sender_xy": [
+    9,
+    1
+   ],
+   "sender_saw": "spot 2 is lit",
+   "sender_sent": [
+    30,
+    17,
+    18
+   ],
+   "sender_message_reads_as": 0,
+   "reader_confidence": 0.32,
+   "sender_action": "move y+1",
+   "listener_xy": [
+    9,
+    9
+   ],
+   "listener_heard": [
+    20,
+    32,
+    45
+   ],
+   "heard_reads_as": 3,
+   "listener_action": "move x+1",
+   "listener_steps_to_lit_spot": 5,
+   "listener_delivered": false,
+   "sender_delivered": false,
+   "listener_next_xy": [
+    10,
+    9
+   ]
+  },
+  {
+   "step": 52,
+   "lit_spot": 2,
+   "lit_spot_xy": [
+    9,
+    3
+   ],
+   "sender_xy": [
+    9,
+    2
+   ],
+   "sender_saw": "spot 2 is lit",
+   "sender_sent": [
+    26,
+    18,
+    21
+   ],
+   "sender_message_reads_as": 2,
+   "reader_confidence": 0.269,
+   "sender_action": "craft",
+   "listener_xy": [
+    10,
+    9
+   ],
+   "listener_heard": [
+    30,
+    17,
+    18
+   ],
+   "heard_reads_as": 0,
+   "listener_action": "stay",
+   "listener_steps_to_lit_spot": 5,
+   "listener_delivered": false,
+   "sender_delivered": true,
+   "listener_next_xy": [
+    10,
+    9
+   ]
+  },
+  {
+   "step": 53,
+   "lit_spot": 0,
+   "lit_spot_xy": [
+    3,
+    3
+   ],
+   "sender_xy": [
+    1,
+    3
+   ],
+   "sender_saw": "spot 0 is lit",
+   "sender_sent": [
+    42,
+    23,
+    28
+   ],
+   "sender_message_reads_as": 0,
+   "reader_confidence": 0.29,
+   "sender_action": "move x+1",
+   "listener_xy": [
+    10,
+    9
+   ],
+   "listener_heard": [
+    26,
+    18,
+    21
+   ],
+   "heard_reads_as": 2,
+   "listener_action": "move x-1",
+   "listener_steps_to_lit_spot": 5,
+   "listener_delivered": false,
+   "sender_delivered": false,
+   "listener_next_xy": [
+    9,
+    9
+   ]
+  },
+  {
+   "step": 54,
+   "lit_spot": 0,
+   "lit_spot_xy": [
+    3,
+    3
+   ],
+   "sender_xy": [
+    2,
+    3
+   ],
+   "sender_saw": "spot 0 is lit",
+   "sender_sent": [
+    19,
+    48,
+    45
+   ],
+   "sender_message_reads_as": 0,
+   "reader_confidence": 0.303,
+   "sender_action": "craft",
+   "listener_xy": [
+    9,
+    9
+   ],
+   "listener_heard": [
+    42,
+    23,
+    28
+   ],
+   "heard_reads_as": 0,
+   "listener_action": "move x+1",
+   "listener_steps_to_lit_spot": 5,
+   "listener_delivered": false,
+   "sender_delivered": true,
+   "listener_next_xy": [
+    10,
+    9
+   ]
+  },
+  {
+   "step": 55,
+   "lit_spot": 3,
+   "lit_spot_xy": [
+    9,
+    9
+   ],
+   "sender_xy": [
+    4,
+    0
+   ],
+   "sender_saw": "spot 3 is lit",
+   "sender_sent": [
+    20,
+    55,
+    5
+   ],
+   "sender_message_reads_as": 1,
+   "reader_confidence": 0.29,
+   "sender_action": "move y-1",
+   "listener_xy": [
+    10,
+    9
+   ],
+   "listener_heard": [
+    19,
+    48,
+    45
+   ],
+   "heard_reads_as": 0,
+   "listener_action": "move x-1",
+   "listener_steps_to_lit_spot": 0,
+   "listener_delivered": false,
+   "sender_delivered": false,
+   "listener_next_xy": [
+    9,
+    9
+   ]
+  },
+  {
+   "step": 56,
+   "lit_spot": 3,
+   "lit_spot_xy": [
+    9,
+    9
+   ],
+   "sender_xy": [
+    4,
+    11
+   ],
+   "sender_saw": "spot 3 is lit",
+   "sender_sent": [
+    18,
+    6,
+    21
+   ],
+   "sender_message_reads_as": 1,
+   "reader_confidence": 0.367,
+   "sender_action": "move y-1",
+   "listener_xy": [
+    9,
+    9
+   ],
+   "listener_heard": [
+    20,
+    55,
+    5
+   ],
+   "heard_reads_as": 1,
+   "listener_action": "idle (5)",
+   "listener_steps_to_lit_spot": 0,
+   "listener_delivered": false,
+   "sender_delivered": false,
+   "listener_next_xy": [
+    9,
+    9
+   ]
+  },
+  {
+   "step": 57,
+   "lit_spot": 3,
+   "lit_spot_xy": [
+    9,
+    9
+   ],
+   "sender_xy": [
+    4,
+    10
+   ],
+   "sender_saw": "spot 3 is lit",
+   "sender_sent": [
+    46,
+    18,
+    41
+   ],
+   "sender_message_reads_as": 0,
+   "reader_confidence": 0.323,
+   "sender_action": "move x+1",
+   "listener_xy": [
+    9,
+    9
+   ],
+   "listener_heard": [
+    18,
+    6,
+    21
+   ],
+   "heard_reads_as": 1,
+   "listener_action": "move x+1",
+   "listener_steps_to_lit_spot": 0,
+   "listener_delivered": false,
+   "sender_delivered": false,
+   "listener_next_xy": [
+    10,
+    9
+   ]
+  },
+  {
+   "step": 58,
+   "lit_spot": 3,
+   "lit_spot_xy": [
+    9,
+    9
+   ],
+   "sender_xy": [
+    5,
+    10
+   ],
+   "sender_saw": "spot 3 is lit",
+   "sender_sent": [
+    31,
+    24,
+    28
+   ],
+   "sender_message_reads_as": 0,
+   "reader_confidence": 0.278,
+   "sender_action": "idle (11)",
+   "listener_xy": [
+    10,
+    9
+   ],
+   "listener_heard": [
+    46,
+    18,
+    41
+   ],
+   "heard_reads_as": 0,
+   "listener_action": "move x-1",
+   "listener_steps_to_lit_spot": 0,
+   "listener_delivered": false,
+   "sender_delivered": false,
+   "listener_next_xy": [
+    9,
+    9
+   ]
+  },
+  {
+   "step": 59,
+   "lit_spot": 3,
+   "lit_spot_xy": [
+    9,
+    9
+   ],
+   "sender_xy": [
+    5,
+    10
+   ],
+   "sender_saw": "spot 3 is lit",
+   "sender_sent": [
+    63,
+    6,
+    21
+   ],
+   "sender_message_reads_as": 3,
+   "reader_confidence": 0.28,
+   "sender_action": "move y-1",
+   "listener_xy": [
+    9,
+    9
+   ],
+   "listener_heard": [
+    31,
+    24,
+    28
+   ],
+   "heard_reads_as": 0,
+   "listener_action": "craft",
+   "listener_steps_to_lit_spot": 0,
+   "listener_delivered": true,
+   "sender_delivered": false,
+   "listener_next_xy": [
+    3,
+    7
+   ]
+  },
+  {
+   "step": 60,
+   "lit_spot": 2,
+   "lit_spot_xy": [
+    9,
+    3
+   ],
+   "sender_xy": [
+    5,
+    9
+   ],
+   "sender_saw": "spot 2 is lit",
+   "sender_sent": [
+    15,
+    18,
+    14
+   ],
+   "sender_message_reads_as": 1,
+   "reader_confidence": 0.276,
+   "sender_action": "move y+1",
+   "listener_xy": [
+    3,
+    7
+   ],
+   "listener_heard": [
+    63,
+    6,
+    21
+   ],
+   "heard_reads_as": 3,
+   "listener_action": "idle (5)",
+   "listener_steps_to_lit_spot": 5,
+   "listener_delivered": false,
+   "sender_delivered": false,
+   "listener_next_xy": [
+    3,
+    7
+   ]
+  },
+  {
+   "step": 61,
+   "lit_spot": 2,
+   "lit_spot_xy": [
+    9,
+    3
+   ],
+   "sender_xy": [
+    5,
+    10
+   ],
+   "sender_saw": "spot 2 is lit",
+   "sender_sent": [
+    15,
+    28,
+    37
+   ],
+   "sender_message_reads_as": 0,
+   "reader_confidence": 0.29,
+   "sender_action": "move y-1",
+   "listener_xy": [
+    3,
+    7
+   ],
+   "listener_heard": [
+    15,
+    18,
+    14
+   ],
+   "heard_reads_as": 1,
+   "listener_action": "move y+1",
+   "listener_steps_to_lit_spot": 5,
+   "listener_delivered": false,
+   "sender_delivered": false,
+   "listener_next_xy": [
+    3,
+    8
+   ]
+  },
+  {
+   "step": 62,
+   "lit_spot": 2,
+   "lit_spot_xy": [
+    9,
+    3
+   ],
+   "sender_xy": [
+    5,
+    9
+   ],
+   "sender_saw": "spot 2 is lit",
+   "sender_sent": [
+    14,
+    32,
+    28
+   ],
+   "sender_message_reads_as": 2,
+   "reader_confidence": 0.305,
+   "sender_action": "move y+1",
+   "listener_xy": [
+    3,
+    8
+   ],
+   "listener_heard": [
+    15,
+    28,
+    37
+   ],
+   "heard_reads_as": 0,
+   "listener_action": "craft",
+   "listener_steps_to_lit_spot": 5,
+   "listener_delivered": false,
+   "sender_delivered": false,
+   "listener_next_xy": [
+    3,
+    8
+   ]
+  },
+  {
+   "step": 63,
+   "lit_spot": 2,
+   "lit_spot_xy": [
+    9,
+    3
+   ],
+   "sender_xy": [
+    5,
+    10
+   ],
+   "sender_saw": "spot 2 is lit",
+   "sender_sent": [
+    46,
+    32,
+    5
+   ],
+   "sender_message_reads_as": 2,
+   "reader_confidence": 0.278,
+   "sender_action": "move y-1",
+   "listener_xy": [
+    3,
+    8
+   ],
+   "listener_heard": [
+    14,
+    32,
+    28
+   ],
+   "heard_reads_as": 2,
+   "listener_action": "craft",
+   "listener_steps_to_lit_spot": 5,
+   "listener_delivered": false,
+   "sender_delivered": false,
+   "listener_next_xy": [
+    3,
+    8
+   ]
+  },
+  {
+   "step": 64,
+   "lit_spot": 2,
+   "lit_spot_xy": [
+    9,
+    3
+   ],
+   "sender_xy": [
+    5,
+    9
+   ],
+   "sender_saw": "spot 2 is lit",
+   "sender_sent": [
+    6,
+    23,
+    49
+   ],
+   "sender_message_reads_as": 1,
+   "reader_confidence": 0.312,
+   "sender_action": "move x+1",
+   "listener_xy": [
+    3,
+    8
+   ],
+   "listener_heard": [
+    46,
+    32,
+    5
+   ],
+   "heard_reads_as": 2,
+   "listener_action": "move y+1",
+   "listener_steps_to_lit_spot": 5,
+   "listener_delivered": false,
+   "sender_delivered": false,
+   "listener_next_xy": [
+    3,
+    9
+   ]
+  },
+  {
+   "step": 65,
+   "lit_spot": 2,
+   "lit_spot_xy": [
+    9,
+    3
+   ],
+   "sender_xy": [
+    6,
+    9
+   ],
+   "sender_saw": "spot 2 is lit",
+   "sender_sent": [
+    51,
+    62,
+    49
+   ],
+   "sender_message_reads_as": 3,
+   "reader_confidence": 0.302,
+   "sender_action": "move x+1",
+   "listener_xy": [
+    3,
+    9
+   ],
+   "listener_heard": [
+    6,
+    23,
+    49
+   ],
+   "heard_reads_as": 1,
+   "listener_action": "craft",
+   "listener_steps_to_lit_spot": 5,
+   "listener_delivered": false,
+   "sender_delivered": false,
+   "listener_next_xy": [
+    3,
+    9
+   ]
+  },
+  {
+   "step": 66,
+   "lit_spot": 2,
+   "lit_spot_xy": [
+    9,
+    3
+   ],
+   "sender_xy": [
+    7,
+    9
+   ],
+   "sender_saw": "spot 2 is lit",
+   "sender_sent": [
+    33,
+    4,
+    13
+   ],
+   "sender_message_reads_as": 3,
+   "reader_confidence": 0.295,
+   "sender_action": "move x+1",
+   "listener_xy": [
+    3,
+    9
+   ],
+   "listener_heard": [
+    51,
+    62,
+    49
+   ],
+   "heard_reads_as": 3,
+   "listener_action": "craft",
+   "listener_steps_to_lit_spot": 5,
+   "listener_delivered": false,
+   "sender_delivered": false,
+   "listener_next_xy": [
+    3,
+    9
+   ]
+  },
+  {
+   "step": 67,
+   "lit_spot": 2,
+   "lit_spot_xy": [
+    9,
+    3
+   ],
+   "sender_xy": [
+    8,
+    9
+   ],
+   "sender_saw": "spot 2 is lit",
+   "sender_sent": [
+    46,
+    17,
+    21
+   ],
+   "sender_message_reads_as": 3,
+   "reader_confidence": 0.271,
+   "sender_action": "idle (11)",
+   "listener_xy": [
+    3,
+    9
+   ],
+   "listener_heard": [
+    33,
+    4,
+    13
+   ],
+   "heard_reads_as": 3,
+   "listener_action": "craft",
+   "listener_steps_to_lit_spot": 5,
+   "listener_delivered": false,
+   "sender_delivered": false,
+   "listener_next_xy": [
+    3,
+    9
+   ]
+  },
+  {
+   "step": 68,
+   "lit_spot": 2,
+   "lit_spot_xy": [
+    9,
+    3
+   ],
+   "sender_xy": [
+    8,
+    9
+   ],
+   "sender_saw": "spot 2 is lit",
+   "sender_sent": [
+    25,
+    59,
+    12
+   ],
+   "sender_message_reads_as": 1,
+   "reader_confidence": 0.319,
+   "sender_action": "move y+1",
+   "listener_xy": [
+    3,
+    9
+   ],
+   "listener_heard": [
+    46,
+    17,
+    21
+   ],
+   "heard_reads_as": 3,
+   "listener_action": "move x-1",
+   "listener_steps_to_lit_spot": 5,
+   "listener_delivered": false,
+   "sender_delivered": false,
+   "listener_next_xy": [
+    2,
+    9
+   ]
+  },
+  {
+   "step": 69,
+   "lit_spot": 2,
+   "lit_spot_xy": [
+    9,
+    3
+   ],
+   "sender_xy": [
+    8,
+    10
+   ],
+   "sender_saw": "spot 2 is lit",
+   "sender_sent": [
+    41,
+    36,
+    51
+   ],
+   "sender_message_reads_as": 2,
+   "reader_confidence": 0.322,
+   "sender_action": "move y+1",
+   "listener_xy": [
+    2,
+    9
+   ],
+   "listener_heard": [
+    25,
+    59,
+    12
+   ],
+   "heard_reads_as": 1,
+   "listener_action": "move x+1",
+   "listener_steps_to_lit_spot": 5,
+   "listener_delivered": false,
+   "sender_delivered": false,
+   "listener_next_xy": [
+    3,
+    9
+   ]
+  },
+  {
+   "step": 70,
+   "lit_spot": 2,
+   "lit_spot_xy": [
+    9,
+    3
+   ],
+   "sender_xy": [
+    8,
+    11
+   ],
+   "sender_saw": "spot 2 is lit",
+   "sender_sent": [
+    62,
+    39,
+    32
+   ],
+   "sender_message_reads_as": 3,
+   "reader_confidence": 0.288,
+   "sender_action": "move y+1",
+   "listener_xy": [
+    3,
+    9
+   ],
+   "listener_heard": [
+    41,
+    36,
+    51
+   ],
+   "heard_reads_as": 2,
+   "listener_action": "craft",
+   "listener_steps_to_lit_spot": 5,
+   "listener_delivered": false,
+   "sender_delivered": false,
+   "listener_next_xy": [
+    3,
+    9
+   ]
+  },
+  {
+   "step": 71,
+   "lit_spot": 2,
+   "lit_spot_xy": [
+    9,
+    3
+   ],
+   "sender_xy": [
+    8,
+    0
+   ],
+   "sender_saw": "spot 2 is lit",
+   "sender_sent": [
+    20,
+    27,
+    21
+   ],
+   "sender_message_reads_as": 1,
+   "reader_confidence": 0.289,
+   "sender_action": "move y+1",
+   "listener_xy": [
+    3,
+    9
+   ],
+   "listener_heard": [
+    62,
+    39,
+    32
+   ],
+   "heard_reads_as": 3,
+   "listener_action": "craft",
+   "listener_steps_to_lit_spot": 5,
+   "listener_delivered": false,
+   "sender_delivered": false,
+   "listener_next_xy": [
+    3,
+    9
+   ]
+  },
+  {
+   "step": 72,
+   "lit_spot": 2,
+   "lit_spot_xy": [
+    9,
+    3
+   ],
+   "sender_xy": [
+    8,
+    1
+   ],
+   "sender_saw": "spot 2 is lit",
+   "sender_sent": [
+    21,
+    62,
+    45
+   ],
+   "sender_message_reads_as": 0,
+   "reader_confidence": 0.293,
+   "sender_action": "move y+1",
+   "listener_xy": [
+    3,
+    9
+   ],
+   "listener_heard": [
+    20,
+    27,
+    21
+   ],
+   "heard_reads_as": 1,
+   "listener_action": "craft",
+   "listener_steps_to_lit_spot": 5,
+   "listener_delivered": false,
+   "sender_delivered": false,
+   "listener_next_xy": [
+    3,
+    9
+   ]
+  },
+  {
+   "step": 73,
+   "lit_spot": 2,
+   "lit_spot_xy": [
+    9,
+    3
+   ],
+   "sender_xy": [
+    8,
+    2
+   ],
+   "sender_saw": "spot 2 is lit",
+   "sender_sent": [
+    2,
+    32,
+    37
+   ],
+   "sender_message_reads_as": 2,
+   "reader_confidence": 0.322,
+   "sender_action": "craft",
+   "listener_xy": [
+    3,
+    9
+   ],
+   "listener_heard": [
+    21,
+    62,
+    45
+   ],
+   "heard_reads_as": 0,
+   "listener_action": "craft",
+   "listener_steps_to_lit_spot": 5,
+   "listener_delivered": false,
+   "sender_delivered": true,
+   "listener_next_xy": [
+    3,
+    9
+   ]
+  },
+  {
+   "step": 74,
+   "lit_spot": 1,
+   "lit_spot_xy": [
+    3,
+    9
+   ],
+   "sender_xy": [
+    11,
+    0
+   ],
+   "sender_saw": "spot 1 is lit",
+   "sender_sent": [
+    26,
+    0,
+    31
+   ],
+   "sender_message_reads_as": 0,
+   "reader_confidence": 0.293,
+   "sender_action": "move x+1",
+   "listener_xy": [
+    3,
+    9
+   ],
+   "listener_heard": [
+    2,
+    32,
+    37
+   ],
+   "heard_reads_as": 2,
+   "listener_action": "craft",
+   "listener_steps_to_lit_spot": 0,
+   "listener_delivered": true,
+   "sender_delivered": false,
+   "listener_next_xy": [
+    8,
+    6
+   ]
+  },
+  {
+   "step": 75,
+   "lit_spot": 2,
+   "lit_spot_xy": [
+    9,
+    3
+   ],
+   "sender_xy": [
+    0,
+    0
+   ],
+   "sender_saw": "spot 2 is lit",
+   "sender_sent": [
+    63,
+    63,
+    12
+   ],
+   "sender_message_reads_as": 0,
+   "reader_confidence": 0.263,
+   "sender_action": "move x-1",
+   "listener_xy": [
+    8,
+    6
+   ],
+   "listener_heard": [
+    26,
+    0,
+    31
+   ],
+   "heard_reads_as": 0,
+   "listener_action": "move y-1",
+   "listener_steps_to_lit_spot": 2,
+   "listener_delivered": false,
+   "sender_delivered": false,
+   "listener_next_xy": [
+    8,
+    5
+   ]
+  },
+  {
+   "step": 76,
+   "lit_spot": 2,
+   "lit_spot_xy": [
+    9,
+    3
+   ],
+   "sender_xy": [
+    11,
+    0
+   ],
+   "sender_saw": "spot 2 is lit",
+   "sender_sent": [
+    0,
+    56,
+    51
+   ],
+   "sender_message_reads_as": 2,
+   "reader_confidence": 0.345,
+   "sender_action": "move x-1",
+   "listener_xy": [
+    8,
+    5
+   ],
+   "listener_heard": [
+    63,
+    63,
+    12
+   ],
+   "heard_reads_as": 0,
+   "listener_action": "move x+1",
+   "listener_steps_to_lit_spot": 1,
+   "listener_delivered": false,
+   "sender_delivered": false,
+   "listener_next_xy": [
+    9,
+    5
+   ]
+  },
+  {
+   "step": 77,
+   "lit_spot": 2,
+   "lit_spot_xy": [
+    9,
+    3
+   ],
+   "sender_xy": [
+    10,
+    0
+   ],
+   "sender_saw": "spot 2 is lit",
+   "sender_sent": [
+    0,
+    56,
+    51
+   ],
+   "sender_message_reads_as": 2,
+   "reader_confidence": 0.345,
+   "sender_action": "move x-1",
+   "listener_xy": [
+    9,
+    5
+   ],
+   "listener_heard": [
+    0,
+    56,
+    51
+   ],
+   "heard_reads_as": 2,
+   "listener_action": "move y+1",
+   "listener_steps_to_lit_spot": 1,
+   "listener_delivered": false,
+   "sender_delivered": false,
+   "listener_next_xy": [
+    9,
+    6
+   ]
+  },
+  {
+   "step": 78,
+   "lit_spot": 2,
+   "lit_spot_xy": [
+    9,
+    3
+   ],
+   "sender_xy": [
+    9,
+    0
+   ],
+   "sender_saw": "spot 2 is lit",
+   "sender_sent": [
+    62,
+    32,
+    48
+   ],
+   "sender_message_reads_as": 2,
+   "reader_confidence": 0.336,
+   "sender_action": "move y+1",
+   "listener_xy": [
+    9,
+    6
+   ],
+   "listener_heard": [
+    0,
+    56,
+    51
+   ],
+   "heard_reads_as": 2,
+   "listener_action": "move y-1",
+   "listener_steps_to_lit_spot": 2,
+   "listener_delivered": false,
+   "sender_delivered": false,
+   "listener_next_xy": [
+    9,
+    5
+   ]
+  },
+  {
+   "step": 79,
+   "lit_spot": 2,
+   "lit_spot_xy": [
+    9,
+    3
+   ],
+   "sender_xy": [
+    9,
+    1
+   ],
+   "sender_saw": "spot 2 is lit",
+   "sender_sent": [
+    41,
+    6,
+    63
+   ],
+   "sender_message_reads_as": 0,
+   "reader_confidence": 0.283,
+   "sender_action": "move y+1",
+   "listener_xy": [
+    9,
+    5
+   ],
+   "listener_heard": [
+    62,
+    32,
+    48
+   ],
+   "heard_reads_as": 2,
+   "listener_action": "move y+1",
+   "listener_steps_to_lit_spot": 1,
+   "listener_delivered": false,
+   "sender_delivered": false,
+   "listener_next_xy": [
+    9,
+    6
+   ]
+  },
+  {
+   "step": 80,
+   "lit_spot": 2,
+   "lit_spot_xy": [
+    9,
+    3
+   ],
+   "sender_xy": [
+    9,
+    2
+   ],
+   "sender_saw": "spot 2 is lit",
+   "sender_sent": [
+    2,
+    31,
+    35
+   ],
+   "sender_message_reads_as": 2,
+   "reader_confidence": 0.316,
+   "sender_action": "craft",
+   "listener_xy": [
+    9,
+    6
+   ],
+   "listener_heard": [
+    41,
+    6,
+    63
+   ],
+   "heard_reads_as": 0,
+   "listener_action": "move y+1",
+   "listener_steps_to_lit_spot": 2,
+   "listener_delivered": false,
+   "sender_delivered": true,
+   "listener_next_xy": [
+    9,
+    7
+   ]
+  },
+  {
+   "step": 81,
+   "lit_spot": 3,
+   "lit_spot_xy": [
+    9,
+    9
+   ],
+   "sender_xy": [
+    5,
+    2
+   ],
+   "sender_saw": "spot 3 is lit",
+   "sender_sent": [
+    16,
+    22,
+    54
+   ],
+   "sender_message_reads_as": 3,
+   "reader_confidence": 0.293,
+   "sender_action": "move x+1",
+   "listener_xy": [
+    9,
+    7
+   ],
+   "listener_heard": [
+    2,
+    31,
+    35
+   ],
+   "heard_reads_as": 2,
+   "listener_action": "move y+1",
+   "listener_steps_to_lit_spot": 1,
+   "listener_delivered": false,
+   "sender_delivered": false,
+   "listener_next_xy": [
+    9,
+    8
+   ]
+  },
+  {
+   "step": 82,
+   "lit_spot": 3,
+   "lit_spot_xy": [
+    9,
+    9
+   ],
+   "sender_xy": [
+    6,
+    2
+   ],
+   "sender_saw": "spot 3 is lit",
+   "sender_sent": [
+    21,
+    63,
+    37
+   ],
+   "sender_message_reads_as": 0,
+   "reader_confidence": 0.318,
+   "sender_action": "idle (9)",
+   "listener_xy": [
+    9,
+    8
+   ],
+   "listener_heard": [
+    16,
+    22,
+    54
+   ],
+   "heard_reads_as": 3,
+   "listener_action": "move x+1",
+   "listener_steps_to_lit_spot": 0,
+   "listener_delivered": false,
+   "sender_delivered": false,
+   "listener_next_xy": [
+    10,
+    8
+   ]
+  },
+  {
+   "step": 83,
+   "lit_spot": 3,
+   "lit_spot_xy": [
+    9,
+    9
+   ],
+   "sender_xy": [
+    6,
+    2
+   ],
+   "sender_saw": "spot 3 is lit",
+   "sender_sent": [
+    57,
+    23,
+    37
+   ],
+   "sender_message_reads_as": 2,
+   "reader_confidence": 0.302,
+   "sender_action": "move x+1",
+   "listener_xy": [
+    10,
+    8
+   ],
+   "listener_heard": [
+    21,
+    63,
+    37
+   ],
+   "heard_reads_as": 0,
+   "listener_action": "move x-1",
+   "listener_steps_to_lit_spot": 0,
+   "listener_delivered": false,
+   "sender_delivered": false,
+   "listener_next_xy": [
+    9,
+    8
+   ]
+  },
+  {
+   "step": 84,
+   "lit_spot": 3,
+   "lit_spot_xy": [
+    9,
+    9
+   ],
+   "sender_xy": [
+    7,
+    2
+   ],
+   "sender_saw": "spot 3 is lit",
+   "sender_sent": [
+    55,
+    44,
+    37
+   ],
+   "sender_message_reads_as": 2,
+   "reader_confidence": 0.331,
+   "sender_action": "move y+1",
+   "listener_xy": [
+    9,
+    8
+   ],
+   "listener_heard": [
+    57,
+    23,
+    37
+   ],
+   "heard_reads_as": 2,
+   "listener_action": "move x+1",
+   "listener_steps_to_lit_spot": 0,
+   "listener_delivered": false,
+   "sender_delivered": false,
+   "listener_next_xy": [
+    10,
+    8
+   ]
+  },
+  {
+   "step": 85,
+   "lit_spot": 3,
+   "lit_spot_xy": [
+    9,
+    9
+   ],
+   "sender_xy": [
+    7,
+    3
+   ],
+   "sender_saw": "spot 3 is lit",
+   "sender_sent": [
+    55,
+    63,
+    51
+   ],
+   "sender_message_reads_as": 2,
+   "reader_confidence": 0.318,
+   "sender_action": "move x+1",
+   "listener_xy": [
+    10,
+    8
+   ],
+   "listener_heard": [
+    55,
+    44,
+    37
+   ],
+   "heard_reads_as": 2,
+   "listener_action": "craft",
+   "listener_steps_to_lit_spot": 0,
+   "listener_delivered": true,
+   "sender_delivered": false,
+   "listener_next_xy": [
+    11,
+    10
+   ]
+  },
+  {
+   "step": 86,
+   "lit_spot": 0,
+   "lit_spot_xy": [
+    3,
+    3
+   ],
+   "sender_xy": [
+    8,
+    3
+   ],
+   "sender_saw": "spot 0 is lit",
+   "sender_sent": [
+    31,
+    23,
+    51
+   ],
+   "sender_message_reads_as": 3,
+   "reader_confidence": 0.296,
+   "sender_action": "move x-1",
+   "listener_xy": [
+    11,
+    10
+   ],
+   "listener_heard": [
+    55,
+    63,
+    51
+   ],
+   "heard_reads_as": 2,
+   "listener_action": "move y-1",
+   "listener_steps_to_lit_spot": 4,
+   "listener_delivered": false,
+   "sender_delivered": false,
+   "listener_next_xy": [
+    11,
+    9
+   ]
+  },
+  {
+   "step": 87,
+   "lit_spot": 0,
+   "lit_spot_xy": [
+    3,
+    3
+   ],
+   "sender_xy": [
+    7,
+    3
+   ],
+   "sender_saw": "spot 0 is lit",
+   "sender_sent": [
+    31,
+    43,
+    22
+   ],
+   "sender_message_reads_as": 3,
+   "reader_confidence": 0.293,
+   "sender_action": "move x-1",
+   "listener_xy": [
+    11,
+    9
+   ],
+   "listener_heard": [
+    31,
+    23,
+    51
+   ],
+   "heard_reads_as": 3,
+   "listener_action": "move x-1",
+   "listener_steps_to_lit_spot": 5,
+   "listener_delivered": false,
+   "sender_delivered": false,
+   "listener_next_xy": [
+    10,
+    9
+   ]
+  },
+  {
+   "step": 88,
+   "lit_spot": 0,
+   "lit_spot_xy": [
+    3,
+    3
+   ],
+   "sender_xy": [
+    6,
+    3
+   ],
+   "sender_saw": "spot 0 is lit",
+   "sender_sent": [
+    46,
+    63,
+    37
+   ],
+   "sender_message_reads_as": 0,
+   "reader_confidence": 0.297,
+   "sender_action": "move x-1",
+   "listener_xy": [
+    10,
+    9
+   ],
+   "listener_heard": [
+    31,
+    43,
+    22
+   ],
+   "heard_reads_as": 3,
+   "listener_action": "move x-1",
+   "listener_steps_to_lit_spot": 5,
+   "listener_delivered": false,
+   "sender_delivered": false,
+   "listener_next_xy": [
+    9,
+    9
+   ]
+  },
+  {
+   "step": 89,
+   "lit_spot": 0,
+   "lit_spot_xy": [
+    3,
+    3
+   ],
+   "sender_xy": [
+    5,
+    3
+   ],
+   "sender_saw": "spot 0 is lit",
+   "sender_sent": [
+    18,
+    18,
+    18
+   ],
+   "sender_message_reads_as": 1,
+   "reader_confidence": 0.319,
+   "sender_action": "move x-1",
+   "listener_xy": [
+    9,
+    9
+   ],
+   "listener_heard": [
+    46,
+    63,
+    37
+   ],
+   "heard_reads_as": 0,
+   "listener_action": "move x+1",
+   "listener_steps_to_lit_spot": 5,
+   "listener_delivered": false,
+   "sender_delivered": false,
+   "listener_next_xy": [
+    10,
+    9
+   ]
+  },
+  {
+   "step": 90,
+   "lit_spot": 0,
+   "lit_spot_xy": [
+    3,
+    3
+   ],
+   "sender_xy": [
+    4,
+    3
+   ],
+   "sender_saw": "spot 0 is lit",
+   "sender_sent": [
+    18,
+    1,
+    47
+   ],
+   "sender_message_reads_as": 0,
+   "reader_confidence": 0.305,
+   "sender_action": "idle (5)",
+   "listener_xy": [
+    10,
+    9
+   ],
+   "listener_heard": [
+    18,
+    18,
+    18
+   ],
+   "heard_reads_as": 1,
+   "listener_action": "move x-1",
+   "listener_steps_to_lit_spot": 5,
+   "listener_delivered": false,
+   "sender_delivered": false,
+   "listener_next_xy": [
+    9,
+    9
+   ]
+  },
+  {
+   "step": 91,
+   "lit_spot": 0,
+   "lit_spot_xy": [
+    3,
+    3
+   ],
+   "sender_xy": [
+    4,
+    3
+   ],
+   "sender_saw": "spot 0 is lit",
+   "sender_sent": [
+    20,
+    59,
+    63
+   ],
+   "sender_message_reads_as": 0,
+   "reader_confidence": 0.278,
+   "sender_action": "move x-1",
+   "listener_xy": [
+    9,
+    9
+   ],
+   "listener_heard": [
+    18,
+    1,
+    47
+   ],
+   "heard_reads_as": 0,
+   "listener_action": "move x+1",
+   "listener_steps_to_lit_spot": 5,
+   "listener_delivered": false,
+   "sender_delivered": false,
+   "listener_next_xy": [
+    10,
+    9
+   ]
+  },
+  {
+   "step": 92,
+   "lit_spot": 0,
+   "lit_spot_xy": [
+    3,
+    3
+   ],
+   "sender_xy": [
+    3,
+    3
+   ],
+   "sender_saw": "spot 0 is lit",
+   "sender_sent": [
+    2,
+    55,
+    22
+   ],
+   "sender_message_reads_as": 2,
+   "reader_confidence": 0.268,
+   "sender_action": "craft",
+   "listener_xy": [
+    10,
+    9
+   ],
+   "listener_heard": [
+    20,
+    59,
+    63
+   ],
+   "heard_reads_as": 0,
+   "listener_action": "move x-1",
+   "listener_steps_to_lit_spot": 5,
+   "listener_delivered": false,
+   "sender_delivered": true,
+   "listener_next_xy": [
+    9,
+    9
+   ]
+  },
+  {
+   "step": 93,
+   "lit_spot": 1,
+   "lit_spot_xy": [
+    3,
+    9
+   ],
+   "sender_xy": [
+    6,
+    4
+   ],
+   "sender_saw": "spot 1 is lit",
+   "sender_sent": [
+    51,
+    44,
+    5
+   ],
+   "sender_message_reads_as": 3,
+   "reader_confidence": 0.278,
+   "sender_action": "move x-1",
+   "listener_xy": [
+    9,
+    9
+   ],
+   "listener_heard": [
+    2,
+    55,
+    22
+   ],
+   "heard_reads_as": 2,
+   "listener_action": "move x+1",
+   "listener_steps_to_lit_spot": 5,
+   "listener_delivered": false,
+   "sender_delivered": false,
+   "listener_next_xy": [
+    10,
+    9
+   ]
+  },
+  {
+   "step": 94,
+   "lit_spot": 1,
+   "lit_spot_xy": [
+    3,
+    9
+   ],
+   "sender_xy": [
+    5,
+    4
+   ],
+   "sender_saw": "spot 1 is lit",
+   "sender_sent": [
+    31,
+    18,
+    17
+   ],
+   "sender_message_reads_as": 0,
+   "reader_confidence": 0.341,
+   "sender_action": "move x-1",
+   "listener_xy": [
+    10,
+    9
+   ],
+   "listener_heard": [
+    51,
+    44,
+    5
+   ],
+   "heard_reads_as": 3,
+   "listener_action": "move x-1",
+   "listener_steps_to_lit_spot": 4,
+   "listener_delivered": false,
+   "sender_delivered": false,
+   "listener_next_xy": [
+    9,
+    9
+   ]
+  },
+  {
+   "step": 95,
+   "lit_spot": 1,
+   "lit_spot_xy": [
+    3,
+    9
+   ],
+   "sender_xy": [
+    4,
+    4
+   ],
+   "sender_saw": "spot 1 is lit",
+   "sender_sent": [
+    21,
+    0,
+    31
+   ],
+   "sender_message_reads_as": 0,
+   "reader_confidence": 0.314,
+   "sender_action": "stay",
+   "listener_xy": [
+    9,
+    9
+   ],
+   "listener_heard": [
+    31,
+    18,
+    17
+   ],
+   "heard_reads_as": 0,
+   "listener_action": "move x+1",
+   "listener_steps_to_lit_spot": 5,
+   "listener_delivered": false,
+   "sender_delivered": false,
+   "listener_next_xy": [
+    10,
+    9
+   ]
+  },
+  {
+   "step": 96,
+   "lit_spot": 1,
+   "lit_spot_xy": [
+    3,
+    9
+   ],
+   "sender_xy": [
+    4,
+    4
+   ],
+   "sender_saw": "spot 1 is lit",
+   "sender_sent": [
+    19,
+    48,
+    24
+   ],
+   "sender_message_reads_as": 3,
+   "reader_confidence": 0.294,
+   "sender_action": "move x-1",
+   "listener_xy": [
+    10,
+    9
+   ],
+   "listener_heard": [
+    21,
+    0,
+    31
+   ],
+   "heard_reads_as": 0,
+   "listener_action": "move x-1",
+   "listener_steps_to_lit_spot": 4,
+   "listener_delivered": false,
+   "sender_delivered": false,
+   "listener_next_xy": [
+    9,
+    9
+   ]
+  },
+  {
+   "step": 97,
+   "lit_spot": 1,
+   "lit_spot_xy": [
+    3,
+    9
+   ],
+   "sender_xy": [
+    3,
+    4
+   ],
+   "sender_saw": "spot 1 is lit",
+   "sender_sent": [
+    14,
+    56,
+    18
+   ],
+   "sender_message_reads_as": 2,
+   "reader_confidence": 0.308,
+   "sender_action": "move y+1",
+   "listener_xy": [
+    9,
+    9
+   ],
+   "listener_heard": [
+    19,
+    48,
+    24
+   ],
+   "heard_reads_as": 3,
+   "listener_action": "move x+1",
+   "listener_steps_to_lit_spot": 5,
+   "listener_delivered": false,
+   "sender_delivered": false,
+   "listener_next_xy": [
+    10,
+    9
+   ]
+  },
+  {
+   "step": 98,
+   "lit_spot": 1,
+   "lit_spot_xy": [
+    3,
+    9
+   ],
+   "sender_xy": [
+    3,
+    5
+   ],
+   "sender_saw": "spot 1 is lit",
+   "sender_sent": [
+    57,
+    44,
+    21
+   ],
+   "sender_message_reads_as": 2,
+   "reader_confidence": 0.284,
+   "sender_action": "move y+1",
+   "listener_xy": [
+    10,
+    9
+   ],
+   "listener_heard": [
+    14,
+    56,
+    18
+   ],
+   "heard_reads_as": 2,
+   "listener_action": "move x-1",
+   "listener_steps_to_lit_spot": 4,
+   "listener_delivered": false,
+   "sender_delivered": false,
+   "listener_next_xy": [
+    9,
+    9
+   ]
+  },
+  {
+   "step": 99,
+   "lit_spot": 1,
+   "lit_spot_xy": [
+    3,
+    9
+   ],
+   "sender_xy": [
+    3,
+    6
+   ],
+   "sender_saw": "spot 1 is lit",
+   "sender_sent": [
+    42,
+    6,
+    32
+   ],
+   "sender_message_reads_as": 3,
+   "reader_confidence": 0.281,
+   "sender_action": "move y+1",
+   "listener_xy": [
+    9,
+    9
+   ],
+   "listener_heard": [
+    57,
+    44,
+    21
+   ],
+   "heard_reads_as": 2,
+   "listener_action": "move x+1",
+   "listener_steps_to_lit_spot": 5,
+   "listener_delivered": false,
+   "sender_delivered": false,
+   "listener_next_xy": [
+    10,
+    9
+   ]
+  },
+  {
+   "step": 100,
+   "lit_spot": 1,
+   "lit_spot_xy": [
+    3,
+    9
+   ],
+   "sender_xy": [
+    3,
+    7
+   ],
+   "sender_saw": "spot 1 is lit",
+   "sender_sent": [
+    51,
+    0,
+    56
+   ],
+   "sender_message_reads_as": 1,
+   "reader_confidence": 0.264,
+   "sender_action": "craft",
+   "listener_xy": [
+    10,
+    9
+   ],
+   "listener_heard": [
+    42,
+    6,
+    32
+   ],
+   "heard_reads_as": 3,
+   "listener_action": "move x-1",
+   "listener_steps_to_lit_spot": 4,
+   "listener_delivered": false,
+   "sender_delivered": false,
+   "listener_next_xy": [
+    9,
+    9
+   ]
+  },
+  {
+   "step": 101,
+   "lit_spot": 1,
+   "lit_spot_xy": [
+    3,
+    9
+   ],
+   "sender_xy": [
+    3,
+    7
+   ],
+   "sender_saw": "spot 1 is lit",
+   "sender_sent": [
+    46,
+    28,
+    14
+   ],
+   "sender_message_reads_as": 2,
+   "reader_confidence": 0.29,
+   "sender_action": "move y+1",
+   "listener_xy": [
+    9,
+    9
+   ],
+   "listener_heard": [
+    51,
+    0,
+    56
+   ],
+   "heard_reads_as": 1,
+   "listener_action": "move x+1",
+   "listener_steps_to_lit_spot": 5,
+   "listener_delivered": false,
+   "sender_delivered": false,
+   "listener_next_xy": [
+    10,
+    9
+   ]
+  },
+  {
+   "step": 102,
+   "lit_spot": 1,
+   "lit_spot_xy": [
+    3,
+    9
+   ],
+   "sender_xy": [
+    3,
+    8
+   ],
+   "sender_saw": "spot 1 is lit",
+   "sender_sent": [
+    55,
+    10,
+    13
+   ],
+   "sender_message_reads_as": 3,
+   "reader_confidence": 0.304,
+   "sender_action": "craft",
+   "listener_xy": [
+    10,
+    9
+   ],
+   "listener_heard": [
+    46,
+    28,
+    14
+   ],
+   "heard_reads_as": 2,
+   "listener_action": "move x-1",
+   "listener_steps_to_lit_spot": 4,
+   "listener_delivered": false,
+   "sender_delivered": true,
+   "listener_next_xy": [
+    9,
+    9
+   ]
+  },
+  {
+   "step": 103,
+   "lit_spot": 3,
+   "lit_spot_xy": [
+    9,
+    9
+   ],
+   "sender_xy": [
+    6,
+    1
+   ],
+   "sender_saw": "spot 3 is lit",
+   "sender_sent": [
+    57,
+    24,
+    47
+   ],
+   "sender_message_reads_as": 0,
+   "reader_confidence": 0.302,
+   "sender_action": "move x+1",
+   "listener_xy": [
+    9,
+    9
+   ],
+   "listener_heard": [
+    55,
+    10,
+    13
+   ],
+   "heard_reads_as": 3,
+   "listener_action": "move x+1",
+   "listener_steps_to_lit_spot": 0,
+   "listener_delivered": false,
+   "sender_delivered": false,
+   "listener_next_xy": [
+    10,
+    9
+   ]
+  },
+  {
+   "step": 104,
+   "lit_spot": 3,
+   "lit_spot_xy": [
+    9,
+    9
+   ],
+   "sender_xy": [
+    7,
+    1
+   ],
+   "sender_saw": "spot 3 is lit",
+   "sender_sent": [
+    2,
+    56,
+    47
+   ],
+   "sender_message_reads_as": 0,
+   "reader_confidence": 0.285,
+   "sender_action": "stay",
+   "listener_xy": [
+    10,
+    9
+   ],
+   "listener_heard": [
+    57,
+    24,
+    47
+   ],
+   "heard_reads_as": 0,
+   "listener_action": "move x-1",
+   "listener_steps_to_lit_spot": 0,
+   "listener_delivered": false,
+   "sender_delivered": false,
+   "listener_next_xy": [
+    9,
+    9
+   ]
+  },
+  {
+   "step": 105,
+   "lit_spot": 3,
+   "lit_spot_xy": [
+    9,
+    9
+   ],
+   "sender_xy": [
+    7,
+    1
+   ],
+   "sender_saw": "spot 3 is lit",
+   "sender_sent": [
+    19,
+    22,
+    31
+   ],
+   "sender_message_reads_as": 0,
+   "reader_confidence": 0.297,
+   "sender_action": "move y-1",
+   "listener_xy": [
+    9,
+    9
+   ],
+   "listener_heard": [
+    2,
+    56,
+    47
+   ],
+   "heard_reads_as": 0,
+   "listener_action": "idle (9)",
+   "listener_steps_to_lit_spot": 0,
+   "listener_delivered": false,
+   "sender_delivered": false,
+   "listener_next_xy": [
+    9,
+    9
+   ]
+  },
+  {
+   "step": 106,
+   "lit_spot": 3,
+   "lit_spot_xy": [
+    9,
+    9
+   ],
+   "sender_xy": [
+    7,
+    0
+   ],
+   "sender_saw": "spot 3 is lit",
+   "sender_sent": [
+    42,
+    55,
+    41
+   ],
+   "sender_message_reads_as": 0,
+   "reader_confidence": 0.297,
+   "sender_action": "move y-1",
+   "listener_xy": [
+    9,
+    9
+   ],
+   "listener_heard": [
+    19,
+    22,
+    31
+   ],
+   "heard_reads_as": 0,
+   "listener_action": "move x+1",
+   "listener_steps_to_lit_spot": 0,
+   "listener_delivered": false,
+   "sender_delivered": false,
+   "listener_next_xy": [
+    10,
+    9
+   ]
+  },
+  {
+   "step": 107,
+   "lit_spot": 3,
+   "lit_spot_xy": [
+    9,
+    9
+   ],
+   "sender_xy": [
+    7,
+    11
+   ],
+   "sender_saw": "spot 3 is lit",
+   "sender_sent": [
+    9,
+    39,
+    49
+   ],
+   "sender_message_reads_as": 1,
+   "reader_confidence": 0.266,
+   "sender_action": "move y-1",
+   "listener_xy": [
+    10,
+    9
+   ],
+   "listener_heard": [
+    42,
+    55,
+    41
+   ],
+   "heard_reads_as": 0,
+   "listener_action": "move x-1",
+   "listener_steps_to_lit_spot": 0,
+   "listener_delivered": false,
+   "sender_delivered": false,
+   "listener_next_xy": [
+    9,
+    9
+   ]
+  },
+  {
+   "step": 108,
+   "lit_spot": 3,
+   "lit_spot_xy": [
+    9,
+    9
+   ],
+   "sender_xy": [
+    7,
+    10
+   ],
+   "sender_saw": "spot 3 is lit",
+   "sender_sent": [
+    30,
+    60,
+    37
+   ],
+   "sender_message_reads_as": 0,
+   "reader_confidence": 0.33,
+   "sender_action": "move y-1",
+   "listener_xy": [
+    9,
+    9
+   ],
+   "listener_heard": [
+    9,
+    39,
+    49
+   ],
+   "heard_reads_as": 1,
+   "listener_action": "idle (11)",
+   "listener_steps_to_lit_spot": 0,
+   "listener_delivered": false,
+   "sender_delivered": false,
+   "listener_next_xy": [
+    9,
+    9
+   ]
+  },
+  {
+   "step": 109,
+   "lit_spot": 3,
+   "lit_spot_xy": [
+    9,
+    9
+   ],
+   "sender_xy": [
+    7,
+    9
+   ],
+   "sender_saw": "spot 3 is lit",
+   "sender_sent": [
+    57,
+    32,
+    32
+   ],
+   "sender_message_reads_as": 2,
+   "reader_confidence": 0.305,
+   "sender_action": "move x+1",
+   "listener_xy": [
+    9,
+    9
+   ],
+   "listener_heard": [
+    30,
+    60,
+    37
+   ],
+   "heard_reads_as": 0,
+   "listener_action": "craft",
+   "listener_steps_to_lit_spot": 0,
+   "listener_delivered": true,
+   "sender_delivered": false,
+   "listener_next_xy": [
+    5,
+    2
+   ]
+  },
+  {
+   "step": 110,
+   "lit_spot": 0,
+   "lit_spot_xy": [
+    3,
+    3
+   ],
+   "sender_xy": [
+    8,
+    9
+   ],
+   "sender_saw": "spot 0 is lit",
+   "sender_sent": [
+    19,
+    28,
+    22
+   ],
+   "sender_message_reads_as": 2,
+   "reader_confidence": 0.301,
+   "sender_action": "move y-1",
+   "listener_xy": [
+    5,
+    2
+   ],
+   "listener_heard": [
+    57,
+    32,
+    32
+   ],
+   "heard_reads_as": 2,
+   "listener_action": "stay",
+   "listener_steps_to_lit_spot": 1,
+   "listener_delivered": false,
+   "sender_delivered": false,
+   "listener_next_xy": [
+    5,
+    2
+   ]
+  },
+  {
+   "step": 111,
+   "lit_spot": 0,
+   "lit_spot_xy": [
+    3,
+    3
+   ],
+   "sender_xy": [
+    8,
+    8
+   ],
+   "sender_saw": "spot 0 is lit",
+   "sender_sent": [
+    2,
+    6,
+    21
+   ],
+   "sender_message_reads_as": 1,
+   "reader_confidence": 0.266,
+   "sender_action": "stay",
+   "listener_xy": [
+    5,
+    2
+   ],
+   "listener_heard": [
+    19,
+    28,
+    22
+   ],
+   "heard_reads_as": 2,
+   "listener_action": "move x-1",
+   "listener_steps_to_lit_spot": 1,
+   "listener_delivered": false,
+   "sender_delivered": false,
+   "listener_next_xy": [
+    4,
+    2
+   ]
+  },
+  {
+   "step": 112,
+   "lit_spot": 0,
+   "lit_spot_xy": [
+    3,
+    3
+   ],
+   "sender_xy": [
+    8,
+    8
+   ],
+   "sender_saw": "spot 0 is lit",
+   "sender_sent": [
+    63,
+    54,
+    14
+   ],
+   "sender_message_reads_as": 3,
+   "reader_confidence": 0.308,
+   "sender_action": "idle (9)",
+   "listener_xy": [
+    4,
+    2
+   ],
+   "listener_heard": [
+    2,
+    6,
+    21
+   ],
+   "heard_reads_as": 1,
+   "listener_action": "move x-1",
+   "listener_steps_to_lit_spot": 0,
+   "listener_delivered": false,
+   "sender_delivered": false,
+   "listener_next_xy": [
+    3,
+    2
+   ]
+  },
+  {
+   "step": 113,
+   "lit_spot": 0,
+   "lit_spot_xy": [
+    3,
+    3
+   ],
+   "sender_xy": [
+    8,
+    8
+   ],
+   "sender_saw": "spot 0 is lit",
+   "sender_sent": [
+    41,
+    23,
+    47
+   ],
+   "sender_message_reads_as": 0,
+   "reader_confidence": 0.3,
+   "sender_action": "idle (11)",
+   "listener_xy": [
+    3,
+    2
+   ],
+   "listener_heard": [
+    63,
+    54,
+    14
+   ],
+   "heard_reads_as": 3,
+   "listener_action": "move x-1",
+   "listener_steps_to_lit_spot": 0,
+   "listener_delivered": false,
+   "sender_delivered": false,
+   "listener_next_xy": [
+    2,
+    2
+   ]
+  },
+  {
+   "step": 114,
+   "lit_spot": 0,
+   "lit_spot_xy": [
+    3,
+    3
+   ],
+   "sender_xy": [
+    8,
+    8
+   ],
+   "sender_saw": "spot 0 is lit",
+   "sender_sent": [
+    16,
+    60,
+    28
+   ],
+   "sender_message_reads_as": 0,
+   "reader_confidence": 0.303,
+   "sender_action": "stay",
+   "listener_xy": [
+    2,
+    2
+   ],
+   "listener_heard": [
+    41,
+    23,
+    47
+   ],
+   "heard_reads_as": 0,
+   "listener_action": "stay",
+   "listener_steps_to_lit_spot": 0,
+   "listener_delivered": false,
+   "sender_delivered": false,
+   "listener_next_xy": [
+    2,
+    2
+   ]
+  },
+  {
+   "step": 115,
+   "lit_spot": 0,
+   "lit_spot_xy": [
+    3,
+    3
+   ],
+   "sender_xy": [
+    8,
+    8
+   ],
+   "sender_saw": "spot 0 is lit",
+   "sender_sent": [
+    16,
+    56,
+    3
+   ],
+   "sender_message_reads_as": 3,
+   "reader_confidence": 0.289,
+   "sender_action": "move x-1",
+   "listener_xy": [
+    2,
+    2
+   ],
+   "listener_heard": [
+    16,
+    60,
+    28
+   ],
+   "heard_reads_as": 0,
+   "listener_action": "idle (9)",
+   "listener_steps_to_lit_spot": 0,
+   "listener_delivered": false,
+   "sender_delivered": false,
+   "listener_next_xy": [
+    2,
+    2
+   ]
+  },
+  {
+   "step": 116,
+   "lit_spot": 0,
+   "lit_spot_xy": [
+    3,
+    3
+   ],
+   "sender_xy": [
+    7,
+    8
+   ],
+   "sender_saw": "spot 0 is lit",
+   "sender_sent": [
+    41,
+    36,
+    22
+   ],
+   "sender_message_reads_as": 2,
+   "reader_confidence": 0.286,
+   "sender_action": "idle (5)",
+   "listener_xy": [
+    2,
+    2
+   ],
+   "listener_heard": [
+    16,
+    56,
+    3
+   ],
+   "heard_reads_as": 3,
+   "listener_action": "move x-1",
+   "listener_steps_to_lit_spot": 0,
+   "listener_delivered": false,
+   "sender_delivered": false,
+   "listener_next_xy": [
+    1,
+    2
+   ]
+  },
+  {
+   "step": 117,
+   "lit_spot": 0,
+   "lit_spot_xy": [
+    3,
+    3
+   ],
+   "sender_xy": [
+    7,
+    8
+   ],
+   "sender_saw": "spot 0 is lit",
+   "sender_sent": [
+    46,
+    6,
+    11
+   ],
+   "sender_message_reads_as": 3,
+   "reader_confidence": 0.295,
+   "sender_action": "idle (11)",
+   "listener_xy": [
+    1,
+    2
+   ],
+   "listener_heard": [
+    41,
+    36,
+    22
+   ],
+   "heard_reads_as": 2,
+   "listener_action": "move y+1",
+   "listener_steps_to_lit_spot": 1,
+   "listener_delivered": false,
+   "sender_delivered": false,
+   "listener_next_xy": [
+    1,
+    3
+   ]
+  },
+  {
+   "step": 118,
+   "lit_spot": 0,
+   "lit_spot_xy": [
+    3,
+    3
+   ],
+   "sender_xy": [
+    7,
+    8
+   ],
+   "sender_saw": "spot 0 is lit",
+   "sender_sent": [
+    63,
+    20,
+    13
+   ],
+   "sender_message_reads_as": 1,
+   "reader_confidence": 0.321,
+   "sender_action": "move x-1",
+   "listener_xy": [
+    1,
+    3
+   ],
+   "listener_heard": [
+    46,
+    6,
+    11
+   ],
+   "heard_reads_as": 3,
+   "listener_action": "move y+1",
+   "listener_steps_to_lit_spot": 1,
+   "listener_delivered": false,
+   "sender_delivered": false,
+   "listener_next_xy": [
+    1,
+    4
+   ]
+  },
+  {
+   "step": 119,
+   "lit_spot": 0,
+   "lit_spot_xy": [
+    3,
+    3
+   ],
+   "sender_xy": [
+    6,
+    8
+   ],
+   "sender_saw": "spot 0 is lit",
+   "sender_sent": [
+    19,
+    20,
+    24
+   ],
+   "sender_message_reads_as": 3,
+   "reader_confidence": 0.276,
+   "sender_action": "idle (11)",
+   "listener_xy": [
+    1,
+    4
+   ],
+   "listener_heard": [
+    63,
+    20,
+    13
+   ],
+   "heard_reads_as": 1,
+   "listener_action": "move y+1",
+   "listener_steps_to_lit_spot": 1,
+   "listener_delivered": false,
+   "sender_delivered": false,
+   "listener_next_xy": [
+    1,
+    5
+   ]
+  },
+  {
+   "step": 120,
+   "lit_spot": 0,
+   "lit_spot_xy": [
+    3,
+    3
+   ],
+   "sender_xy": [
+    6,
+    8
+   ],
+   "sender_saw": "spot 0 is lit",
+   "sender_sent": [
+    51,
+    32,
+    32
+   ],
+   "sender_message_reads_as": 3,
+   "reader_confidence": 0.283,
+   "sender_action": "move x-1",
+   "listener_xy": [
+    1,
+    5
+   ],
+   "listener_heard": [
+    19,
+    20,
+    24
+   ],
+   "heard_reads_as": 3,
+   "listener_action": "move y-1",
+   "listener_steps_to_lit_spot": 1,
+   "listener_delivered": false,
+   "sender_delivered": false,
+   "listener_next_xy": [
+    1,
+    4
+   ]
+  },
+  {
+   "step": 121,
+   "lit_spot": 0,
+   "lit_spot_xy": [
+    3,
+    3
+   ],
+   "sender_xy": [
+    5,
+    8
+   ],
+   "sender_saw": "spot 0 is lit",
+   "sender_sent": [
+    63,
+    20,
+    22
+   ],
+   "sender_message_reads_as": 3,
+   "reader_confidence": 0.27,
+   "sender_action": "move y+1",
+   "listener_xy": [
+    1,
+    4
+   ],
+   "listener_heard": [
+    51,
+    32,
+    32
+   ],
+   "heard_reads_as": 3,
+   "listener_action": "stay",
+   "listener_steps_to_lit_spot": 1,
+   "listener_delivered": false,
+   "sender_delivered": false,
+   "listener_next_xy": [
+    1,
+    4
+   ]
+  },
+  {
+   "step": 122,
+   "lit_spot": 0,
+   "lit_spot_xy": [
+    3,
+    3
+   ],
+   "sender_xy": [
+    5,
+    9
+   ],
+   "sender_saw": "spot 0 is lit",
+   "sender_sent": [
+    25,
+    22,
+    54
+   ],
+   "sender_message_reads_as": 1,
+   "reader_confidence": 0.296,
+   "sender_action": "move x-1",
+   "listener_xy": [
+    1,
+    4
+   ],
+   "listener_heard": [
+    63,
+    20,
+    22
+   ],
+   "heard_reads_as": 3,
+   "listener_action": "idle (11)",
+   "listener_steps_to_lit_spot": 1,
+   "listener_delivered": false,
+   "sender_delivered": false,
+   "listener_next_xy": [
+    1,
+    4
+   ]
+  },
+  {
+   "step": 123,
+   "lit_spot": 0,
+   "lit_spot_xy": [
+    3,
+    3
+   ],
+   "sender_xy": [
+    4,
+    9
+   ],
+   "sender_saw": "spot 0 is lit",
+   "sender_sent": [
+    21,
+    56,
+    14
+   ],
+   "sender_message_reads_as": 3,
+   "reader_confidence": 0.291,
+   "sender_action": "move y-1",
+   "listener_xy": [
+    1,
+    4
+   ],
+   "listener_heard": [
+    25,
+    22,
+    54
+   ],
+   "heard_reads_as": 1,
+   "listener_action": "move y-1",
+   "listener_steps_to_lit_spot": 1,
+   "listener_delivered": false,
+   "sender_delivered": false,
+   "listener_next_xy": [
+    1,
+    3
+   ]
+  },
+  {
+   "step": 124,
+   "lit_spot": 0,
+   "lit_spot_xy": [
+    3,
+    3
+   ],
+   "sender_xy": [
+    4,
+    8
+   ],
+   "sender_saw": "spot 0 is lit",
+   "sender_sent": [
+    33,
+    48,
+    51
+   ],
+   "sender_message_reads_as": 2,
+   "reader_confidence": 0.314,
+   "sender_action": "move x-1",
+   "listener_xy": [
+    1,
+    3
+   ],
+   "listener_heard": [
+    21,
+    56,
+    14
+   ],
+   "heard_reads_as": 3,
+   "listener_action": "move x+1",
+   "listener_steps_to_lit_spot": 1,
+   "listener_delivered": false,
+   "sender_delivered": false,
+   "listener_next_xy": [
+    2,
+    3
+   ]
+  },
+  {
+   "step": 125,
+   "lit_spot": 0,
+   "lit_spot_xy": [
+    3,
+    3
+   ],
+   "sender_xy": [
+    3,
+    8
+   ],
+   "sender_saw": "spot 0 is lit",
+   "sender_sent": [
+    25,
+    23,
+    28
+   ],
+   "sender_message_reads_as": 1,
+   "reader_confidence": 0.311,
+   "sender_action": "move y-1",
+   "listener_xy": [
+    2,
+    3
+   ],
+   "listener_heard": [
+    33,
+    48,
+    51
+   ],
+   "heard_reads_as": 2,
+   "listener_action": "craft",
+   "listener_steps_to_lit_spot": 0,
+   "listener_delivered": true,
+   "sender_delivered": false,
+   "listener_next_xy": [
+    9,
+    1
+   ]
+  },
+  {
+   "step": 126,
+   "lit_spot": 3,
+   "lit_spot_xy": [
+    9,
+    9
+   ],
+   "sender_xy": [
+    3,
+    7
+   ],
+   "sender_saw": "spot 3 is lit",
+   "sender_sent": [
+    14,
+    60,
+    22
+   ],
+   "sender_message_reads_as": 0,
+   "reader_confidence": 0.293,
+   "sender_action": "move x+1",
+   "listener_xy": [
+    9,
+    1
+   ],
+   "listener_heard": [
+    25,
+    23,
+    28
+   ],
+   "heard_reads_as": 1,
+   "listener_action": "move y+1",
+   "listener_steps_to_lit_spot": 3,
+   "listener_delivered": false,
+   "sender_delivered": false,
+   "listener_next_xy": [
+    9,
+    2
+   ]
+  },
+  {
+   "step": 127,
+   "lit_spot": 3,
+   "lit_spot_xy": [
+    9,
+    9
+   ],
+   "sender_xy": [
+    4,
+    7
+   ],
+   "sender_saw": "spot 3 is lit",
+   "sender_sent": [
+    20,
+    63,
+    31
+   ],
+   "sender_message_reads_as": 0,
+   "reader_confidence": 0.283,
+   "sender_action": "move x+1",
+   "listener_xy": [
+    9,
+    2
+   ],
+   "listener_heard": [
+    14,
+    60,
+    22
+   ],
+   "heard_reads_as": 0,
+   "listener_action": "move x+1",
+   "listener_steps_to_lit_spot": 4,
+   "listener_delivered": false,
+   "sender_delivered": false,
+   "listener_next_xy": null
+  }
+ ]
+}
