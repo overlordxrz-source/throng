@@ -2903,6 +2903,39 @@ more expensive, because it produces publishable-looking nulls.
   - A local CPU run of the real net was too slow for the laptop rule (> 10 min at update 1) and was stopped. The
     relaunched probe is the GPU test.
 
+- **Real-net probe, second attempt (7366052): out of memory again, ~$0.1.** The update-1 self-check PASSED (jitted vs
+  eager gradient on 256 rows: rel. diff 2.0e-5), but the jitted gradient on the full 2,048-row sample needs **one 15.3
+  GiB buffer** (memory scales with rows: ~7.6 MB per row in this network; training's 512-row minibatches fit).
+  - **Fix (comm-jit 80e3d6e, re-pinned): the diag gradient is the mean of the gradients on the sample's four 512-row
+    chunks; the KL forward is chunked the same way.** **Definition change, disclosed:** the PS term is a batch
+    statistic, so `ps_grad_share` is now the mean training-minibatch gradient's share (what the optimizer sees per
+    step), not the 2,048-row gradient's. `grad_norm` is likewise the norm of the mean minibatch gradient. Neither is a
+    bar. Training path untouched.
+  - Cumulative cost of the two failed starts ~$0.2. **If the third attempt fails, I stop and put "drop --log-diag" to
+    Cam** rather than iterate on paid GPU.
+
+- **Item 4 result (free): the trigger fires.** `toy_out_modal/grad_share/analysis_grad_share.txt` (copy in
+  `docs/data/grad_share/`). Listener rows' share of the C1-E message-head gradient, ||c_L|| / (||c_L|| + ||c_S||):
+
+  | seed | u1500 | u1750 (extra) | u2000 | cos(c_L, c_S) at 1500 / 1750 / 2000 |
+  |---|---|---|---|---|
+  | s185 | 0.61 | 0.43 | 0.41 | -0.01 / -0.06 / -0.15 |
+  | s186 | 0.63 | 0.45 | 0.57 | -0.03 / -0.32 / -0.22 |
+  | s187 | 0.62 | 0.49 | 0.40 | +0.03 / +0.05 / -0.01 |
+
+  - **>= 0.30 in 3/3 seeds at both registered checkpoints.** The split is exact (residual ~2e-7). Without the
+    codebooks the shares are the same to 3 decimals: the listener-row gradient lands on gwt_comms_1 and the slot heads.
+  - **Reading:** the listener's own losses (token PG with its own advantages, token entropy, VQ) push the message head
+    with 0.7-1.7x the sender rows' magnitude, in a direction **orthogonal to or against** the sender's (cosine -0.32 to
+    +0.05). That is a credit-unrelated force on the very weights that carry the code, present during erosion. **It does
+    not show that this force causes the erosion**; the stop-grad arm tests that.
+  - Caveat: PopArt stats are fitted (actor-only saves); the exact cross-check on the c1rep u2000 snapshots follows.
+  - **Registered for the next account (Cam's trigger):** C1-E with the message head trained by sender rows only (step
+    B (iii): the MSGK keys take the sender-row gradient rescaled by the sender row fraction, i.e. exactly c_S), wire-on
+    x3 / wire-off x2, fresh seeds, the C1-E protocol otherwise, the C1-E replication's 2,000 bar (and its 3,000 bar).
+    **Code needed:** the (iii) flag currently runs only as a branch from a resumed snapshot (`--resume --branch
+    stopgrad`); a from-scratch flag plus its apparatus check (listener-row message-head gradient = 0; mutant caught).
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
