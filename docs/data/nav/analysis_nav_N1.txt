@@ -1,0 +1,9 @@
+Gate N1: deliveries/world (both agents), mean over updates 1451-1500, >= 17.42 (0.7 x ORACLE0's 24.89)
+nav_s260.jsonl: 1500 updates, last-50 deliveries 24.45 -> PASS
+nav_s261.jsonl: 1500 updates, last-50 deliveries 24.93 -> PASS
+nav_s262.jsonl: 1500 updates, last-50 deliveries 24.65 -> PASS
+nav_s263.jsonl: 1500 updates, last-50 deliveries 24.72 -> PASS
+nav_s264.jsonl: 1500 updates, last-50 deliveries 25.34 -> PASS
+nav_s265.jsonl: 1500 updates, last-50 deliveries 22.48 -> PASS
+nav_s266.jsonl: 1500 updates, last-50 deliveries 24.66 -> PASS
+nav_s267.jsonl: 1500 updates, last-50 deliveries 24.97 -> PASS

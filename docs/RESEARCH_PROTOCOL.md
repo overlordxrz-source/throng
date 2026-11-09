@@ -3518,6 +3518,13 @@ more expensive, because it produces publishable-looking nulls.
     All 4 chains run.
   - Guard: Mac guard `cap_guard_r2.sh` at **$15** until the Modal guard is live.
 
+- **(b) grow done; (d) navigators done (roadtoagi111).**
+  - `ero_grow`: 3/3 complete (1,500 updates, snapshots on the volume). Every wire-off seed formed a full code by 1,500
+    (per-slot MI 1.99 in all three; c_ps annealed to 0). `ero_cal` (9 runs) launched ~02:37.
+  - **`nav`: 8/8 PASS gate N1** (deliveries per world over the last 50 updates: 24.45 / 24.93 / 24.65 / 24.72 /
+    25.34 / 22.48 / 24.66 / 24.97 vs 17.42; `docs/data/nav/`). Params in `testbed/toy/nav/`. **G0 (4 runs) launched
+    ~02:40.**
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
