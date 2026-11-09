@@ -42,7 +42,7 @@ def test_death_at_zero_energy_and_dead_agents_frozen():
 
 
 def test_birth_only_above_threshold_into_free_slot():
-    cfg = env.Cfg(L=16, N=3, P=1, reproduce=True, A_min=0)
+    cfg = env.Cfg(L=16, N=3, P=1, reproduce=True, A_min=0, rep_mode="threshold")
     s = mk(cfg, [[5, 5], [8, 8], [0, 0]], energy=[0.99, 0.6, 0.5], alive=[True, True, False])
     s2, _, info = env.step(cfg, s, jnp.array([0, 0, 0]), jax.random.PRNGKey(0))
     assert info["births"].tolist() == [False, False, True]                                # slot 2 was free
@@ -85,3 +85,56 @@ def test_homeostatic_reward_sign():
     s = mk(cfg, [[10, 10], [3, 3]], energy=[0.5, 0.5])
     _, r, _ = env.step(cfg, s, jnp.array([env.EAT, 0]), jax.random.PRNGKey(0))
     assert float(r[0]) > 0 > float(r[1])                                                  # toward the setpoint is rewarded
+
+
+def full(cfg, pos, energy, alive, fed=None, rel=None, parent=None):
+    s = mk(cfg, pos, energy=energy, alive=alive)
+    N = cfg.N
+    return s._replace(fed=jnp.zeros(N, jnp.int32) if fed is None else jnp.asarray(fed, jnp.int32),
+                      rel=(0.5 * (1 - jnp.eye(N))) if rel is None else jnp.asarray(rel),
+                      parent=jnp.full(N, -1, jnp.int32) if parent is None else jnp.asarray(parent, jnp.int32))
+
+
+def test_setpoint_reproduction_after_hold():
+    cfg = env.Cfg(L=16, N=3, P=1, reproduce=True, A_min=0, rep_hold=50, regrow=0.0, d0=0.0, d_move=0.0)
+    s = full(cfg, [[5, 5], [8, 8], [0, 0]], [0.85, 0.6, 0.5], [True, True, False], fed=[49, 0, 0])
+    s2, _, info = env.step(cfg, s, jnp.array([0, 0, 0]), jax.random.PRNGKey(0))
+    assert info["births"].tolist() == [False, False, True]                       # 50th step at >= 0.8 -> birth
+    assert np.isclose(float(s2.energy[0]), 0.85 - 0.3) and np.isclose(float(s2.energy[2]), 0.5)
+    assert int(s2.fed[0]) == 0 and int(s2.parent[2]) == 0
+    s = full(cfg, [[5, 5], [8, 8], [0, 0]], [0.85, 0.6, 0.5], [True, True, False], fed=[10, 0, 0])
+    _, _, info = env.step(cfg, s, jnp.array([0, 0, 0]), jax.random.PRNGKey(0))
+    assert not bool(info["births"].any())                                         # not held long enough
+
+
+def test_relatedness_lineage():
+    cfg = env.Cfg(L=16, N=5, P=1, reproduce=True, A_min=0, rep_hold=1, regrow=0.0, d0=0.0, d_move=0.0)
+    rel = np.zeros((5, 5)); rel[0, 1] = rel[1, 0] = 0.5                           # 0 and 1 are founders (0.5)
+    s = full(cfg, [[2, 2], [9, 9], [0, 0], [4, 4], [6, 6]], [0.9, 0.5, 0.5, 0.5, 0.5], [True, True, False, False, False],
+             fed=[5, 0, 0, 0, 0], rel=rel)
+    s, _, info = env.step(cfg, s, jnp.zeros(5, jnp.int32), jax.random.PRNGKey(0))  # 0 has a child in slot 2
+    R_ = np.asarray(s.rel)
+    assert info["births"].tolist()[2] and R_[2, 0] == 0.5 and R_[0, 2] == 0.5     # parent-offspring 0.5
+    assert np.isclose(R_[2, 1], 0.25)                                             # parent's kin at 0.5 x
+    s = s._replace(energy=s.energy.at[0].set(0.9), fed=s.fed.at[0].set(5))
+    s, _, info = env.step(cfg, s, jnp.zeros(5, jnp.int32), jax.random.PRNGKey(1))  # 0 has a second child (slot 3)
+    R_ = np.asarray(s.rel)
+    assert info["births"].tolist()[3] and R_[3, 2] == 0.5 and R_[2, 3] == 0.5     # siblings 0.5
+    assert np.allclose(R_, R_.T) and np.all(np.diag(R_) == 0)
+    s = s._replace(energy=s.energy.at[1].set(0.0))
+    s, _, _ = env.step(cfg, s, jnp.ones(5, jnp.int32), jax.random.PRNGKey(2))        # 1 dies -> leaves the kin table
+    R_ = np.asarray(s.rel)
+    assert np.all(R_[1] == 0) and np.all(R_[:, 1] == 0)
+
+
+def test_inclusive_reward():
+    for inc in (False, True):
+        cfg = env.Cfg(L=16, N=2, P=1, regrow=0.0, inclusive=inc)
+        s = full(cfg, [[10, 10], [3, 3]], [0.5, 0.5], [True, True])
+        _, r, info = env.step(cfg, s, jnp.array([env.EAT, 0]), jax.random.PRNGKey(0))
+        own0 = float(env.drive(cfg, 0.5) - env.drive(cfg, 0.5 + cfg.eff * float(info["take"][0]) - cfg.d0))
+        own1 = float(env.drive(cfg, 0.5) - env.drive(cfg, 0.5 - cfg.d0))
+        if not inc:                                                               # k = 0 control: own reward only
+            assert np.isclose(float(r[0]), own0) and np.isclose(float(r[1]), own1)
+        else:                                                                     # + 0.5 x the kin's reduction
+            assert np.isclose(float(r[0]), own0 + 0.5 * own1, atol=1e-6) and np.isclose(float(r[1]), own1 + 0.5 * own0, atol=1e-6)

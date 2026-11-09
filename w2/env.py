@@ -32,10 +32,14 @@ class Cfg(NamedTuple):
     E_rep: float = 0.95
     A_min: int = 100
     A_max: int = 5000
-    c_rep: float = 0.4
+    c_rep: float = 0.3          # the parent pays this (Cam Nov 9 ~17:50: 0.3)
     reproduce: bool = False
+    rep_mode: str = "setpoint"   # Cam Nov 9 ~17:50: birth after E >= E_set held rep_hold steps (else: E >= E_rep)
+    rep_hold: int = 50
+    E_child: float = 0.5
     E_set: float = 0.8
     drive_n: float = 2.0
+    inclusive: bool = False      # inclusive-fitness reward: + mean over living kin of relatedness x their drive reduction
 
 
 class State(NamedTuple):
@@ -46,6 +50,9 @@ class State(NamedTuple):
     energy: jnp.ndarray
     age: jnp.ndarray
     alive: jnp.ndarray
+    fed: jnp.ndarray = None       # consecutive steps at E >= E_set
+    rel: jnp.ndarray = None       # (N, N) relatedness, 0 on the diagonal and for dead slots
+    parent: jnp.ndarray = None    # parent slot (-1 for founders)
 
 
 def capacity(cfg: Cfg, centres):
@@ -60,7 +67,9 @@ def reset(cfg: Cfg, key) -> State:
     centres = jax.random.randint(k1, (cfg.P, 2), 0, cfg.L)
     cap = capacity(cfg, centres)
     pos = jax.random.randint(k2, (cfg.N, 2), 0, cfg.L)
-    return State(cap, cap, centres, pos, jnp.full(cfg.N, cfg.E0), jnp.zeros(cfg.N, jnp.int32), jnp.ones(cfg.N, bool))
+    rel = 0.5 * (1.0 - jnp.eye(cfg.N))                                    # founders' cluster: 0.5 to each other
+    return State(cap, cap, centres, pos, jnp.full(cfg.N, cfg.E0), jnp.zeros(cfg.N, jnp.int32), jnp.ones(cfg.N, bool),
+                 jnp.zeros(cfg.N, jnp.int32), rel, jnp.full(cfg.N, -1, jnp.int32))
 
 
 def window(cfg: Cfg, grid, pos, r):
@@ -114,9 +123,19 @@ def step(cfg: Cfg, s: State, act, key):
     dead = alive & ((E <= 0.0) | (age >= cfg.A_max))
     alive2 = alive & ~dead
     r = jnp.where(alive, drive(cfg, E_prev) - drive(cfg, E), 0.0)
+    rel = s.rel if s.rel is not None else jnp.zeros((cfg.N, cfg.N))
+    if cfg.inclusive:                     # own drive reduction + mean over living kin of relatedness x theirs
+        kin = (rel > 0) & alive[None, :]
+        r = r + jnp.where(alive, (rel * r[None, :] * kin).sum(1) / jnp.maximum(kin.sum(1), 1), 0.0)
+    fed = jnp.where(alive2 & (E >= cfg.E_set), (s.fed if s.fed is not None else 0) + 1, 0)
+    par = s.parent if s.parent is not None else jnp.full(cfg.N, -1, jnp.int32)
+    rel = jnp.where(alive2[:, None] & alive2[None, :], rel, 0.0)            # the dead leave the kin table
     births = jnp.zeros(cfg.N, bool)
     if cfg.reproduce:
-        parent = alive2 & (E >= cfg.E_rep) & (age >= cfg.A_min)
+        if cfg.rep_mode == "setpoint":
+            parent = alive2 & (fed >= cfg.rep_hold) & (age >= cfg.A_min)
+        else:
+            parent = alive2 & (E >= cfg.E_rep) & (age >= cfg.A_min)
         free = ~alive2
         pr = jnp.cumsum(parent) * parent                                     # k-th parent -> k-th free slot
         fr = jnp.cumsum(free) * free
@@ -128,10 +147,23 @@ def step(cfg: Cfg, s: State, act, key):
         off = MOVES[1 + jax.random.randint(key, (cfg.N,), 0, 4)]
         cpos = (pos + off) % cfg.L
         E = jnp.where(ok_parent, E - cfg.c_rep, E)
+        fed = jnp.where(ok_parent, 0, fed)
         pos = pos.at[child].set(cpos, mode="drop")
-        E = E.at[child].set(cfg.c_rep * 0.9, mode="drop")
+        e_child = cfg.E_child if cfg.rep_mode == "setpoint" else cfg.c_rep * 0.9
+        E = E.at[child].set(e_child, mode="drop")
         age = age.at[child].set(0, mode="drop")
         births = jnp.zeros(cfg.N, bool).at[child].set(True, mode="drop")
+        cp = jnp.full(cfg.N, -1, jnp.int32).at[child].set(jnp.arange(cfg.N), mode="drop")   # newborn slot -> its parent
+        par = jnp.where(births, cp, par)
+        fed = jnp.where(births, 0, fed)
+        # relatedness: newborn row = 0.5 x its parent's row; parent and siblings (same parent) 0.5; then symmetric
+        pc = jnp.clip(cp, 0, cfg.N - 1)
+        row = 0.5 * rel[pc]
+        row = jnp.where(jnp.arange(cfg.N)[None, :] == pc[:, None], 0.5, row)
+        row = jnp.where((par[None, :] == cp[:, None]) & (cp[:, None] >= 0), 0.5, row)
+        rel = jnp.where(births[:, None], row, rel)
+        rel = jnp.where(births[None, :], rel.T, rel)
+        rel = rel * (1.0 - jnp.eye(cfg.N))
         alive2 = alive2 | births
-    s2 = State(food, s.cap, s.centres, pos, E, age, alive2)
+    s2 = State(food, s.cap, s.centres, pos, E, age, alive2, fed, rel, par)
     return s2, r, dict(dead=dead, births=births, take=take, moved=moved)
