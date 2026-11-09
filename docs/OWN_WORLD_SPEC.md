@@ -121,3 +121,37 @@ is laptop work.
 - Option A (per-agent brains, one world) vs B.
 - The predator escapes in stage 3.
 - `N_max` and `L` for the first stage (proposal: N_max = 64, L = 64).
+
+## 12. Open-endedness (Cam, Nov 9 ~08:00): room for all six; prototype only (1)
+
+1. **Generative physics. PROTOTYPED** (`w2/physics.py`, 5 tests).
+   - A material is a property vector `[heat, mass, nutrition, hardness, moisture]`. Five rules (combine, burn, grow,
+     decay, break) map vectors to vectors, so products are materials and combinations compound. The tests show
+     depth-2 products the depth-1 set can't make.
+   - No named objects anywhere agents look: an agent senses a cell's material as its vector (optionally noisy).
+     Food in section 2 becomes a material with high nutrition; "eat" takes nutrition.
+   - **Novelty metric:** distinct quantised material vectors made per life (`physics.signature`).
+2. **Unbounded map (hook):** the world is chunked (e.g. 32 x 32). A chunk's initial materials come from
+   `hash(world_seed, chunk_x, chunk_y)`, so there is no edge and no stored map. Only chunks within a radius of some
+   agent are simulated; others are frozen with their deltas stored (see 3). Senses are already local and absolute, so
+   nothing in an agent's input changes.
+3. **World change by agents (hook):** actions *place* (put a carried material on a cell), *store* (an inventory of k
+   material vectors), *build* (combine two carried materials into a placed product). Changes are a sparse per-chunk
+   delta map, kept when a chunk freezes and re-applied when it thaws, so changes persist.
+4. **Variable-length messages (flag, off):** a message is a sequence of up to `L_max` symbols ending with an END
+   symbol, one symbol per step from the token head, with END as an action. The wire carries the last completed
+   sequence. With the flag off it is the toy's fixed 3-slot message.
+5. **Drives:** homeostatic energy (section 4), plus `curiosity` (flag, off). Curiosity reward = **learning progress**
+   of the agent's own world model: the decrease in its prediction error on recent experience between two model
+   snapshots (Oudeyer & Kaplan's learning progress), not raw prediction error, so noise is not rewarding.
+   - Inborn traits (learning speed, plasticity schedule, curiosity weight) are heritable ranges with mutation.
+6. **Dreaming (hook, off until rung 6):** each brain trains a world model `(obs, action) -> (next obs, reward)` on its
+   real experience only. A sleep phase runs policy updates on imagined rollouts inside it. It switches on only after
+   the rung-6 gates pass:
+   - the model predicts real change (held-out error under a registered bound);
+   - dreaming beats no-dreaming on survival in a registered A/B;
+   - **no imagined action is ever executed** (the dream rollout has no path to the environment step; an apparatus
+     test asserts it).
+- **Metrics planned:** novelty per life; vocabulary in use (distinct messages heard and acted on per 1,000 steps);
+  **new words for new things without PS** (a word-formation probe when a new material or event first appears, as
+  the toy's fifth-fire test).
