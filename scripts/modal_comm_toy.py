@@ -5,6 +5,7 @@ cap for toy runs on Modal: $2 total. One container per run; results to the volum
 """
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 import modal
@@ -112,6 +113,16 @@ PLANS: dict = {
                                           "--save-at", "1750", "2000", "2250", "2500",
                                           "--save-prefix", f"{{VOL}}/testbed/toy/params/erocal_wd{wd}_s{s}", "--tag", f"EROCAL_{wd}"])
                 for wd in ("3e-4", "1e-3", "3e-3") for s in (270, 271, 272)],
+    # (c) rung-3 rerun (Cam Nov 9 ~07:00 / ~07:55): fresh seeds, the C1-E erosion protocol to 3,000 at the CALIBRATED
+    # weight decay (env RUNG3_WD, set from the registered pick); C1 baseline x5, stop-grad x5, wire-off x5 (stop-grad on)
+    "rung3": [(f"r3_{arm_t}_s{s}", ["--arm", arm, "--seed", str(s), *[x if x != "2000" else "3000" for x in _ERO],
+                                     "--erode-wd", os.environ.get("RUNG3_WD", "UNSET"), "--wire-blind", "1", *extra,
+                                     "--eval-at", "1500", "2000", "2500",
+                                     "--save-at", "1500", "1750", "2000", "2500", "3000",
+                                     "--save-prefix", f"{{VOL}}/testbed/toy/params/r3_{arm_t}_s{s}", "--tag", f"R3_{arm_t.upper()}"])
+              for arm_t, arm, extra, ss in (("base", "COMM", [], range(290, 295)),
+                                            ("sg", "COMM", ["--msg-grad", "sender"], range(295, 300)),
+                                            ("off", "NOSIG", ["--msg-grad", "sender"], range(300, 305))) for s in ss],
     # (d) separate brains: 8 G-12 navigators by ORACLE0's own recipe (founders 260-263, newborn pool 264-267), then the G0
     # word-bias gate: the C1 formation recipe to 1,500 from navigators 260 (seeds 280 / 281) and 261 (seeds 282 / 283)
     "nav": [(f"nav_s{s}", ["--arm", "ORACLE", "--seed", str(s), "--updates", "1500", "--craft-cost", "0.45",
@@ -178,6 +189,8 @@ PLANS: dict = {
 def main(plan: str, outdir: str = "toy_out_modal", only: str = ""):
     Path(outdir).mkdir(exist_ok=True)
     jobs = PLANS[plan]
+    if plan == "rung3" and os.environ.get("RUNG3_WD", "UNSET") == "UNSET":
+        raise SystemExit("rung3 needs RUNG3_WD (the registered erosion-calibration pick)")
     if only:   # comma-separated tags (e.g. a price probe of one job)
         jobs = [j for j in jobs if j[0] in only.split(",")]
     if not only and plan == "c1":

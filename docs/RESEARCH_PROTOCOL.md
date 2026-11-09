@@ -3560,6 +3560,22 @@ more expensive, because it produces publishable-looking nulls.
     - (c) C1 x5 + stop-grad x5 + wire-off x5 (stop-grad on) = 5 + 10 x 1.19 = 16.9 run-units = **~$3.7**;
     - (e) 8 population runs x ~$1.07 = **~$8.6**, to be re-timed after the population is wired in.
 
+- **REGISTERED (before data): (c) rung-3 rerun launch details** (plan `rung3`; analysis `analyze_rung3.py`).
+  - Fresh seeds: C1 baseline 290-294, stop-grad 295-299, wire-off 300-304 (stop-grad on).
+  - The C1-E erosion protocol (erode-from 1,500) to 3,000 at the **picked weight decay** (env `RUNG3_WD`; the plan
+    refuses to run without it). Evals at 1,500 / 2,000 / 2,500 + final 3,000; params saved at 1,500 / 1,750 / 2,000 /
+    2,500 / 3,000.
+  - **A seed HOLDS iff, at BOTH 2,500 and 3,000:**
+    - reliance: drop >= 30%, paired > 2 SE, listener window >= the wire-off window mean (as C1 / c1rep);
+    - **gain:** listener window >= wire-off mean + 1.0 per world.
+  - **Arm PASS iff >= 3/5 hold. Wire-off bar:** shuffle-corrected joint MI < 0.05 at u3000 in all 5 (laptop
+    `--mi-null` on the u3000 params).
+  - **Stop-grad adopted unless (# stop-grad seeds holding) < (# baseline seeds holding).**
+  - Note: the u2500 readout is 1,000 updates after PS ends, inside Cam's "read no earlier than 1,500 after PS"
+    rule. Cam asked for both readouts here, and the calibrated strength is chosen so that unused codes die by 2,500;
+    flagged, not changed.
+  - Price: ~$3.7 (Cam's cap $3.4 + 25% = $4.25).
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
