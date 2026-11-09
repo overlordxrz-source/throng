@@ -44,6 +44,8 @@ def main():
     ap.add_argument("--worlds", type=int, default=16); ap.add_argument("--T", type=int, default=64)
     ap.add_argument("--epochs", type=int, default=2); ap.add_argument("--juvenile", type=int, default=0)
     ap.add_argument("--long-life", action="store_true"); ap.add_argument("--random-code", action="store_true")
+    ap.add_argument("--eval-eps", type=int, default=16, help="paired test episodes per life (4 was underpowered)")
+    ap.add_argument("--sanity", action="store_true", help="positive control: scripted listener following the heard sector")
     ap.add_argument("--seed", type=int, default=0); ap.add_argument("--out", default="w2_out/learnability.json")
     a = ap.parse_args()
     cfg = env.Cfg(L=96, N=NB + NL, P=6, patch_sigma=1.0, d0=0.004 if a.long_life else 0.008, reproduce=False,
@@ -86,6 +88,16 @@ def main():
         o = obs_l(s, shift)
         lg, v = jax.vmap(lambda p, x: net.apply(p, x[None]))(P, o); lg, v = lg[:, 0], v[:, 0]
         act_l = jax.random.categorical(k1, lg)
+        if a.sanity:                                      # POSITIVE CONTROL: a scripted listener that follows the heard sector
+            h = hear(s, shift); lpos = s.pos[NB:]
+            here = s.food[lpos[:, 0], lpos[:, 1]]
+            wv = env.window(cfg, s.food, lpos, cfg.r).reshape(NL, -1); best = jnp.argmax(wv, 1); seen = wv.max(1) > 0.2
+            o_ = jnp.arange(-cfg.r, cfg.r + 1)
+            toward = lambda dx, dy: jnp.where(jnp.abs(dx) >= jnp.abs(dy), jnp.where(dx < 0, 1, 2), jnp.where(dy > 0, 3, 4))  # noqa: E731
+            vis = toward(o_[best // (2 * cfg.r + 1)], o_[best % (2 * cfg.r + 1)])
+            sec = jnp.argmax(h[:, :8], 1); ang = sec * (2 * jnp.pi / 8)
+            hd = toward(jnp.round(jnp.cos(ang) * 3), jnp.round(jnp.sin(ang) * 3))
+            act_l = jnp.where(here >= 0.2, env.EAT, jnp.where(seen, vis, jnp.where(h[:, 8] > 0.5, hd, act_l)))
         if a.juvenile:                                    # the young stays within hearing range of the beacons
             far = hear(s, 0)[:, 8] < 0.5
             act_l = jnp.where(young & far, 0, act_l)
@@ -180,7 +192,7 @@ def main():
         print("no completed lives"); return
     Pz = jax.tree_util.tree_map(lambda *x: jnp.stack(x), *[x["params"] for x in lives])
     C = jnp.asarray(np.stack([x["centres"] for x in lives]))
-    keys = jax.vmap(lambda i: jax.random.split(jax.random.PRNGKey(7000 + i), 4))(jnp.arange(len(lives)))
+    keys = jax.vmap(lambda i: jax.random.split(jax.random.PRNGKey(7000 + i), a.eval_eps))(jnp.arange(len(lives)))
     true = np.asarray(ev(Pz, C, keys, 0)); swap = np.asarray(ev(Pz, C, keys, 1))
     res = []
     for i, x in enumerate(lives):
@@ -188,7 +200,7 @@ def main():
         drop = 1 - s_.sum() / max(t.sum(), 1e-9); ok = bool(drop >= 0.30 and d.mean() > 2 * se)
         res.append(dict(lifespan=x["lifespan"], eaten_true=float(t.mean()), eaten_swap=float(s_.mean()), drop=float(drop), passed=ok))
     frac = np.mean([r_["passed"] for r_ in res])
-    summ = dict(variant=dict(juvenile=a.juvenile, long_life=a.long_life, random_code=a.random_code, updates=a.updates, T=T,
+    summ = dict(variant=dict(juvenile=a.juvenile, long_life=a.long_life, random_code=a.random_code, sanity=a.sanity, updates=a.updates, T=T,
                              epochs=a.epochs), lives=len(res), pass_frac=float(frac),
                 median_drop=float(np.median([r_["drop"] for r_ in res])), median_lifespan=float(np.median([r_["lifespan"] for r_ in res])),
                 gate="PASS" if frac >= 0.5 else "FAIL")
