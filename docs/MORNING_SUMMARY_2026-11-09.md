@@ -23,11 +23,10 @@ Account `roadtoagi111`. Everything is recorded in `docs/RESEARCH_PROTOCOL.md`, w
 
 ## Waiting on Cam
 
-1. **(e) price.** It came to ~$15 for 5 POP + 3 control, against the $6 cap, because a population update costs 2.8x a
-   toy update. Options:
-   - (i) shorter lives (1,000-update lifetimes, generation 4 at ~4,000 updates): ~$6.8;
-   - (ii) 3 + 2 runs at full length: ~$9.5;
-   - (iii) a 2-minute GPU timing probe first (~$0.05).
+1. **(e) price.** Re-priced on Modal: a population update takes 3.15 s on 2 CPUs (8 CPUs no faster; an L4 GPU slower,
+   at 6.2 s). That puts 5 POP + 3 control at **~$11.3, against the $6 cap**, and each 9,000-update run at ~8 h. The
+   option that fits: **shorter lives** (lifetime 1,000; generation 4 at ~4,000 updates), **~$5.0 for 8 runs**. That is a
+   design change, so it's Cam's call.
 2. **(f) tau.** Step 2's starting entropy (9.5 nats) is impossible with 4 symbols (maximum 4.16). The proposed
    reading is the same fraction of maximum (0.76), giving **tau = 0.63** (calibrated). OK to launch?
 3. **The own-world spec** (`docs/OWN_WORLD_SPEC.md`): sign-off, plus three decisions: per-agent brains vs lineage

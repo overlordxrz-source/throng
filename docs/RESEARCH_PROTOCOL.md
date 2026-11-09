@@ -3692,6 +3692,15 @@ more expensive, because it produces publishable-looking nulls.
     their slot words; seeds from different navigators share no more than chance. The separate-brains design (each
     newborn from a navigator no living brain started from) removes the bias. (e) is not held by G0, only by its price.
 
+- **(e) re-price probe (Modal, ~$0.1; `scripts/modal_pop.py`; 12 updates at W 48 / T 128 / B 4):** mean t_update over
+  updates 4-12: **2-core CPU 3.15 s; 8-core CPU 3.42 s (no gain); L4 GPU 6.18 s (slower).** The first combined probe's
+  L4 leg was killed by my own client timeout during its image build; it was retried alone, detached.
+  - At the toy's effective ~$0.18 per container-hour (c1rep billed), a 9,000-update run costs **~$1.4**, so **5 POP + 3
+    control = ~$11.3** vs the $6 cap (over 25%; held for Cam). A 9,000-update run also takes ~7.9 h, past the toy
+    launcher's 6 h function timeout; it needs a longer timeout.
+  - **Option (i) shorter lives** (lifetime 1,000, stagger 250, sensitive period 500, settle 250; generation 4 at ~4,000
+    updates): ~$0.63 per run, **~$5.0 for 8**, within the cap. A design change, so Cam's call.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
