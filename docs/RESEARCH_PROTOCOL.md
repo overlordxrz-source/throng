@@ -3079,6 +3079,20 @@ more expensive, because it produces publishable-looking nulls.
   no work now. (Root cause found in 3b: ORACLE0's pos / G and offset / (G/2) features made fires on G 24 look half
   as far.)
 
+- **G 24 navigator: registered smoke gate (i) FAILS (laptop, $0). Not launched.**
+  - Seed 250, from scratch, craft cost 0.381, 50 updates: Craft attempts near a fire per world 1.02 (updates 1-10) →
+    0.03 (41-50); deliveries 0.24 → 0.01.
+  - **Why:** a random beginner Crafts anywhere and pays 0.381 per failed Craft. On G 24 only 36 of 576 cells (6%) are
+    next to a fire, versus 25% on G 12 where ORACLE0 learned, so the policy learns to stop crafting before it learns
+    to navigate. The blind break-even (0.762) assumes a searcher that Crafts only at fires, which a beginner isn't.
+  - **Exploratory smokes, same seed and world (after the gate failed; disclosed):**
+    - cost 0: attempts 2.73 → 12.78, deliveries 0.55 → 2.16 (learning);
+    - cost 0.1: attempts 1.62 → 3.30, deliveries 0.37 → 0.82 (learning).
+  - **Proposal for Cam:** train the navigator at a **density-matched craft cost**: ORACLE0's 0.45 x (near-fire cell
+    share G 24 / G 12 = 0.0625 / 0.25) = **0.11**. Same gates (no collapse by 50; >= 15.3 deliveries per world at
+    2,000), then the VoI on top at 0.381 as accepted. Alternatively cost 0 for the navigator only. Next account
+    (the gate failed, so nothing launches here).
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
