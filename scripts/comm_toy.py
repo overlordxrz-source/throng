@@ -195,6 +195,9 @@ def main():
                     help="north star (Cam, 2026-11-08): build a dictionary (fire -> modal sender triple) from frozen control "
                          "rollouts, then 'speak to them': replace the sender's broadcast by the dictionary word for fire "
                          "X = T + s and count listener Crafts at X, vs the control and vs the sender's own words for X")
+    ap.add_argument("--msg-grad", default="all", choices=["all", "sender"],
+                    help="Cam Nov 9: 'sender' = from-scratch stop-grad: the message head trains on sender rows only (PS unscaled)")
+    ap.add_argument("--selftest-sg2", action="store_true", help="apparatus check of --msg-grad sender at update 1 (Cam Nov 9)")
     ap.add_argument("--mi-null", type=int, default=0, help="with --same-spot: joint-MI shuffle null (N label permutations); skips the swaps")
     ap.add_argument("--same-spot", action="store_true", help="Cam Nov 9: same-spot vs cross-spot empirical swap + joint / pre-Craft MI")
     ap.add_argument("--spawn-box", default=None, help="x0,y0,x1,y1 inclusive: start / respawn cells restricted to this box")
@@ -534,7 +537,7 @@ def main():
         pg = -jnp.minimum(ratio * adv_t, jnp.clip(ratio, 1 - CLIP, 1 + CLIP) * adv_t)
         return jnp.mean(pg), jnp.mean(ent), crit_loss, adv_t
 
-    def total_loss(params, mb, vs, vsh, ps_c, te_c):
+    def total_loss(params, mb, vs, vsh, ps_c, te_c, ps_force=None):
         if a.credit != "joint":
             loss, mets = ppo_loss(params, apply_fn, mb["obs"], mb["actions"], None, mb["lp_act"], mb["adv"],
                                   mb["ret"], mb["carries"], 1, mb["values"], clip_eps=CLIP, vf_coef=VF, ent_coef=ENT,
@@ -546,6 +549,8 @@ def main():
             mets = dict(mets, tok_pg=tpg, tok_ent=tent, credit_critic_loss=closs)
             ps = ps_term(params, mb["obs"], mb["carries"]) if a.ps else jnp.array(0.0)
             ps_coef = ps_c if a.ps_anneal else a.ps
+            if ps_force is not None:   # apparatus / --msg-grad sender only; the default path never sets it
+                ps_coef = ps_force
             mets = dict(mets, aux_ps=ps, aux_pl=jnp.array(0.0), ps_coef=ps_coef)
             return loss - ps_coef * ps, mets
         loss, mets = ppo_loss(params, apply_fn, mb["obs"], mb["actions"], None, mb["log_probs"], mb["adv"],
@@ -558,6 +563,8 @@ def main():
         pl = pl_term(params, mb["obs"], mb["carries"]) if a.pl else jnp.array(0.0)
         mets = dict(mets, aux_ps=ps, aux_pl=pl)
         ps_coef = ps_c if a.ps_anneal else a.ps            # constant path unchanged when not annealing
+        if ps_force is not None:   # apparatus / --msg-grad sender only; the default path never sets it
+            ps_coef = ps_force
         mets = dict(mets, ps_coef=ps_coef)
         return loss - ps_coef * ps - a.pl * pl, mets
 
@@ -595,6 +602,40 @@ def main():
         g = dict(g_all["params"])
         for k in MSGK:
             g[k] = jax.tree_util.tree_map(lambda x: x * scale, g_snd["params"][k])
+        groups = [["head_action"], ["head_value"], [k for k in g if k not in ("head_action", "head_value")]]
+        for grp in groups:
+            g.update(_clip_group({k: g[k] for k in grp}))
+        upd, opt_state = opt.update({"params": g}, opt_state, params)
+        return optax.apply_updates(params, upd), opt_state, mets
+
+    def sg2_grads(params, mb, vs, vsh, ps_c, te_c, version="fixed", leak_row=-1):
+        """Cam Nov 9 (from-scratch stop-grad, PS fix): every parameter gets the usual all-row gradient, EXCEPT the message
+        head (MSGK), which gets (n_sender / n_rows) x the sender-row gradient of the loss WITHOUT the PS term, plus the PS
+        term's own gradient UNSCALED (the PS term is a batch statistic over sender rows, not a row mean). version="old" =
+        the resume-branch composition (the scaled sender-row gradient INCLUDING PS), kept for the apparatus check only.
+        leak_row >= 0 (mutant, apparatus only): that minibatch row is counted as a sender row."""
+        g_all = jax.grad(lambda p_: total_loss(p_, mb, vs, vsh, ps_c, te_c)[0])(params)
+        snd = (mb["obs"][:, O_INF] > 0.5).astype(jnp.float32)
+        if leak_row >= 0:
+            snd = snd.at[leak_row].set(1.0)
+        scale = snd.sum() / snd.shape[0]
+        mb_s = dict(mb, alive=snd)
+        if version == "old":
+            g_s = jax.grad(lambda p_: total_loss(p_, mb_s, vs, vsh, ps_c, te_c)[0])(params)
+            msg = {k: jax.tree_util.tree_map(lambda x: x * scale, g_s["params"][k]) for k in MSGK}
+        else:
+            g_s0 = jax.grad(lambda p_: total_loss(p_, mb_s, vs, vsh, ps_c, te_c, ps_force=0.0)[0])(params)
+            ps_eff = ps_c if a.ps_anneal else a.ps                 # the coefficient total_loss itself applies
+            g_ps = (jax.grad(lambda p_: -ps_eff * ps_term(p_, mb["obs"], mb["carries"]))(params) if a.ps else None)
+            msg = {k: jax.tree_util.tree_map(lambda x, y: x * scale + y, g_s0["params"][k], g_ps["params"][k]) if g_ps is not None
+                   else jax.tree_util.tree_map(lambda x: x * scale, g_s0["params"][k]) for k in MSGK}
+        g = dict(g_all["params"]); g.update(msg)
+        return {"params": g}
+
+    @jax.jit
+    def mb_step_sg2(params, opt_state, mb, vs, vsh, ps_c, te_c):
+        (loss, mets) = total_loss(params, mb, vs, vsh, ps_c, te_c)
+        g = dict(sg2_grads(params, mb, vs, vsh, ps_c, te_c)["params"])
         groups = [["head_action"], ["head_value"], [k for k in g if k not in ("head_action", "head_value")]]
         for grp in groups:
             g.update(_clip_group({k: g[k] for k in grp}))
@@ -1149,6 +1190,58 @@ def main():
         print(json.dumps(dict(phase="qcheck", prefix=a.qcheck, arm=a.arm, sent_top_share=top, q_spread=spread,
                               mean_sent_adv=adv, n=500)), flush=True)
         raise SystemExit(0)
+
+    if a.selftest_sg2:
+        """Cam Nov 9 apparatus check for --msg-grad sender, on an update-1 minibatch (the training batch recipe):
+        (1) the listener rows' contribution to the message-head gradient is exactly 0: perturbing every listener row's
+            advantage / return / actions / log-prob / value leaves the MSGK gradient bit-identical; flag-off and a mutant
+            that leaks ONE listener row into the sender set must change it;
+        (2) the PS term's gradient on MSGK (gradient at c_ps minus at c_ps = 0) is allclose to flag-off (rtol 1e-4,
+            atol 1e-6 x max|g|); the old scaled-PS composition must FAIL that check."""
+        assert a.ps > 0 and a.ps_anneal, "run with --ps and --ps-anneal (the protocol config; c_ps is then honoured)"
+        _, Rq = rollout(params, init_state(jax.random.PRNGKey(41)), jax.random.PRNGKey(42))
+        Rq = jax.tree_util.tree_map(np.asarray, Rq)
+        vals = popart.denormalise(Rq["values"])
+        advq, retq = gae_bootstrap(Rq["rewards"], vals, np.zeros_like(Rq["rewards"]), vals[-1], GAMMA, LAM)
+        params = popart.update_and_preserve(retq, params)
+        M = T * N
+        flat = {k: Rq[k].reshape((M,) + Rq[k].shape[2:]) for k in ("obs", "actions", "log_probs", "carries", "token_actions")}
+        flat["values"] = vals.reshape(M).astype(np.float32)
+        flat["adv"], flat["ret"] = advq.reshape(M).astype(np.float32), retq.reshape(M).astype(np.float32)
+        idx = np.random.default_rng(43).permutation(M)[:MB]
+        mb = {k: jnp.asarray(v[idx]) for k, v in flat.items()}
+        lisr = np.asarray(mb["obs"][:, O_INF] < 0.5)
+        r_ = np.random.default_rng(44)
+        mb_p = dict(mb)
+        for k in ("adv", "ret", "values", "log_probs"):
+            v = np.array(mb[k]); v[lisr] = r_.normal(size=lisr.sum()).astype(v.dtype) * 5; mb_p[k] = jnp.asarray(v)
+        v = np.array(mb["actions"]); v[lisr] = r_.integers(0, 5, lisr.sum()); mb_p["actions"] = jnp.asarray(v)
+        v = np.array(mb["token_actions"]); v[lisr] = r_.integers(0, V, (lisr.sum(), 3)); mb_p["token_actions"] = jnp.asarray(v)
+        args = (popart.sigma, popart.mu, a.ps, TOK_ENT)
+        vec = lambda g: np.concatenate([np.asarray(x, np.float64).ravel() for k in MSGK for x in jax.tree_util.tree_leaves(g["params"][k])])  # noqa: E731
+        full = lambda m_, ps_: jax.grad(lambda p_: total_loss(p_, m_, popart.sigma, popart.mu, ps_, TOK_ENT, ps_force=ps_)[0])(params)  # noqa: E731
+        res = {}
+        g1, g1p = vec(sg2_grads(params, mb, *args)), vec(sg2_grads(params, mb_p, *args))
+        res["listener_perturbed_identical"] = bool(np.array_equal(g1, g1p))
+        res["flag_off_changes"] = bool(not np.array_equal(vec(full(mb, a.ps)), vec(full(mb_p, a.ps))))
+        lr0 = int(np.where(lisr)[0][0])
+        gm, gmp = vec(sg2_grads(params, mb, *args, leak_row=lr0)), vec(sg2_grads(params, mb_p, *args, leak_row=lr0))
+        res["leak_one_row_mutant_changes"] = bool(not np.array_equal(gm, gmp))
+        ps_ref = vec(full(mb, a.ps)) - vec(full(mb, 0.0))
+        ps_new = vec(sg2_grads(params, mb, *args)) - vec(sg2_grads(params, mb, popart.sigma, popart.mu, 0.0, TOK_ENT))
+        ps_old = (vec(sg2_grads(params, mb, *args, version="old")) -
+                  vec(sg2_grads(params, mb, popart.sigma, popart.mu, 0.0, TOK_ENT, version="old")))
+        atol = 1e-6 * float(np.abs(ps_ref).max())
+        res["ps_grad_allclose_fixed"] = bool(np.allclose(ps_new, ps_ref, rtol=1e-4, atol=atol))
+        res["ps_grad_allclose_old"] = bool(np.allclose(ps_old, ps_ref, rtol=1e-4, atol=atol))
+        res["ps_norm_ratio_fixed"] = float(np.linalg.norm(ps_new) / np.linalg.norm(ps_ref))
+        res["ps_norm_ratio_old"] = float(np.linalg.norm(ps_old) / np.linalg.norm(ps_ref))
+        res["sender_row_fraction"] = float(1 - lisr.mean())
+        ok = (res["listener_perturbed_identical"] and res["flag_off_changes"] and res["leak_one_row_mutant_changes"]
+              and res["ps_grad_allclose_fixed"] and not res["ps_grad_allclose_old"])
+        res["PASS"] = bool(ok)
+        print(json.dumps(res, indent=1), flush=True)
+        raise SystemExit(0 if ok else 1)
 
     if a.selftest_leak:
         """Step A: gradient of the LISTENER's losses (token PPO term zeroed) w.r.t. the shared message parameters,
@@ -1705,6 +1798,8 @@ def main():
                 mb = dict(mb, alive=(mb["obs"][:, O_INF] > 0.5).astype(jnp.float32))   # the frozen listener does not train
             if a.resume and a.branch == "stopgrad":
                 params, opt_state, mets = mb_step_stopgrad(params, opt_state, mb, popart.sigma, popart.mu, ps_c, te_c)
+            elif a.msg_grad == "sender":
+                params, opt_state, mets = mb_step_sg2(params, opt_state, mb, popart.sigma, popart.mu, ps_c, te_c)
             else:
                 params, opt_state, mets = mb_step(params, opt_state, mb, popart.sigma, popart.mu, ps_c, te_c)
             if a.resume and a.branch == "wireblind":
