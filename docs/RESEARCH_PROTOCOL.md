@@ -3823,6 +3823,31 @@ more expensive, because it produces publishable-looking nulls.
   - Spend at relaunch $5.35 (all credit). (e) with the lost partial: ~$12.1 vs cap $12, inside the 25% allowance.
   - The Mac guard still depends on the Mac. The Modal guard (waiting on M's secret) removes that.
 
+- **W2 after sign-off (laptop, $0; comm-toy).**
+  - `w2/env.py`: setpoint reproduction (E >= 0.8 held 50 steps, parent pays 0.3, newborn at 0.5), lineage relatedness
+    (founders 0.5; parent / offspring / sibling 0.5; others 0.5 x the parent's; the dead leave the table), and the
+    inclusive-fitness reward flag (own drive reduction + mean over living kin of relatedness x theirs). **14/14 tests**,
+    incl. the k = 0 control equalling own reward.
+  - **W2 navigators** (`w2/navigators.py`; blind, k = 0, no comm, seeds 1000-1007, 400 updates each). Frozen-policy
+    lifespans 653 / 540 / 549 / 623 / 599 / 754 / 605 / 627. **Gate (>= 0.7x best 754 = 527): 8/8 pass.**
+  - **Per-agent brains + PPO** (`w2/agents.py`): one MLP per agent slot, own Adam, W replicate worlds vmapped.
+    - A newborn's slot is reset inside the rollout to a navigator no living agent of its world started from, and its
+      Adam is reset.
+    - Each brain trains only on its current individual's rows.
+    - Founders spawn clustered; extinct worlds are re-seeded (counted).
+  - **Laptop runs** (8 worlds x 8 agents, T 256, 200 updates, seed 1):
+
+    | arm | births per 1,000 steps per world, by quintile | alive / 8 | extinctions |
+    |---|---|---|---|
+    | inclusive | 4.43 / 4.68 / 4.92 / 4.88 / 4.86 | 6.7 | 9 (all in the first 40 updates) |
+    | k = 0 | 4.65 / 4.77 / 4.72 / 4.77 / 5.02 | 6.7 | 9 (first 40) |
+
+    - **Turnover:** ~0.61 births per slot per 1,000 steps, i.e. one per ~1,630 steps. Mean lifespan ~1,370 steps (6.7
+      alive / 4.9 deaths per 1,000 steps), so every slot turns over about **once per ~1.2 lifetimes. Cam's target (at
+      least once per ~3 lifetimes) is met.** Agents do not avoid reproduction at the setpoint.
+    - No inclusive vs k = 0 difference yet over 200 updates (no comm; kin rarely meet in this short run).
+    - 0.35 s per update on the laptop (~47k agent-steps/s with learning).
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
