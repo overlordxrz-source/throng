@@ -89,7 +89,14 @@ PLANS: dict = {
                                           ("S2_NOSIG", "NOSIG", [], (200, 201))) for s in ss],
     # C1-E replication (Cam item 4, 2026-11-08 night): fresh seeds; full-state snapshot at 2,000 so that a continuation (if
     # Cam approves) resumes faithfully instead of regenerating (C1 saved actor params only)
-    "c1rep": [(f"c1rep_{w}_s{s}", ["--arm", arm, "--seed", str(s), *_ERO, "--wire-blind", "1", "--snapshot-at", "2000",
+    # Cam Nov 9 approved the continuation to 3,000 (option B). Run straight to 3,000 instead of 2,000 + resume: nothing in
+    # comm_toy.py depends on --updates except the loop bound and the final eval, mid-run evals leave training bit-identical
+    # and snapshot+resume is bit-identical, so the 2,000 readout (eval-at 2000) is the same; the 2,000 snapshot is still written.
+    "c1rep": [(f"c1rep_{w}_s{s}", ["--arm", arm, "--seed", str(s),
+                                   *[x if x != "2000" else "3000" for x in _ERO], "--eval-at", "1500", "2000", "2500",
+                                   "--save-at", "1500", "1750", "2000", "2500", "3000",
+                                   "--save-prefix", f"{{VOL}}/testbed/toy/params/c1rep_{w}_s{s}",
+                                   "--wire-blind", "1", "--snapshot-at", "2000",
                                    "--snapshot-path", f"{{VOL}}/testbed/toy/snap/c1rep_{w}_s{s}_u2000.pkl", "--tag", f"C1REP_{w.upper()}"])
               for w, arm, ss in (("on", "COMM", range(230, 235)), ("off", "NOSIG", (235, 236))) for s in ss],
     # step 3b value-of-information check (Cam item 6, 2026-11-08 night): lookout world, PS off, wire off in both arms

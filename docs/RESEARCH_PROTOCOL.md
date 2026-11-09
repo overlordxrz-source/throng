@@ -2828,6 +2828,81 @@ more expensive, because it produces publishable-looking nulls.
   - Egress within the free allowance.
   - **Pass 2 is required after the last run on this account** (c1rep snapshots, s3b params, real-net checkpoints).
 
+- **Cam's rulings, Nov 9 (pasted by the user; M's decision included).**
+  1. **Credit verified.** M reported $18 left at 21:50 with the meter at ~$24.3, so the limit is ~$42.3 (~$17.5 left
+     at $24.78). The user read **$17.8 left** on the billing page on Nov 8 ~19:30 with the meter at $24.73, which
+     agrees (limit ~$42.5). **Guard stays at $41.0 total metered**, restarted before each launch.
+  2. **Free checks accepted.** C1-T3's ~0 was the post-reset probe; the pre-reset re-probe passes 3/3. C1-E's 2,000
+     pass stands as registered, but in 2 of 3 seeds it is a decaying code: **rung 3 is not shown until the 3,000
+     readout.**
+  3. **Item 3: B approved, A deferred to the next account, C rejected.** The C1-E replication continues all 7 seeds to
+     3,000. The 2,000 readout stays the registered primary.
+     - **Registered bar at 3,000:** reliance in >= 3 of 5 wire-on seeds AND wire-off MI (Miller-Madow) < 0.5 bit in
+       both. No pooled-drop term. NOSIG level = the wire-off mean over the 50 updates before 3,000. Redirection
+       reported. Added to `analyze_c1rep.py`.
+     - **Implementation (disclosed):** the 7 runs go **straight to 3,000** instead of 2,000 + resume. Evidence that this
+       is the same experiment:
+       - in `comm_toy.py`, `--updates` is used only as the loop bound and for the final eval;
+       - local check: a 30-update run with `--eval-at 20` reproduces a 20-update run row for row
+         (31/31 train / MI / swap rows identical up to update 20);
+       - mid-run evals and snapshot + resume were already shown bit-identical.
+     - The 2,000 full-state snapshot is still written. Eval at 1,500 / 2,000 / 2,500, final at 3,000. Params saved
+       at 1,500 / 1,750 / 2,000 / 2,500 / 3,000.
+  4. **Approved, free: the listener rows' share of the message-head gradient in C1-E** (u1500 and u2000, wire-on
+     s185-187), plus its cosine with the sender rows' gradient. Registered before computing:
+     - Gradient = the first-epoch training gradient of `total_loss` at the saved params on fresh rollouts (4
+       rollouts, every minibatch of a random permutation, ratio = 1, pre-clip). Every term is a row-masked mean, so
+       g_all = c_S + c_L exactly, with c_X = (X's row fraction) x the gradient with alive = X's rows. The split
+       residual is reported. c_ps = 0 at both checkpoints under the erosion protocol.
+     - Message head = the step-B (iii) key set (gwt_comms_1, head_signal_slot0-2, codebook_0-2). Also reported
+       without the codebooks.
+     - **Share = ||c_L|| / (||c_L|| + ||c_S||)**, which is bounded in [0, 1] even when the cosine is negative. Also
+       reported: ||c_L||^2 / (||c_L||^2 + ||c_S||^2), cos(c_L, c_S), and the projection c_L . g_all / ||g_all||^2.
+     - **PopArt stats are not in the actor-only saves.** They are fitted by OLS of the GAE returns on the raw value-head
+       output, iterated 5x. Approximate, disclosed. Exact cross-check later on the c1rep u2000 full-state snapshots
+       (which hold the PopArt stats): same tool, exact vs fitted.
+     - **Trigger (Cam):** if the share >= 30%, register for the next account: C1-E with the message head trained by
+       sender rows only (step B's (iii) flag), wire-on x3 and wire-off x2. I read "the share" as **>= 0.30 in at least
+       2 of the 3 seeds at either checkpoint**; Cam can amend.
+     - Tool: `comm_toy.py --grad-share` (eval-only; exits before training; the default path is untouched).
+  5. **Speak test accepted as descriptive** (with the specificity disclosure). **It meets translation-track step 2's
+     gate in the toy** (our word on par with the real sender's). Recorded: in the eroded C1-E seeds our dictionary word
+     beats the sender's own (18-20 vs ~15 Crafts at X), so **erosion is on the production side**; the listener keeps
+     the vocabulary.
+  6. **Step 6 FAIL accepted. Rerun one arm on the next account:**
+     - keep ORACLE0 for navigation;
+     - re-initialise the message head and the material input rows;
+     - set tau so the starting sender token entropy matches step 2's (~9.5 nats summed over slots, update 1);
+     - **precondition gate:** >= 12 distinct messages (of 14 training meanings) at update 1,000 in >= 4 of 5 seeds,
+       otherwise stop and report before reading compositionality.
+  7. **3b VoI: my two added conditions accepted.** It runs on this account after the replication launches if the probe
+     leaves room, otherwise on the next account. If it fails on occupancy, the next design gives agents a reason to
+     pass by the lookout, not a bigger reward for information.
+  8. **Real-net PS x2 (seeds 52 / 53) approved as planned, with the probe gate.** Order: real-net probe, then the C1-E
+     replication, then VoI.
+  9. **North star.**
+     - Crystallization on the production side, tied to the message head's plasticity (hearing stays plastic), and
+       learning-speed variety across agents: agreed. **M approved both traits as permanent parts of their nature:
+       message-head plasticity that settles with age, and varied learning speeds across agents. Design them into the
+       separate-brains stage** (after the toy repeat).
+     - **Consequence to plan for (Cam):** with crystallization plus copying, wire-off codes will persist too (T3 showed
+       copying alone keeps them), so the wire-off control stops discriminating. The bar moves to **reliance across
+       generations, plus adapting when the world changes** (e.g. the fires move): a living code persists while it is
+       useful and changes when the world does.
+     - Order: the C1-E replication, then separate brains with rotating partners and varied learning speeds.
+
+- **Real-net probe, first attempt (2026-11-08 19:34): out of GPU memory, ~$0.1.**
+  - `rep_PS52` on c242635 crashed in update 1, **in `--log-diag`, not in training**: the PPO update completed
+    (64 minibatches); the eager (un-jitted) gradient of the loss on the 2,048-row diag sample then exhausted the A10G
+    (`RESOURCE_EXHAUSTED`, every allocator chunk in use, so not fragmentation).
+  - **Never tested on the GPU before.** The "verified" in c242635 was a CPU check. A first-update GPU smoke of every
+    new flag belongs in the config audit from now on.
+  - **Fix (comm-jit 7366052, launcher re-pinned):** the same loss on the same sample, jitted once; the KL forward is
+    jitted; an unused eager loss evaluation was removed. **Update-1 self-check:** the jitted vs the eager gradient on a
+    256-row sub-sample, relative difference <= 1e-3, otherwise the run stops (exit 4). The training path is untouched.
+  - A local CPU run of the real net was too slow for the laptop rule (> 10 min at update 1) and was stopped. The
+    relaunched probe is the GPU test.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
