@@ -195,6 +195,7 @@ def main():
                     help="north star (Cam, 2026-11-08): build a dictionary (fire -> modal sender triple) from frozen control "
                          "rollouts, then 'speak to them': replace the sender's broadcast by the dictionary word for fire "
                          "X = T + s and count listener Crafts at X, vs the control and vs the sender's own words for X")
+    ap.add_argument("--spawn-box", default=None, help="x0,y0,x1,y1 inclusive: start / respawn cells restricted to this box")
     ap.add_argument("--export-m", default=None, help="for M: write dictionary + one episode transcript (CSV/JSON) to this dir")
     ap.add_argument("--grad-share", action="store_true",
                     help="Cam Nov 9 item 4: listener vs sender rows' share of the message-head gradient at the loaded params")
@@ -230,6 +231,10 @@ def main():
     hn = np.asarray(HEARTHS)
     dd = np.abs(cells[:, None, :] - hn[None]); dd = np.minimum(dd, G - dd).max(-1)
     VALID = jnp.asarray(cells[(dd > 1).all(1)])           # respawn cells: not within radius 1 of any hearth
+    if a.spawn_box is not None:   # retuned 3b world (Cam, Nov 9): start and respawn only inside the fire cluster's region
+        bx0, by0, bx1, by1 = (int(v) for v in a.spawn_box.split(","))
+        vv = np.asarray(VALID)
+        VALID = jnp.asarray(vv[(vv[:, 0] >= bx0) & (vv[:, 0] <= bx1) & (vv[:, 1] >= by0) & (vv[:, 1] <= by1)])
 
     model = ToyNet(H, credit=a.credit, wire_blind=a.wire_blind)
 
