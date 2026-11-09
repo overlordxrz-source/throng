@@ -195,6 +195,7 @@ def main():
                     help="north star (Cam, 2026-11-08): build a dictionary (fire -> modal sender triple) from frozen control "
                          "rollouts, then 'speak to them': replace the sender's broadcast by the dictionary word for fire "
                          "X = T + s and count listener Crafts at X, vs the control and vs the sender's own words for X")
+    ap.add_argument("--same-spot", action="store_true", help="Cam Nov 9: same-spot vs cross-spot empirical swap + joint / pre-Craft MI")
     ap.add_argument("--spawn-box", default=None, help="x0,y0,x1,y1 inclusive: start / respawn cells restricted to this box")
     ap.add_argument("--export-m", default=None, help="for M: write dictionary + one episode transcript (CSV/JSON) to this dir")
     ap.add_argument("--grad-share", action="store_true",
@@ -1421,6 +1422,60 @@ def main():
         raise SystemExit(0 if ok else 1)
 
     np_rng = np.random.default_rng(a.seed)
+    if a.same_spot:            # Cam Nov 9 ~02:40 check (a) + (c): same-spot swap control and joint / pre-Craft MI; frozen params
+        from comm_testbed import mi_miller_madow
+        lis = np.asarray(is_listener)
+        ev_rng = np.random.default_rng(5_000 + a.seed)
+        enc = lambda x: (x[..., 0] * V + x[..., 1]) * V + x[..., 2]  # noqa: E731
+
+        def joint_mi(e, lab):
+            _, ei = np.unique(e, return_inverse=True)
+            J = np.zeros((ei.max() + 1, NCLS)); np.add.at(J, (ei, lab), 1); P = J / J.sum()
+            px, py = P.sum(1, keepdims=True), P.sum(0, keepdims=True); nz = P > 0
+            mi = float((P[nz] * np.log2(P[nz] / (px @ py)[nz])).sum())
+            return mi, mi - (nz.sum() - (px > 0).sum() - (py > 0).sum() + 1) / (2 * len(lab) * np.log(2)), int(ei.max() + 1)
+        all_tok, all_lab, pre_tok, pre_lab = [], [], [], []
+        for k in range(a.swap_pairs):
+            st0 = init_state(jax.random.PRNGKey(10_000 + k))
+            _, Rc = rollout(params, st0, jax.random.PRNGKey(20_000 + k), swap=False)
+            Rc = jax.tree_util.tree_map(np.asarray, Rc)
+            trip_c, lab = Rc["token_actions"][:, ~lis], Rc["active"]                 # (T, W, 3), (T, W)
+            all_tok.append(trip_c.reshape(-1, 3)); all_lab.append(lab.reshape(-1))
+            # steps before the listener's first Craft within each lit period (a period = a run of one lit spot in a world)
+            craftL = Rc["actions"][:, lis] == ACTION_CRAFT                            # (T, W)
+            for w_ in range(W):
+                seen = False
+                for t_ in range(T):
+                    if t_ > 0 and lab[t_, w_] != lab[t_ - 1, w_]:
+                        seen = False
+                    if not seen:
+                        pre_tok.append(trip_c[t_, w_]); pre_lab.append(lab[t_, w_])
+                    if craftL[t_, w_]:
+                        seen = True
+            if a.arm != "COMM":
+                continue
+            table = np.zeros((4, 512, 3), np.int32)
+            for t in range(4):
+                tt = trip_c[lab == t]
+                table[t] = tt[ev_rng.integers(0, len(tt), 512)]
+            row = dict(phase="same_spot", pair=k, listener_dep_control=float(Rc["dep"][:, lis].sum() / W))
+            for nm, sh in (("cross", 1), ("same", 0)):
+                _, Rk = rollout(params, st0, jax.random.PRNGKey(20_000 + k), swap="empirical", table=jnp.asarray(table), shift=sh)
+                Rk = jax.tree_util.tree_map(np.asarray, Rk)
+                if not np.allclose(Rk["heard_next"][:, lis], Rk["bc_sw"][:, ~lis]):
+                    print("[APPARATUS] FATAL: swap wiring", flush=True); raise SystemExit(1)
+                row[f"listener_dep_{nm}"] = float(Rk["dep"][:, lis].sum() / W)
+                row[f"swapped_differs_{nm}"] = float(np.any(Rk["trip_used"][:, ~lis] != Rk["token_actions"][:, ~lis], -1).mean())
+            emit(row)
+        tok, lab = np.concatenate(all_tok), np.concatenate(all_lab)
+        ptok, plab = np.stack(pre_tok), np.asarray(pre_lab)
+        jm, jmm, nd = joint_mi(enc(tok), lab); pm, pmm, pnd = joint_mi(enc(ptok), plab)
+        emit(dict(phase="mi_joint", n=int(len(lab)), slot_mi_mm=[float(mi_miller_madow(tok[:, i], lab, V, NCLS)) for i in range(3)],
+                  joint_mi_plugin=jm, joint_mi_mm=jmm, distinct_triples=nd,
+                  pre_craft_n=int(len(plab)), pre_craft_slot_mi_mm=[float(mi_miller_madow(ptok[:, i], plab, V, NCLS)) for i in range(3)],
+                  pre_craft_joint_mi_plugin=pm, pre_craft_joint_mi_mm=pmm, pre_craft_distinct=pnd))
+        raise SystemExit(0)
+
     if a.export_m:             # for M (Cam, Nov 9): dictionary table + one episode transcript; frozen params, $0
         import csv
         lis = np.asarray(is_listener)
