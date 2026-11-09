@@ -3600,6 +3600,22 @@ more expensive, because it produces publishable-looking nulls.
   - Metrics to plan for: novelty (distinct material combinations per life); vocabulary in use; whether new words
     appear for new things without PS.
 
+- **(f) step-6 rerun: code ready, launch HELD for Cam (judgment call; overnight rule).**
+  - New flags (comm-toy): `--reinit-msg` re-initialises the message head (gwt_comms_1, head_signal_slot0-2) and enc_0's
+    material input rows (O_NOISE..+4) after the ORACLE0 warm start; `--tau` overrides the token temperature. The
+    default path is bit-identical (12 updates, 19/19 rows).
+  - **The judgment call:** "tau so the starting token entropy matches step 2's". Step 2 started at 9.53 nats summed
+    over 3 slots of 64 symbols; with step 6's 4-symbol vocabulary the maximum is 3 ln 4 = 4.16 nats, so the literal
+    target is impossible.
+  - Proposed reading: **match the fraction of maximum:** 9.53 / 12.48 = 0.764 → 3.18 nats.
+  - Laptop calibration (update-1 summed sender entropy, `--comp --vq-vocab 4 --reinit-msg`): tau 0.08 → 0.65, 0.3 →
+    2.15, 0.5 → 2.89, 0.6 → 3.12, 0.7 → 3.30, 1.0 → 3.63. **Proposed tau = 0.63.**
+  - Otherwise as ruled: one arm, 5 seeds (fresh, 310-314), 3,000 updates; gate >= 12 distinct messages at 1,000 in
+    >= 4 of 5 seeds, else stop before reading compositionality; then the step-6 analysis. Price ~$0.7-1.0, cap $1.
+- **W2 prototype (laptop, code + tests):** `w2/env.py`, the world core (energy drain / eat / death / reproduction mask,
+  food patches, egocentric absolute window, ORACLE offset, homeostatic reward). **6/6 tests pass**, including **the same
+  local scene giving an identical observation at L = 64 and L = 256**.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
