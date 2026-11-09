@@ -3421,6 +3421,43 @@ more expensive, because it produces publishable-looking nulls.
     `toy` 117, `toy/params` 209, `toy/snap` 10 (incl. the c1rep u2000 snapshots).
   - Nothing remains only on Modal.
 
+- **Cam, Nov 9 ~07:00: account close-out and next-account plan.**
+  1. **Shuffle null accepted. Toy rung 3 = "bar passed on the letter; use keeping the code alive NOT SHOWN".**
+     s236's decay (0.93 at u2000 → 0.48 at u2500 → 0.23 at u3000, roughly halving every 500 updates) is the
+     unused-code clock at wd 3e-4; the calibration has to beat it.
+  2. **REAL NET: rung 2 MET on the real network** (registered rule >= 2/3 seeds; 2/2 passed, so a third seed can't
+     change it). Scope: formation + use with PS on, not erosion. Caveats recorded: s53's gain-rule dip (3.35 at
+     u450) and the degenerate probe 400.
+     - Probe-400 post-mortem: re-run that probe on the s53 u400 checkpoint with a new probe seed. Free only if it
+       runs on the laptop in < 10 min, else next account (cap $0.5). Report only.
+     - Third real-net seed + NOSIG, and the A100 timing: **DEFERRED** (the next stages run in the toy, then our own
+       world).
+  3. **Next account, in order (allowance $14, guard $15):**
+     - **(a) Guard on Modal** as a scheduled function. M creates the token secret; M gets the exact steps; the agent
+       never handles the token. Until it's live, the Mac guard runs as before.
+     - **(b) Erosion calibration to u2500** as registered, cap $1.1. **The 3 wire-off seeds grow with stop-grad ON**
+       (every later arm uses it). If no strength qualifies, report; don't extend.
+     - **(c) Rung-3 rerun at the picked strength,** as registered: C1 x5, stop-grad x5, wire-off x3, fresh seeds,
+       both readouts. **Cap $3.4**, all arms and the u2500 eval kept. The calibration seeds must not double as this
+       control. If the picked strength leaves 0/5 survivors in BOTH wire-on arms, stop and report before (e).
+     - **(d) Separate brains: navigators + G0 word-bias gate**, in parallel with (b), cap $1.4.
+     - **(e) Separate-brains population runs after (c): APPROVED as designed, cap $6**, plus:
+       - **control population:** the same design with the wire OFF and copying ON (copying alone could carry a code
+         across generations). Bar: shuffle-corrected joint MI < 0.05 at the readout in every control seed;
+       - message-head gradients follow (c): sender rows only, unless stop-grad does worse;
+       - **fifth fire APPROVED as a registered secondary** (reported, not part of the rung-3 bar). Its offset slot is
+         in the obs from update 0, it is never lit before 7,500, and PS never applies to it. Also report which age
+         group coins its word (newborns in their sensitive period, or settled brains);
+       - **ladder rung 3 is met only if the bars hold in gen-4 brains in >= 2/3 population seeds.**
+     - **(f) Step-6 compositionality rerun** as ruled at 00:40 (re-init message head + material rows; tau for step-2's
+       starting entropy; gate >= 12 distinct messages at 1,000 in >= 4/5). Price first, cap $1. Any time.
+     - **DEFERRED:** C1-T3 to 2,750 (superseded by (e)); the 3b navigator / VoI (the G-scaled obs is a toy limit;
+       rebuild the lookout test in our own world with absolute, limited-range senses).
+  4. Accepted: the stop-grad build, its apparatus check, the ps_force fix, the population code and its 11 tests.
+  - **Budget check (my estimates):** (b) ~$1.0 + (c) ~$3.2 + (d) navigators $0.9 + G0 $0.45 + (e) 5 runs ~$5.3 plus
+    the control population (+2 runs ~$2.1) = ~$7.4 vs the $6 cap, so **(e) needs re-pricing or one fewer seed**, to
+    be timed after integration + (f) ~$1 = ~$13.9 against the $14 allowance. (e) is the item to re-price first.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
