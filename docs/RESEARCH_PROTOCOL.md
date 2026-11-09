@@ -2958,6 +2958,29 @@ more expensive, because it produces publishable-looking nulls.
 - **If the Mac sleeps the local guard stops.** Worst case without it: the runs end on their own (PS52 projected ~$6.35;
   its function timeout is 8 h = ~$9; toy runs ~$0.05 per 1,000 updates), so metered stays < ~$36 without PS53.
 
+- **Cam, Nov 9 early.**
+  1. **PS53: option (b).** It launches now without `--log-diag`. PS52 keeps the diagnostics, enough for a crash
+     post-mortem on one seed. Same registered experiment and bar (primary in 2/2 = PASS, 1/2 = partial).
+  2. Accepted: the OOM fix and the `ps_grad_share` redefinition (not a bar); C1-E straight to 3,000; VoI launched.
+  3. Grad share: the trigger fired (accepted); withdrawing the "opposing push" reading was right. **The stop-grad arm
+     runs first on the next account**, with its from-scratch flag and **apparatus check: only sender rows send
+     gradient into the message head, and a mutant that leaks one listener row must fail.**
+  4. **Separate-brains stage:** if the code weights mostly random-walk, crystallization (message-head plasticity
+     falling with age) damps that walk directly, and separate brains remove the listener half by construction. **Log
+     gradient noise and code drift** so each trait's effect can be measured.
+  5. **Next account, in order:**
+     1. backup pass 2;
+     2. move the spend guard into a small scheduled Modal function, so it doesn't depend on the Mac (check
+        feasibility and price first);
+     3. the stop-grad arm;
+     4. C1-T3 to 2,750 (option A);
+     5. the step-6 rerun;
+     6. the 3b arms, if VoI qualifies;
+     7. the third real-net seed plus NOSIG;
+     8. a 2-minute real-net timing on an A100 vs the A10G (cost per run, future runs only).
+  6. Each batch is analysed on landing with the registered scripts.
+  - Launcher: `REPLICATE` adds `--log-diag` for seed 52 only.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under

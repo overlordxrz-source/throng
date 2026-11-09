@@ -127,11 +127,12 @@ def confirm():
 
 # Real-net replication (Cam, 2026-11-08 night; shrunk to fit this account): the confirmation's recipe exactly, plus the
 # wire-blind message pathway, --log-diag and checkpoints every 50 updates; fresh seeds 52 / 53; price probe = rep_PS52 alone.
+# Cam Nov 9 early, option (b): rep_PS53 runs WITHOUT --log-diag (the diag writes nothing back; PS52 keeps it).
 REPLICATE = [(f"rep_PS{s}", ["--arm", "COMM", "--seed", str(s), "--updates", "450", "--tau", "0.08", "--craft-cost", "0.1",
                              "--warm-start", "{VOL}/testbed/params/comm_ORACLE0_run_b88fe7f_a2.msgpack", "--ps", "2.015",
                              "--apparatus-update", "2", "--mi-halt-k", "5", "--mi-floor", "0.92", "--mi-probe-halt",
                              "--eval-at", *[str(u) for u in range(50, 450, 50)], "--swap-pairs", "10",
-                             "--swap-modes", "empirical", "--wire-blind", "1", "--log-diag", "--ckpt-every", "50",
+                             "--swap-modes", "empirical", "--wire-blind", "1", *(["--log-diag"] if s == 52 else []), "--ckpt-every", "50",
                              "--ckpt-prefix", f"{{VOL}}/testbed/comm_jit/ckpt/rep_PS{s}",
                              "--save-params", f"{{VOL}}/testbed/params/rep_PS{s}.msgpack"])
              for s in (52, 53)]
