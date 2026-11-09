@@ -403,6 +403,17 @@ def main():
     from collections import deque
     mi_buf = deque(maxlen=10)
     probe_below = []
+
+    @jax.jit
+    def diag_grad(p_, Sd, ps_c):   # --log-diag only: the loss on the diag sample, jitted once (see the self-check)
+        kw_ = dict(clip_eps=float(cfg.get("ppo_clip_eps", 0.2)), vf_coef=a.vf_coef, ent_coef=float(cfg.get("ppo_entropy_coef", 0.02)),
+                   vq_coef=float(cfg.get("vq_loss_coef", 0.1)), value_scale=Sd["sig"], value_clip=False, value_shift=Sd["mu"],
+                   popart_mode=True, token_actions=Sd["tok"], token_tau=a.tau, token_ent_coef=a.token_ent_coef)
+        return jax.grad(lambda q: rl_jax.ppo_loss(q, apply_fn, Sd["obs"], Sd["act"], Sd["alarm"], Sd["lp"], Sd["adv"], Sd["ret"],
+                                                  Sd["c"], nl, Sd["v"], **kw_, ps_coef=ps_c,
+                                                  ps_cols=((s0 + 12, s0 + 21) if a.ps > 0 else None))[0])(p_)
+
+    diag_fwd = jax.jit(lambda p_, c_, o_: apply_fn(p_, c_, o_, nl))
     for u in range(1, a.updates + 1):
         t0 = time.time()
         env_key, k_env = jax.random.split(env_key)
@@ -561,15 +572,37 @@ def main():
                                                      S["c"], nl, S["v"], **kw, ps_coef=ps_c,
                                                      ps_cols=((s0 + 12, s0 + 21) if a.ps > 0 else None))
             gnorm = lambda g: float(np.sqrt(sum(float(jnp.sum(x ** 2)) for x in jax.tree_util.tree_leaves(g))))  # noqa: E731
-            g_tot = jax.grad(lambda p_: lossf(p_, a.ps)[0])(params_before)
+            # 2026-11-09: the eager (op-by-op) gradient on 2,048 rows ran the A10G out of memory at update 1 (rep_PS52).
+            # Same loss, same sample, jitted once (diag_grad below); the update-1 self-check compares it to the eager
+            # gradient on a 256-row sub-sample and stops the run on a mismatch.
+            Sd = dict(S, sig=jnp.float32(popart.sigma), mu=jnp.float32(popart.mu))
+            if u == 1:
+                S2 = {k: v[:256] for k, v in S.items()}
+                kw2 = dict(kw, token_actions=S2["tok"])
+                eager = jax.grad(lambda p_: rl_jax.ppo_loss(p_, apply_fn, S2["obs"], S2["act"], S2["alarm"], S2["lp"], S2["adv"],
+                                                            S2["ret"], S2["c"], nl, S2["v"], **kw2, ps_coef=a.ps,
+                                                            ps_cols=((s0 + 12, s0 + 21) if a.ps > 0 else None))[0])(params_before)
+                jitd = diag_grad(params_before, dict(S2, sig=Sd["sig"], mu=Sd["mu"]), a.ps)
+                ne_, nj_ = gnorm(eager), gnorm(jitd)
+                nd_ = gnorm(jax.tree_util.tree_map(lambda x, y: x - y, eager, jitd))
+                ok_ = nd_ <= 1e-3 * max(ne_, 1e-12)
+                print(f"[DIAG JIT CHECK] eager norm {ne_:.6g} jit norm {nj_:.6g} rel diff {nd_ / max(ne_, 1e-12):.2e} -> "
+                      f"{'PASS' if ok_ else 'FAIL'}", flush=True)
+                emit(dict(base, phase="diag_jit_check", eager_norm=ne_, jit_norm=nj_, rel_diff=nd_ / max(ne_, 1e-12), ok=bool(ok_)))
+                del eager, jitd
+                if not ok_:
+                    raise SystemExit(4)
+            g_tot = diag_grad(params_before, Sd, a.ps)
             diag["grad_norm"] = gnorm(g_tot)
             if a.ps > 0:
-                g_nops = jax.grad(lambda p_: lossf(p_, 0.0)[0])(params_before)
+                g_nops = diag_grad(params_before, Sd, 0.0)
                 g_ps = jax.tree_util.tree_map(lambda x, y: x - y, g_tot, g_nops)
                 diag["ps_grad_norm"] = gnorm(g_ps); diag["ps_grad_share"] = diag["ps_grad_norm"] / max(diag["grad_norm"], 1e-12)
+                del g_nops, g_ps
+            del g_tot
             # KL and clip fraction of the update, on the sample: old = rollout log-probs, new = params after the update
-            l_new, m_new = lossf(params, a.ps)
-            _, o_new = apply_fn(params, S["c"], S["obs"], nl)
+            # (2026-11-09: the unused eager loss evaluation that stood here was removed; the forward is jitted)
+            _, o_new = diag_fwd(params, S["c"], S["obs"])
             from jax_sim.action_space import mask_disabled_actions as _mask
             lp_new = jnp.take_along_axis(jax.nn.log_softmax(_mask(o_new.action_logits, axis=-1), -1), S["act"][:, None], -1)[:, 0]
             lp_new = lp_new + jnp.take_along_axis(jax.nn.log_softmax(o_new.alarm_out, -1), S["alarm"][:, None], -1)[:, 0]
