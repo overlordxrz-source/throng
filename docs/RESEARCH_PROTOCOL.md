@@ -3616,6 +3616,21 @@ more expensive, because it produces publishable-looking nulls.
   food patches, egocentric absolute window, ORACLE offset, homeostatic reward). **6/6 tests pass**, including **the same
   local scene giving an identical observation at L = 64 and L = 256**.
 
+- **(b) Erosion calibration: RESULT. Registered pick = weight decay 1e-3** (`analyze_erocal.py`;
+  `docs/data/ero_cal/`). 9/9 runs complete. Shuffle-corrected joint MI (bits) of the wire-off seeds (stop-grad ON),
+  from ~1.99 at u1500:
+
+  | wd | s270 at 1,750 / 2,000 / 2,250 / 2,500 | s271 | s272 |
+  |---|---|---|---|
+  | 3e-4 | 0.955 / 0.515 / 0.127 / 0.009 | 0.883 / 0.025 / 0.025 / 0.003 | 1.008 / 0.340 / 0.199 / **0.143** |
+  | **1e-3** | 0.245 / 0.000 / 0.000 / -0.001 | 0.227 / 0.002 / 0.000 / 0.000 | 0.072 / 0.002 / 0.000 / 0.001 |
+  | 3e-3 | 0.000 throughout | 0.000 | 0.000 |
+
+  - 3e-4 fails (s272 still at 0.143 at 2,500). **1e-3 is the smallest strength with every unused code < 0.05 by
+    u2500** (in fact <= 0.002 by u2000). 3e-3 kills the code within 250 updates.
+  - Cost: grow + calibration ~$0.6 (billing report to confirm).
+  - **(c) launched at wd 1e-3** (`RUNG3_WD=1e-3`, plan `rung3`, 15 runs).
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
