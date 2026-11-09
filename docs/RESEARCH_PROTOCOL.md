@@ -3037,6 +3037,28 @@ more expensive, because it produces publishable-looking nulls.
       G 24 vs G 12, a few updates) follows and is reported as such; if navigation is broken, the remedy is Cam's call
       (it touches the observation, i.e. the body).
 
+- **Retuned 3b world: registered smoke gate FAILS (laptop, $0); stopped as registered.**
+  - Smoke (seeds 240 ORACLE / 241 NOSIG, 50 updates, the registered world): Craft attempts per world, updates 1-10 →
+    41-50: ORACLE 0.31 → 0.00, NOSIG 0.38 → 0.00. Deliveries per world 0.04 → 0. The scripted blind searcher in the
+    same world makes 11.9.
+  - **Diagnostic (reported as such): the ORACLE0 warm start cannot navigate on G 24.** ORACLE arm (everyone always
+    informed), seed 242, 3 updates, deliveries per world:
+    - G 12 (the warm start's own world): 24.4 / 24.0 / 22.6;
+    - G 12 with reroll 10: 23.8 / 23.1 / 22.1;
+    - **G 24, same fire coordinates, spawn box: 0.12 / 0.03 / 0.00.**
+  - **This is also the cause of the first VoI's collapse**, not the craft cost (the old world's blind break-even was
+    0.78 > 0.45). ORACLE0 learned on G 12, and the observation scales positions and fire offsets by G (pos / G,
+    offset / (G/2)), so on G 24 every fire looks half as far as it is.
+  - Options for Cam (no 3b run until he picks):
+    - **(a) A G 24 warm start:** train an ORACLE0-style navigator in the 3b world itself (ORACLE arm, PS off), ~1
+      toy run, then the VoI on top. The agents learn their own world; the cleanest.
+    - **(b) A constant observation scale** (positions and offsets divided by 12 on any grid): the world is unchanged,
+      but the sensor changes and offsets beyond 6 exceed the trained range.
+    - **(c) Shrink the layout into G 12:** impossible with the geometry rule (torus max 6 cells per axis; the lookout
+      can't be 14+ steps from the fires).
+    - Recommend (a). Its smoke gate is the same: Craft attempts don't collapse by update 50, and the ORACLE navigator
+      delivers >= 0.5x the scripted informed level (30.5 per world) before the VoI starts.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
