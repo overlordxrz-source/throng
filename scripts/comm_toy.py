@@ -195,6 +195,11 @@ def main():
                     help="north star (Cam, 2026-11-08): build a dictionary (fire -> modal sender triple) from frozen control "
                          "rollouts, then 'speak to them': replace the sender's broadcast by the dictionary word for fire "
                          "X = T + s and count listener Crafts at X, vs the control and vs the sender's own words for X")
+    ap.add_argument("--grad-share", action="store_true",
+                    help="Cam Nov 9 item 4: listener vs sender rows' share of the message-head gradient at the loaded params")
+    ap.add_argument("--grad-share-u", type=int, default=2000, help="the update the loaded params come from (sets c_ps / tok-ent)")
+    ap.add_argument("--grad-share-rollouts", type=int, default=4)
+    ap.add_argument("--grad-share-snap", default=None, help="full-state snapshot: exact params + PopArt stats")
     ap.add_argument("--calibrate", action="store_true")
     ap.add_argument("--wire-init-scale", type=float, default=1.0,
                     help="after warm start, scale the (never-trained) wire-input rows of enc_0 and gwt_comms_1 (fidelity calibration)")
@@ -1192,6 +1197,78 @@ def main():
         res["forward_sender_argmax_changed_frac_random_wire"] = am(p_rec, p_rand)
         res["shared_parameters_sender_listener"] = "all (one ToyNet; the role is set only by the informed flag in obs)"
         print(json.dumps(res, indent=1), flush=True)
+        raise SystemExit(0)
+
+    if a.grad_share:
+        """Cam Nov 9 item 4 (free, eval-only): the listener rows' share of the message-head gradient. On fresh rollouts
+        at the loaded params, the first-epoch training gradient (total_loss, ratio = 1, mean over every minibatch of a
+        random permutation, pre-clip) is split exactly by rows: every term of total_loss is a row-masked mean, so
+        g_all = f_S g_S + f_L g_L with g_X = the gradient with alive = X's rows and f_X = X's row fraction (the PS term is
+        not row-masked; c_ps = 0 at u >= 1,500 under the erosion protocol, so it is absent). Message head = MSGK (the
+        step-B (iii) stop-grad key set). PopArt stats: exact from --grad-share-snap (a full-state snapshot); otherwise
+        (actor-only saves) fitted by OLS of the GAE returns on the raw value-head output, iterated 5x (disclosed)."""
+        lisg = np.asarray(is_listener)
+        if a.grad_share_snap:
+            import pickle
+            snap = pickle.load(open(a.grad_share_snap, "rb"))
+            params = jax.tree_util.tree_map(jnp.asarray, snap["params"])
+            popart.mu, popart.nu, popart.initialised = snap["popart"]
+            gs_u, pa_src = snap["u"], "snapshot (exact)"
+        else:
+            gs_u, pa_src = a.grad_share_u, "OLS fit (approximate)"
+        ps_g = a.ps
+        if a.ps_anneal:
+            s0_, e0_ = a.ps_anneal
+            ps_g = a.ps * float(np.clip((e0_ - gs_u) / (e0_ - s0_), 0.0, 1.0)) if gs_u > s0_ else a.ps
+        te_g = a.erode_tok_ent if (a.erode_tok_ent is not None and gs_u >= a.erode_from) else TOK_ENT
+        assert ps_g == 0.0, "the PS term is not row-masked; the split is exact only with c_ps = 0"
+        sel = lambda g: np.concatenate([np.asarray(x, np.float64).ravel() for k in MSGK  # noqa: E731
+                                        for x in jax.tree_util.tree_leaves(g["params"][k])])
+        sel_h = lambda g: np.concatenate([np.asarray(x, np.float64).ravel() for k in MSGK if not k.startswith("codebook")  # noqa: E731
+                                          for x in jax.tree_util.tree_leaves(g["params"][k])])
+        gfn = jax.jit(jax.grad(lambda p_, mb, sg, mu: total_loss(p_, mb, sg, mu, ps_g, te_g)[0]))
+        acc = {"all": 0.0, "S": 0.0, "L": 0.0}; acc_h = {"all": 0.0, "S": 0.0, "L": 0.0}; nmb = 0
+        st_g = init_state(jax.random.PRNGKey(60_000 + gs_u))
+        for rr in range(a.grad_share_rollouts):
+            st_g, R = rollout(params, st_g, jax.random.PRNGKey(61_000 + 7 * gs_u + rr))
+            R = jax.tree_util.tree_map(np.asarray, R)
+            obs_last = build_obs(st_g[0], st_g[1], st_g[3], jax.random.PRNGKey(62_000 + rr))
+            _, o_last = apply_fn(params, st_g[4], obs_last); vh_last = np.asarray(o_last.values)
+            if not a.grad_share_snap:          # fit (mu, sigma): returns ~ sigma * v_hat + mu
+                mu_, sg_ = float(R["rewards"].mean() / (1 - GAMMA)), 1.0
+                for _ in range(5):
+                    vals = R["values"] * sg_ + mu_
+                    _, ret_ = gae_bootstrap(R["rewards"], vals, np.zeros_like(R["rewards"]), vh_last * sg_ + mu_, GAMMA, LAM)
+                    sg_, mu_ = np.polyfit(R["values"].ravel(), ret_.ravel(), 1)
+                    sg_ = float(max(sg_, 1e-4)); mu_ = float(mu_)
+                popart.mu, popart.nu, popart.initialised = mu_, sg_ ** 2 + mu_ ** 2, True
+            values = popart.denormalise(R["values"])
+            adv, ret = gae_bootstrap(R["rewards"], values, np.zeros_like(R["rewards"]), popart.denormalise(vh_last), GAMMA, LAM)
+            M = T * N
+            flat = {k: R[k].reshape((M,) + R[k].shape[2:]) for k in ("obs", "actions", "log_probs", "carries", "token_actions")}
+            flat["values"] = values.reshape(M).astype(np.float32)
+            flat["adv"], flat["ret"] = adv.reshape(M).astype(np.float32), ret.reshape(M).astype(np.float32)
+            snd_row = np.broadcast_to(~lisg, (T, N)).reshape(M)
+            perm = np.random.default_rng(63_000 + rr).permutation(M)
+            for i in range(M // MB):
+                idx = perm[i * MB:(i + 1) * MB]
+                mb = {k: jnp.asarray(v[idx]) for k, v in flat.items()}
+                fS = float(snd_row[idx].mean())
+                for nm, msk, f in (("all", None, 1.0), ("S", snd_row[idx], fS), ("L", ~snd_row[idx], 1.0 - fS)):
+                    g = gfn(params, mb if msk is None else dict(mb, alive=jnp.asarray(msk, jnp.float32)), popart.sigma, popart.mu)
+                    acc[nm] = acc[nm] + f * sel(g); acc_h[nm] = acc_h[nm] + f * sel_h(g)
+                nmb += 1
+        out = dict(phase="grad_share", update=gs_u, popart=pa_src, popart_mu=popart.mu, popart_sigma=popart.sigma,
+                   rollouts=a.grad_share_rollouts, minibatches=nmb, c_ps=ps_g)
+        for lab, A_ in (("msgk", acc), ("head_no_codebook", acc_h)):
+            gA, cS, cL = (A_[k] / nmb for k in ("all", "S", "L"))
+            nS, nL = float(np.linalg.norm(cS)), float(np.linalg.norm(cL))
+            out[lab] = dict(norm_all=float(np.linalg.norm(gA)), norm_S=nS, norm_L=nL,
+                            share_L=nL / (nS + nL + 1e-30), share_L_sq=nL ** 2 / (nS ** 2 + nL ** 2 + 1e-30),
+                            cos_LS=float(np.dot(cL, cS) / (nS * nL + 1e-30)),
+                            proj_share_L=float(np.dot(cL, gA) / (np.dot(gA, gA) + 1e-30)),
+                            split_residual=float(np.linalg.norm(gA - cS - cL) / (np.linalg.norm(gA) + 1e-30)))
+        emit(out)
         raise SystemExit(0)
 
     if a.selftest_lookout:

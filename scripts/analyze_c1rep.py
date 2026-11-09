@@ -6,8 +6,10 @@ Reliance per seed at u (empirical swap, 10 pairs): drop >= 30%, paired drop > 2 
 PASS (at 2,000) iff reliance in >= 3 of 5 wire-on seeds AND pooled drop >= 30% (1 - sum of swap deliveries / sum of control
   deliveries over all 50 wire-on empirical pairs) AND wire-off MI (Miller-Madow, mean over slots) < 0.5 bit in both.
 Reported, not gated: redirection per seed (Crafts at T', swap >= 2x control and paired increase > 2 SE), the mean of the
-  per-seed drops, the formation check at 1,500, and -- if a continuation's rows are present -- the same readouts at 2,500 /
-  3,000 (the continuation's bar is Cam's to set).
+  per-seed drops, the formation check at 1,500, and the same readouts at 2,500.
+CONTINUATION (Cam, Nov 9; option B; 2,000 stays the registered primary): PASS at 3,000 iff reliance in >= 3 of 5 wire-on seeds
+  AND wire-off MI < 0.5 bit in both (no pooled-drop term). NOSIG level = wire-off mean over the 50 updates before 3,000.
+  Redirection reported. The runs go straight to 3,000 (bit-identical to 2,000 + resume; see the protocol).
 """
 import gzip
 import json
@@ -58,6 +60,9 @@ def main(paths):
         if u == 2000:
             ok = len(rel) == 5 and sum(rel) >= 3 and pooled >= 0.30 and len(offmi) == 2 and all(m < 0.5 for m in offmi)
             print(f"\n== C1-E REPLICATION (registered, at 2,000): {'PASS' if ok else 'FAIL'}")
+        if u == 3000:
+            ok = len(rel) == 5 and sum(rel) >= 3 and len(offmi) == 2 and all(m < 0.5 for m in offmi)
+            print(f"\n== C1-E CONTINUATION (registered, at 3,000): {'PASS' if ok else 'FAIL'}")
 
 
 if __name__ == "__main__":
