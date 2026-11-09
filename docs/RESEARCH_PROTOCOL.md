@@ -3320,6 +3320,79 @@ more expensive, because it produces publishable-looking nulls.
     **~$3.2, over the $3 cap.** Options: wire-off x2, or stop at u3000 without the u2500 eval. Cam's call.
   - Stop-grad alone as first specified (x7): ~$1.85 vs its $1.5 cap; superseded by the rung-3 rerun plan.
 
+- **DESIGN FOR SIGN-OFF (Cam item 6): the separate-brains toy. Code + unit tests only; no paid run until Cam signs
+  off on the next account.**
+  - **Built (comm-toy):**
+    - `scripts/brains.py`: population mechanics as pure functions.
+    - `tests/test_brains.py`: **11/11 pass**; each property is paired with a mutant that must fail it:
+      - pairs are balanced (each ordered pair W / 12 times per update) and reshuffled every update;
+      - the brain-aware forward equals each brain's own forward;
+      - **gradients stay inside a brain** (brain-0 rows put exactly 0 on brains 1-3; a shared-brain mutant leaks);
+      - the clip is per brain (a global clip would shrink the others);
+      - the plasticity-by-age schedule and the per-brain learning speed are applied to the Adam *updates* (Adam ignores
+        gradient scale), and a no-age-schedule mutant is detected;
+      - vmapped per-brain Adam equals independent optimizers;
+      - a newborn reset touches only its brain (parameters and Adam state);
+      - imitation draws only from elder senders (never the newborn itself, a younger brain, or a listener row);
+      - the message-head gradient rule ('all' / 'sender' rows).
+    - Brain-aware forward = compute-all-brains-and-select. At 512 rows it costs 2.7x a plain forward + gradient
+      (per-row vmap would cost 8.7x). Gradient isolation is exact.
+    - Not yet wired into the training loop (the integration follows sign-off, with its own apparatus checks).
+  - **Stage 0a: navigators (different starting weights; no ORACLE0 word bias).** 8 G 12 navigators by ORACLE0's own
+    recipe (arm ORACLE, from scratch, PS off, craft cost 0.45, 1,500 updates), seeds 260-267: 4 for the founders, 4
+    for newborns (a newborn always takes a navigator no living brain started from).
+    - Gate N1: each navigator's deliveries per world over its last 50 updates >= 0.7x ORACLE0's (the same rule as the
+      confirmation's warm-start check).
+  - **Stage 0b: word-bias gate G0 (Cam's shared-body concern, tested directly).** The C1 recipe (wire-blind,
+    PS formation, to 1,500) as isolated pairs: navigator A x 2 seeds, navigator B x 2 seeds.
+    - Same-start pairs should share slot words: the positive control, as the ORACLE0 seeds did (3 of 4 fires
+      identical).
+    - **Pass iff different-start pairs agree on slot words no more than a fire-label-permutation null (95th
+      percentile).**
+    - If different starts still converge, the bias isn't from the start, and the culture test needs rethinking before
+      it runs.
+  - **Stage 1: the population.**
+    - World: G 12, 4 fires, assigned sender / listener per pairing, wire-blind head.
+    - **B = 4 brains, W = 48 worlds** (each of the 12 ordered pairs in 4 worlds, reshuffled every update).
+    - **PS only for the founders' formation** (c_ps 1.99 annealed to 0 over 1,000-1,500, as C1). **Never for newborns.**
+      Message-head weight decay from 1,500 at the **calibrated erosion strength** (next account's first item, so that
+      unused codes reliably die).
+    - **Generations:** lifetime 2,000 updates. Founders are replaced at 1,500 / 2,000 / 2,500 / 3,000 (staggered), then
+      every 2,000, so every lineage slot turns over at 1,500-3,000, 3,500-5,000 and 5,500-7,000. **At 7,500 every
+      living brain is generation 4 and none ever met PS.**
+    - Newborns: a fresh navigator start and a fresh Adam state.
+      - Copying: imitation of elder senders' (obs, token) pairs, message head only, during the sensitive period.
+      - **Speech that settles with age:** message-head plasticity 1.0 for the first 1,000 updates of life, then linear to
+        0.1 over 500; hearing stays plastic.
+      - **Varied learning speeds:** a fixed per-lineage multiplier 0.5 / 0.75 / 1.0 / 1.5.
+    - Message-head gradient rule per brain: `all` or `sender`, **set by the stop-grad result** on the next account. With
+      rotating pairs each brain also listens, so its own listener rows would train its own message head unless `sender`.
+      Separate brains alone don't remove that half.
+    - Arms: POP (wire on) x3 seeds; POP-NOSIG (wire off) x2.
+  - **Bars (registered for sign-off), at 7,500, all ordered pairs:**
+    - **Rung 3 (primary):** in >= 2 of 3 POP seeds:
+      - cross-spot reliance >= 30%;
+      - **real gain:** true-message deliveries >= POP-NOSIG + 1.0 per world;
+      - **same-spot control** drop < 0.5x cross-spot.
+    - Code liveness: shuffle-corrected joint MI of POP-NOSIG < 0.05 bits at 7,500. If it fails, the erosion strength
+      wasn't enough, and the primary is read only through reliance and gain.
+    - Reported: which founder's words (if any) survive to generation 4; per brain, the agreement of its slot words with
+      the population's.
+  - **Adaptation (secondary; design question for Cam).** In this toy, moving the fires is transparent to the code: the
+    observation gives every fire's offset by fire index, so a word for "fire k" still works after fire k moves.
+    **Proposal:** reserve a 5th fire's dims from the start, never lit until 7,500, then lit like the others. Pass iff by
+    9,000 listeners redirect to fire 5 when told (cross-spot swap on fire 5) in >= 2 of 3 seeds: a new word coined by
+    generation-4 brains with no PS.
+  - **Logged per brain, for each trait's effect (Cam Nov 9 item 4):** message-head gradient norm, its split-half
+    cosine every 250 updates (gradient noise), message-head displacement per update, code drift (share of its modal
+    slot tokens changed vs 250 updates earlier), age, generation, plasticity, learning-speed multiplier.
+  - **Cost estimate** (toy billed rate $0.074 per 1,000 updates, evals included; population update ~1.6x a toy update
+    from the 2.7x network factor and W 48 / 64; to be re-timed on the laptop after integration):
+    - navigators 8 x 1,500 = ~$0.9;
+    - G0: 4 x 1,500 = ~$0.45;
+    - population: 9,000 updates x 1.6 x $0.074 / 1,000 = ~$1.07 per run, x5 = ~$5.3;
+    - **total ~$6.7**, after the erosion calibration and the stop-grad decision.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
