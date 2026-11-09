@@ -3059,6 +3059,26 @@ more expensive, because it produces publishable-looking nulls.
     - Recommend (a). Its smoke gate is the same: Craft attempts don't collapse by update 50, and the ORACLE navigator
       delivers >= 0.5x the scripted informed level (30.5 per world) before the VoI starts.
 
+- **Cam, Nov 9 (3b follow-up).** (1) No Drive copy needed; Cam read `for_m` from the repo with M's permission. (2) Option
+  (a) approved: a G 24 navigator warm start. Gate: **navigator >= 0.5x scripted informed (>= 15.3 deliveries per world)
+  and no Craft collapse by update 50.** Launch now only if the projected account total stays <= $40.0 metered,
+  otherwise first on the next account. The VoI rerun on top goes to the next account either way. Break-even numbers
+  and craft cost 0.381 accepted. (3) Design requirement (architecture section below). (4) Culture note acknowledged.
+- **REGISTERED: the G 24 navigator** (plan `nav24`):
+  - ORACLE0's own recipe moved to the 3b world: arm ORACLE (everyone always informed; no lookout flag), **from scratch
+    (no warm start)**, PS off, G 24, fires (3,3) (3,9) (9,3) (9,9), spawn box 1,1-11,11, reroll 10, craft cost 0.381,
+    seed 250, 2,000 updates (params auto-saved at 1,500 / 1,750 / 2,000).
+  - **Gate:** (i) no Craft collapse by 50: mean Craft attempts per world over updates 41-50 >= 0.5x updates 1-10 (local
+    smoke first, then the same rows in the paid run); (ii) **deliveries by both agents per world, mean over updates
+    1,951-2,000, >= 15.3.** The saved u2000 params become the 3b warm start only if both hold.
+  - Budget rule: launch only when the projection (metered + remaining real-net + remaining c1rep + ~$0.2) <= $40.0.
+    At 21:03 it was ~$39.7, within the c1rep estimate's error, so the decision waits for c1rep to land (~21:50)
+    and pin its cost.
+- **Architecture requirement for our own world (W2+), Cam:** senses in **absolute local units with a limited
+  range**, not scaled by grid size, so worlds can grow without breaking navigation. Option (b)'s direction long-term;
+  no work now. (Root cause found in 3b: ORACLE0's pos / G and offset / (G/2) features made fires on G 24 look half
+  as far.)
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
