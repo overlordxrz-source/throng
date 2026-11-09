@@ -11,7 +11,7 @@ import modal
 
 _REQUIREMENTS = str(Path(__file__).resolve().parents[1] / "requirements.txt")
 
-PINNED_SHA = "1f8e51d25f8fdfdd2e0c243a38a4b48c2832a350"  # comm-toy branch
+PINNED_SHA = "9c26a23faccf6ffcf6dd00a7ea4da282b7cf0aa0"  # comm-toy branch (Nov 9: --msg-grad sender etc.; 1f8e51d before; default path bit-identical)
 REPO_URL = "https://github.com/overlordxrz-source/throng.git"
 VOLUME_NAME = "throng-runs"
 VOLUME_MOUNT = "/mnt/throng-runs"
@@ -99,6 +99,28 @@ PLANS: dict = {
                                    "--wire-blind", "1", "--snapshot-at", "2000",
                                    "--snapshot-path", f"{{VOL}}/testbed/toy/snap/c1rep_{w}_s{s}_u2000.pkl", "--tag", f"C1REP_{w.upper()}"])
               for w, arm, ss in (("on", "COMM", range(230, 235)), ("off", "NOSIG", (235, 236))) for s in ss],
+    # NEXT ACCOUNT (Cam Nov 9 ~07:00) (b): erosion calibration. Grow 3 fresh wire-off seeds with stop-grad ON to a
+    # full-state snapshot at 1,500 (weight decay starts at 1,501 so the snapshot is pre-erosion), then resume each at
+    # wd 3e-4 / 1e-3 / 3e-3 to 2,500 with params saved every 250 (shuffle-corrected joint MI computed from them, free).
+    "ero_grow": [(f"erocal_grow_s{s}", ["--arm", "NOSIG", "--seed", str(s), *[x if x != "2000" else "1500" for x in _ERO],
+                                         "--erode-from", "1501", "--wire-blind", "1", "--msg-grad", "sender",
+                                         "--snapshot-at", "1500", "--snapshot-path", f"{{VOL}}/testbed/toy/snap/erocal_s{s}_u1500.pkl",
+                                         "--tag", "EROCAL_GROW"]) for s in (270, 271, 272)],
+    "ero_cal": [(f"erocal_wd{wd}_s{s}", ["--arm", "NOSIG", "--seed", str(s), *_ERO, "--updates", "2500", "--erode-from", "1501",
+                                          "--erode-wd", wd, "--wire-blind", "1", "--msg-grad", "sender",
+                                          "--resume", f"{{VOL}}/testbed/toy/snap/erocal_s{s}_u1500.pkl",
+                                          "--save-at", "1750", "2000", "2250", "2500",
+                                          "--save-prefix", f"{{VOL}}/testbed/toy/params/erocal_wd{wd}_s{s}", "--tag", f"EROCAL_{wd}"])
+                for wd in ("3e-4", "1e-3", "3e-3") for s in (270, 271, 272)],
+    # (d) separate brains: 8 G-12 navigators by ORACLE0's own recipe (founders 260-263, newborn pool 264-267), then the G0
+    # word-bias gate: the C1 formation recipe to 1,500 from navigators 260 (seeds 280 / 281) and 261 (seeds 282 / 283)
+    "nav": [(f"nav_s{s}", ["--arm", "ORACLE", "--seed", str(s), "--updates", "1500", "--craft-cost", "0.45",
+                           "--save-params", f"{{VOL}}/testbed/toy/nav/nav_s{s}.msgpack", "--tag", "NAV"]) for s in range(260, 268)],
+    "g0": [(f"g0_n{n}_s{s}", ["--arm", "COMM", "--seed", str(s), "--updates", "1500",
+                              "--warm-start", f"{{VOL}}/testbed/toy/nav/nav_s{n}.msgpack", "--wire-init-scale", "0.06",
+                              "--craft-cost", "0.45", "--ps", "1.99", "--ps-anneal", "1000", "1500", "--wire-blind", "1",
+                              "--msg-grad", "sender", "--tag", f"G0_N{n}"])
+           for n, ss in ((260, (280, 281)), (261, (282, 283))) for s in ss],
     # step 3b value-of-information check (Cam item 6, 2026-11-08 night): lookout world, PS off, wire off in both arms
     "s3b_voi": [(f"s3b_{w}_s{s}", ["--arm", "NOSIG", "--seed", str(s), "--updates", "2000", "--warm-start", _W, "--craft-cost", "0.45",
                                   "--grid", "24", "--hearths", "3,3;3,9;9,3;9,9", "--lookout", "18,18,1", "--reroll", "10", *extra,

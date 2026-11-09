@@ -3486,6 +3486,38 @@ more expensive, because it produces publishable-looking nulls.
     is live (M's secret `throng-guard-token`).
   - **Nothing paid until Cam confirms whether the $14 allowance means credits only.**
 
+- **New account: the user reports the workspace is "loaded with $42.5"**, the same figure as rapidcrisp before it
+  billed past $30. Asked whether it is credit or a spending limit. **Cam's guard $15 is below $30 either way**, so the
+  plan below is not expected to bill.
+- **REGISTERED launch details, (b) erosion calibration and (d) navigators + G0** (toy launcher re-pinned to comm-toy
+  `9c26a23`, which adds `--msg-grad sender`. The default path was verified bit-identical when that flag landed; the
+  other additions since 1f8e51d are eval-only modes or off-by-default flags).
+  - **(b) `ero_grow`:** 3 fresh wire-off seeds 270 / 271 / 272, the C1-E recipe with wire-blind and **stop-grad ON**, to
+    1,500, full-state snapshot at 1,500.
+    - Weight decay starts at **1,501** (not 1,500), so the snapshot is pre-erosion and every strength starts from the
+      same state; disclosed, a 1-update shift.
+    - **`ero_cal`:** each snapshot resumed at wd 3e-4 / 1e-3 / 3e-3 to 2,500 (9 runs), params saved at 1,750 / 2,000 /
+      2,250 / 2,500.
+    - **Shuffle-corrected joint MI every 250 updates is computed from those saved params on the laptop**
+      (`comm_toy.py --same-spot --mi-null 100`, as for the u3000 checks; free, no in-run code).
+    - **Pick (as registered):** the smallest strength at which every wire-off seed is below 0.05 bits by u2500. If none
+      qualifies, report; don't extend. Cap $1.1 (estimate ~$0.7: NOSIG runs carry no swap evals).
+  - **(d) `nav`:** 8 navigators, seeds 260-267, ORACLE0's own recipe (arm ORACLE, from scratch, craft cost 0.45, 1,500
+    updates, wire-blind 0 as ORACLE0); final params to `testbed/toy/nav/`.
+    - **Gate N1:** deliveries per world (both agents), mean over updates 1,451-1,500, >= 0.7x ORACLE0's 24.89 =
+      **17.42**.
+  - **(d) `g0`, after `nav`:** the C1 formation recipe to 1,500 (wire-blind, PS 1.99 annealed 1,000-1,500,
+    wire-init 0.06, craft cost 0.45, `--msg-grad sender`) from navigator 260 (seeds 280 / 281) and navigator 261
+    (seeds 282 / 283).
+    - Analysis `analyze_g0.py` on the `--export-m` dictionaries of the u1500 params: agreement = share of the 12
+      (fire, slot) cells with the same token.
+    - **PASS iff the mean different-start agreement <= the 95th percentile of a fire-relabelling null** (4 cross pairs
+      x 23 non-identity permutations). Same-start agreement is reported as the positive control.
+    - Caps: nav + g0 together $1.4 (estimate ~$0.9).
+  - Local smoke (laptop): grow → snapshot → resume at a different strength with saves; navigator → G0 warm start.
+    All 4 chains run.
+  - Guard: Mac guard `cap_guard_r2.sh` at **$15** until the Modal guard is live.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
