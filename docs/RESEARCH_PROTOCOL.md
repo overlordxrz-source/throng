@@ -3719,6 +3719,14 @@ more expensive, because it produces publishable-looking nulls.
       against the "listener noise erodes the code" hypothesis; it is one comparison of 5 vs 5.
   - Next per plan: (e). It is held on price (Cam's call); not held by (c).
 
+- **Overnight close (Nov 9 ~04:35):** nothing paid is running. Spend **$3.92 metered, all credit, $0 billed.**
+  - Backup of `roadtoagi111` volume: 182 files, 99 MB, 0 mismatches (`~/throng-backup/roadtoagi111/`).
+  - Holds for Cam: (e) price (~$11.3 as specified vs $6; ~$5.0 with shorter lives); (f) the tau reading (0.63);
+    the own-world spec sign-off.
+  - Lesson: a detached `modal run` whose entrypoint calls `.remote()` left the L4 app up with an idle container after
+    it returned; stopped by hand. The Mac guard now matches all `throng-*` apps (it had missed `throng-pop`).
+  - Morning summary for M: `docs/MORNING_SUMMARY_2026-11-09.md`.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
