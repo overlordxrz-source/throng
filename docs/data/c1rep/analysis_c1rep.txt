@@ -1,0 +1,44 @@
+
+== update 1500 (NOSIG level 1.59)
+   wire-on s230: drop +76% paired 3.07 SE 0.05 | L dep 4.29 -> reliance ok | crafts@T' 0.46 -> 10.39 redirection ok | MI 1.972
+   wire-on s231: drop +73% paired 5.47 SE 0.06 | L dep 7.45 -> reliance ok | crafts@T' 0.42 -> 25.33 redirection ok | MI 1.984
+   wire-on s232: drop +72% paired 7.29 SE 0.10 | L dep 10.29 -> reliance ok | crafts@T' 0.67 -> 25.32 redirection ok | MI 2.000
+   wire-on s233: drop +70% paired 4.89 SE 0.08 | L dep 7.02 -> reliance ok | crafts@T' 0.43 -> 21.16 redirection ok | MI 1.982
+   wire-on s234: drop +70% paired 4.54 SE 0.06 | L dep 6.80 -> reliance ok | crafts@T' 0.44 -> 21.02 redirection ok | MI 1.983
+   wire-off s235: MI 1.998
+   wire-off s236: MI 1.998
+   reliance 5/5 | redirection 5/5 | pooled drop +72% | mean per-seed drop +72% | wire-off MI < 0.5 in both: False
+
+== update 2000 (NOSIG level 2.85)
+   wire-on s230: drop +12% paired 0.33 SE 0.07 | L dep 3.77 -> reliance x | crafts@T' 1.50 -> 5.98 redirection ok | MI 0.385
+   wire-on s231: drop +52% paired 2.64 SE 0.06 | L dep 5.04 -> reliance ok | crafts@T' 1.35 -> 13.66 redirection ok | MI 0.113
+   wire-on s232: drop +13% paired 0.51 SE 0.11 | L dep 4.50 -> reliance x | crafts@T' 2.69 -> 6.06 redirection ok | MI 0.144
+   wire-on s233: drop +11% paired 0.14 SE 0.04 | L dep 1.35 -> reliance x | crafts@T' 1.35 -> 1.56 redirection x | MI 0.031
+   wire-on s234: drop +69% paired 2.58 SE 0.07 | L dep 4.54 -> reliance ok | crafts@T' 1.65 -> 6.71 redirection ok | MI 0.475
+   wire-off s235: MI 0.001
+   wire-off s236: MI 0.930
+   reliance 2/5 | redirection 4/5 | pooled drop +37% | mean per-seed drop +31% | wire-off MI < 0.5 in both: False
+
+== C1-E REPLICATION (registered, at 2,000): FAIL
+
+== update 2500 (NOSIG level 2.38)
+   wire-on s230: drop +5% paired 0.11 SE 0.05 | L dep 2.33 -> reliance x | crafts@T' 2.53 -> 2.60 redirection x | MI 0.001
+   wire-on s231: drop +66% paired 3.56 SE 0.06 | L dep 5.73 -> reliance ok | crafts@T' 0.85 -> 12.37 redirection ok | MI 0.191
+   wire-on s232: drop +32% paired 1.32 SE 0.09 | L dep 4.00 -> reliance ok | crafts@T' 2.31 -> 6.95 redirection ok | MI 0.110
+   wire-on s233: drop -1% paired -0.02 SE 0.04 | L dep 1.76 -> reliance x | crafts@T' 2.92 -> 2.88 redirection x | MI 0.001
+   wire-on s234: drop +45% paired 1.98 SE 0.08 | L dep 3.93 -> reliance ok | crafts@T' 3.50 -> 6.95 redirection x | MI 0.188
+   wire-off s235: MI 0.001
+   wire-off s236: MI 0.442
+   reliance 3/5 | redirection 2/5 | pooled drop +38% | mean per-seed drop +29% | wire-off MI < 0.5 in both: True
+
+== update 3000 (NOSIG level 2.80)
+   wire-on s230: drop +4% paired 0.09 SE 0.05 | L dep 2.13 -> reliance x | crafts@T' 2.53 -> 2.68 redirection x | MI 0.001
+   wire-on s231: drop +80% paired 4.44 SE 0.10 | L dep 5.98 -> reliance ok | crafts@T' 1.36 -> 6.00 redirection ok | MI 0.255
+   wire-on s232: drop +58% paired 2.55 SE 0.07 | L dep 4.72 -> reliance ok | crafts@T' 1.45 -> 7.85 redirection ok | MI 0.087
+   wire-on s233: drop -1% paired -0.04 SE 0.07 | L dep 3.74 -> reliance x | crafts@T' 3.93 -> 4.01 redirection x | MI 0.012
+   wire-on s234: drop +51% paired 1.95 SE 0.05 | L dep 3.60 -> reliance ok | crafts@T' 2.33 -> 5.07 redirection ok | MI 0.156
+   wire-off s235: MI 0.001
+   wire-off s236: MI 0.133
+   reliance 3/5 | redirection 3/5 | pooled drop +47% | mean per-seed drop +38% | wire-off MI < 0.5 in both: True
+
+== C1-E CONTINUATION (registered, at 3,000): PASS

@@ -3104,6 +3104,45 @@ more expensive, because it produces publishable-looking nulls.
     41-50 >= 0.5x updates 1-10, in both VoI arms, warm-started from the navigator's u2000 params. If it collapses,
     report before anything paid.
 
+- **C1-E replication: RESULT (registered analysis `analyze_c1rep.py`; 7/7 runs complete, 3,000 train rows each, no
+  restarts; `docs/data/c1rep/analysis_c1rep.txt`).**
+  - **At 2,000 (the registered primary): FAIL.**
+    - Reliance 2/5 (s231 +52%, s234 +69%; s230 +12%, s232 +13%, s233 +11%). The bar needs 3.
+    - **Wire-off s236 MI 0.93** (>= 0.5; s235 0.001).
+    - Pooled drop 37% (would pass), redirection 4/5.
+    - My registered prediction was pass ~45%.
+  - **At 3,000 (the registered continuation bar, Cam Nov 9): PASS.**
+    - Reliance 3/5: s231 +80%, s232 +58%, s234 +51%; s230 +4%, s233 -1%.
+    - Wire-off MI 0.001 / 0.133 (< 0.5 in both).
+    - Redirection 3/5; pooled drop 47%.
+  - **Per seed (descriptive), reliance drop at 1,500 / 2,000 / 2,500 / 3,000:**
+
+    | seed | 1,500 | 2,000 | 2,500 | 3,000 | reading |
+    |---|---|---|---|---|---|
+    | s231 | +73 | +52 | +66 | +80 | held |
+    | s234 | +70 | +69 | +45 | +51 | held |
+    | s232 | +72 | +13 | +32 | +58 | **recovered** |
+    | s230 | +76 | +12 | +5 | +4 | died |
+    | s233 | +70 | +11 | -1 | -1 | died |
+
+    Formation at 1,500: 5/5 reliance and redirection, MI ~2 bits.
+  - **Reading.**
+    - The registered primary fails. The C1-E 2,000 pass (3/3) does not replicate on fresh seeds.
+    - Under the registered 3,000 bar, 3 of 5 seeds hold a code the listener relies on, 1,500 updates after PS was
+      removed and with the erosion pressure still on. One of them (s232) recovered after nearly losing it.
+    - **Two cautions before calling rung 3:**
+      - The wire-off control discriminates only late: s236's PS-made code was still at 0.93 bits at 2,000 and
+        decayed by 2,500.
+      - At 3,000 the reliant seeds carry little sender MI (0.09-0.26 bits per slot, Miller-Madow) yet listeners lose
+        51-80% of deliveries under the swap: a weak but consistently read code.
+    - Rung 3 is Cam's call.
+- **Grad-share PopArt cross-check (registered method validation; `docs/data/grad_share/xcheck.txt`):** c1rep u2000,
+  seeds 230-234, exact PopArt (snapshot) vs fitted (OLS, the C1-E method).
+  - **The fitted sigma is 9-12x too small** (16-20 vs 143-231).
+  - The share still agrees within 0.19 (mean |diff| 0.08), and every exact share is >= 0.30 (0.37-0.58).
+  - **So the C1-E 185-187 shares are approximate to about +-0.2, and the trigger stands.** The cosine is not robust to
+    the fit (s231: exact -0.22, fitted +0.19), in line with the split-half finding.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under

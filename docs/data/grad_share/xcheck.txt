@@ -1,0 +1,6 @@
+PopArt cross-check (c1rep u2000): exact PopArt from the full-state snapshot vs OLS-fitted (the method used for C1-E 185-187)
+s230: share exact 0.575 fit 0.541 | cos exact -0.089 fit -0.239 | popart mu/sigma exact 279.8/178.45 fit 211.5/15.97
+s231: share exact 0.495 fit 0.382 | cos exact -0.220 fit +0.187 | popart mu/sigma exact 284.5/201.00 fit 288.5/17.99
+s232: share exact 0.390 fit 0.582 | cos exact +0.070 fit +0.121 | popart mu/sigma exact 285.5/231.49 fit 281.3/19.79
+s233: share exact 0.558 fit 0.583 | cos exact -0.113 fit -0.187 | popart mu/sigma exact 165.6/143.23 fit 201.1/15.77
+s234: share exact 0.365 fit 0.385 | cos exact +0.606 fit +0.579 | popart mu/sigma exact 274.3/204.75 fit 265.8/19.31
