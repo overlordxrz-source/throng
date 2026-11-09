@@ -3393,6 +3393,34 @@ more expensive, because it produces publishable-looking nulls.
     - population: 9,000 updates x 1.6 x $0.074 / 1,000 = ~$1.07 per run, x5 = ~$5.3;
     - **total ~$6.7**, after the erosion calibration and the stop-grad decision.
 
+- **Real-net replication (wire-blind PS x2, seeds 52 / 53): RESULT. PRIMARY PASS, 2/2** (registered
+  `scripts/analyze_confirm.py`; `docs/data/realnet_rep/analysis_confirm_rep.txt`). Both runs completed 450 updates
+  with no halts (apparatus at 2 and MI check at 5 passed in both).
+  - Primary (probes 350 / 400 / 450, 30 pairs), listener Crafts at T' per world, control → swap:
+    - **s52: 1.93 → 31.40 (x16.3), paired +29.47, SE 1.28;**
+    - **s53: 2.52 → 21.66 (x8.6), paired +19.14, SE 2.44.**
+  - Reliance (deposit drop under the swap) at 350 / 400 / 450: s52 +50 / +67 / +61%; s53 +34 / +36 / +61%. It rose
+    across probes in both (from +10-16% at 50). MI ~2 bits throughout (null p95 <= 0.05).
+  - **Descriptive caveats:**
+    - **s53's probe 400 is degenerate:** control deposits 0.37 per world and Crafts at T' 0.35 → 2.58, against the
+      training window's 5.74 listener deliveries. The pooled primary passes with it included. The cause is not
+      investigated (a probe-rollout oddity or a transient policy state).
+    - **Cam's new gain rule** (adopted after this was registered, so descriptive here): listener deliveries per world
+      in the training window vs the historical NOSIG reference 4.26 + 1.0 = 5.26. s52 5.86 / 6.45 / 5.85 (passes at
+      every primary probe). s53 5.57 / 5.74 / **3.35** (fails at 450, with a late dip; sender window minimum 9.3).
+      There is no NOSIG arm on this account; the next account's third seed + NOSIG gives the real reference.
+    - PS52 carries `--log-diag` (the chunked-diag definition), for post-mortems.
+  - This is the real-net counterpart of the shared-brain code with the wire-blind fix: the code forms and is used
+    with PS on (PS is never removed in this 450-update recipe). It is not an erosion or rung-3 result.
+  - **Account spend final: $38.44 metered** (Cam's projection ~$38.4; the guard never fired and exited at 01:33
+    with no live apps). Real net this account: two failed starts $0.135 + PS52 + PS53.
+- **Backup pass 2 (Cam's rule before any account switch), 2026-11-09 ~01:40: VERIFIED.** The whole `throng-runs`
+  volume was re-copied to `~/throng-backup/rapidcrisp_throng-runs/testbed/`: **373 files, 1.35 GB, 0 mismatches**
+  by name and size (walked per directory; sizes are integers in the listing).
+  - `params` 5 (incl. rep_PS52 / rep_PS53 finals), `comm_jit` 14, `comm_jit/ckpt` 18 (both seeds every 50),
+    `toy` 117, `toy/params` 209, `toy/snap` 10 (incl. the c1rep u2000 snapshots).
+  - Nothing remains only on Modal.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under

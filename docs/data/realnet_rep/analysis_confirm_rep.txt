@@ -1,0 +1,28 @@
+== seed 52: 450 updates; halts: none
+   apparatus @ 2: ok=True, ps_grad_message_heads=1.0075673851339382, distinct_sender_messages=548, listener_wire_nonzero_frac=1.0
+   mi_check @ 5: mi_bits=1.9840923893970241, floor=0.92, ok=True
+   probe 50: crafts@T' 6.33 -> 10.44 | deposits 4.48 -> 3.77 (reliance +16%) | Delta +0.034 | L dep/world (train, window) 1.98 | S dep min/mean 11.8/20.2 | MI 1.995 (null p95 0.015) | swap token seen 100.0%
+   probe 100: crafts@T' 3.97 -> 7.05 | deposits 2.03 -> 1.61 (reliance +21%) | Delta +0.039 | L dep/world (train, window) 5.41 | S dep min/mean 10.2/21.7 | MI 1.933 (null p95 0.048) | swap token seen 100.0%
+   probe 150: crafts@T' 4.22 -> 21.58 | deposits 5.10 -> 3.18 (reliance +38%) | Delta +0.048 | L dep/world (train, window) 3.19 | S dep min/mean 2.9/11.9 | MI 1.998 (null p95 0.016) | swap token seen 100.0%
+   probe 200: crafts@T' 5.48 -> 20.52 | deposits 4.39 -> 3.26 (reliance +26%) | Delta +0.110 | L dep/world (train, window) 5.32 | S dep min/mean 17.0/19.7 | MI 1.999 (null p95 0.015) | swap token seen 100.0%
+   probe 250: crafts@T' 5.27 -> 22.32 | deposits 5.89 -> 3.92 (reliance +34%) | Delta +0.083 | L dep/world (train, window) 4.84 | S dep min/mean 19.1/20.9 | MI 1.989 (null p95 0.012) | swap token seen 100.0%
+   probe 300: crafts@T' 4.72 -> 21.18 | deposits 5.53 -> 3.31 (reliance +40%) | Delta +0.116 | L dep/world (train, window) 5.61 | S dep min/mean 20.8/22.6 | MI 1.998 (null p95 0.013) | swap token seen 100.0%
+   probe 350: crafts@T' 2.97 -> 37.14 | deposits 6.31 -> 3.12 (reliance +50%) | Delta +0.151 | L dep/world (train, window) 5.86 | S dep min/mean 22.2/23.8 | MI 1.998 (null p95 0.013) | swap token seen 100.0%
+   probe 400: crafts@T' 0.98 -> 21.52 | deposits 4.67 -> 1.54 (reliance +67%) | Delta +0.198 | L dep/world (train, window) 6.45 | S dep min/mean 21.7/23.6 | MI 1.996 (null p95 0.011) | swap token seen 100.0%
+   probe 450: crafts@T' 1.83 -> 35.53 | deposits 5.93 -> 2.34 (reliance +61%) | Delta +0.153 | L dep/world (train, window) 5.85 | S dep min/mean 19.0/23.1 | MI 1.986 (null p95 0.012) | swap token seen 100.0%
+   PRIMARY (probes 350/400/450, 30 pairs): crafts@T' control 1.93 swap 31.40 (ratio 16.29, need >= 2) | paired +29.47 SE 1.28 (need > 2 SE) -> pass
+== seed 53: 450 updates; halts: none
+   apparatus @ 2: ok=True, ps_grad_message_heads=0.7235278067548271, distinct_sender_messages=565, listener_wire_nonzero_frac=1.0
+   mi_check @ 5: mi_bits=1.9946508770593432, floor=0.92, ok=True
+   probe 50: crafts@T' 6.72 -> 8.38 | deposits 2.71 -> 2.44 (reliance +10%) | Delta +0.021 | L dep/world (train, window) 2.66 | S dep min/mean 4.7/18.0 | MI 1.982 (null p95 0.026) | swap token seen 100.0%
+   probe 100: crafts@T' 8.78 -> 16.24 | deposits 4.90 -> 4.14 (reliance +16%) | Delta +0.013 | L dep/world (train, window) 3.86 | S dep min/mean 11.4/18.5 | MI 1.999 (null p95 0.017) | swap token seen 100.0%
+   probe 150: crafts@T' 3.99 -> 14.44 | deposits 4.47 -> 2.84 (reliance +37%) | Delta +0.049 | L dep/world (train, window) 5.09 | S dep min/mean 18.8/20.7 | MI 1.999 (null p95 0.015) | swap token seen 100.0%
+   probe 200: crafts@T' 5.22 -> 19.27 | deposits 5.70 -> 3.92 (reliance +31%) | Delta +0.039 | L dep/world (train, window) 5.66 | S dep min/mean 19.6/22.4 | MI 1.999 (null p95 0.012) | swap token seen 100.0%
+   probe 250: crafts@T' 3.92 -> 32.64 | deposits 6.46 -> 3.82 (reliance +41%) | Delta +0.030 | L dep/world (train, window) 6.31 | S dep min/mean 21.7/24.1 | MI 1.994 (null p95 0.013) | swap token seen 100.0%
+   probe 300: crafts@T' 4.59 -> 29.79 | deposits 5.42 -> 3.67 (reliance +32%) | Delta +0.093 | L dep/world (train, window) 5.51 | S dep min/mean 15.7/21.1 | MI 1.998 (null p95 0.013) | swap token seen 100.0%
+   probe 350: crafts@T' 4.04 -> 25.29 | deposits 5.39 -> 3.56 (reliance +34%) | Delta +0.054 | L dep/world (train, window) 5.57 | S dep min/mean 18.9/22.5 | MI 1.999 (null p95 0.013) | swap token seen 100.0%
+   probe 400: crafts@T' 0.35 -> 2.58 | deposits 0.37 -> 0.23 (reliance +36%) | Delta +0.045 | L dep/world (train, window) 5.74 | S dep min/mean 11.0/22.2 | MI 1.998 (null p95 0.033) | swap token seen 100.0%
+   probe 450: crafts@T' 3.17 -> 37.10 | deposits 6.41 -> 2.53 (reliance +61%) | Delta +0.309 | L dep/world (train, window) 3.35 | S dep min/mean 9.3/17.9 | MI 1.991 (null p95 0.013) | swap token seen 100.0%
+   PRIMARY (probes 350/400/450, 30 pairs): crafts@T' control 2.52 swap 21.66 (ratio 8.60, need >= 2) | paired +19.14 SE 2.44 (need > 2 SE) -> pass
+
+== PRIMARY: PASS (2/2)
