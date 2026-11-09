@@ -1,0 +1,15 @@
+{
+ "variant": {
+  "juvenile": 0,
+  "long_life": false,
+  "random_code": false,
+  "updates": 150,
+  "T": 64,
+  "epochs": 2
+ },
+ "lives": 2090,
+ "pass_frac": 0.007177033492822967,
+ "median_drop": 0.0,
+ "median_lifespan": 67.0,
+ "gate": "FAIL"
+}

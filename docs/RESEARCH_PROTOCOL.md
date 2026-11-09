@@ -3926,6 +3926,24 @@ more expensive, because it produces publishable-looking nulls.
   - The learned newborns' median drop is ~0 in every variant, so the fail looks genuine. Both fallbacks are being
     re-run on the 16-episode test before any verdict.
 
+- **Learnability gate: RESULT, FAIL after both fallbacks (16-episode test; `docs/data/w2_learnability/`).**
+
+  | variant | lives | pass | median drop | food eaten, true / swapped (mean, 300 steps) |
+  |---|---|---|---|---|
+  | (a) juvenile J = 500 | 662 | **0.8%** | 0.0 | 3.46 / 3.48 |
+  | (a) + (b) juvenile + drain halved | 553 | **0.0%** | 0.0 | 5.26 / 5.29 |
+  | positive control (scripted listener) | 74 | **65% (gate PASS)** | 0.63 | 10.36 / 3.90 |
+  | baseline (4-episode test) | 2,090 | 0.7% | 0.0 | - |
+
+  - **Reading:** the code is worth learning (a listener that uses it eats ~2.7x more than the learned newborns), and the
+    test detects use. **But a newborn starting from a navigator does not learn to listen within one life**, even with
+    a 500-step provisioned juvenile period and longer lives (median life 572-641 steps, ~9-10 updates of its own
+    64-step data).
+  - Per Cam's rule: report. **Cam asks M about copying elders' actions as an inborn trait.**
+  - Other levers (not run, for Cam): higher plasticity in the young (a larger newborn learning rate, already a
+    heritable trait); a pretrained listening prior (navigators trained with a scripted speaker); or brains that learn
+    across lives.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
