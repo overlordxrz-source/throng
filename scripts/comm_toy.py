@@ -200,6 +200,8 @@ def main():
     ap.add_argument("--grad-share-u", type=int, default=2000, help="the update the loaded params come from (sets c_ps / tok-ent)")
     ap.add_argument("--grad-share-rollouts", type=int, default=4)
     ap.add_argument("--grad-share-snap", default=None, help="full-state snapshot: exact params + PopArt stats")
+    ap.add_argument("--grad-share-r0", type=int, default=0, help="first rollout index (split-half noise check)")
+    ap.add_argument("--grad-share-save", default=None, help="save the MSGK vectors c_S, c_L, g_all (.npz)")
     ap.add_argument("--calibrate", action="store_true")
     ap.add_argument("--wire-init-scale", type=float, default=1.0,
                     help="after warm start, scale the (never-trained) wire-input rows of enc_0 and gwt_comms_1 (fidelity calibration)")
@@ -1229,7 +1231,7 @@ def main():
         gfn = jax.jit(jax.grad(lambda p_, mb, sg, mu: total_loss(p_, mb, sg, mu, ps_g, te_g)[0]))
         acc = {"all": 0.0, "S": 0.0, "L": 0.0}; acc_h = {"all": 0.0, "S": 0.0, "L": 0.0}; nmb = 0
         st_g = init_state(jax.random.PRNGKey(60_000 + gs_u))
-        for rr in range(a.grad_share_rollouts):
+        for rr in range(a.grad_share_r0, a.grad_share_r0 + a.grad_share_rollouts):
             st_g, R = rollout(params, st_g, jax.random.PRNGKey(61_000 + 7 * gs_u + rr))
             R = jax.tree_util.tree_map(np.asarray, R)
             obs_last = build_obs(st_g[0], st_g[1], st_g[3], jax.random.PRNGKey(62_000 + rr))
@@ -1268,6 +1270,8 @@ def main():
                             cos_LS=float(np.dot(cL, cS) / (nS * nL + 1e-30)),
                             proj_share_L=float(np.dot(cL, gA) / (np.dot(gA, gA) + 1e-30)),
                             split_residual=float(np.linalg.norm(gA - cS - cL) / (np.linalg.norm(gA) + 1e-30)))
+        if a.grad_share_save:
+            np.savez(a.grad_share_save, **{k: acc[k] / nmb for k in ("all", "S", "L")})
         emit(out)
         raise SystemExit(0)
 
