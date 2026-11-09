@@ -3525,6 +3525,41 @@ more expensive, because it produces publishable-looking nulls.
     25.34 / 22.48 / 24.66 / 24.97 vs 17.42; `docs/data/nav/`). Params in `testbed/toy/nav/`. **G0 (4 runs) launched
     ~02:40.**
 
+- **Cam, Nov 9 ~07:45: billing and budget.**
+  1. **From now on, allowances mean FREE CREDIT ONLY; nothing may be billed without M's explicit OK.** Guard cap =
+     min(approved allowance, credit balance - $1). **The rapidcrisp $8.43 billed is recorded as Cam's planning error**
+     (he treated the ~$42 spending limit as credit), not a rule breach.
+  2. **(e) re-price:** the wire-off + copying control population also gives the NOSIG delivery baseline (wire-off
+     listeners are no-signal listeners, as in c1rep), so there is no separate NOSIG population.
+     - **My 5 runs were 3 POP + 2 POP-NOSIG.** In the registered design every newborn copies elders, so that NOSIG
+       population already had copying ON: it *is* Cam's control. No design change; the ~$7.4 figure double-counted it.
+  3. Probe-400 post-mortem: DEFERRED with the rest of the real net.
+  4. Plan total ~$11.9 against $14. N1 (8/8) noted. Proceed: (b) pick and G0 by the registered rules, then (c).
+- **Cam, Nov 9 ~07:50: own world (W2), spec first.** Code + tests only, no paid runs, in parallel with (b)-(f).
+  `docs/OWN_WORLD_SPEC.md` for sign-off before any code beyond a prototype.
+  - Requirements:
+    - pure JAX, jit / vmap end to end, >= 100k agent-steps/s on one A10G (laptop CPU measured first);
+    - **senses absolute, local, limited range** (a small window; no G-scaled positions);
+    - **body and reward:** energy drains every step; food refills it; death at 0; reproduction at high energy;
+      offspring inherit traits (learning speed, plasticity schedule) with mutation; **no task reward, a homeostatic
+      reward** (Keramati & Gutkin 2014);
+    - things worth talking about, staged behind flags: moving / depleting food patches; a lookout with a wide view;
+      two predator kinds needing different escapes (the alarm-call test); facts with parts (kind x place);
+    - the toy's wire (VQ, wire-blind message head, the stop-grad rule from (c)), with the swap, same-spot and speak
+      probes ported.
+  - **Prototype gates:** (1) a no-comm agent survives longer than a random one; (2) an ORACLE agent told where the
+    food is lives >= 2x as long as a blind one (value of information); (3) steps/s measured. Build plan + cost to the
+    first paid smoke.
+- **Cam, Nov 9 ~07:55: budget raised.** M confirms the full ~$42 on this account is spendable.
+  - **Guard raised to $41** (Mac guard restarted at 02:44, CAP 41.0).
+  - Per-item caps are estimates: overruns up to 25% are fine without asking; anything more, tell Cam first.
+  - The extra buys statistical power: **(c) wire-off x3 → x5; (e) 3 POP → 5 POP, 2 control → 3 control**, both
+    re-priced before launch.
+  - Keep ~$25 in reserve for the own-world prototype smoke and follow-ups.
+  - **Re-price (estimates, $0.22 per 3,000-update toy run, stop-grad 1.19x):**
+    - (c) C1 x5 + stop-grad x5 + wire-off x5 (stop-grad on) = 5 + 10 x 1.19 = 16.9 run-units = **~$3.7**;
+    - (e) 8 population runs x ~$1.07 = **~$8.6**, to be re-timed after the population is wired in.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
