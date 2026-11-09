@@ -10,7 +10,7 @@ from pathlib import Path
 import modal
 
 _REQUIREMENTS = str(Path(__file__).resolve().parents[1] / "requirements.txt")
-PINNED_SHA = "bc63ba0d672c2c121ea7dfafe73cc68a93ab8f38"  # comm-toy branch (pop_toy.py + selftest)
+PINNED_SHA = "5c5b07adeb789f881a7b6e51f89440a81d822ac5"  # comm-toy branch (pop_toy.py + fifth fire + selftest)
 REPO_URL = "https://github.com/overlordxrz-source/throng.git"
 VOLUME_MOUNT = "/mnt/throng-runs"
 
@@ -56,6 +56,27 @@ def run_cpu8(tag: str, args: list) -> str:
 @app.function(image=cpu_image, cpu=2.0, memory=4096, timeout=30 * 60, retries=0, volumes={VOLUME_MOUNT: volume})
 def run_cpu2(tag: str, args: list) -> str:
     return _run(tag, args)
+
+
+@app.function(image=cpu_image, cpu=2.0, memory=4096, timeout=12 * 60 * 60, retries=0, volumes={VOLUME_MOUNT: volume})
+def run_pop(tag: str, args: list) -> str:
+    """one population run (~8 h at 3.15 s / update); 12 h timeout (Cam ~14:45: raise the timeout)"""
+    return _run(tag, args)
+
+
+# (e) Cam ~14:45: 5 POP + 3 control, registered lifetimes, erosion OFF, msg-grad all, fire 5 lit from 7,500
+_POP = ["--updates", "9000", "--fifth-fire", "--lit-from", "7500", "--msg-grad", "all",
+        "--eval-at", "1500", "3500", "5500", "7500", "--save-at", "7500", "9000"]
+POP_JOBS = ([(f"pop_on_s{s}", ["--arm", "COMM", "--seed", str(s), *_POP, "--save-prefix", f"{{VOL}}/testbed/pop/params/pop_on_s{s}",
+                                "--tag", "POP"]) for s in range(320, 325)]
+            + [(f"pop_ctl_s{s}", ["--arm", "NOSIG", "--seed", str(s), *_POP, "--save-prefix", f"{{VOL}}/testbed/pop/params/pop_ctl_s{s}",
+                                   "--tag", "POPCTL"]) for s in range(325, 328)])
+
+
+@app.local_entrypoint()
+def population():
+    for (tag, _), txt in zip(POP_JOBS, run_pop.starmap(POP_JOBS)):
+        print(f"[pop] {tag}: {len(txt.splitlines())} lines", flush=True)
 
 
 _T = ["--seed", "9", "--updates", "12", "--erode-wd", "1e-3", "--tag", "POP_TIMING"]

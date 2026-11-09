@@ -3763,6 +3763,30 @@ more expensive, because it produces publishable-looking nulls.
   `--reinit-msg`; default path bit-identical). Analysis: the precondition gate (>= 12 distinct messages at u1000 in
   >= 4/5, from the topsim rows) first, then `analyze_step6.py`.
 
+- **REGISTERED (before launch): (e) population run details** (`scripts/modal_pop.py::population`, comm-toy
+  `5c5b07a`; analysis `analyze_pop.py`).
+  - **Seeds:** POP 320-324 (wire on), POPCTL 325-327 (wire off, copying on = the NOSIG baseline).
+  - **Design:** 9,000 updates, B 4, W 48, founders' PS 1.99 annealed 1,000-1,500, **erosion OFF**, **msg-grad all**;
+    replacements at 1,500 / 2,000 / 2,500 / 3,000, then every 2,000 per slot (all gen 4 at 7,500); sensitive period
+    1,000, settle 500, floor 0.1; learning speeds 0.5 / 0.75 / 1.0 / 1.5; copying coefficient 1.0; newborns from
+    navigators no living brain started from (pool 260-267).
+  - **Fifth fire** at the grid centre (6,6): its offset (2 dims) and need (1 dim) are in the obs from update 0 (D 62).
+    The navigators' first-layer weights are expanded with zero rows, so they are unchanged in function (apparatus:
+    `expand_preserves_navigator`). Lit only from 7,500 (re-rolls over 5 fires from then). PS never touches it (PS ends
+    at 1,500).
+  - Evals (10 pairs each) at 1,500 / 3,500 / 5,500 / 7,500 / 9,000 + token dumps; brains saved at 7,500 / 9,000.
+  - **Bars exactly as Cam ruled:**
+    - primary at u7500, reliance >= 30% (paired > 2 SE) + true-message >= control-population + 1.0 (both from the
+      probe's control rollouts) + same-spot drop < 0.5x cross, in >= 3/5;
+    - secondary: shuffle-corrected joint MI (all brains' sender steps pooled; 100 fire-label permutations), POP
+      median >= 2x control and >= +0.2 bits;
+    - fire 5 at u9000: swap-to-fire-5 Crafts at fire 5 >= 2x control and paired > 2 SE in >= 3/5, plus the age groups.
+  - **Apparatus `--selftest` with fire 5: PASS** in COMM and NOSIG (brain isolation, imitation on the message head only,
+    PS exactly 0 without founders, navigator expansion function-preserving, fire-5 need reaching the message path,
+    wire-off zero). A fire-5 end-to-end smoke passed.
+  - **Runtime:** ~8 h per run on 2-CPU containers; function timeout raised to 12 h (Cam's option). **Price ~$8-11.3**
+    (cap $12).
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
