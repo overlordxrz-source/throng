@@ -3727,6 +3727,42 @@ more expensive, because it produces publishable-looking nulls.
     it returned; stopped by hand. The Mac guard now matches all `throng-*` apps (it had missed `throng-pop`).
   - Morning summary for M: `docs/MORNING_SUMMARY_2026-11-09.md`.
 
+- **Cam, Nov 9 ~14:45: morning rulings.**
+  1. **(c) accepted. Toy rung 3 at calibrated erosion: FAIL** (baseline 2/5, stop-grad 0/5; the wire-off control at ~0
+     bits now discriminates). Stop-grad not adopted; message-head rule = all rows.
+     - **Verdict for the shared-network toy: use protects a code against erosion only sometimes.** Likely because the
+       code is worth little here (listeners +1-3 deliveries over no signal), so the pressure to keep it is weak.
+       **This question is no longer tested in the shared-network toy.**
+     - The stop-grad direction (0/5 vs 2/5) is recorded as **weak evidence (p ~0.4) that the listener's gradient
+       through the shared head helps rather than erodes.**
+  2. **(e) population: LAUNCH** at the registered lifetimes (2,000), **5 POP + 3 control, cap $12.** Changes before
+     launch:
+     - **Erosion OFF:** turnover is the decay force (newborns start from navigators with no code; a code survives only
+       if copied and kept).
+     - **Primary (ladder rung 3), at u7500** (all gen 4, before fire 5), in >= 3/5 POP seeds:
+       - reliance >= 30% with paired > 2 SE;
+       - true-message deliveries >= control-population deliveries + 1.0;
+       - same-spot control clean (same-spot drop < half the cross-spot drop).
+     - **Secondary (use keeps it alive):** shuffle-corrected joint MI at u7500, POP median >= 2x the control median AND
+       >= 0.2 bits above it; per seed and per generation (u1500 / 3500 / 5500 / 7500) in both arms.
+     - **Fire 5:** redirection to fire 5 by u9000 in >= 3/5 POP seeds; report which age group coins its word.
+     - Export one dictionary per generation per POP seed (word drift, for M).
+     - Runtime ~8 h per run, past the 6 h timeout: raise the timeout, or chunk with checkpoint + resume (bit-identity
+       verified first). Cam's prediction: primary pass ~45%.
+  3. **(f) tau = 0.63 APPROVED** ("that's what I meant"). Launch, cap $1.
+  4. Own world: Cam needs a <= 30-line summary of the spec's key choices in the next report.
+     - **Brains: ONE PER AGENT.** W2 v1: 8 agents, B = 8, with copying and turnover from the population code.
+     - **v1 = food + lookout only.** Predators next, behind a flag: two kinds with different escapes (one can't reach
+       agents in cover cells, the other can't reach agents on high cells; the wrong escape gets caught). Kinds are
+       property vectors, with no names.
+     - **Size: the tuned prototype world** (P6, sigma 1.0, L96, drain 0.008), 8 agents spawned clustered, hearing range
+       ~3x the view radius.
+     - No paid W2 runs until Cam signs off on the summary.
+  5. Housekeeping accepted. Budget: ~$4 spent of $41; (e) + (f) ~$13.
+- **(f) launch details:** plan `step6r`, seeds 310-314, toy launcher re-pinned to comm-toy `bc63ba0` (adds `--tau` /
+  `--reinit-msg`; default path bit-identical). Analysis: the precondition gate (>= 12 distinct messages at u1000 in
+  >= 4/5, from the topsim rows) first, then `analyze_step6.py`.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under

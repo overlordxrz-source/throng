@@ -12,7 +12,7 @@ import modal
 
 _REQUIREMENTS = str(Path(__file__).resolve().parents[1] / "requirements.txt")
 
-PINNED_SHA = "9c26a23faccf6ffcf6dd00a7ea4da282b7cf0aa0"  # comm-toy branch (Nov 9: --msg-grad sender etc.; 1f8e51d before; default path bit-identical)
+PINNED_SHA = "bc63ba0d672c2c121ea7dfafe73cc68a93ab8f38"  # comm-toy branch (Nov 9: + --tau / --reinit-msg; default path bit-identical)
 REPO_URL = "https://github.com/overlordxrz-source/throng.git"
 VOLUME_NAME = "throng-runs"
 VOLUME_MOUNT = "/mnt/throng-runs"
@@ -123,6 +123,12 @@ PLANS: dict = {
               for arm_t, arm, extra, ss in (("base", "COMM", [], range(290, 295)),
                                             ("sg", "COMM", ["--msg-grad", "sender"], range(295, 300)),
                                             ("off", "NOSIG", ["--msg-grad", "sender"], range(300, 305))) for s in ss],
+    # (f) step-6 rerun (Cam ~00:40 / Nov 9 ~14:45: tau 0.63 approved): one arm, fresh seeds; ORACLE0 for navigation,
+    # message head + material input rows re-initialised (--reinit-msg), tau 0.63 (step 2's starting fraction of max entropy)
+    "step6r": [(f"step6r_comp_s{s}", ["--arm", "COMM", "--seed", str(s), "--updates", "3000", "--warm-start", _W,
+                                      "--wire-init-scale", "0.06", "--craft-cost", "0.45", "--ps", "1.99", "--wire-blind", "1",
+                                      "--comp", "--vq-vocab", "4", "--reinit-msg", "--tau", "0.63",
+                                      "--eval-at", "1000", "2000", "--tag", "S6R_COMP"]) for s in range(310, 315)],
     # (d) separate brains: 8 G-12 navigators by ORACLE0's own recipe (founders 260-263, newborn pool 264-267), then the G0
     # word-bias gate: the C1 formation recipe to 1,500 from navigators 260 (seeds 280 / 281) and 261 (seeds 282 / 283)
     "nav": [(f"nav_s{s}", ["--arm", "ORACLE", "--seed", str(s), "--updates", "1500", "--craft-cost", "0.45",
