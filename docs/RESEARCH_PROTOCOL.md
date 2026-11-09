@@ -2981,6 +2981,23 @@ more expensive, because it produces publishable-looking nulls.
   6. Each batch is analysed on landing with the registered scripts.
   - Launcher: `REPLICATE` adds `--log-diag` for seed 52 only.
 
+- **Step 3b VoI result (registered analysis, `analyze_step3b_voi.py`; 4 runs complete, 2,000 updates each): DOES NOT
+  QUALIFY.**
+  - Deliveries per world at 2,000: ORACLE 0.00 / 0.00, NOSIG 0.00 / 0.00 (ratio 0.76; every-ORACLE > every-NOSIG
+    false; floor false). `docs/data/s3b_voi/`.
+  - **Two failures, not one** (descriptive, from the train rows):
+    - **Occupancy at chance:** lookout agent-steps 0.015-0.016 at the end. The lookout is 9 of 576 cells (0.0156),
+      so this is uniform wandering; no lookout behaviour emerged. The ORACLE arm is informed only 3% of the time
+      (either agent at the lookout), so it cannot show value either.
+    - **The base task collapsed:** Craft attempts fall from ~1-4 per world (updates 1-10) to ~0 by update 11-100 in
+      all four runs, and deliveries stay ~0.005 per world throughout. With craft cost 0.45 and success rare in the
+      24-grid, the warm-started policy learns not to Craft. Informed or not, nobody delivers.
+  - **Reading for Cam's rule** ("if it fails on occupancy, give agents a reason to pass by the lookout"): it fails on
+    occupancy, but a lookout reason alone would not rescue it, because informed agents don't deliver either. The next
+    world design has to keep the base task alive (e.g. a lower craft cost in the 24-grid, or fires nearer the
+    spawn area) *and* route agents past the lookout. That is Cam's design call. No 3b arms on this account.
+  - Cost ~$0.35 (per-app billing report not yet posted).
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under

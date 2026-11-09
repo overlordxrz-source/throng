@@ -1,0 +1,8 @@
+== S3B_ORACLE
+   s220: deliveries/world @500 0.00 @1000 0.00 @1500 0.01 @2000 0.00 | lookout occupancy (agent-steps) 0.0154, either agent 0.0306 | informed 0.0306
+   s221: deliveries/world @500 0.02 @1000 0.01 @1500 0.00 @2000 0.00 | lookout occupancy (agent-steps) 0.0164, either agent 0.0324 | informed 0.0324
+== S3B_NOSIG
+   s222: deliveries/world @500 0.00 @1000 0.01 @1500 0.00 @2000 0.00 | lookout occupancy (agent-steps) 0.0149, either agent 0.0296 | informed 0.0149
+   s223: deliveries/world @500 0.01 @1000 0.00 @1500 0.00 @2000 0.00 | lookout occupancy (agent-steps) 0.0153, either agent 0.0303 | informed 0.0153
+
+== STEP 3b VOI: ORACLE 0.00 vs NOSIG 0.00 (ratio 0.76; every ORACLE > every NOSIG False; floor False) -> DOES NOT QUALIFY (retune the world)
