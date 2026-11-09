@@ -3,6 +3,41 @@
 Draft, Nov 9. Cam asked for this spec before any code beyond a prototype. Code + tests only; no paid runs until
 sign-off.
 
+## Summary for sign-off (<= 30 lines; Cam's Nov 9 ~14:45 decisions folded in)
+
+1. **Engine:** pure JAX; state = fixed-shape arrays with an `alive` mask; step jitted, scanned, vmapped.
+   World + senses run at ~8M agent-steps/s on the laptop CPU, so brains set the speed.
+2. **World v1:** torus L 96, 6 food patches (sigma 1.0), regrowth 0.02/step; **food + lookout only**.
+   Predators come next behind a flag (two kinds as property vectors: one can't reach cover cells, one can't reach
+   high cells; the wrong escape is caught).
+3. **Body:** energy drains (0.008 basal + 0.003 per move); eating takes nutrition; death at 0. Reproduction above
+   E 0.95 into a free slot. Offspring inherit traits (learning speed, plasticity schedule) with mutation, never
+   weights.
+4. **Reward:** homeostatic drive reduction only (Keramati & Gutkin 2014; setpoint 0.8). No task reward, no reward for
+   messages.
+5. **Senses:** a 7 x 7 egocentric window (food, agents), own energy and age. The lookout widens the view to 19 x 19.
+   **Absolute cells, never divided by L** (a tested invariant). Hearing: the 2 nearest speakers within **radius 9**
+   (3x the view radius), one step delayed.
+6. **Brains: one per agent** (B = N = 8 in v1), stacked and vmapped. Newborns start from independently trained
+   navigators (G0 showed shared starts bias words). Copying, turnover, settling speech and learning speeds come
+   from the population code.
+7. **Agents v1:** 8, spawned clustered.
+8. **Wire:** the toy's 3-slot VQ token policy, wire-blind message head, message-head rule = all rows (stop-grad not
+   adopted). Probes ported: cross-spot / same-spot swap, speak, joint MI with a shuffle null.
+9. **Open-endedness hooks:**
+   - generative physics (materials = property vectors, 5 rules, products compound: prototyped);
+   - hash-seeded chunks with no edge; place / store / build with persistent deltas;
+   - a variable-length message flag; a curiosity drive (learning progress, flag);
+   - a dreaming hook, off until the rung-6 gates.
+10. **Prototype gates (laptop, done):**
+    - P1 a learned agent lives 645 vs random 61 steps;
+    - P2 an oracle-informed agent lives 2.34x a blind one (after retuning the world, not the agents);
+    - P3 ~8M agent-steps/s for world + senses.
+11. **Next:** per-agent brains (B = 8) + per-agent PPO on the laptop. Then the first paid smoke: a 2-minute A10G
+    timing + a ~10-minute no-comm run, **~$0.3**, after sign-off.
+12. **Metrics planned:** survival, deliveries, novelty (distinct materials per life), vocabulary in use, new words for
+    new things without PS.
+
 **Principle (unchanged):** we design the world and its pressures, never the meanings. No reward ever names a
 signal, a meaning or a task. Probes (swap, same-spot, speak) are measurements on frozen test episodes.
 
