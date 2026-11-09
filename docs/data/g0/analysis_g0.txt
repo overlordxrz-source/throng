@@ -1,0 +1,9 @@
+same start   280-281: agreement 0.500
+same start   282-283: agreement 0.500
+different    280-282: agreement 0.000
+different    280-283: agreement 0.083
+different    281-282: agreement 0.000
+different    281-283: agreement 0.083
+null (fire-relabelled cross pairs, n=92): mean 0.014, p95 0.083
+
+== G0: mean different-start agreement 0.042 vs null p95 0.083 -> PASS (same-start mean 0.500)

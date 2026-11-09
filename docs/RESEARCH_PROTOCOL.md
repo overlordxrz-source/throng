@@ -3682,6 +3682,16 @@ more expensive, because it produces publishable-looking nulls.
   - Next (laptop): per-agent brains + PPO for the learned P1 / P2. Then the 2-minute A10G smoke (~$0.3) after Cam's
     sign-off.
 
+- **(d) G0 word-bias gate: RESULT, PASS** (`analyze_g0.py`; `docs/data/g0/`). 4/4 runs complete; codes formed by 1,500
+  (per-slot MI 1.43-2.00 bits).
+  - Slot-word agreement over the 12 (fire, slot) cells:
+    - **same start (positive control): 280-281 0.500, 282-283 0.500;**
+    - **different starts: 0.000 / 0.083 / 0.000 / 0.083, mean 0.042**;
+    - fire-relabelling null mean 0.014, **p95 0.083**.
+  - **PASS (0.042 <= 0.083).** Cam's shared-body effect is confirmed directly: two seeds from one navigator share half
+    their slot words; seeds from different navigators share no more than chance. The separate-brains design (each
+    newborn from a navigator no living brain started from) removes the bias. (e) is not held by G0, only by its price.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
