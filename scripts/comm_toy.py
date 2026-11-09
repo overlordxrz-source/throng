@@ -195,6 +195,7 @@ def main():
                     help="north star (Cam, 2026-11-08): build a dictionary (fire -> modal sender triple) from frozen control "
                          "rollouts, then 'speak to them': replace the sender's broadcast by the dictionary word for fire "
                          "X = T + s and count listener Crafts at X, vs the control and vs the sender's own words for X")
+    ap.add_argument("--export-m", default=None, help="for M: write dictionary + one episode transcript (CSV/JSON) to this dir")
     ap.add_argument("--grad-share", action="store_true",
                     help="Cam Nov 9 item 4: listener vs sender rows' share of the message-head gradient at the loaded params")
     ap.add_argument("--grad-share-u", type=int, default=2000, help="the update the loaded params come from (sets c_ps / tok-ent)")
@@ -1415,6 +1416,90 @@ def main():
         raise SystemExit(0 if ok else 1)
 
     np_rng = np.random.default_rng(a.seed)
+    if a.export_m:             # for M (Cam, Nov 9): dictionary table + one episode transcript; frozen params, $0
+        import csv
+        lis = np.asarray(is_listener)
+        outd = Path(a.export_m); outd.mkdir(parents=True, exist_ok=True)
+        toks, labs = [], []
+        for k in range(4):     # the speak test's dictionary keys, so the words reproduce its dictionary exactly
+            _, Rc = rollout(params, init_state(jax.random.PRNGKey(70_000 + k)), jax.random.PRNGKey(71_000 + k))
+            Rc = jax.tree_util.tree_map(np.asarray, Rc)
+            toks.append(Rc["token_actions"][:, ~lis].reshape(-1, 3)); labs.append(Rc["active"].reshape(-1))
+        tok, lab = np.concatenate(toks), np.concatenate(labs)
+        HN = np.asarray(HEARTHS)
+        slotw = np.array([[np.bincount(tok[lab == t, i], minlength=V).argmax() for i in range(3)] for t in range(4)])
+        # naive-Bayes reader over slots (add-0.5 smoothing), fitted on the same dictionary rollouts
+        cnt = np.stack([np.stack([np.bincount(tok[lab == t, i], minlength=V) for i in range(3)]) for t in range(4)]) + 0.5
+        logp = np.log(cnt / cnt.sum(-1, keepdims=True)); prior = np.log(np.bincount(lab, minlength=4) / len(lab))
+        def read(tr):
+            s_ = prior + np.array([sum(logp[t, i, tr[i]] for i in range(3)) for t in range(4)])
+            p_ = np.exp(s_ - s_.max()); p_ /= p_.sum()
+            return int(p_.argmax()), float(p_.max())
+        dic_rows = []
+        for t in range(4):
+            m = lab == t; vals, cnts = np.unique(tok[m], axis=0, return_counts=True); o = np.argsort(-cnts)
+            other = [u for u in range(4) if u != t]
+            row = dict(lit_spot=t, spot_xy=HN[t].tolist(), messages_sampled=int(m.sum()),
+                       most_common_triple=vals[o[0]].tolist(), most_common_triple_share=float(cnts[o[0]] / m.sum()),
+                       distinct_triples=int(len(vals)),
+                       top5_triples=[dict(triple=vals[j].tolist(), share=float(cnts[j] / m.sum())) for j in o[:5]],
+                       slot_words=slotw[t].tolist(),
+                       slot_word_share=[float(np.mean(tok[m, i] == slotw[t, i])) for i in range(3)],
+                       # how often each slot says one of the OTHER spots' words (0 = never confused)
+                       slot_uses_other_spots_word=[float(np.mean(np.isin(tok[m, i], slotw[other, i]))) for i in range(3)],
+                       read_back_correct=float(np.mean([read(x)[0] == t for x in tok[m][:4000]])))
+            dic_rows.append(row)
+        meta = dict(checkpoint=a.warm_start, arm=a.arm, wire_blind=a.wire_blind, grid=G, worlds=W, steps=T,
+                    vocab_per_slot=V, note="sender = the informed agent (sees which spot is lit); listener = uninformed partner, "
+                    "hears the sender's 3-token message one step later. slot words = each slot's most common token for "
+                    "that spot. read_back_correct = how often a simple reader (per-slot frequencies) recovers the lit "
+                    "spot from a single message.")
+        json.dump(dict(meta=meta, dictionary=dic_rows), open(outd / "dictionary.json", "w"), indent=1)
+        with open(outd / "dictionary.csv", "w", newline="") as f:
+            wr = csv.writer(f)
+            wr.writerow(["lit_spot", "spot_x", "spot_y", "most_common_triple", "share_of_messages", "distinct_triples",
+                         "slot1_word", "slot1_share", "slot2_word", "slot2_share", "slot3_word", "slot3_share", "read_back_correct"])
+            for r_ in dic_rows:
+                wr.writerow([r_["lit_spot"], *r_["spot_xy"], "-".join(map(str, r_["most_common_triple"])),
+                             round(r_["most_common_triple_share"], 4), r_["distinct_triples"],
+                             *sum(([r_["slot_words"][i], round(r_["slot_word_share"][i], 4)] for i in range(3)), []),
+                             round(r_["read_back_correct"], 4)])
+        # one episode: a fresh rollout; the world with the most listener deliveries; every step of that world
+        _, Re = rollout(params, init_state(jax.random.PRNGKey(95_000)), jax.random.PRNGKey(95_001))
+        Re = jax.tree_util.tree_map(np.asarray, Re)
+        dl = Re["dep"][:, lis].sum(0); w = int(dl.argmax()); si, li = 2 * w, 2 * w + 1
+        NAMES = {0: "stay", 1: "move x-1", 2: "move x+1", 3: "move y+1", 4: "move y-1", ACTION_CRAFT: "craft"}
+        posf = lambda t_, i_: [int(round(v)) for v in (Re["obs"][t_, i_, :2] * G)]  # noqa: E731
+        def dist(p_, h_):
+            d_ = np.abs(np.asarray(p_) - h_); d_ = np.minimum(d_, G - d_); return int(max(d_.max() - 1, 0))
+        steps = []
+        for t_ in range(T):
+            lit = int(Re["active"][t_, w]); h = HN[lit]
+            sp, lp_ = posf(t_, si), posf(t_, li)
+            trip = Re["token_actions"][t_, si].tolist(); heard = Re["token_actions"][t_ - 1, si].tolist() if t_ > 0 else None
+            rd = read(trip); hr = read(heard) if heard is not None else (None, None)
+            la = int(Re["actions"][t_, li]); sa = int(Re["actions"][t_, si])
+            nxt = posf(t_ + 1, li) if t_ + 1 < T else None
+            steps.append(dict(step=t_, lit_spot=lit, lit_spot_xy=h.tolist(), sender_xy=sp, sender_saw=f"spot {lit} is lit",
+                              sender_sent=trip, sender_message_reads_as=rd[0], reader_confidence=round(rd[1], 3),
+                              sender_action=NAMES.get(sa, f"idle ({sa})"), listener_xy=lp_, listener_heard=heard,
+                              heard_reads_as=hr[0], listener_action=NAMES.get(la, f"idle ({la})"),
+                              listener_steps_to_lit_spot=dist(lp_, h),
+                              listener_delivered=bool(Re["dep"][t_, li]), sender_delivered=bool(Re["dep"][t_, si]),
+                              listener_next_xy=nxt))
+        json.dump(dict(meta=dict(meta, world=w, listener_deliveries_in_episode=int(dl[w]), key="95000/95001",
+                                 note=meta["note"] + " A delivery respawns the agent elsewhere and re-lights a different "
+                                 "spot; an unlit-for-too-long spot also re-rolls. 'idle (k)' = an action with no effect in this world. "
+                                 "listener_steps_to_lit_spot = moves needed to stand next to the lit spot (0 = can craft there)."), steps=steps),
+                  open(outd / "transcript.json", "w"), indent=1)
+        with open(outd / "transcript.csv", "w", newline="") as f:
+            wr = csv.writer(f); keys = list(steps[0].keys()); wr.writerow(keys)
+            for s_ in steps:
+                wr.writerow([("-".join(map(str, v)) if isinstance(v, list) else ("" if v is None else v)) for v in (s_[k] for k in keys)])
+        emit(dict(phase="export_m", outdir=str(outd), world=w, listener_deliveries=int(dl[w]),
+                  words=[r_["most_common_triple"] for r_ in dic_rows]))
+        raise SystemExit(0)
+
     if a.speak_test:           # exploratory, frozen params, its own keys (70_000+ / 80_000+)
         lis = np.asarray(is_listener)
         from comm_testbed import mi_miller_madow
