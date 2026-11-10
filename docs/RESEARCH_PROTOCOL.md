@@ -4326,7 +4326,7 @@ more expensive, because it produces publishable-looking nulls.
     - The old pick's 4 seeds are the same runs as its re-read, so it is reference only, not a candidate (Cam: "don't
       pick from that re-read alone"). The runner-up re-read is reported only.
 
-- **RESULT (Nov 10 ~01:00): 4a hearing probe: FAIL as specified. The pipeline bug is DATA COVERAGE: within a life,
+- **RESULT (Nov 10 ~00:20): 4a hearing probe: FAIL as specified. The pipeline bug is DATA COVERAGE: within a life,
   a learner hears ONE message** (`docs/data/hearing_probe/`; comm-toy `3541b79`; `learnability.py --hearing-probe`).
   - **Setup:**
     - train only the heard rows (Dense_0 rows 100:111) + the policy head of each learner, from its navigator;
