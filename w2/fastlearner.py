@@ -48,6 +48,21 @@ class Agent(nn.Module):
         return h, nn.Dense(6, name="pi")(y), nn.Dense(1, name="v")(y)[..., 0]
 
 
+class SideMem(nn.Module):
+    """Cam's fallback (Nov 10 ~03:55): the W2 navigator MLP is the policy trunk (its weights loaded; obs only), and a GRU
+    side memory over [heard (11), previous action (6), previous reward (1)] adds to the policy logits through a
+    ZERO-initialised head -- at init the agent IS the navigator; meta-training can only add message use."""
+    @nn.compact
+    def __call__(self, h, x):
+        obs, side = x[..., :100], x[..., 100:]
+        t = nn.tanh(nn.Dense(128, name="Dense_0")(obs)); t = nn.tanh(nn.Dense(128, name="Dense_1")(t))
+        lg_nav = nn.Dense(6, name="Dense_2")(t); v = nn.Dense(1, name="Dense_3")(t)[..., 0]
+        z = nn.tanh(nn.Dense(64, name="side_enc")(side))
+        h, y = nn.GRUCell(H, name="gru")(h, z)
+        lg = lg_nav + nn.Dense(6, name="side_head", kernel_init=nn.initializers.zeros, bias_init=nn.initializers.zeros)(y)
+        return h, lg, v
+
+
 def sector(off):
     ang = jnp.arctan2(off[..., 1].astype(jnp.float32), off[..., 0].astype(jnp.float32))
     return jnp.mod(jnp.round(ang / (2 * jnp.pi / 8)).astype(jnp.int32), 8)
@@ -79,11 +94,12 @@ def main():
     ap.add_argument("--navs", default="w2_out/nav/*.msgpack", help="W2 navigators to clone (Cam Nov 10 ~03:55)")
     ap.add_argument("--bc-pretrain", type=int, default=0, help="phase 1: N updates of behaviour cloning (no messages)")
     ap.add_argument("--continue-on-fail", action="store_true")
+    ap.add_argument("--arch", default="gru", choices=["gru", "sidemem"])
     ap.add_argument("--bc", type=float, default=0.0, help="phase 2: BC loss weight kept on during meta-training")
     a = ap.parse_args()
     os.makedirs(a.out, exist_ok=True)
     cfg = env.Cfg(L=96, N=NB + NL, P=6, patch_sigma=1.0, d0=0.008, reproduce=False, A_max=100_000)
-    W, T = a.worlds, a.T; net = Agent()
+    W, T = a.worlds, a.T; net = SideMem() if a.arch == "sidemem" else Agent()
     D = 100 + 11 + 6 + 1
     params = net.init(jax.random.PRNGKey(a.seed), jnp.zeros((1, H)), jnp.zeros((1, D)))
     FA, FB = code_families()
@@ -92,6 +108,12 @@ def main():
     NAVP = jax.tree_util.tree_map(lambda *x: jnp.stack(x), *[flax.serialization.from_bytes(nt, open(f, "rb").read())
                                                             for f in sorted(_g.glob(a.navs))])
     KN = jax.tree_util.tree_leaves(NAVP)[0].shape[0]
+    if a.arch == "sidemem":                         # load a navigator into the trunk
+        pp = {k: dict(v) for k, v in params["params"].items()}
+        nav0 = flax.serialization.from_bytes(nt, open(sorted(_g.glob(a.navs))[0], "rb").read())
+        for k in ("Dense_0", "Dense_1", "Dense_2", "Dense_3"):
+            pp[k] = dict(nav0["params"][k])
+        params = {"params": pp}
     opt = optax.chain(optax.clip_by_global_norm(1.0), optax.adam(a.lr)); ost = opt.init(params)
 
     def topic_values(s, key):
@@ -128,7 +150,7 @@ def main():
         ok = cheb[jnp.arange(NL), j] <= R_HEAR
         return jnp.concatenate([jax.nn.one_hot(tok[j], 8), jnp.ones((NL, 1)), dj / R_HEAR], 1) * ok[:, None]
 
-    def step(p, s, perm, h, pa, pr, key, shift, null, topic, no_msg=False):
+    def step(p, s, perm, h, pa, pr, key, shift, null, topic, no_msg=False, expert=None):
         k1, k2, k3 = jax.random.split(key, 3)
         hd = hear(s, perm, shift, k3, null, topic)
         if no_msg:
@@ -136,6 +158,8 @@ def main():
         x = jnp.concatenate([env.observe(cfg, s)[NB:], hd, jax.nn.one_hot(pa, 6), pr[:, None]], 1)
         h2, lg, v = net.apply(p, h, x)
         act = jax.random.categorical(k1, lg)
+        if expert is not None:                     # DAgger roll-in: the navigator drives, the clone learns on its states
+            nlg, _ = nav_net.apply(expert, x[:, :100]); act = jax.random.categorical(jax.random.fold_in(k1, 3), nlg)
         lp = jnp.take_along_axis(jax.nn.log_softmax(lg), act[:, None], 1)[:, 0]
         s2, r, info = env.step(cfg, s, jnp.concatenate([jnp.zeros(NB, jnp.int32), act]), k2)
         E = s2.energy.at[:NB].set(1.0)
@@ -144,14 +168,14 @@ def main():
         rr = r[NB:] * 20.0
         return s2, h2, act, rr, (x, act, lp, v, rr, info["take"][NB:])
 
-    def roll(p, s, perm, topic, h, pa, pr, key):
+    def roll(p, s, perm, topic, h, pa, pr, key, navp, use_expert):
         def body(c, k):
             s, h, pa, pr = c
-            s2, h2, act, rr, rec = step(p, s, perm, h, pa, pr, k, 0, a.null_code, topic)
+            s2, h2, act, rr, rec = step(p, s, perm, h, pa, pr, k, 0, a.null_code, topic, expert=navp if use_expert else None)
             return (s2, h2, act, rr), rec + (h,)
         (s, h, pa, pr), R = jax.lax.scan(body, (s, h, pa, pr), jax.random.split(key, T))
         return s, h, pa, pr, R
-    roll_w = jax.jit(jax.vmap(roll, in_axes=(None, 0, 0, 0, 0, 0, 0, 0)))
+    roll_w = jax.jit(jax.vmap(roll, in_axes=(None, 0, 0, 0, 0, 0, 0, 0, 0, None)), static_argnums=(9,))
 
     def loss(p, x, h0, act, lp0, adv, ret, navp, w_rl, w_bc):
         """recompute the GRU over the chunk from its stored start state (truncated BPTT over T); + BC (DAgger) toward the
@@ -167,6 +191,22 @@ def main():
         nl, _ = nav_net.apply(navp, x[..., :100])
         L = L + w_bc * (-(jax.nn.softmax(nl) * ls).sum(-1)).mean()
         return L
+
+    def _bc_parts(p, x, h0, navp):
+        def body(h, xt):
+            h2, lg, v = net.apply(p, h, xt)
+            return h2, lg
+        _, lg = jax.lax.scan(body, h0, x)
+        nl, _ = nav_net.apply(navp, x[..., :100])
+        return jax.nn.log_softmax(lg), nl
+
+    @jax.jit
+    def bc_ce(p, x, h0, navp):
+        return jax.vmap(lambda x_, h_, n_: (lambda ls, nl: (-(jax.nn.softmax(nl) * ls).sum(-1)).mean())(*_bc_parts(p, x_, h_, n_)))(x, h0, navp).mean()
+
+    @jax.jit
+    def bc_agree(p, x, h0, navp):
+        return jax.vmap(lambda x_, h_, n_: (lambda ls, nl: (ls.argmax(-1) == nl.argmax(-1)).mean())(*_bc_parts(p, x_, h_, n_)))(x, h0, navp).mean()
 
     @jax.jit
     def upd(p, ost, x, h0, act, lp0, adv, ret, navp, w_rl, w_bc):
@@ -248,7 +288,8 @@ def main():
             phase1 = it < a.bc_pretrain
             t0 = time.time()
             key, k = jax.random.split(key)
-            S, Hh, PA, PR, (x, act, lp, v, r, take, h0s) = roll_w(params, S, Pm, Tp, Hh, PA, PR, jax.random.split(k, W))
+            roll_in = phase1 and it < int(0.67 * a.bc_pretrain)                         # expert roll-in, then the clone drives
+            S, Hh, PA, PR, (x, act, lp, v, r, take, h0s) = roll_w(params, S, Pm, Tp, Hh, PA, PR, jax.random.split(k, W), nav_w, roll_in)
             v_, r_ = np.asarray(v), np.asarray(r)                                      # (W, T, NL)
             adv = np.zeros_like(r_); last = 0.0
             for t in reversed(range(T)):
@@ -269,6 +310,11 @@ def main():
                     open(f"{a.out}/params_bc.msgpack", "wb").write(flax.serialization.to_bytes(params)); print("STOP: intake gate failed"); return
                 open(f"{a.out}/params_bc.msgpack", "wb").write(flax.serialization.to_bytes(params))
             if it < a.bc_pretrain:
+                if (it + 1) % 50 == 0:
+                    ce = float(bc_ce(params, x, h0s[:, 0], nav_w)); agree = float(bc_agree(params, x, h0s[:, 0], nav_w))
+                    nl_, _ = nav_net.apply(jax.tree_util.tree_map(lambda q: q[0], nav_w), x[0, ..., :100]); pn = jax.nn.softmax(nl_)
+                    Hn = float((-(pn * jnp.log(pn + 1e-9)).sum(-1)).mean())
+                    print(f"bc {it + 1}: CE {ce:.3f} (navigator entropy {Hn:.3f} -> KL ~{ce - Hn:.3f}) argmax agreement {agree:.3f} | eaten/step {float(np.asarray(take).mean()):.5f}", flush=True)
                 continue
             if a.pilot_every and (it + 1 - a.bc_pretrain) % a.pilot_every == 0:
                 g = gate(FB, 16, "B", HELD_TOPIC, quick=True)
