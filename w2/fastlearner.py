@@ -85,6 +85,8 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--updates", type=int, default=300); ap.add_argument("--worlds", type=int, default=32)
     ap.add_argument("--world", default="proto", help='"proto" or "d0,P,relocate" (Cam Nov 10 4b)')
+    ap.add_argument("--beacon-spread", type=int, default=2, help="speakers at (+-k, +-k) around the cluster centre (Cam Nov 10 coverage)")
+    ap.add_argument("--beacon-walk", action="store_true", help="speakers random-walk at agent speed")
     ap.add_argument("--coverage", action="store_true", help="diagnostic: distinct heard tokens per life (adapt + test), per topic")
     ap.add_argument("--T", type=int, default=64); ap.add_argument("--life", type=int, default=640)
     ap.add_argument("--adapt", type=int, default=300); ap.add_argument("--lr", type=float, default=3e-4)
@@ -139,7 +141,8 @@ def main():
     def new_world(key, perm):
         s = env.reset(cfg, key)
         c = jax.random.randint(jax.random.fold_in(key, 1), (2,), 0, cfg.L)
-        bpos = (c[None] + jnp.array([[-2, -2], [-2, 2], [2, -2], [2, 2]])) % cfg.L
+        k_ = a.beacon_spread
+        bpos = (c[None] + jnp.array([[-k_, -k_], [-k_, k_], [k_, -k_], [k_, k_]])) % cfg.L
         lpos = (c[None] + jax.random.randint(jax.random.fold_in(key, 2), (NL, 2), -3, 4)) % cfg.L
         return s._replace(pos=jnp.concatenate([bpos, lpos], 0)), perm
 
@@ -165,7 +168,8 @@ def main():
         if expert is not None:                     # DAgger roll-in: the navigator drives, the clone learns on its states
             nlg, _ = nav_net.apply(expert, x[:, :100]); act = jax.random.categorical(jax.random.fold_in(k1, 3), nlg)
         lp = jnp.take_along_axis(jax.nn.log_softmax(lg), act[:, None], 1)[:, 0]
-        s2, r, info = env.step(cfg, s, jnp.concatenate([jnp.zeros(NB, jnp.int32), act]), k2)
+        act_b = jax.random.randint(jax.random.fold_in(key, 77), (NB,), 1, 5) if a.beacon_walk else jnp.zeros(NB, jnp.int32)
+        s2, r, info = env.step(cfg, s, jnp.concatenate([act_b, act]), k2)
         E = s2.energy.at[:NB].set(1.0)
         E = E.at[NB:].set(jnp.maximum(E[NB:], 0.02))                                   # lives have a fixed length (no death)
         s2 = s2._replace(energy=E, alive=s2.alive.at[:].set(True))
@@ -303,9 +307,13 @@ def main():
         for t in range(6):
             tok, okh = (np.asarray(x) for x in f(params, perms, keys, t))            # (n, steps, NL)
             d = [len(np.unique(tok[i, :, l][okh[i, :, l]])) for i in range(n) for l in range(NL)]
-            out[TOPICS[t]] = dict(distinct_tokens_median=float(np.median(d)), hist=np.bincount(d, minlength=9).tolist(),
-                                  heard_frac=float(okh.mean()))
-        print("COVERAGE", json.dumps(dict(world=a.world, steps=a.adapt + 300, per_topic=out))); return
+            g25 = [int((np.bincount(tok[i, :, l][okh[i, :, l]], minlength=8) >= 25).sum()) for i in range(n) for l in range(NL)]
+            out[TOPICS[t]] = dict(distinct_tokens_median=float(np.median(d)), tokens_ge25_median=float(np.median(g25)),
+                                  hist=np.bincount(d, minlength=9).tolist(), heard_frac=float(okh.mean()),
+                                  gate_i=bool(np.median(d) >= 4 and np.median(g25) >= 3))
+        res = dict(world=a.world, steps=a.adapt + 300, beacon_spread=a.beacon_spread, beacon_walk=a.beacon_walk, per_topic=out,
+                   gate_i_useful=all(out[TOPICS[t]]["gate_i"] for t in (0, 1, 2)))
+        print("COVERAGE", json.dumps(res)); os.makedirs(a.out, exist_ok=True); json.dump(res, open(f"{a.out}/coverage.json", "w"), indent=1); return
 
     if a.apparatus:
         p0 = params if a.eval_only is None else flax.serialization.from_bytes(params, open(a.eval_only, "rb").read())

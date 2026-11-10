@@ -73,6 +73,13 @@ def main():
     ap.add_argument("--diag", type=int, default=0, help="free diagnostic: on this many lives, does the predictive head use the message?")
     ap.add_argument("--seed", type=int, default=0); ap.add_argument("--out", default="w2_out/learnability.json")
     ap.add_argument("--world", default="proto", help='"proto" or "d0,P,relocate" (Cam Nov 10 4b)')
+    ap.add_argument("--beacon-spread", type=int, default=2, help="beacons at (+-k, +-k) around the cluster centre (Cam Nov 10 coverage: spread)")
+    ap.add_argument("--beacon-walk", action="store_true", help="beacons random-walk at agent speed (one random move per step)")
+    ap.add_argument("--young-seek", action="store_true", help="a young that hears nothing steps toward the nearest beacon (was: stays)")
+    ap.add_argument("--no-train", action="store_true", help="apparatus gate: no learning; per-life coverage + life test (+ blind on the same lives)")
+    ap.add_argument("--test", default="shift", choices=["shift", "heard25"], help="heard25: swap = a derangement among the sectors that life heard >= --min-heard times")
+    ap.add_argument("--min-heard", type=int, default=25); ap.add_argument("--test-window", type=int, default=300)
+    ap.add_argument("--test-start", default="fresh", choices=["fresh", "life"], help="life: each probe episode starts in the life's own world at its end (patch centres + beacon positions), the learner beside a random beacon")
     ap.add_argument("--hearing-probe", action="store_true", help="Cam Nov 10 ~05:15: supervised probe of the hearing pathway")
     ap.add_argument("--probe-steps", type=int, default=300); ap.add_argument("--probe-lrs", default="1,4,16")
     ap.add_argument("--probe-collect", type=int, default=32, help="teacher rollouts (x T steps) per data set")
@@ -101,13 +108,17 @@ def main():
 
     def beacons_reset(s, key):
         c = jax.random.randint(key, (2,), 0, cfg.L)
-        bpos = (c[None] + jnp.array([[-2, -2], [-2, 2], [2, -2], [2, 2]])) % cfg.L
+        k_ = a.beacon_spread
+        bpos = (c[None] + jnp.array([[-k_, -k_], [-k_, k_], [k_, -k_], [k_, k_]])) % cfg.L
         mpos = (c[None] + jax.random.randint(jax.random.fold_in(key, 1), (M, 2), -3, 4)) % cfg.L
         return s._replace(pos=jnp.concatenate([bpos, mpos], 0)), c
 
-    def hear(s, shift):
-        """(M, HD) for the non-beacon agents: nearest beacon within radius; its sector (+ shift) one-hot, flag, offset / R"""
+    def hear(s, shift, perm=None):
+        """(M, HD) for the non-beacon agents: nearest beacon within radius; its sector (+ shift, or mapped through perm)
+        one-hot, flag, offset / R"""
         sec = jnp.mod(sector(env.oracle_offset(cfg, s))[:NB] + shift, 8)
+        if perm is not None:
+            sec = perm[sec]
         lp, bp = s.pos[NB:], s.pos[:NB]
         d = (bp[None] - lp[:, None] + cfg.L // 2) % cfg.L - cfg.L // 2
         cheb = jnp.abs(d).max(-1); j = jnp.argmin(cheb, 1); dj = d[jnp.arange(M), j]
@@ -125,9 +136,9 @@ def main():
         hd = tw(jnp.round(jnp.cos(ang) * 3), jnp.round(jnp.sin(ang) * 3))
         return jnp.where(here >= 0.2, env.EAT, jnp.where(seen, vis, jnp.where(h[:, 8] > 0.5, hd, fallback)))
 
-    def step_all(P, s, key, shift, young):
+    def step_all(P, s, key, shift, young, perm=None):
         k1, k2 = jax.random.split(key)
-        h = hear(s, shift)
+        h = hear(s, shift, perm)
         o = jnp.concatenate([env.observe(cfg, s)[NB:], h], 1)                              # (M, D)
         lg, v, _ = jax.vmap(lambda p, x: net.apply(p, x[None]))(P, o[:NL]); lg, v = lg[:, 0], v[:, 0]
         act_l = jax.random.categorical(k1, lg)
@@ -135,10 +146,17 @@ def main():
         if a.sanity:
             act_l = sc[:NL]
         if a.juvenile:                                    # the young stay within hearing range of the beacons
-            act_l = jnp.where(young & (h[:NL, 8] < 0.5), 0, act_l)
+            if a.young_seek:                              # ... by stepping toward the nearest beacon (beacons may wander)
+                db = (s.pos[:NB][None] - s.pos[NB:NB + NL][:, None] + cfg.L // 2) % cfg.L - cfg.L // 2
+                dn_ = db[jnp.arange(NL), jnp.argmin(jnp.abs(db).max(-1), 1)]
+                seek = jnp.where(jnp.abs(dn_[:, 0]) >= jnp.abs(dn_[:, 1]), jnp.where(dn_[:, 0] < 0, 1, 2), jnp.where(dn_[:, 1] > 0, 3, 4))
+                act_l = jnp.where(young & (h[:NL, 8] < 0.5), seek, act_l)
+            else:
+                act_l = jnp.where(young & (h[:NL, 8] < 0.5), 0, act_l)
         lp = jnp.take_along_axis(jax.nn.log_softmax(lg), act_l[:, None], 1)[:, 0]
         act_m = jnp.concatenate([act_l, sc[NL:]])
-        s2, r, info = env.step(cfg, s, jnp.concatenate([jnp.zeros(NB, jnp.int32), act_m]), k2)
+        act_b = jax.random.randint(jax.random.fold_in(key, 77), (NB,), 1, 5) if a.beacon_walk else jnp.zeros(NB, jnp.int32)
+        s2, r, info = env.step(cfg, s, jnp.concatenate([act_b, act_m]), k2)
         E = s2.energy.at[:NB].set(1.0).at[NB + NL:].set(1.0)                              # beacons + elders immortal
         if a.juvenile:
             E = E.at[NB:NB + NL].set(jnp.where(young & s2.alive[NB:NB + NL], jnp.maximum(E[NB:NB + NL], cfg.E0), E[NB:NB + NL]))
@@ -207,21 +225,31 @@ def main():
             return optax.apply_updates(p, jax.tree_util.tree_map(lambda x: x * f_, u)), os_
         return jax.vmap(jax.vmap(one))(P, OS, f, o, m, eo, ea, em)
 
-    def eval_life(p, centres, key, shift_mode):
+    def eval_life(p, centres, key, shift_mode, perm=None, bpos=None):
         s = env.reset(cfg, key)
         s = s._replace(centres=centres, cap=env.capacity(cfg, centres), food=env.capacity(cfg, centres))
         s, _ = beacons_reset(s, jax.random.fold_in(key, 3))
+        if bpos is not None:                      # --test-start life: the life's beacons; the learner beside one of them
+            j = jax.random.randint(jax.random.fold_in(key, 11), (), 0, NB)
+            lp0 = (bpos[j] + jax.random.randint(jax.random.fold_in(key, 12), (2,), -3, 4)) % cfg.L
+            s = s._replace(pos=s.pos.at[:NB].set(bpos).at[NB].set(lp0))
         s = s._replace(alive=jnp.array([True] * NB + [True] + [False] * (M - 1)))
         sh = jax.random.randint(jax.random.fold_in(key, 9), (), 1, 8) * shift_mode
         P1 = jax.tree_util.tree_map(lambda x: jnp.broadcast_to(x, (NL,) + x.shape), p)
         def body(c, k):
             s, eaten = c
-            s2, rec = step_all(P1, s, k, sh, jnp.zeros(NL, bool))
+            s2, rec = step_all(P1, s, k, sh, jnp.zeros(NL, bool), perm)
             s2 = s2._replace(alive=s2.alive.at[NB + 1:].set(False))                      # only this learner (no elders)
             return (s2, eaten + rec[6][0]), None
-        (s, eaten), _ = jax.lax.scan(body, (s, 0.0), jax.random.split(jax.random.fold_in(key, 5), 300))
+        (s, eaten), _ = jax.lax.scan(body, (s, 0.0), jax.random.split(jax.random.fold_in(key, 5), a.test_window))
         return eaten
     ev = jax.jit(jax.vmap(jax.vmap(eval_life, in_axes=(None, None, 0, None)), in_axes=(0, 0, 0, None)))
+    def make_evp():   # the heard25 test: per-life, per-episode sector permutation (identity = true message); traced on first call
+        if a.test_start == "life":
+            return jax.jit(jax.vmap(jax.vmap(lambda p, c, k, q, b: eval_life(p, c, k, 0, q, b), in_axes=(None, None, 0, 0, None)),
+                                    in_axes=(0, 0, 0, 0, 0)))
+        f = jax.jit(jax.vmap(jax.vmap(lambda p, c, k, q: eval_life(p, c, k, 0, q), in_axes=(None, None, 0, 0)), in_axes=(0, 0, 0, 0)))
+        return lambda p, c, k, q, b=None: f(p, c, k, q)
 
     rng = np.random.default_rng(a.seed); key = jax.random.PRNGKey(a.seed)
     states = []
@@ -235,11 +263,14 @@ def main():
     mem_o, mem_m, mem_e = [], [], []            # replay memory: the last a.mem rollouts, (W, NL, T, D) each (+ elder data)
     since_birth = np.zeros((W, NL), int)        # rollouts since birth (replay uses own memory only)
     gsteps = np.zeros((W, NL), int)
+    cnt = np.zeros((W, NL, 8), np.int64)       # per-life heard-sector counts (coverage)
     lives = []
     for it in range(a.updates):
         key, k = jax.random.split(key)
         S, (o, act, lp, v, r, dn, take, eo, ea, ne, alive, yc) = roll_w(P, S, jax.random.split(k, W))
         o, act, lp, v, r, dn, alive = (np.asarray(x) for x in (o, act, lp, v, r, dn, alive))   # (W, T, NL, ...)
+        hm = (o[..., 108] > 0.5) & alive
+        cnt += np.einsum("wtl,wtlk->wlk", hm.astype(np.int64), (o[..., 100:108] > 0.5).astype(np.int64))
         adv = np.zeros_like(r); last = 0.0
         for t in reversed(range(T)):
             nv = v[:, t + 1] if t + 1 < T else v[:, t]; nt = 1.0 - dn[:, t]
@@ -258,11 +289,11 @@ def main():
             EO = jnp.zeros((W, NL, 1, Dd)); EA = jnp.zeros((W, NL, 1), jnp.int32); EM = jnp.zeros((W, NL, 1))
         agel = np.asarray(S.age)[:, NB:NB + NL]
         fy = jnp.asarray(1.0 + (a.young_lr - 1.0) * np.clip(1.0 - agel / max(a.juvenile, 1), 0.0, 1.0), jnp.float32)
-        for _ in range(a.epochs):
+        for _ in range(0 if a.no_train else a.epochs):
             P, OS = upd(P, OS, fy, tr(o), tr(act), tr(lp), tr(A.astype(np.float32)), tr(ret.astype(np.float32)), tr(m), EO, EA, EM)
         gsteps += a.epochs
         since_birth += 1
-        if a.replay and (a.pred or a.copy_replay):
+        if a.replay and (a.pred or a.copy_replay) and not a.no_train:
             mem_o.append(np.swapaxes(o, 1, 2)); mem_m.append(np.swapaxes(m, 1, 2)); mem_e.append((EO, EA, np.asarray(EM)))
             mem_o, mem_m, mem_e = mem_o[-a.mem:], mem_m[-a.mem:], mem_e[-a.mem:]
             for _ in range(a.replay):
@@ -275,7 +306,7 @@ def main():
         dead = ~np.asarray(S.alive)[:, NB:NB + NL]
         ages = np.asarray(S.age)[:, NB:NB + NL]
         for w, l in zip(*np.where(dead)):
-            lives.append(dict(lifespan=int(ages[w, l]), grad_steps=int(gsteps[w, l]),
+            lives.append(dict(lifespan=int(ages[w, l]), grad_steps=int(gsteps[w, l]), heard=cnt[w, l].copy(), bpos=np.asarray(S.pos)[w, :NB].copy(),
                               params=jax.tree_util.tree_map(lambda x: x[w, l], P), centres=np.asarray(S.centres[w])))
             nav_of[w, l] = rng.integers(0, K)
         if dead.any():
@@ -283,7 +314,7 @@ def main():
             P = jax.tree_util.tree_map(lambda x, y: jnp.where(dm.reshape(dm.shape + (1,) * (x.ndim - 2)), y, x), P, fresh)
             OS = jax.tree_util.tree_map(lambda x, y: jnp.where(dm.reshape(dm.shape + (1,) * (x.ndim - 2)), y, x), OS,
                                         jax.vmap(jax.vmap(opt.init))(fresh))
-            since_birth[dead] = 0; gsteps[dead] = 0
+            since_birth[dead] = 0; gsteps[dead] = 0; cnt[dead] = 0
             npos = (np.asarray(S.pos)[:, :NB].mean(1, keepdims=True).astype(int) + rng.integers(-3, 4, (W, NL, 2))) % cfg.L
             pos = np.asarray(S.pos).copy(); E = np.asarray(S.energy).copy(); age = np.asarray(S.age).copy(); al = np.asarray(S.alive).copy()
             sl = slice(NB, NB + NL)
@@ -326,13 +357,38 @@ def main():
     Pz = jax.tree_util.tree_map(lambda *x: jnp.stack(x), *[x["params"] for x in lives])
     C = jnp.asarray(np.stack([x["centres"] for x in lives]))
     keys = jax.vmap(lambda i: jax.random.split(jax.random.PRNGKey(7000 + i), a.eval_eps))(jnp.arange(len(lives)))
-    true = np.asarray(ev(Pz, C, keys, 0)); swap = np.asarray(ev(Pz, C, keys, 1))
+    scorable = np.ones(len(lives), bool)
+    if a.test == "heard25":
+        rq = np.random.default_rng(4242); E_ = a.eval_eps
+        ident = np.tile(np.arange(8), (len(lives), E_, 1)); der = ident.copy()
+        for i, x in enumerate(lives):
+            Sset = np.where(x["heard"] >= a.min_heard)[0]
+            if len(Sset) < 2:
+                scorable[i] = False; continue
+            for e in range(E_):
+                while True:
+                    q = rq.permutation(Sset)
+                    if np.all(q != Sset):
+                        break
+                der[i, e, Sset] = q
+        evp = make_evp(); BP = jnp.asarray(np.stack([x["bpos"] for x in lives]))
+        true = np.asarray(evp(Pz, C, keys, jnp.asarray(ident), BP)); swap = np.asarray(evp(Pz, C, keys, jnp.asarray(der), BP))
+    else:
+        true = np.asarray(ev(Pz, C, keys, 0)); swap = np.asarray(ev(Pz, C, keys, 1))
+    blind = None
+    if a.no_train and a.sanity:              # the blind comparison on the SAME lives / keys: the navigator policy
+        a.sanity = False
+        blind = np.asarray(make_evp()(Pz, C, keys, jnp.asarray(np.tile(np.arange(8), (len(lives), a.eval_eps, 1))),
+                                      jnp.asarray(np.stack([x["bpos"] for x in lives]))))
+        a.sanity = True
     res = []
     for i, x in enumerate(lives):
         t, s_ = true[i], swap[i]; d = t - s_; se = d.std(ddof=1) / np.sqrt(len(d))
         drop = 1 - s_.sum() / max(t.sum(), 1e-9)
         res.append(dict(lifespan=x["lifespan"], grad_steps=x["grad_steps"], eaten_true=float(t.mean()), eaten_swap=float(s_.mean()),
-                        drop=float(drop), passed=bool(drop >= 0.30 and d.mean() > 2 * se)))
+                        drop=float(drop), passed=bool(scorable[i] and drop >= 0.30 and d.mean() > 2 * se), scorable=bool(scorable[i]),
+                        distinct_heard=int((x["heard"] > 0).sum()), sectors_ge_min=int((x["heard"] >= a.min_heard).sum()),
+                        eaten_blind=float(blind[i].mean()) if blind is not None else None))
     frac = np.mean([r_["passed"] for r_ in res])
     summ = dict(variant=dict(juvenile=a.juvenile, long_life=a.long_life, pred=a.pred, replay=a.replay, copy=a.copy,
                              copy_replay=a.copy_replay, young_lr=a.young_lr,
@@ -343,8 +399,20 @@ def main():
                 eaten_true_mean=float(np.mean([r_["eaten_true"] for r_ in res])),
                 eaten_swap_mean=float(np.mean([r_["eaten_swap"] for r_ in res])), gate="PASS" if frac >= 0.5 else "FAIL",
                 diag=diag)
+    if a.no_train:
+        dh = np.array([r_["distinct_heard"] for r_ in res]); gm = np.array([r_["sectors_ge_min"] for r_ in res])
+        summ["apparatus"] = dict(
+            test_start=a.test_start, beacon_spread=a.beacon_spread, beacon_walk=a.beacon_walk, young_seek=a.young_seek, world=a.world, test=a.test,
+            test_window=a.test_window, eval_eps=a.eval_eps, policy="scripted listener" if a.sanity else "navigator (no training)",
+            coverage_median_distinct=float(np.median(dh)), coverage_median_sectors_ge_min=float(np.median(gm)),
+            coverage_hist_distinct=np.bincount(dh, minlength=9).tolist(),
+            gate_i=bool(np.median(dh) >= 4 and np.median(gm) >= 3), scorable_frac=float(scorable.mean()))
+        if blind is not None:
+            eb = float(np.mean([r_["eaten_blind"] for r_ in res])); summ["apparatus"]["eaten_blind_mean"] = eb
+            summ["apparatus"]["scripted_over_blind"] = float(summ["eaten_true_mean"] / max(eb, 1e-9))
+            summ["apparatus"]["gate_ii"] = bool(frac >= 0.9 and summ["eaten_true_mean"] >= 2 * eb)
     os.makedirs(os.path.dirname(a.out), exist_ok=True)
-    json.dump(dict(summary=summ, lives=res), open(a.out, "w"), indent=1)
+    json.dump(dict(summary=summ, lives=res), open(a.out, "w"), indent=1, default=lambda z: z.tolist() if hasattr(z, "tolist") else str(z))
     print(json.dumps(summ))
 
 
