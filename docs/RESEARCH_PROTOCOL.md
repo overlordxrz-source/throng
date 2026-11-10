@@ -4139,6 +4139,25 @@ more expensive, because it produces publishable-looking nulls.
   - Bookkeeping: a stalled download first produced a truncated local file; re-fetched with a size check. s334 had a
     restart segment; the last complete one is used.
 
+- **Cam, Nov 10 ~03:55: rulings.**
+  - **W2 retune: the in-between sweep APPROVED** (relocation ~0.001, d0 0.0015-0.002, 8-12 patches; laptop). Same
+    three gates and the same pick rule. If nothing passes, report.
+  - **(f) FAIL accepted** (moving: 7-10 distinct vs 5-6; the code is now worth a lot, NOSIG 0.15-0.25). **One last toy
+    try, REGISTERED:**
+    - vocab **8** codes per slot, everything else as rerun 2 (world fix, material rows, reinit-msg, tau 0.63,
+      COMM x5 + NOSIG x2, fresh seeds 340-344 / 345-346);
+    - run to **u2000**, gate read at u2000: >= 12 distinct messages in >= 4/5;
+    - if it passes, read compositionality with the registered analysis (`analyze_step6.py` at U = 2,000); cap $1.5;
+    - **if it fails, step 6 is parked in the toy**, and compositionality moves to W2 (kind x place facts from the
+      generative physics).
+  - **Fast learner: behaviour cloning APPROVED** (our own W2 navigators, no messages, no code taught):
+    1. clone the navigators' foraging into the GRU agent; **gate: median intake within 10% of the navigators' before
+       any meta-training**;
+    2. meta-train on random topics / codes with a small BC loss kept on; re-pilot under the same rising-reliance rule
+       before Modal;
+    3. if cloning can't reach the intake gate, switch to the navigator MLP trunk + GRU side memory.
+  - (e): analyse when it lands.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under

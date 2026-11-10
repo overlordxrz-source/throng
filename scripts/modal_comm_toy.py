@@ -139,6 +139,15 @@ PLANS: dict = {
                                           "--wire-init-scale", "0.06", "--craft-cost", "0.45", "--ps", "1.99", "--wire-blind", "1",
                                           "--comp", "--vq-vocab", "4", "--reinit-msg", "--tau", "0.63", "--spoil-wrong",
                                           "--material-rows", "--tag", "S6F_NOSIG"]) for s in (335, 336)]),
+    # (f) last toy try (Cam Nov 10 ~03:55): vocab 8, else as step6f; run to u2000, gate read at u2000
+    "step6v8": ([(f"step6v8_comp_s{s}", ["--arm", "COMM", "--seed", str(s), "--updates", "2000", "--warm-start", _W,
+                                         "--wire-init-scale", "0.06", "--craft-cost", "0.45", "--ps", "1.99", "--wire-blind", "1",
+                                         "--comp", "--vq-vocab", "8", "--reinit-msg", "--tau", "0.63", "--spoil-wrong",
+                                         "--material-rows", "--eval-at", "1000", "--tag", "S6V8_COMP"]) for s in range(340, 345)]
+                + [(f"step6v8_nosig_s{s}", ["--arm", "NOSIG", "--seed", str(s), "--updates", "2000", "--warm-start", _W,
+                                            "--wire-init-scale", "0.06", "--craft-cost", "0.45", "--ps", "1.99", "--wire-blind", "1",
+                                            "--comp", "--vq-vocab", "8", "--reinit-msg", "--tau", "0.63", "--spoil-wrong",
+                                            "--material-rows", "--tag", "S6V8_NOSIG"]) for s in (345, 346)]),
     # (d) separate brains: 8 G-12 navigators by ORACLE0's own recipe (founders 260-263, newborn pool 264-267), then the G0
     # word-bias gate: the C1 formation recipe to 1,500 from navigators 260 (seeds 280 / 281) and 261 (seeds 282 / 283)
     "nav": [(f"nav_s{s}", ["--arm", "ORACLE", "--seed", str(s), "--updates", "1500", "--craft-cost", "0.45",
