@@ -1,0 +1,17 @@
+EXPLORATORY ONLY (Cam Nov 10 ~05:15; no claim): registered analyze_step6.py at U=2000 on the 3 step6v8 COMM seeds with >= 12 distinct messages (s340, s342, s344). The seed-count gates (4/5, 3/5) do not apply to 3 seeds; read per seed.
+   s340 u1000: topsim rho 0.494 (null p95 0.153; 14 distinct messages / 14 meanings) | held-out success real 0.0650 (163/2509) vs shuffled 0.0634 | training-pair success 0.4940
+   s340 u2000: topsim rho 0.494 (null p95 0.165; 14 distinct messages / 14 meanings) | held-out success real 0.0210 (238/11337) vs shuffled 0.0202 | training-pair success 0.5681
+   s340 @2000: gate 1 ok | gate 2 x (binomial vs 1/16 p 1; vs shuffled p 0.33)
+   s342 u1000: topsim rho 0.528 (null p95 0.183; 13 distinct messages / 14 meanings) | held-out success real 0.0028 (5/1789) vs shuffled 0.0059 | training-pair success 0.1000
+   s342 u2000: topsim rho 0.528 (null p95 0.191; 13 distinct messages / 14 meanings) | held-out success real 0.0059 (119/20061) vs shuffled 0.0073 | training-pair success 0.4504
+   s342 @2000: gate 1 ok | gate 2 x (binomial vs 1/16 p 1; vs shuffled p 0.96)
+   s344 u1000: topsim rho 0.602 (null p95 0.174; 12 distinct messages / 14 meanings) | held-out success real 0.0991 (166/1675) vs shuffled 0.0853 | training-pair success 0.3811
+   s344 u2000: topsim rho 0.602 (null p95 0.179; 12 distinct messages / 14 meanings) | held-out success real 0.0532 (333/6265) vs shuffled 0.0539 | training-pair success 0.3467
+   s344 @2000: gate 1 ok | gate 2 x (binomial vs 1/16 p 1; vs shuffled p 0.57)
+
+== STEP 6: gate 1 (topsim) FAIL (3/3) | gate 2 (held-out) FAIL (0/3) -> FAIL
+
+NOTE: the summary line applies the 5-seed counts (>= 4, >= 3) to 3 seeds, so its "FAIL (3/3)" for gate 1 is an artefact.
+Per seed: topsim above the permutation null in 3/3 (rho 0.49 / 0.53 / 0.60 vs null p95 ~0.17-0.19); held-out
+generalisation in 0/3 (held-out success at or below chance 1/16 and indistinguishable from shuffled messages).
+rho is identical at u1000 and u2000 in every seed: the meaning-to-message map is frozen from u1000 on.
