@@ -3979,6 +3979,18 @@ more expensive, because it produces publishable-looking nulls.
     fix for Cam: a wrong-material Craft spoils the opportunity (the pair re-rolls). A fire-only listener would then
     succeed ~1/4 of the time per opportunity, a delivery gap of ~70%.
 
+- **W2 P1 / P2 on MEDIANS with juvenile provisioning (J = 500; Cam Nov 10 lever 1; `w2/p12_medians.py`;
+  `docs/data/w2_learnability/p12_medians.txt`).** Same learner and budget as before (400 updates, seed 0), provisioning
+  in training and test; nobody pays (no parents in this setting).
+  - Median lifespans of 3,000 steps (16 worlds x 64 agents): **random 559, learned blind 710, learned oracle 709**
+    (bootstrap SE 0 / 11 / 13).
+  - **P1 PASS** (blind > random by > 2 SE). **P2 FAIL on medians: oracle / blind = 1.00x** (needs >= 2x).
+  - **Reading:** with provisioning, most agents still die ~200 steps after it ends, informed or not. The oracle's
+    advantage (2.34x on means without provisioning) lives in the minority that reaches a patch.
+  - Cam's rule (P2 must hold on medians) is not met, so **the world needs retuning before the comm run**, at Cam's
+    call. Candidates: denser or larger patches, or a lower drain so a typical post-juvenile agent can find food, while
+    information still doubles the median life.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under

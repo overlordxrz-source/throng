@@ -1,0 +1,2 @@
+MEDIANS with juvenile 500: random 559 (SE 0) | learned blind 710 (SE 11) | learned oracle 709 (SE 13)
+P1 (blind > random by > 2 SE): PASS | P2 (oracle >= 2x blind): 1.00x -> FAIL
