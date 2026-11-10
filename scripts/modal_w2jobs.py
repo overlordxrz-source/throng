@@ -13,7 +13,7 @@ from pathlib import Path
 import modal
 
 _REQUIREMENTS = str(Path(__file__).resolve().parents[1] / "requirements.txt")
-PINNED_SHA = "62b6758d9095e31dca25472c1c08d67ab2037cd0"  # comm-toy: frozen test (b61afb2-identical) + --seek-age + --snap-ages + ckpt
+PINNED_SHA = "bd6f4afaecb98720bd8177d2cc3a6211bbd6a050"  # comm-toy: frozen test (b61afb2-identical, re-verified) + per-life snapshot pass/gsteps
 REPO_URL = "https://github.com/overlordxrz-source/throng.git"
 VOLUME_MOUNT = "/mnt/throng-runs"
 OUTD = f"{VOLUME_MOUNT}/testbed/w2jobs"
@@ -54,7 +54,13 @@ _ARM = ["w2/learnability.py", "--navs", _NAVS, *_WORLD, *_APP, "--seek-age", "50
         "--snap-ages", "250,500,1000"]
 _NOLEV = ["--juvenile", "0"]
 _ALLON = ["--juvenile", "500", "--pred", "1.0", "--replay", "8", "--copy", "1.0", "--copy-replay", "--young-lr", "4"]
+_DOSE = [*_ARM[:-2], "--juvenile", "500", "--pred", "1.0", "--copy", "1.0", "--copy-replay", "--young-lr", "4"]   # all-on base minus snap ages / replay
 PLANS = {
+    # Cam Nov 10 ~18:20: dose-response (R32 x5, R128 x3 after the price probe, J2000 x5); item cap $4, stopped at $5
+    "dose": [(f"dose_r32_s{s}", [*_DOSE, "--snap-ages", "250,500,1000", "--replay", "32", "--seed", str(s)]) for s in range(5)]
+            + [(f"dose_r128_s{s}", [*_DOSE, "--snap-ages", "250,500,1000", "--replay", "128", "--seed", str(s)]) for s in range(3)]
+            + [(f"dose_j2000_s{s}", [*_DOSE[:_DOSE.index("--juvenile")], "--juvenile", "2000", *_DOSE[_DOSE.index("--juvenile") + 2:],
+                                     "--snap-ages", "250,500,1000,2000", "--replay", "8", "--seed", str(s)]) for s in range(5)],
     # Cam Nov 10: the appetite-free (random-fallback) VoI on the full gate lives, REPORTED (same deterministic gate config)
     "app_voi_r": [("app_gate_voir", ["w2/learnability.py", "--navs", _NAVS, *_WORLD, *_APP, "--updates", "150",
                                      "--worlds", "16", "--no-train", "--sanity"])],

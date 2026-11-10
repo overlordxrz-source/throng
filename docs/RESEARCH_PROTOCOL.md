@@ -4886,6 +4886,26 @@ more expensive, because it produces publishable-looking nulls.
      The Modal guard (waiting on M's secret) fixes the guard dying with the session.
   7. (e) closed, FAIL as registered (7 seeds); check 4b decides how the verdict reads.
 
+- **REGISTERED (before data): dose-response batch `dose`** (Modal `throng-w2jobs` at comm-toy `bd6f4af`; test path
+  re-verified identical to the frozen `b61afb2`, 8/8 lives; --ckpt on).
+  - **Price probe (laptop, training only; the eval cost is known from the all-on arms):**
+    - training per update in steady state: R128 ~28 s (~70 min of training), R32 ~7 s by linear scaling (the probe
+      window was too short to read), J2000 3.4 s (~9 min);
+    - est. per run: R32 ~$0.22, R128 ~$0.42, J2000 ~$0.16;
+    - 5 + 5 + 5 seeds = ~$4.0, at the $4 cap. **Per the rule, R128 is cut to 3 seeds: total est. ~$3.2.**
+  - **Arms:**
+    - all-on base (juvenile 500, pred 1.0, copy 1.0, copy-in-replay, young-lr x4) plus: **R32** (replay 32) x5,
+      **R128** (replay 128) x3, **J2000** (juvenile 2000, replay 8) x5;
+    - snapshots 250 / 500 / 1,000 (+ 2,000 for J2000); per-life snapshot pass and gradient steps are now stored, so
+      age trends can be tested PAIRED;
+    - everything else as the all-on arm (frozen heard25 test, >= 5 sectors, 48 x 600, seek-age 500, spread 6 + walk).
+  - **Flag:** in this code `--juvenile` also sets the period over which young-lr x4 decays. J2000 therefore lengthens
+    both provisioning AND heightened plasticity (as specified: juvenile 500 -> 2000).
+  - **Decision rule: as Cam registered (above).** "Rising with dose" = age-1,000 pass R128 > R32 > 10.4% (two-proportion
+    z > 2 per step).
+  - **Item watch:** `~/throng-smoke/item_watch.sh`, APP throng-w2jobs, CAP 4.0. It **stops the app at $5.00** (cap +
+    25%), counting all metered spend since its start (only this item runs).
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
