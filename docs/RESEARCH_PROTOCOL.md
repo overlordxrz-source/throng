@@ -4044,6 +4044,30 @@ more expensive, because it produces publishable-looking nulls.
     Then `analyze_step6.py`. Cap $1 (estimate ~$0.9).
   - Checks: default path bit-identical (15/15 rows); the new flags run end to end (laptop smoke).
 
+- **Learnability round 2 (Cam Nov 10 ~02:25): ALL FAIL; the diagnostic says go straight to the fast learner**
+  (`docs/data/w2_learnability/g2_*_summary.json`; 16-episode test, 16 worlds x 150 updates).
+  - **Diagnostic (predictive + replay arm, 64 lives x 4 true-message test episodes):** the head's food-in-view-4-ahead
+    error on the same observations with the heard sector intact vs shifted by 4: MSE 0.0980 vs 0.0979, **swap increase
+    -0.06%, paired z -0.04.** The predictive head does not use the message at all. Per Cam's rule: within-life data is
+    too thin; go straight to the fast learner.
+  - Arms on the copy-arm base (juvenile + predictive + replay + copy):
+
+    | arm | lives | pass | median drop |
+    |---|---|---|---|
+    | + copying inside replay | 664 | 0.75% | 0.0 |
+    | + young plasticity (x4 decaying over J) | 708 | 1.7% | 0.0 |
+    | + both | 710 | 1.1% | 0.0 |
+
+    All at ~306 gradient steps per life.
+  - **Next: build the fast learner** (approved; laptop first, cap $3): RL^2-style recurrent prior meta-trained on a
+    random code each life, with the leak test and the gates in `docs/W2_FAST_LEARNER_DESIGN.md`.
+- **W2 world retune harness built** (`w2/retune.py`). Env adds parent-paid juvenile provisioning (`juvenile`) and
+  relocating food (`relocate`), with 2 new tests (11/11).
+  - The smoke caught two gate-logic bugs, both fixed: P2m passed on 0 >= 2 x 0 (now it needs a positive oracle
+    median); and unprovisioned founders dominated the medians (the gates now use lives born during the evaluation,
+    with all-lives medians reported).
+  - The sweep is running.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under

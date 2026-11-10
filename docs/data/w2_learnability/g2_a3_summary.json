@@ -1,0 +1,26 @@
+{
+ "variant": {
+  "juvenile": 500,
+  "long_life": false,
+  "pred": 1.0,
+  "replay": 8,
+  "copy": 1.0,
+  "copy_replay": false,
+  "young_lr": 4.0,
+  "n_elders": 2,
+  "sanity": false,
+  "random_code": false,
+  "updates": 150,
+  "T": 64,
+  "epochs": 2
+ },
+ "lives": 708,
+ "pass_frac": 0.01694915254237288,
+ "median_drop": 0.0,
+ "median_lifespan": 566.0,
+ "median_grad_steps_per_life": 306.0,
+ "eaten_true_mean": 2.3725188062104974,
+ "eaten_swap_mean": 2.3727565708263594,
+ "gate": "FAIL",
+ "diag": null
+}
