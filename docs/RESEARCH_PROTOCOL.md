@@ -4749,8 +4749,10 @@ more expensive, because it produces publishable-looking nulls.
        only; report.
      - **NO-LEVER PASS:** report immediately.
   8. Spend fine (~$20.65; batch ~$0.5 of $8).
-  - **Note on "paired > 2 SE" for the age trend:** the snapshots are per life. The paired comparison is over the
-    eligible lives that have both snapshots (pass indicator, age k vs the next age), pooled over an arm's seeds.
+  - **Deviation (flagged): the age trend cannot be tested paired.** The running arms (`62b6758`) store each age's pass
+    fraction over the eligible lives that reached it, not each life's pass at each age. So the trend is tested with a
+    two-proportion z-test between consecutive ages (pooled over an arm's seeds), the later set being a subset of the
+    earlier. Rising = 1000 > 500 > 250 with each step z > 2. Per-life snapshot outcomes are to be stored in later runs.
 
 ## Part 3 — Fossils
 
