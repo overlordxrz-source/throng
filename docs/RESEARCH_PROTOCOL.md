@@ -4845,6 +4845,47 @@ more expensive, because it produces publishable-looking nulls.
     - per-item caps need their own watch, not only the global guard.
   - New-work batch (cap $8): throng-w2jobs $2.75 + pop-ck $0.08 = ~$2.83.
 
+- **Cam, Nov 10 (rulings on the ~18:20 report).**
+  1. **Which 30%: the registered bar is 50% of eligible lives passing, a passing life having reliance >= 30%.**
+     Crossings, labelled:
+     - **ARM BAR (50% of lives pass): ~3,700-5,800 steps (4-7x a life); linear 3-point ~4,850.** The log-age fit makes
+       it far worse.
+     - (Secondary) 30% of lives pass: ~2,400-3,400 steps; linear ~2,900.
+  2. **Read accepted.** Matched age (0/380 vs 69/661) shows the lever package beats plain RL. No-lever gets ~12
+     gradient steps per life vs all-on ~480 (40x), so the lead hypothesis is **in-life learning compute**. "Longer
+     childhood without levers" is off the table.
+  3. **Next batch: dose-response** (compute per life vs experience per life).
+     - Frozen test b61afb2, same eligibility, young-seek as before, all-on base, 5 seeds each:
+       - **R32:** replay 8 -> 32;
+       - **R128:** replay 8 -> 128;
+       - **J2000:** juvenile 500 -> 2000 (replay 8).
+     - 2-min price probe first. **Item cap $4** (batch total $8, ~$2.83 used); if the probe says > $4, cut R128 to 3
+       seeds.
+     - Report per arm: pass at ages 250 / 500 / 1,000 (+ 2,000 for J2000) and at death; ever-pass vs at-death; pass vs
+       cumulative gradient steps; median lifespan; eligibility.
+     - **Registered decision:**
+       - any arm >= 50% at death (>= 50 eligible) -> report; that setting goes into the W2 registration, ablations
+         after;
+       - R arms rise with dose (age-1000 pass R128 > R32 > 10.4%, z > 2) but none passes -> compute-limited; Cam picks
+         the next dose or the fast learner;
+       - R flat, J2000 rises -> experience-limited; longer childhood becomes a W2 life-history question;
+       - all flat -> the learner is the limit, not the dose; the fast learner becomes the priority.
+  4. **Free checks first** (laptop; existing snapshots and dumps):
+     - (a) prove each lever ran in all-on (its own loss or signal is nonzero and changes over a life), and say who
+       copy-actions copies;
+     - (b) prove copying ran in (e): the copy-signal loss over a gen-2 newborn's life, and newborn-vs-elder token
+       agreement on the same inputs vs chance. If it was a no-op, fix it before copying goes into W2; (e)'s verdict then
+       reads "uninformative" rather than "transmission failed";
+     - (c) the predictive-head swap check on the all-on snapshots.
+  5. **Fast learner:** free laptop recalibration now with the learnability test design:
+     - last-heard scoring, eligibility, stratified probes;
+     - positive control >= 90%, negative control <= 10%, both VoI forms >= 1.5x;
+     - the new held-out topic picked and registered before any learner runs;
+     - no Modal.
+  6. **(e) overrun accepted.** Addition: **the per-item watch must STOP the item at cap + 25%**, not just report it.
+     The Modal guard (waiting on M's secret) fixes the guard dying with the session.
+  7. (e) closed, FAIL as registered (7 seeds); check 4b decides how the verdict reads.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
