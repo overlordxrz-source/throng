@@ -4716,6 +4716,42 @@ more expensive, because it produces publishable-looking nulls.
     no-lever arm by > 15 points. Steps to first reliance vs median lifespan.
   - Ablate only if all-on passes.
 
+- **Cam, Nov 10 (rulings on the ~06:45 / ~06:46 reports).**
+  1. **(e) population: VERDICT FAIL as registered.**
+     - Primary 0/3 POP seeds, so at most 2/5 < 3/5. Secondary FAIL (MI at u7500: POP 0.010 vs control 0.006). Fire 5:
+       0/3.
+     - **s324 CANCELLED** (07:03). s322 and s326 finish and go into the record.
+     - **Recorded: "Separate-brains toy population: the founders' code dies through turnover in both arms; cultural
+       transmission not shown. Consistent with W2: one-life learnability is the bottleneck." The toy population is
+       CLOSED.** Transmission moves to W2 once learnability passes.
+     - Free diagnostic from the existing dumps (laptop): per generation, speaker MI and listener reliance by age. Did
+       any newborn (gen 2+) ever acquire the founders' code? Did the founders' listeners rely at u1500?
+     - Dictionaries per generation go to `docs/data/for_m`.
+  2. **Gate (ii) PASS accepted.** The bar was on the point estimate (91.9%). **CI caveat: the 95% CI lower bound is
+     87.2%, below 90%.**
+  3. **VoI:** the registered bar stands for this gate (no moving it after the fact). The random-fallback VoI on the
+     full gate lives is a REPORTED number (`app_gate_voir`, launched 07:03). **From now on every harness's VoI bar needs
+     BOTH forms >= 1.5x** (navigator fallback and random fallback).
+  4. **Copy signals** applies in the W2 comm run (newborns speak), not here.
+  5. **Young-seek in both arms** (seek-age 500, geometry trigger, off in the test): accepted.
+  6. **Fast learner 4c: PARKED, no spend.**
+     - If learnability all-on passes, it stays parked.
+     - If all-on fails, recalibrate it with the learnability test design (last-heard, eligibility, stratified). The
+       held-out topic may be replaced first: richest-patch cannot reach coverage.
+  7. **Learnability arms decision tree (registered now).** Bar per arm as registered; also reliance at ages 250 / 500 /
+     1,000 and the age at first reliance vs median lifespan.
+     - **ALL-ON PASS:** leave-one-out ablations, 6 arms x 3 seeds (~$3.6, inside the $8 cap). Then report; Cam writes
+       the W2 comm-run registration.
+     - **ALL-ON FAIL with reliance rising with age** (1000 > 500 > 250, paired > 2 SE): learning is real but too slow.
+       Report the slope and the extrapolated age at 30%. Launch nothing; Cam chooses between a longer childhood and
+       stronger levers.
+     - **ALL-ON FAIL, flat:** rerun the swap-on-predictions check (does the predictive head use the message?), laptop
+       only; report.
+     - **NO-LEVER PASS:** report immediately.
+  8. Spend fine (~$20.65; batch ~$0.5 of $8).
+  - **Note on "paired > 2 SE" for the age trend:** the snapshots are per life. The paired comparison is over the
+    eligible lives that have both snapshots (pass indicator, age k vs the next age), pooled over an arm's seeds.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under

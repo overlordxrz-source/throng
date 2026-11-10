@@ -55,6 +55,9 @@ _ARM = ["w2/learnability.py", "--navs", _NAVS, *_WORLD, *_APP, "--seek-age", "50
 _NOLEV = ["--juvenile", "0"]
 _ALLON = ["--juvenile", "500", "--pred", "1.0", "--replay", "8", "--copy", "1.0", "--copy-replay", "--young-lr", "4"]
 PLANS = {
+    # Cam Nov 10: the appetite-free (random-fallback) VoI on the full gate lives, REPORTED (same deterministic gate config)
+    "app_voi_r": [("app_gate_voir", ["w2/learnability.py", "--navs", _NAVS, *_WORLD, *_APP, "--updates", "150",
+                                     "--worlds", "16", "--no-train", "--sanity"])],
     # Cam Nov 10 (6): learnability 2 arms x 5 seeds after the frozen test; bars as registered
     "learn_arms": [(f"learn_nolev_s{s}", [*_ARM, *_NOLEV, "--seed", str(s)]) for s in range(5)]
                   + [(f"learn_allon_s{s}", [*_ARM, *_ALLON, "--seed", str(s)]) for s in range(5)],
