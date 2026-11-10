@@ -4686,6 +4686,36 @@ more expensive, because it produces publishable-looking nulls.
       is genuinely worth something there.
     - Learnability now reports both (`voi_random_fallback`). The registered VoI bar used the navigator-fallback form.
 
+- **RESULT (Nov 10 ~06:45): APPARATUS GATE (ii) PASSES** (`docs/data/apparatus/app_gate_scripted_b61afb2.json`; Modal).
+  - 264 scripted-listener lives (median lifespan 2,144); **197 eligible (74.6%)**.
+  - **Scripted control 91.9%** (Wilson 95% CI 87.2-94.9%; bar >= 90% on the point estimate). Stratified: 5 sectors
+    80% (n 55), 6 88% (n 42), 7-8 100% (n 100).
+  - **Non-listener (negative control) 0.0%** (CI 0-1.9%; bar <= 10%).
+  - **VoI: true 23.7 vs silence 6.9 food per probe = 3.42x, paired z 50** (bar >= 1.5x, > 2 SE). This is the
+    navigator-fallback form; the appetite-free form was not in this run.
+  - Secondary (no bar): probes whose swap moved the well-heard sectors >= 90 degrees on average: 92.4% (197 lives).
+  - Coverage (i) re-confirmed: median 8 distinct / 6 sectors >= 25x.
+  - Note: the control's CI lower bound (87%) is below 90%. The bar was on the point estimate.
+- **TEST FROZEN at comm-toy `b61afb2`** (Cam ruling 6). The learner arms run at `62b6758`.
+  - Its diff from `b61afb2` adds training-side flags only (--seek-age, --snap-ages, --ckpt), the appetite-free VoI
+    and report fields.
+  - **Verified: the same gate config at both commits gives identical per-life results (true / swap / pass / blind)
+    and an identical heard25 report** (8 lives, tiny config).
+- **REGISTERED (before data): learnability 2 arms x 5 seeds** (Modal `throng-w2jobs`, plan `learn_arms`, `62b6758`,
+  --ckpt on; est. ~$2).
+  - **Common to both arms:**
+    - picked world; nav_w13 navigators; 16 worlds x 4 learners x 150 updates;
+    - spread 6 + walk; young-seek as scaffolding at `--seek-age 500` in BOTH arms (geometry trigger; off in the test);
+    - the frozen heard25 test: last-heard, >= 5 sectors >= 25x, 48 probes x 600 steps;
+    - age snapshots at 250 / 500 / 1,000 for steps to first reliance.
+  - **No levers:** `--juvenile 0`, pred 0, replay 0, copy 0, young-lr 1.
+  - **All levers:** `--juvenile 500 --pred 1.0 --replay 8 --copy 1.0 --copy-replay --young-lr 4`.
+    - **"Copy signals" has no counterpart in this listener-only harness** (learners do not speak); flagged.
+  - **Bar (registered):** cross-direction reliance >= 30% (paired > 2 SE) in >= 50% of ELIGIBLE lives, per arm,
+    >= 50 eligible lives. Eligibility rate reported per arm; stratified 5 / 6 / 7-8 if eligibility differs from the
+    no-lever arm by > 15 points. Steps to first reliance vs median lifespan.
+  - Ablate only if all-on passes.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under

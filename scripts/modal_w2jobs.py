@@ -13,7 +13,7 @@ from pathlib import Path
 import modal
 
 _REQUIREMENTS = str(Path(__file__).resolve().parents[1] / "requirements.txt")
-PINNED_SHA = "b61afb21b7fbcbdb4996e4109a4bb599757a4120"  # comm-toy: apparatus + heard25 rulings + ckpt + nav_w13
+PINNED_SHA = "62b6758d9095e31dca25472c1c08d67ab2037cd0"  # comm-toy: frozen test (b61afb2-identical) + --seek-age + --snap-ages + ckpt
 REPO_URL = "https://github.com/overlordxrz-source/throng.git"
 VOLUME_MOUNT = "/mnt/throng-runs"
 OUTD = f"{VOLUME_MOUNT}/testbed/w2jobs"
@@ -26,7 +26,7 @@ image = (modal.Image.debian_slim(python_version="3.11").apt_install("git")
          .pip_install_from_requirements(_REQUIREMENTS))
 
 
-@app.function(image=image, cpu=4.0, memory=6144, timeout=2 * 60 * 60, retries=0, volumes={VOLUME_MOUNT: volume})
+@app.function(image=image, cpu=4.0, memory=6144, timeout=4 * 60 * 60, retries=0, volumes={VOLUME_MOUNT: volume})
 def run_w2(tag: str, args: list) -> str:
     import os
     import subprocess
@@ -50,7 +50,14 @@ _NAVS = "w2_out/nav_w13/*.msgpack"
 _WORLD = ["--world", "0.0013,8,0.001"]
 _APP = ["--beacon-walk", "--young-seek", "--beacon-spread", "6", "--test", "heard25", "--score", "last-heard", "--min-sectors", "5",
         "--eval-eps", "48", "--test-window", "600"]
+_ARM = ["w2/learnability.py", "--navs", _NAVS, *_WORLD, *_APP, "--seek-age", "500", "--updates", "150", "--worlds", "16",
+        "--snap-ages", "250,500,1000"]
+_NOLEV = ["--juvenile", "0"]
+_ALLON = ["--juvenile", "500", "--pred", "1.0", "--replay", "8", "--copy", "1.0", "--copy-replay", "--young-lr", "4"]
 PLANS = {
+    # Cam Nov 10 (6): learnability 2 arms x 5 seeds after the frozen test; bars as registered
+    "learn_arms": [(f"learn_nolev_s{s}", [*_ARM, *_NOLEV, "--seed", str(s)]) for s in range(5)]
+                  + [(f"learn_allon_s{s}", [*_ARM, *_ALLON, "--seed", str(s)]) for s in range(5)],
     # apparatus gate (ii) (Cam Nov 10): scripted control >= 90% on eligible lives, non-listener <= 10%, VoI >= 1.5x
     "app_gate": [("app_gate_scripted", ["w2/learnability.py", "--navs", _NAVS, *_WORLD, *_APP, "--updates", "150",
                                         "--worlds", "16", "--no-train", "--sanity"])],
