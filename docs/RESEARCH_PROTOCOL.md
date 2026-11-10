@@ -4906,6 +4906,40 @@ more expensive, because it produces publishable-looking nulls.
   - **Item watch:** `~/throng-smoke/item_watch.sh`, APP throng-w2jobs, CAP 4.0. It **stops the app at $5.00** (cap +
     25%), counting all metered spend since its start (only this item runs).
 
+- **RESULT (Nov 10 ~18:50): FREE CHECKS 4a-4c** (laptop; comm-toy `c92d447`; `docs/data/check_4b/`).
+  - **(a) Every lever ran in the all-on arm.** `--log-levers`, 30 updates, all-on config, picked world; each lever's own
+    signal on the same rollout, measured before the update, after the PPO epochs, and after the replay passes:
+    - **Predictive aux:** loss 0.89 at mean age ~64, falling to 0.06-0.14 later in life.
+    - **Copy actions:** CE 5.8 at the start of life, falling to ~1.3-1.9. 64 learners copying at mean age 64, falling
+      to 3-8 by age ~1,200 (copying stops at age 1,000).
+      - **Who it copies: 2 immortal scripted elders.** They forage by the heard code (eat on food, head for visible
+        food, else walk the heard sector) and are copied when within hearing range of a young learner.
+    - **Replay:** 32 extra passes per update once memory is full. Isolated effect per update: **the replay passes cut the
+      predictive loss by 0.063** (the PPO epochs by 0.038).
+    - **Copy-in-replay:** **cuts the copy CE by 0.98 per update** (the PPO epochs by 0.16).
+    - **Young-lr:** factor ~3.6 near birth, decaying to 1 over the juvenile period.
+  - **(b) Copying in (e) RAN but was INEFFECTIVE (not a strict no-op).** `pop_toy --log-imit` (tiny config, 600
+    updates, one newborn copying founders) and `--copy-diag` (the saved u7500 brains of s320 / s321 / s323):
+    - **The copy loss is nonzero and falls (44.7 -> 21.1 nats over 600 updates) but stays ABOVE uniform** (~7 nats
+      per slot vs log 64 = 4.2).
+    - Newborn-vs-elder argmax token agreement on the copied inputs stays at chance: 0.9-2.0% vs 0.7-1.5% for shuffled
+      targets, at most a hint (2.0 vs 0.9%) by ages 450-600.
+    - On the real u7500 brains, per-slot agreement of every brain with every other on the elder's own sender inputs
+      is **0.5-4.6%, at chance** (fresh-navigator chance 1.6-2.7%; 1/64 = 1.6%). This includes the brain copying at
+      age 500 and the one that has just finished at age 1,000.
+    - **Likely cause: `TAU = 0.08`.** Token logits are VQ distances / 0.08, so every brain's token policy is nearly
+      one-hot. A newborn starts confidently wrong, and cross-entropy on the message head moves it only slowly.
+    - **Reading for (e):** newborns never came to emit their elders' tokens, so (e) did not test cultural transmission
+      with a working copy mechanism. **Proposed verdict wording: "transmission uninformative: the copy pathway was
+      ineffective (TAU 0.08)"**, not "transmission failed". (e) stays closed.
+    - **Before copying goes into W2:** a copy-pathway unit check (a newborn must reach above-chance agreement with a
+      fixed elder within its sensitive period), e.g. a softer temperature for the copy loss, or copying in z_e space.
+  - **(c) The predictive head still ignores the message, with coverage fixed.** 64 trained all-on lives (s0
+    checkpoint at u124) x 4 true-message episodes: food-in-view-4-ahead MSE 0.0862 true vs 0.0857 with the heard
+    sector rotated by 4. **Swap increase -0.5%, paired z -0.9.**
+    - Reading (not tested): the target (food within the 7x7 view four steps ahead) may be barely informed by a
+      direction to a patch beyond view.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
