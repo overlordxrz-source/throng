@@ -68,7 +68,8 @@ def sector(off):
     return jnp.mod(jnp.round(ang / (2 * jnp.pi / 8)).astype(jnp.int32), 8)
 
 
-TOPICS = ["nearest_food_dir", "richest_patch_dir", "food_distance_band", "nearest_agent_dir", "speaker_energy_band", "noise"]
+TOPICS = ["nearest_food_dir", "richest_patch_dir", "food_distance_band", "nearest_agent_dir", "speaker_energy_band", "noise",
+          "second_nearest_patch_dir"]       # 6: Nov 10 candidate held-out topic (richest-patch cannot reach coverage)
 USEFUL, USELESS = (0, 1, 2), (3, 4, 5)
 HELD_TOPIC = 1                                   # held out of meta-training (Cam Nov 10 ~03:15)
 TRAIN_TOPICS = (0, 2, 3, 4, 5)
@@ -94,6 +95,10 @@ def main():
     ap.add_argument("--score", default="window", choices=["window", "last-heard"], help="last-heard (Cam Nov 10 metric): only food eaten while the last TRUE token heard is one the life heard >= --min-heard x in adaptation counts")
     ap.add_argument("--voi-fallback", default="policy", choices=["policy", "random"], help="scripted listener's move when it hears nothing and sees no food: the agent's own policy (navigator) or a random move")
     ap.add_argument("--scripted-voi", action="store_true", help="4c VoI: a scripted listener that decodes the life's code and follows the direction, true vs silence (direction topics)")
+    ap.add_argument("--calib", default="", help="Nov 10: recalibrate the FL life test with the learnability design on these topic ids (e.g. 0,6); exit")
+    ap.add_argument("--probes", type=int, default=16)
+    ap.add_argument("--probe-window", type=int, default=300)
+    ap.add_argument("--probe-fresh", action="store_true", help="each probe is a FRESH world with the same code (listeners start near the speakers, as in the learnability test), carrying the life's adapted hidden state")
     ap.add_argument("--coverage", action="store_true", help="diagnostic: distinct heard tokens per life (adapt + test), per topic")
     ap.add_argument("--T", type=int, default=64); ap.add_argument("--life", type=int, default=640)
     ap.add_argument("--adapt", type=int, default=300); ap.add_argument("--lr", type=float, default=3e-4)
@@ -143,7 +148,9 @@ def main():
         v3 = sector(dl[jnp.arange(NB), jnp.argmin(jnp.abs(dl).sum(-1), 1)])
         v4 = jnp.clip((s.energy[:NB] * 8).astype(jnp.int32), 0, 7)
         v5 = jax.random.randint(key, (NB,), 0, 8)
-        return jnp.stack([v0, v1, v2, v3, v4, v5])
+        sec2 = jnp.argsort(dist, 1)[:, 1]                                                # second-nearest patch
+        v6 = sector(d[jnp.arange(NB), sec2])
+        return jnp.stack([v0, v1, v2, v3, v4, v5, v6])
 
     def new_world(key, perm):
         s = env.reset(cfg, key)
@@ -176,16 +183,20 @@ def main():
         hdg = tw(jnp.round(jnp.cos(ang) * 3), jnp.round(jnp.sin(ang) * 3))
         return jnp.where(here >= 0.2, env.EAT, jnp.where(seen, vis, jnp.where(hd[:, 8] > 0.5, hdg, fallback)))
 
-    def step(p, s, perm, h, pa, pr, key, shift, null, topic, no_msg=False, expert=None, scripted=False):
+    def step(p, s, perm, h, pa, pr, key, shift, null, topic, no_msg=False, expert=None, scripted=False, remap=None, rfb=None):
         k1, k2, k3 = jax.random.split(key, 3)
         hd = hear(s, perm, shift, k3, null, topic)
+        if remap is not None:                      # Nov 10 calibration: per-listener token derangement (identity = true)
+            tk_ = remap[jnp.arange(NL), jnp.argmax(hd[:, :8], 1)]
+            hd = hd.at[:, :8].set(jax.nn.one_hot(tk_, 8) * hd[:, 8:9])
         if no_msg:
             hd = jnp.zeros_like(hd)
         x = jnp.concatenate([env.observe(cfg, s)[NB:], hd, jax.nn.one_hot(pa, 6), pr[:, None]], 1)
         h2, lg, v = net.apply(p, h, x)
         act = jax.random.categorical(k1, lg)
         if scripted:
-            fb = jax.random.randint(jax.random.fold_in(k1, 5), (NL,), 1, 5) if a.voi_fallback == "random" else act
+            use_r = (a.voi_fallback == "random") if rfb is None else rfb
+            fb = jax.random.randint(jax.random.fold_in(k1, 5), (NL,), 1, 5) if use_r else act
             act = scripted_act(s, hd, perm, fb)
         if expert is not None:                     # DAgger roll-in: the navigator drives, the clone learns on its states
             nlg, _ = nav_net.apply(expert, x[:, :100]); act = jax.random.categorical(jax.random.fold_in(k1, 3), nlg)
@@ -376,6 +387,96 @@ def main():
         return dict(nav_median=float(np.median(nv)), fl_median=float(np.median(fl)),
                     ratio=float(np.median(fl) / max(np.median(nv), 1e-9)), **{"pass": bool(np.median(fl) >= 0.9 * np.median(nv))})
 
+
+    if a.calib:
+        """Cam Nov 10 (5): the learnability test design on the fast-learner harness. A LIFE = one listener's adaptation
+        (--adapt steps, one world); then --probes branches of 300 steps from the SAME adapted state, true vs a
+        derangement among that listener's well-heard tokens (>= --min-heard x during adaptation), food credited to the
+        last heard true token if well-heard. Eligible iff >= --min-tokens well-heard tokens. Pass = drop >= 30% AND
+        paired > 2 SE over the probes. Controls: positive = scripted decoder (>= 90%), negative = the untrained side
+        memory, i.e. the navigator (message-blind) (<= 10%); VoI = scripted true vs silence, navigator AND random
+        fallback (both >= 1.5x, paired > 2 SE)."""
+        def adapt_fn(p, perm, key, topic, scripted, rfb):
+            s, _ = new_world(key, perm)
+            h = jnp.zeros((NL, H)); pa = jnp.zeros(NL, jnp.int32); pr = jnp.zeros(NL)
+            def body(c, k):
+                s, h, pa, pr, cnt = c
+                ht = hear(s, perm, 0, jax.random.fold_in(k, 3), a.null_code, topic)
+                cnt = cnt + ht[:, :8] * (ht[:, 8:9] > 0.5)
+                s2, h2, act, rr, _ = step(p, s, perm, h, pa, pr, k, 0, a.null_code, topic, False, scripted=scripted, rfb=rfb)
+                return (s2, h2, act, rr, cnt), None
+            (s, h, pa, pr, cnt), _ = jax.lax.scan(body, (s, h, pa, pr, jnp.zeros((NL, 8))), jax.random.split(jax.random.fold_in(key, 1), a.adapt))
+            return (s, h, pa, pr), cnt
+        def probe_fn(p, perm, st, key, topic, remap, well, no_msg, scripted, rfb):
+            s, h, pa, pr = st
+            if a.probe_fresh:                          # a fresh episode with the same code and the life's food patches (as the
+                s0 = s                                 # learnability test keeps the life's centres); the life's memory (h) carried in
+                s, _ = new_world(jax.random.fold_in(key, 31), perm)
+                s = s._replace(centres=s0.centres, cap=env.capacity(cfg, s0.centres), food=env.capacity(cfg, s0.centres))
+            def body(c, k):
+                s, h, pa, pr, eaten, last = c
+                ht = hear(s, perm, 0, jax.random.fold_in(k, 3), a.null_code, topic)
+                last = jnp.where(ht[:, 8] > 0.5, jnp.argmax(ht[:, :8], 1), last)
+                s2, h2, act, rr, rec = step(p, s, perm, h, pa, pr, k, 0, a.null_code, topic, no_msg, scripted=scripted, remap=remap, rfb=rfb)
+                cr = jnp.where(last >= 0, well[jnp.arange(NL), jnp.maximum(last, 0)], False).astype(jnp.float32)
+                return (s2, h2, act, rr, eaten + rec[5] * cr, last), None
+            (_, _, _, _, eaten, _), _ = jax.lax.scan(body, (s, h, pa, pr, jnp.zeros(NL), jnp.full(NL, -1, jnp.int32)), jax.random.split(key, a.probe_window))
+            return eaten
+        AD = jax.jit(jax.vmap(adapt_fn, in_axes=(None, 0, 0, None, None, None)), static_argnums=(3, 4, 5))
+        PR = jax.jit(jax.vmap(jax.vmap(probe_fn, in_axes=(None, None, None, 0, None, 0, None, None, None, None)),
+                              in_axes=(None, 0, 0, 0, None, 0, 0, None, None, None)), static_argnums=(4, 7, 8, 9))
+        def wilson(k, n, z=1.96):
+            if n == 0: return [None, None]
+            ph = k / n; c = (ph + z * z / (2 * n)) / (1 + z * z / n); hw = z * np.sqrt(ph * (1 - ph) / n + z * z / (4 * n * n)) / (1 + z * z / n)
+            return [float(c - hw), float(c + hw)]
+        def life_pass(t, s_):
+            d = t - s_; se = d.std(ddof=1) / np.sqrt(len(d))
+            return bool((1 - s_.sum() / max(t.sum(), 1e-9)) >= 0.30 and d.mean() > 2 * se)
+        n = a.eval_lives; B = a.probes; p_nav = params          # untouched side memory = the navigator (zero side head)
+        perms = jnp.asarray(FB[np.random.default_rng(99).integers(0, len(FB), n)])
+        wkeys = jax.random.split(jax.random.PRNGKey(8100), n)
+        pkeys = jax.vmap(lambda k: jax.random.split(jax.random.fold_in(k, 77), B))(wkeys)
+        out = {}
+        for t in [int(x) for x in a.calib.split(",")]:
+            R = {}
+            for cond, pp, scr, rfb in (("scripted", p_nav, True, False), ("scripted_rfb", p_nav, True, True), ("nonlistener", p_nav, False, False)):
+                st, cnt = AD(pp, perms, wkeys, t, scr, rfb); cnt = np.asarray(cnt)                   # (n, NL, 8)
+                well = cnt >= a.min_heard; elig = well.sum(-1) >= a.min_tokens                          # (n, NL)
+                rq = np.random.default_rng(4242); ident = np.tile(np.arange(8), (n, B, NL, 1)); der = ident.copy()
+                for i in range(n):
+                    for l in range(NL):
+                        S_ = np.where(well[i, l])[0]
+                        if len(S_) < 2: continue
+                        for b in range(B):
+                            while True:
+                                q = rq.permutation(S_)
+                                if np.all(q != S_): break
+                            der[i, b, l, S_] = q
+                W_ = jnp.asarray(well)
+                tru = np.asarray(PR(pp, perms, st, pkeys, t, jnp.asarray(ident), W_, False, scr, rfb))     # (n, B, NL)
+                swp = np.asarray(PR(pp, perms, st, pkeys, t, jnp.asarray(der), W_, False, scr, rfb))
+                sil = np.asarray(PR(pp, perms, st, pkeys, t, jnp.asarray(ident), W_, True, scr, rfb)) if scr else None
+                ok = np.array([[life_pass(tru[i, :, l], swp[i, :, l]) for l in range(NL)] for i in range(n)])
+                ne = int(elig.sum()); k = int(ok[elig].sum()); gm = well.sum(-1)
+                r = dict(lives=n * NL, eligible=ne, eligibility_rate=float(elig.mean()), pass_frac=float(k / ne) if ne else None, ci95=wilson(k, ne),
+                         stratified={lab: dict(n=int((elig & m).sum()), pass_frac=float(ok[elig & m].mean()) if (elig & m).any() else None)
+                                     for lab, m in (("5", gm == 5), ("6", gm == 6), ("7-8", gm >= 7))},
+                         median_distinct=float(np.median((cnt > 0).sum(-1))), median_well=float(np.median(gm)))
+                if sil is not None and ne > 1:
+                    tm, sm = tru.mean(1)[elig], sil.mean(1)[elig]; dv = tm - sm
+                    r["voi"] = dict(eaten_true=float(tm.mean()), eaten_silence=float(sm.mean()), ratio=float(tm.mean() / max(sm.mean(), 1e-9)),
+                                    paired_z=float(dv.mean() / max(dv.std(ddof=1) / np.sqrt(len(dv)), 1e-12)))
+                R[cond] = r
+            R["gate"] = dict(positive_ok=bool(R["scripted"]["pass_frac"] is not None and R["scripted"]["pass_frac"] >= 0.90),
+                             negative_ok=bool(R["nonlistener"]["pass_frac"] is not None and R["nonlistener"]["pass_frac"] <= 0.10),
+                             voi_nav_ok=bool(R["scripted"].get("voi", {}).get("ratio", 0) >= 1.5 and R["scripted"].get("voi", {}).get("paired_z", 0) > 2),
+                             voi_rand_ok=bool(R["scripted_rfb"].get("voi", {}).get("ratio", 0) >= 1.5 and R["scripted_rfb"].get("voi", {}).get("paired_z", 0) > 2),
+                             enough_eligible=bool(R["scripted"]["eligible"] >= 50))
+            R["gate"]["PASS"] = all(R["gate"].values())
+            out[TOPICS[t]] = R
+            print("CALIB", TOPICS[t], json.dumps(R), flush=True)
+        os.makedirs(a.out, exist_ok=True); json.dump(out, open(f"{a.out}/calib.json", "w"), indent=1); return
+
     if a.coverage:
         def cov_life(p, perm, key, topic):
             s, _ = new_world(key, perm)
@@ -390,7 +491,7 @@ def main():
         f = jax.jit(jax.vmap(cov_life, in_axes=(None, 0, 0, None)), static_argnums=(3,))
         n = 64; perms = jnp.asarray(FA[np.random.default_rng(5).integers(0, len(FA), n)]); keys = jax.random.split(jax.random.PRNGKey(31), n)
         out = {}
-        for t in range(6):
+        for t in range(len(TOPICS)):
             tok, okh = (np.asarray(x) for x in f(params, perms, keys, t))            # (n, steps, NL)
             d = [len(np.unique(tok[i, :, l][okh[i, :, l]])) for i in range(n) for l in range(NL)]
             g25 = [int((np.bincount(tok[i, :, l][okh[i, :, l]], minlength=8) >= 25).sum()) for i in range(n) for l in range(NL)]
