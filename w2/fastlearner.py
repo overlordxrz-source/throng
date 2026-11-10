@@ -87,6 +87,7 @@ def main():
     ap.add_argument("--world", default="proto", help='"proto" or "d0,P,relocate" (Cam Nov 10 4b)')
     ap.add_argument("--beacon-spread", type=int, default=2, help="speakers at (+-k, +-k) around the cluster centre (Cam Nov 10 coverage)")
     ap.add_argument("--beacon-walk", action="store_true", help="speakers random-walk at agent speed")
+    ap.add_argument("--beacon-speed", type=int, default=1, help="with --beacon-walk: unit random moves per step (Cam Nov 10: faster walk for richest-patch margin)")
     ap.add_argument("--coverage", action="store_true", help="diagnostic: distinct heard tokens per life (adapt + test), per topic")
     ap.add_argument("--T", type=int, default=64); ap.add_argument("--life", type=int, default=640)
     ap.add_argument("--adapt", type=int, default=300); ap.add_argument("--lr", type=float, default=3e-4)
@@ -170,6 +171,10 @@ def main():
         lp = jnp.take_along_axis(jax.nn.log_softmax(lg), act[:, None], 1)[:, 0]
         act_b = jax.random.randint(jax.random.fold_in(key, 77), (NB,), 1, 5) if a.beacon_walk else jnp.zeros(NB, jnp.int32)
         s2, r, info = env.step(cfg, s, jnp.concatenate([act_b, act]), k2)
+        if a.beacon_walk and a.beacon_speed > 1:   # extra unit moves for the speakers only
+            dirs = jnp.array([[-1, 0], [1, 0], [0, 1], [0, -1]])
+            extra = dirs[jax.random.randint(jax.random.fold_in(key, 78), (a.beacon_speed - 1, NB), 0, 4)].sum(0)
+            s2 = s2._replace(pos=s2.pos.at[:NB].set((s2.pos[:NB] + extra) % cfg.L))
         E = s2.energy.at[:NB].set(1.0)
         E = E.at[NB:].set(jnp.maximum(E[NB:], 0.02))                                   # lives have a fixed length (no death)
         s2 = s2._replace(energy=E, alive=s2.alive.at[:].set(True))
@@ -311,7 +316,7 @@ def main():
             out[TOPICS[t]] = dict(distinct_tokens_median=float(np.median(d)), tokens_ge25_median=float(np.median(g25)),
                                   hist=np.bincount(d, minlength=9).tolist(), heard_frac=float(okh.mean()),
                                   gate_i=bool(np.median(d) >= 4 and np.median(g25) >= 3))
-        res = dict(world=a.world, steps=a.adapt + 300, beacon_spread=a.beacon_spread, beacon_walk=a.beacon_walk, per_topic=out,
+        res = dict(world=a.world, steps=a.adapt + 300, beacon_spread=a.beacon_spread, beacon_walk=a.beacon_walk, beacon_speed=a.beacon_speed, per_topic=out,
                    gate_i_useful=all(out[TOPICS[t]]["gate_i"] for t in (0, 1, 2)))
         print("COVERAGE", json.dumps(res)); os.makedirs(a.out, exist_ok=True); json.dump(res, open(f"{a.out}/coverage.json", "w"), indent=1); return
 
