@@ -82,6 +82,9 @@ def main():
     ap.add_argument("--min-sectors", type=int, default=2, help="Cam Nov 10: a life is scorable only if it heard >= this many sectors >= --min-heard times (ruled: 5); pass rates over eligible lives")
     ap.add_argument("--score", default="window", choices=["window", "last-heard"], help="last-heard: in the heard25 test, only food eaten while the last heard TRUE sector is one the life heard >= --min-heard times counts")
     ap.add_argument("--test-start", default="fresh", choices=["fresh", "life"], help="life: each probe episode starts in the life's own world at its end (patch centres + beacon positions), the learner beside a random beacon")
+    ap.add_argument("--ckpt", default=None, help="checkpoint path; resume from it if present (Cam Nov 10: --ckpt on for Modal runs)")
+    ap.add_argument("--ckpt-every", type=int, default=25)
+    ap.add_argument("--stop-after", type=int, default=0, help="test only: exit abruptly after this many updates (simulated preemption)")
     ap.add_argument("--hearing-probe", action="store_true", help="Cam Nov 10 ~05:15: supervised probe of the hearing pathway")
     ap.add_argument("--probe-steps", type=int, default=300); ap.add_argument("--probe-lrs", default="1,4,16")
     ap.add_argument("--probe-collect", type=int, default=32, help="teacher rollouts (x T steps) per data set")
@@ -273,7 +276,18 @@ def main():
     gsteps = np.zeros((W, NL), int)
     cnt = np.zeros((W, NL, 8), np.int64)       # per-life heard-sector counts (coverage)
     lives = []
-    for it in range(a.updates):
+    it0 = 0
+    if a.ckpt:
+        sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "scripts"))
+        import ckpt as _ck
+        Ck = _ck.load(a.ckpt)
+        if Ck is not None:
+            tj = lambda t: jax.tree_util.tree_map(jnp.asarray, t)  # noqa: E731
+            P, OS, S = tj(Ck["P"]), tj(Ck["OS"]), tj(Ck["S"]); key = jnp.asarray(Ck["key"]); rng = Ck["rng"]
+            mem_o, mem_m = Ck["mem_o"], Ck["mem_m"]; mem_e = [(jnp.asarray(e0), jnp.asarray(e1), e2) for e0, e1, e2 in Ck["mem_e"]]
+            since_birth, gsteps, cnt, lives, nav_of = Ck["since_birth"], Ck["gsteps"], Ck["cnt"], Ck["lives"], Ck["nav_of"]
+            it0 = Ck["it"] + 1; print(f"resumed from update {Ck['it'] + 1}", flush=True)
+    for it in range(it0, a.updates):
         key, k = jax.random.split(key)
         S, (o, act, lp, v, r, dn, take, eo, ea, ne, alive, yc) = roll_w(P, S, jax.random.split(k, W))
         o, act, lp, v, r, dn, alive = (np.asarray(x) for x in (o, act, lp, v, r, dn, alive))   # (W, T, NL, ...)
@@ -328,6 +342,11 @@ def main():
             sl = slice(NB, NB + NL)
             pos[:, sl][dead] = npos[dead]; E[:, sl][dead] = cfg.E0; age[:, sl][dead] = 0; al[:, sl][dead] = True
             S = S._replace(pos=jnp.asarray(pos), energy=jnp.asarray(E), age=jnp.asarray(age), alive=jnp.asarray(al))
+        if a.ckpt and (it + 1) % a.ckpt_every == 0 and it + 1 < a.updates:
+            _ck.save(a.ckpt, dict(it=it, P=P, OS=OS, S=S, key=key, rng=rng, mem_o=mem_o, mem_m=mem_m, mem_e=mem_e,
+                                  since_birth=since_birth, gsteps=gsteps, cnt=cnt, lives=lives, nav_of=nav_of))
+        if a.stop_after and it + 1 == a.stop_after:
+            os._exit(3)
     if not lives:
         print("no completed lives"); return
     diag = None
