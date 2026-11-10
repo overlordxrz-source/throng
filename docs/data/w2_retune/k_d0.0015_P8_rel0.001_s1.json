@@ -1,0 +1,87 @@
+{
+ "config": {
+  "L": 96,
+  "P": 8,
+  "patch_sigma": 1.0,
+  "d0": 0.0015,
+  "relocate": 0.001
+ },
+ "results": {
+  "random": {
+   "offspring_lives": {
+    "lives": 8,
+    "median_life": 248.5,
+    "mean_life": 276.75,
+    "median_offspring": 0.0,
+    "mean_offspring": 0.0,
+    "median_intake_per_step": 8.302070810850982e-05,
+    "km_median_life": 244.0,
+    "km_reached": true,
+    "censored": 0
+   },
+   "all_lives": {
+    "lives": 520,
+    "median_life": 173.0,
+    "mean_life": 184.35192307692307,
+    "median_offspring": 0.0,
+    "mean_offspring": 0.015384615398943424,
+    "median_intake_per_step": 6.453456624100835e-25,
+    "km_median_life": 173.0,
+    "km_reached": true,
+    "censored": 0
+   }
+  },
+  "blind": {
+   "offspring_lives": {
+    "lives": 1293,
+    "median_life": 922.0,
+    "mean_life": 1132.5034802784223,
+    "median_offspring": 0.0,
+    "mean_offspring": 0.8631090521812439,
+    "median_intake_per_step": 0.0011004127531300876,
+    "km_median_life": 929.0,
+    "km_reached": true,
+    "censored": 64
+   },
+   "all_lives": {
+    "lives": 1799,
+    "median_life": 881.0,
+    "mean_life": 959.2707059477488,
+    "median_offspring": 0.0,
+    "mean_offspring": 0.7153974175453186,
+    "median_intake_per_step": 0.0007352683696623088,
+    "km_median_life": 885.0,
+    "km_reached": true,
+    "censored": 64
+   }
+  },
+  "oracle": {
+   "offspring_lives": {
+    "lives": 1088,
+    "median_life": 2160.0,
+    "mean_life": 2352.692095588235,
+    "median_offspring": 0.0,
+    "mean_offspring": 0.4935661852359772,
+    "median_intake_per_step": 0.0019761793164645687,
+    "km_median_life": 3478.0,
+    "km_reached": true,
+    "censored": 619
+   },
+   "all_lives": {
+    "lives": 1557,
+    "median_life": 2772.0,
+    "mean_life": 3050.416827231856,
+    "median_offspring": 0.0,
+    "mean_offspring": 0.671162486076355,
+    "median_intake_per_step": 0.0022185083723416294,
+    "km_median_life": 4088.0,
+    "km_reached": true,
+    "censored": 834
+   }
+  }
+ },
+ "P1m": true,
+ "P4": false,
+ "P2m": false,
+ "P2m_basis": "intake/step (offspring medians 0)"
+}

@@ -4394,6 +4394,34 @@ more expensive, because it produces publishable-looking nulls.
   - rho is identical at u1000 and u2000: the meaning-to-message map is frozen from u1000.
   - So the codes are structured but do not generalise to unseen combinations.
 
+- **RESULT (Nov 10 ~01:20): W2 KM re-read + sweep (c): NO PICK. Report** (`docs/data/w2_retune/summary_km.txt`; per-life
+  arrays in `km_lives/`).
+  - **Instrument check:** the reruns reproduce every old naive median and life count exactly (16/16 cells checked on
+    the first 4 runs; same seeds, deterministic), so this is a true re-read.
+  - **KM vs naive:** KM raises the blind medians modestly (+0 to +25%) and the oracle medians a lot (+50-90%; ~55-75% of
+    oracle lives are censored). The old P2 margins were understated.
+  - **Sweep (c), the candidates (P4 >= 1,100):**
+    - **d0 0.0012 / 8:** blind KM 1189 / 1005 / 1093 / 1200, median **1141**; oracle median 4609 (4.04x). P4 on the
+      median PASS, but **2/4 seeds -> fails.**
+    - **d0 0.0013 / 8:** blind 1136 / 1055 / 1078 / 1303, median **1107**; oracle 5739 (5.18x). Median PASS, **2/4
+      seeds -> fails.**
+    - Both pass all three in 4/4 seeds at the old 1,000 bar. The 10% margin is what fails.
+  - **Re-read (reported only, not picked from):**
+    - **Old pick:** blind 1142 / 929 / 1111 / 970, median 1040; 2/4 seeds -> fails at 1,000 and at 1,100.
+    - **Runner-up:** blind 1307 / 911 / 1696 / 1133, median **1220**; P2 3.89x; **3/4 seeds -> it would pass the new
+      rule at 1,100.** Not a pick, per Cam (re-read only).
+  - **Observation (not a test): lower drain does not buy lifespan.**
+    - Blind intake per step falls with drain (0.00138 at d0 0.0015, 0.00105 at 0.0013, 0.00084 at 0.0012): the
+      homeostatic agents eat less.
+    - The median lifespan of the lives that ended moves only 986 -> 1,102.
+    - Mean offspring per life is ~0.84 in every config, and ~half of the lives that ended had a child.
+    - So the drain lever is nearly exhausted for P4.
+  - **Options for Cam:**
+    - (i) a fresh confirmation of the runner-up on 4 NEW learner seeds (4-7) under the same rule. It passed the rule
+      on its re-read; fresh seeds avoid picking from the re-read. ~35 min laptop.
+    - (ii) accept a 5% P4 margin (both sweep (c) configs pass 4/4 at >= 1,050? To be computed only if asked).
+    - (iii) a different world lever for lifespan (e.g. the reproduction cost c_rep or the provisioning cost).
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under

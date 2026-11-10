@@ -1,0 +1,36 @@
+W2 KM re-read + sweep (c) (Cam Nov 10 ~05:15; registered before data, RESEARCH_PROTOCOL.md). Kaplan-Meier medians
+(right-censored at the horizon): random over all lives; blind / oracle over lives born in the eval.
+Gates: P1m blind >= 3x random; P2 oracle >= 2x blind; P4 blind >= THR (1,100 for sweep (c); the re-read also shows
+1,000, the old bar). A KM median whose survival never reaches 0.5 is reported '>' and counts as passing P4.
+Candidates: sweep (c) only (d0 0.0012 / 0.0013, P8, rel 0.001). The old pick and runner-up are the re-read: reported, not
+picked from. Pick: all three on the 4-seed median AND in >= 3/4 seeds; the largest P2 margin among passers.
+== old pick (re-read, reference) d0.0015_P8_rel0.001: 4 seeds
+  k_d0.0015_P8_rel0.001_s0.json    KM random  173 | blind   1142 (naive  1002; n 2218, cens 387) | oracle   4726 (naive  2983; n 1169, cens 695) | P1m True  P2 True  (4.14x) P4@1100 True 
+  k_d0.0015_P8_rel0.001_s1.json    KM random  173 | blind    929 (naive   922; n 1293, cens 64) | oracle   3478 (naive  2160; n 1088, cens 619) | P1m True  P2 True  (3.74x) P4@1100 False
+  k_d0.0015_P8_rel0.001_s2.json    KM random  173 | blind   1111 (naive   951; n 2107, cens 397) | oracle > 5900 (naive  3169; n 865, cens 607) | P1m True  P2 True  (5.31x) P4@1100 True 
+  k_d0.0015_P8_rel0.001_s3.json    KM random  173 | blind    970 (naive   937; n 701, cens 74) | oracle   5691 (naive  3494; n 959, cens 637) | P1m True  P2 True  (5.87x) P4@1100 False
+  4-seed median: random 173 | blind 1040 | oracle 5208 | P1m True P2 True (5.01x) P4@1000 True; seeds passing all three 2/4 -> fails at P4 >= 1000
+  4-seed median: random 173 | blind 1040 | oracle 5208 | P1m True P2 True (5.01x) P4@1100 False; seeds passing all three 2/4 -> fails at P4 >= 1100
+== runner-up (re-read) d0.0018_P10_rel0.0008: 4 seeds
+  k_d0.0018_P10_rel0.0008_s0.json  KM random  160 | blind   1307 (naive  1056; n 2739, cens 874) | oracle   4599 (naive  2832; n 1256, cens 753) | P1m True  P2 True  (3.52x) P4@1100 True 
+  k_d0.0018_P10_rel0.0008_s1.json  KM random  160 | blind    911 (naive   796; n 653, cens 196) | oracle > 5900 (naive  4460; n 825, cens 602) | P1m True  P2 True  (6.48x) P4@1100 False
+  k_d0.0018_P10_rel0.0008_s2.json  KM random  160 | blind   1696 (naive  1389; n 2169, cens 614) | oracle   4896 (naive  2699; n 950, cens 641) | P1m True  P2 True  (2.89x) P4@1100 True 
+  k_d0.0018_P10_rel0.0008_s3.json  KM random  160 | blind   1133 (naive   917; n 1201, cens 342) | oracle   3227 (naive  2005; n 1299, cens 710) | P1m True  P2 True  (2.85x) P4@1100 True 
+  4-seed median: random 160 | blind 1220 | oracle 4748 | P1m True P2 True (3.89x) P4@1000 True; seeds passing all three 3/4 -> passes at P4 >= 1000
+  4-seed median: random 160 | blind 1220 | oracle 4748 | P1m True P2 True (3.89x) P4@1100 True; seeds passing all three 3/4 -> passes at P4 >= 1100
+== sweep (c) d0 0.0012 d0.0012_P8_rel0.001: 4 seeds
+  k_d0.0012_P8_rel0.001_s0.json    KM random  189 | blind   1189 (naive  1192; n 808, cens 0) | oracle   5827 (naive  3542; n 851, cens 617) | P1m True  P2 True  (4.90x) P4@1100 True 
+  k_d0.0012_P8_rel0.001_s1.json    KM random  189 | blind   1005 (naive   998; n 818, cens 62) | oracle   2665 (naive  1836; n 1518, cens 715) | P1m True  P2 True  (2.65x) P4@1100 False
+  k_d0.0012_P8_rel0.001_s2.json    KM random  189 | blind   1093 (naive  1053; n 1585, cens 156) | oracle   3401 (naive  2019; n 1344, cens 751) | P1m True  P2 True  (3.11x) P4@1100 False
+  k_d0.0012_P8_rel0.001_s3.json    KM random  189 | blind   1200 (naive  1135; n 941, cens 96) | oracle   5817 (naive  3100; n 890, cens 656) | P1m True  P2 True  (4.85x) P4@1100 True 
+  4-seed median: random 189 | blind 1141 | oracle 4609 | P1m True P2 True (4.04x) P4@1000 True; seeds passing all three 4/4 -> passes at P4 >= 1000
+  4-seed median: random 189 | blind 1141 | oracle 4609 | P1m True P2 True (4.04x) P4@1100 True; seeds passing all three 2/4 -> fails at P4 >= 1100
+== sweep (c) d0 0.0013 d0.0013_P8_rel0.001: 4 seeds
+  k_d0.0013_P8_rel0.001_s0.json    KM random  183 | blind   1136 (naive  1108; n 1105, cens 101) | oracle   5999 (naive  4270; n 840, cens 607) | P1m True  P2 True  (5.28x) P4@1100 True 
+  k_d0.0013_P8_rel0.001_s1.json    KM random  183 | blind   1055 (naive   999; n 990, cens 128) | oracle   3380 (naive  2122; n 1184, cens 629) | P1m True  P2 True  (3.20x) P4@1100 False
+  k_d0.0013_P8_rel0.001_s2.json    KM random  183 | blind   1078 (naive  1015; n 2301, cens 284) | oracle   5914 (naive  4359; n 820, cens 606) | P1m True  P2 True  (5.49x) P4@1100 False
+  k_d0.0013_P8_rel0.001_s3.json    KM random  183 | blind   1303 (naive  1144; n 2944, cens 608) | oracle   5564 (naive  3066; n 978, cens 659) | P1m True  P2 True  (4.27x) P4@1100 True 
+  4-seed median: random 183 | blind 1107 | oracle 5739 | P1m True P2 True (5.18x) P4@1000 True; seeds passing all three 4/4 -> passes at P4 >= 1000
+  4-seed median: random 183 | blind 1107 | oracle 5739 | P1m True P2 True (5.18x) P4@1100 True; seeds passing all three 2/4 -> fails at P4 >= 1100
+
+== PICK (sweep (c) candidates, P4 >= 1,100): NONE -> report

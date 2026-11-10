@@ -1,0 +1,87 @@
+{
+ "config": {
+  "L": 96,
+  "P": 8,
+  "patch_sigma": 1.0,
+  "d0": 0.0012,
+  "relocate": 0.001
+ },
+ "results": {
+  "random": {
+   "offspring_lives": {
+    "lives": 9,
+    "median_life": 272.0,
+    "mean_life": 304.44444444444446,
+    "median_offspring": 0.0,
+    "mean_offspring": 0.0,
+    "median_intake_per_step": 5.338948232533499e-08,
+    "km_median_life": 272.0,
+    "km_reached": true,
+    "censored": 0
+   },
+   "all_lives": {
+    "lives": 521,
+    "median_life": 189.0,
+    "mean_life": 201.45297504798464,
+    "median_offspring": 0.0,
+    "mean_offspring": 0.01727447286248207,
+    "median_intake_per_step": 2.393984264431549e-24,
+    "km_median_life": 189.0,
+    "km_reached": true,
+    "censored": 0
+   }
+  },
+  "blind": {
+   "offspring_lives": {
+    "lives": 818,
+    "median_life": 997.5,
+    "mean_life": 1228.90097799511,
+    "median_offspring": 0.0,
+    "mean_offspring": 0.8508557677268982,
+    "median_intake_per_step": 0.0008856610758325486,
+    "km_median_life": 1005.0,
+    "km_reached": true,
+    "censored": 62
+   },
+   "all_lives": {
+    "lives": 1329,
+    "median_life": 879.0,
+    "mean_life": 992.6072234762979,
+    "median_offspring": 0.0,
+    "mean_offspring": 0.614747941493988,
+    "median_intake_per_step": 0.00040857110606482835,
+    "km_median_life": 896.0,
+    "km_reached": true,
+    "censored": 62
+   }
+  },
+  "oracle": {
+   "offspring_lives": {
+    "lives": 1518,
+    "median_life": 1836.0,
+    "mean_life": 2147.8050065876155,
+    "median_offspring": 0.0,
+    "mean_offspring": 0.5691699385643005,
+    "median_intake_per_step": 0.0018184156693805353,
+    "km_median_life": 2665.0,
+    "km_reached": true,
+    "censored": 715
+   },
+   "all_lives": {
+    "lives": 1956,
+    "median_life": 2224.0,
+    "mean_life": 2608.450408997955,
+    "median_offspring": 1.0,
+    "mean_offspring": 0.7382413148880005,
+    "median_intake_per_step": 0.0019271128296776364,
+    "km_median_life": 3141.0,
+    "km_reached": true,
+    "censored": 833
+   }
+  }
+ },
+ "P1m": true,
+ "P4": false,
+ "P2m": true,
+ "P2m_basis": "intake/step (offspring medians 0)"
+}

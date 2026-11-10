@@ -1,0 +1,87 @@
+{
+ "config": {
+  "L": 96,
+  "P": 8,
+  "patch_sigma": 1.0,
+  "d0": 0.0012,
+  "relocate": 0.001
+ },
+ "results": {
+  "random": {
+   "offspring_lives": {
+    "lives": 9,
+    "median_life": 272.0,
+    "mean_life": 304.44444444444446,
+    "median_offspring": 0.0,
+    "mean_offspring": 0.0,
+    "median_intake_per_step": 5.338948232533499e-08,
+    "km_median_life": 272.0,
+    "km_reached": true,
+    "censored": 0
+   },
+   "all_lives": {
+    "lives": 521,
+    "median_life": 189.0,
+    "mean_life": 201.45297504798464,
+    "median_offspring": 0.0,
+    "mean_offspring": 0.01727447286248207,
+    "median_intake_per_step": 2.393984264431549e-24,
+    "km_median_life": 189.0,
+    "km_reached": true,
+    "censored": 0
+   }
+  },
+  "blind": {
+   "offspring_lives": {
+    "lives": 808,
+    "median_life": 1191.5,
+    "mean_life": 1457.819306930693,
+    "median_offspring": 0.0,
+    "mean_offspring": 0.7970296740531921,
+    "median_intake_per_step": 0.0008122406872203611,
+    "km_median_life": 1189.0,
+    "km_reached": true,
+    "censored": 0
+   },
+   "all_lives": {
+    "lives": 1315,
+    "median_life": 979.0,
+    "mean_life": 1160.867680608365,
+    "median_offspring": 0.0,
+    "mean_offspring": 0.6106463670730591,
+    "median_intake_per_step": 0.0004896599339904163,
+    "km_median_life": 979.0,
+    "km_reached": true,
+    "censored": 0
+   }
+  },
+  "oracle": {
+   "offspring_lives": {
+    "lives": 851,
+    "median_life": 3542.0,
+    "mean_life": 3391.0141010575794,
+    "median_offspring": 0.0,
+    "mean_offspring": 0.3595769703388214,
+    "median_intake_per_step": 0.0013983962433639296,
+    "km_median_life": 5827.0,
+    "km_reached": true,
+    "censored": 617
+   },
+   "all_lives": {
+    "lives": 1332,
+    "median_life": 4798.5,
+    "mean_life": 4149.054054054054,
+    "median_offspring": 0.0,
+    "mean_offspring": 0.6156156063079834,
+    "median_intake_per_step": 0.0014223655016789,
+    "km_median_life": 6000.0,
+    "km_reached": false,
+    "censored": 965
+   }
+  }
+ },
+ "P1m": true,
+ "P4": false,
+ "P2m": false,
+ "P2m_basis": "intake/step (offspring medians 0)"
+}
