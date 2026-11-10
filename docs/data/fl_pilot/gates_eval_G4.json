@@ -1,0 +1,107 @@
+{
+ "null_code": false,
+ "held_out": {
+  "topic": "richest_patch_dir",
+  "family": "B"
+ },
+ "per_topic": {
+  "nearest_food_dir": {
+   "family": "B",
+   "topic": "nearest_food_dir",
+   "lives": 16,
+   "eaten_true": 15.515079498291016,
+   "eaten_swap": 15.53669548034668,
+   "pass_frac": 0.0,
+   "median_drop": -0.0017516016960144043,
+   "eaten_no_msg": 16.1951904296875,
+   "msg_vs_silence": -0.04199463129043579
+  },
+  "richest_patch_dir": {
+   "family": "B",
+   "topic": "richest_patch_dir",
+   "lives": 16,
+   "eaten_true": 15.818581581115723,
+   "eaten_swap": 15.84797477722168,
+   "pass_frac": 0.0,
+   "median_drop": -0.0023720860481262207,
+   "eaten_no_msg": 16.1951904296875,
+   "msg_vs_silence": -0.023254334926605225
+  },
+  "food_distance_band": {
+   "family": "B",
+   "topic": "food_distance_band",
+   "lives": 16,
+   "eaten_true": 15.443471908569336,
+   "eaten_swap": 15.423966407775879,
+   "pass_frac": 0.0,
+   "median_drop": 0.004036456346511841,
+   "eaten_no_msg": 16.1951904296875,
+   "msg_vs_silence": -0.04641616344451904
+  },
+  "nearest_agent_dir": {
+   "family": "B",
+   "topic": "nearest_agent_dir",
+   "lives": 16,
+   "eaten_true": 15.533533096313477,
+   "eaten_swap": 15.559942245483398,
+   "pass_frac": 0.0,
+   "median_drop": -0.000819861888885498,
+   "eaten_no_msg": 16.1951904296875,
+   "msg_vs_silence": -0.04085516929626465
+  },
+  "speaker_energy_band": {
+   "family": "B",
+   "topic": "speaker_energy_band",
+   "lives": 16,
+   "eaten_true": 15.705906867980957,
+   "eaten_swap": 15.650245666503906,
+   "pass_frac": 0.0,
+   "median_drop": 0.001632988452911377,
+   "eaten_no_msg": 16.1951904296875,
+   "msg_vs_silence": -0.030211687088012695
+  },
+  "noise": {
+   "family": "B",
+   "topic": "noise",
+   "lives": 16,
+   "eaten_true": 15.509492874145508,
+   "eaten_swap": 15.522309303283691,
+   "pass_frac": 0.0,
+   "median_drop": 0.0005748867988586426,
+   "eaten_no_msg": 16.1951904296875,
+   "msg_vs_silence": -0.04233956336975098
+  }
+ },
+ "leak_check_A": {
+  "family": "A",
+  "topic": "richest_patch_dir",
+  "lives": 16,
+  "eaten_true": 15.539081573486328,
+  "eaten_swap": 15.599002838134766,
+  "pass_frac": 0.0,
+  "median_drop": -0.001789867877960205,
+  "eaten_no_msg": 16.1951904296875,
+  "msg_vs_silence": -0.0405125617980957
+ },
+ "G1_pass": false,
+ "G2_useless_unchanged": true,
+ "G3_leak_ok": true,
+ "in_dist_A_nearest_food": {
+  "family": "A",
+  "topic": "nearest_food_dir",
+  "lives": 16,
+  "eaten_true": 15.331857681274414,
+  "eaten_swap": 15.464378356933594,
+  "pass_frac": 0.0,
+  "median_drop": -0.0013512074947357178,
+  "eaten_no_msg": 16.1951904296875,
+  "msg_vs_silence": -0.053307950496673584
+ },
+ "G4_intake_trained": {
+  "nav_median": 27.4400577545166,
+  "fl_median": 17.007247924804688,
+  "ratio": 0.6197963356971741,
+  "pass": false
+ },
+ "G4_pass": false
+}

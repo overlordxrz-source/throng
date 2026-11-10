@@ -4223,6 +4223,34 @@ more expensive, because it produces publishable-looking nulls.
     ~29k updates, ~$2.1-3.5, so (e) stays inside its cap.
   - Analysis: deduped by segment; the last complete segment (u9000) per seed. Lands ~08:00 if not preempted.
 
+- **RESULT (Nov 10 ~00:20): fast-learner side-memory pilot (laptop, 1,500 updates, BC 0.1): FAIL, no rise. No Modal**
+  **(pilot rule).** Data in `docs/data/fl_pilot/`; comm-toy `54bd6bc`.
+  - **Intake-gate fix first.**
+    - The earlier 0.89 compared the navigator-0 trunk with the 8-navigator pool. The reference is now navigator 0, on 64
+      lives with the same worlds and keys: ratio **1.000** on the initial weights.
+    - This is expected: the zero side head makes agent = navigator. It verifies the gate harness, which is the
+      harness the training rollout also uses (same `step()`).
+  - **Held-out reliance (family B, topic richest-patch): pass fraction 0.0 at u250, 500, 750, 1000, 1250 and 1500**
+    (median drop ~0).
+  - **Final gates:**
+    - G1 FAIL (0.0);
+    - G2 useless topics unchanged (msg vs silence -3% to -4%);
+    - G3 leak OK (trivially; both drops ~0).
+  - **Diagnostics added:**
+    - **In-distribution (family A, trained topic nearest-food): pass 0.0, drop ~0.** Messages are not used even on
+      what it was trained on. Every topic shows messages vs silence at -2% to -5%, i.e. a small cost.
+    - **G4 foraging of the trained agent: 17.0 vs the navigator's 27.4 (0.62x): FAIL.** Meta-training degraded
+      foraging: training intake/agent-step 0.0153 (u1-50) fell to 0.0097-0.0111 from u200 on.
+    - The side head barely moved (max |w| 0.044 from 0). The trunk is not frozen, and BC 0.1 pulls it toward a random
+      navigator per world, not navigator 0.
+  - **Reading:** within 1,500 updates, meta-RL learned no message use and partly unlearned foraging.
+  - **Options for Cam** (not run; each a laptop pilot first):
+    - (i) freeze the trunk; train only the GRU + side head;
+    - (ii) a VoI check for this harness: a scripted listener that follows the nearest-food code. How much more does it
+      eat? If ~0, there is nothing to learn here;
+    - (iii) longer meta-training;
+    - (iv) stop the fast-learner track and carry W2 comm with the population/turnover route.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
