@@ -1,0 +1,11 @@
+Cam Nov 10 ~03:40 gates on MEDIANS (lives born in the eval): P1m blind >= 3x random; P4 blind >= 1,000; P2 oracle life >= 2x blind
+d0 0.002 P12 rel 0.0005 : random   152 blind  1050 oracle  1706 | P1m True  P4 True  P2 False (1.62x)
+d0 0.002 P6 rel 0.001  : random   151 blind   811 oracle  2130 | P1m True  P4 False P2 True  (2.63x)
+d0 0.002 P6 rel 0.0    : random   151 blind   842 oracle   975 | P1m True  P4 False P2 False (1.16x)
+d0 0.003 P8 rel 0.0005 : random   121 blind  1510 oracle  2253 | P1m True  P4 True  P2 False (1.49x)
+d0 0.004 P12 rel 0.0    : random   101 blind   668 oracle  1131 | P1m True  P4 False P2 False (1.69x)
+d0 0.004 P6 rel 0.0005 : random   101 blind  1210 oracle  1609 | P1m True  P4 True  P2 False (1.33x)
+d0 0.004 P6 rel 0.0    : random   101 blind   810 oracle   859 | P1m True  P4 False P2 False (1.06x)
+d0 0.008 P6 rel 0.0    : random    61 blind  1233 oracle  1199 | P1m True  P4 True  P2 False (0.97x)
+
+== passes all three: NONE

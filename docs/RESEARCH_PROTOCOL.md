@@ -4118,6 +4118,27 @@ more expensive, because it produces publishable-looking nulls.
     codes, and re-pilot. Alternatively keep the navigator MLP as the policy trunk and add the GRU as a side memory
     whose state feeds the policy.
 
+- **Cam, Nov 10 ~03:40: W2 retune ruling.** P2m dropped: with a fixed slot cap, births happen only when someone dies,
+  so longer lives mean fewer births per life. The setpoint reproduction rule is kept for the comm run;
+  surplus-paid reproduction is logged as the W3 upgrade, tested then by relative fitness in MIXED populations. New
+  gates on medians, lives born in the eval: **P1m** blind >= 3x random; **P2** oracle median lifespan >= 2x blind;
+  **P4** blind median >= 1,000. Pick the config passing all three with the largest P2 margin; if none passes P2 on
+  medians, report before any further retune.
+- **Retune under the revised gates: NONE passes all three** (`docs/data/w2_retune/summary_v2.txt`).
+  - Only one config passes P2: **d0 0.002 / 6 patches / relocation 0.001: random 151, blind 811, oracle 2,130 (2.63x)**,
+    but P4 fails (811 < 1,000).
+  - The configs passing P4 miss P2: d0 0.002 / 12 / 0.0005 (blind 1,050, oracle 1,706, 1.62x); d0 0.003 / 8 / 0.0005
+    (1,510 vs 2,253, 1.49x); d0 0.004 / 6 / 0.0005 (1,210 vs 1,609, 1.33x).
+  - **Reported before any further retune, as ruled.** The likely next point is between the two leaders: relocation
+    ~0.001 with d0 ~0.0015-0.002 and 8-12 patches.
+- **(f) rerun 2 (world fix + material rows): gate FAIL 0/5, but moving** (`docs/data/step6f/gate.txt`; deduped by
+  segment).
+  - Distinct messages at u1000: **10 / 7 / 8 / 9 / 8** (needs >= 12 in >= 4/5; was 6 / 5 / 6 / 6 / 6 before the fix).
+  - New NOSIG listener deliveries per world (last 50): 0.15 / 0.25 (blind guessing is now costly).
+  - Stopped before compositionality, as registered.
+  - Bookkeeping: a stalled download first produced a truncated local file; re-fetched with a size check. s334 had a
+    restart segment; the last complete one is used.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under

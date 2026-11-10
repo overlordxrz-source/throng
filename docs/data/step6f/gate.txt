@@ -1,0 +1,9 @@
+(f) rerun 2 gate (world fix + material rows): >= 12 distinct messages at u1000 in >= 4/5 COMM seeds (deduped by segment)
+step6f_comp_s330_24f3925.jsonl: 1 seg, 1 complete; distinct messages at u1000 10 -> x
+step6f_comp_s331_24f3925.jsonl: 1 seg, 1 complete; distinct messages at u1000 7 -> x
+step6f_comp_s332_24f3925.jsonl: 1 seg, 1 complete; distinct messages at u1000 8 -> x
+step6f_comp_s333_24f3925.jsonl: 1 seg, 1 complete; distinct messages at u1000 9 -> x
+step6f_comp_s334_24f3925.jsonl: 2 seg, 1 complete; distinct messages at u1000 8 -> x
+step6f_nosig_s335_24f3925.jsonl: 1 seg; NOSIG listener deliveries/world (last 50) 0.15
+step6f_nosig_s336_24f3925.jsonl: 1 seg; NOSIG listener deliveries/world (last 50) 0.25
+== GATE: 0/5 -> FAIL: stop before reading compositionality
