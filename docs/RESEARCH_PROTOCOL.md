@@ -4660,6 +4660,32 @@ more expensive, because it produces publishable-looking nulls.
   - **Cost:** (e) ~$10.1 so far (estimated from metered spend); finishing adds ~$1.3, so ~$11.4 against the $12 cap.
     Option for Cam: cancel s324 (~$1.0 saved); the primary outcome is already fixed.
 
+- **RESULT (Nov 10 ~06:40): fast-learner 4c VoI check: MARGINAL, and the FL life test is not calibrated. STOP for Cam
+  before the frozen-trunk pilot** (comm-toy `62b6758`; `docs/data/fl_4c/`; picked world, spread 6 + walk, 1,100-step
+  lives, 32 codes x 8 episodes x 4 listeners).
+  - **Built:**
+    - `--freeze-trunk` (only side_enc / gru / side_head + the value head learn);
+    - per-episode qualification (an episode qualifies iff its listener heard >= 5 tokens >= 25x in the 800-step
+      adaptation; a code is scorable with >= 4 qualifying episodes);
+    - `--scripted-voi`: a scripted listener that decodes the life's code perfectly and walks the decoded direction,
+      true vs silence on the same episodes;
+    - `--score last-heard` (the ruled metric).
+  - **Nearest-food, the useful training topic:**
+    - whole-window scoring: VoI 0.70x (navigator fallback; z -3.9) / 1.09x (random fallback);
+    - **last-heard scoring: 1.53x (z 3.3, navigator fallback) PASS / 1.44x (z 4.1, random fallback) just under 1.5x.**
+  - **Richest-patch (the held-out topic): only 11-15 of 1,024 episodes qualify (1-1.5%).** Unassessable. Faster beacon
+    walks do not help (above).
+  - **The FL test's positive control fails: the perfect decoder passes the true-vs-swap test in only ~10% of scorable
+    codes** (nearest-food, either fallback; learnability's calibrated test gives 92%). A frozen-trunk pilot scored on
+    this test would be uninterpretable.
+  - **Appetite confound found (applies to learnability's VoI too):** with the navigator as the scripted listener's
+    silence fallback, the comparison partly measures the navigator's satiety.
+    - The fast learner floors energy (hungry navigator): VoI looks low. Learnability (sated navigator, idles): VoI
+      looks high (10.5x in a smoke run).
+    - With a random-move fallback in both arms (appetite-free), the learnability smoke gives **2.8x (z 7.1)**: the code
+      is genuinely worth something there.
+    - Learnability now reports both (`voi_random_fallback`). The registered VoI bar used the navigator-fallback form.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under

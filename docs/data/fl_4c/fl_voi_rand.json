@@ -1,0 +1,36 @@
+{
+ "nearest_food_dir": {
+  "family": "B",
+  "topic": "nearest_food_dir",
+  "scripted": true,
+  "codes": 32,
+  "episodes": 1024,
+  "qualifying_episodes": 314,
+  "qualifying_frac": 0.306640625,
+  "scorable_codes": 31,
+  "pass_frac_scorable": 0.06451612903225806,
+  "median_drop": 0.09688729047775269,
+  "eaten_true": 9.508340835571289,
+  "eaten_silence": 8.756954193115234,
+  "voi_ratio": 1.0858045816421509,
+  "voi_paired_z": 1.2733045097270106,
+  "voi_ok": false
+ },
+ "richest_patch_dir": {
+  "family": "B",
+  "topic": "richest_patch_dir",
+  "scripted": true,
+  "codes": 32,
+  "episodes": 1024,
+  "qualifying_episodes": 11,
+  "qualifying_frac": 0.0107421875,
+  "scorable_codes": 0,
+  "pass_frac_scorable": null,
+  "median_drop": null,
+  "eaten_true": 11.070584297180176,
+  "eaten_silence": 11.552331924438477,
+  "voi_ratio": 0.9582986831665039,
+  "voi_paired_z": -0.09341022758996738,
+  "voi_ok": false
+ }
+}
