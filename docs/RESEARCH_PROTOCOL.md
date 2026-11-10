@@ -4187,6 +4187,18 @@ more expensive, because it produces publishable-looking nulls.
     usual food. **Rule: any harness used later must reproduce the navigator's own W2 intake first.**
   - (f) / (e): analyse when they land.
 
+- **Fast learner, side-memory apparatus (Cam's two checks): PASS** (`w2/fastlearner.py --apparatus`).
+  - Heard tokens change the GRU side memory's state (max |dh| 0.48).
+  - At init they don't reach the policy (logit difference exactly 0, the zero-head design); with a nonzero head they do.
+  - No-message runs: true and swapped arms give identical intake (drop 0.0).
+  - Pilot fix: the first pilot ran the intake gate after one BC update, which had nudged the trainable trunk (0.87x).
+    The gate now runs on the untouched initial weights (0.97x), and the pilot is relaunched (1,500 updates, BC 0.1
+    kept on, quick held-out gate every 250).
+  - Harness-intake rule: the gate's navigator reference eats 29.4 per 300 steps in the beacon world (fixed-length
+    lives, floored energy). That is the harness's own navigator baseline, which the side memory reproduces (0.97x);
+    it is not the navigator's natural-W2 intake.
+- **W2 pick confirmation running:** pick and runner-up x seeds 1-3 (`w2/retune.py --seed`).
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
