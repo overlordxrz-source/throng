@@ -1,0 +1,19 @@
+config                     | rand med |    blind: n med life offs intake |   oracle: n med life offs intake | P1m P4 P2m
+d0 0.002 P12 rel 0.0005  |      152 |          1611   1050  1.0 0.0028 |          1271   1706  0.0 0.0023 | True  False False (offspring)
+d0 0.002 P6 rel 0.001   |      151 |           628    811  0.0 0.0015 |          1330   2130  0.0 0.0023 | True  False False (intake/step (offspring medians 0))
+d0 0.002 P6 rel 0.0     |      151 |           328    842  1.0 0.0021 |           267    975  1.0 0.0021 | True  False False (offspring)
+d0 0.003 P8 rel 0.0005  |      121 |          1150   1510  0.0 0.0034 |          1133   2253  0.0 0.0032 | True  False False (intake/step (offspring medians 0))
+d0 0.004 P12 rel 0.0     |      101 |           332    668  1.0 0.0041 |          3532   1131  1.0 0.0043 | True  False False (offspring)
+d0 0.004 P6 rel 0.0005  |      101 |           456   1210  0.0 0.0042 |          1318   1609  1.0 0.0042 | True  False False (intake/step (offspring medians 0))
+d0 0.004 P6 rel 0.0     |      101 |           357    810  1.0 0.0041 |           417    859  1.0 0.0043 | True  False False (offspring)
+d0 0.008 P6 rel 0.0     |       61 |          1667   1233  1.0 0.0087 |          1967   1199  1.0 0.0087 | True  False False (offspring)
+
+means (offspring lives): blind vs oracle -- mean life, mean offspring
+d0 0.002 P12 rel 0.0005 : life   1366 vs   1978 | offspring 0.82 vs 0.58 (x0.71)
+d0 0.002 P6 rel 0.001  : life    998 vs   2580 | offspring 0.75 vs 0.50 (x0.67)
+d0 0.002 P6 rel 0.0    : life   1131 vs   1115 | offspring 0.93 vs 0.93 (x0.99)
+d0 0.003 P8 rel 0.0005 : life   1892 vs   2472 | offspring 0.70 vs 0.52 (x0.74)
+d0 0.004 P12 rel 0.0    : life    945 vs   1499 | offspring 0.85 vs 0.86 (x1.00)
+d0 0.004 P6 rel 0.0005 : life   1483 vs   1900 | offspring 0.63 vs 0.62 (x0.97)
+d0 0.004 P6 rel 0.0    : life   1007 vs   1226 | offspring 0.92 vs 0.81 (x0.87)
+d0 0.008 P6 rel 0.0    : life   1623 vs   1519 | offspring 0.84 vs 0.83 (x0.98)

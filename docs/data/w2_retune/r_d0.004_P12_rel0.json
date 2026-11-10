@@ -1,0 +1,64 @@
+{
+ "config": {
+  "L": 96,
+  "P": 12,
+  "patch_sigma": 1.0,
+  "d0": 0.004,
+  "relocate": 0.0
+ },
+ "results": {
+  "random": {
+   "offspring_lives": {
+    "lives": 0
+   },
+   "all_lives": {
+    "lives": 512,
+    "median_life": 101.0,
+    "mean_life": 108.009765625,
+    "median_offspring": 0.0,
+    "mean_offspring": 0.0,
+    "median_intake_per_step": 3.833624865292941e-24
+   }
+  },
+  "blind": {
+   "offspring_lives": {
+    "lives": 332,
+    "median_life": 667.5,
+    "mean_life": 945.3012048192771,
+    "median_offspring": 1.0,
+    "mean_offspring": 0.8524096608161926,
+    "median_intake_per_step": 0.004059893106924615
+   },
+   "all_lives": {
+    "lives": 844,
+    "median_life": 275.0,
+    "mean_life": 1320.2132701421801,
+    "median_offspring": 0.0,
+    "mean_offspring": 0.39336493611335754,
+    "median_intake_per_step": 0.002467263323108989
+   }
+  },
+  "oracle": {
+   "offspring_lives": {
+    "lives": 3532,
+    "median_life": 1131.0,
+    "mean_life": 1499.3253114382785,
+    "median_offspring": 1.0,
+    "mean_offspring": 0.8561721444129944,
+    "median_intake_per_step": 0.004308757517223703
+   },
+   "all_lives": {
+    "lives": 3860,
+    "median_life": 1105.0,
+    "mean_life": 1476.7777202072539,
+    "median_offspring": 1.0,
+    "mean_offspring": 0.8673574924468994,
+    "median_intake_per_step": 0.004330681800407299
+   }
+  }
+ },
+ "P1m": true,
+ "P4": false,
+ "P2m": false,
+ "P2m_basis": "offspring"
+}

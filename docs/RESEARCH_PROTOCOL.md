@@ -4085,6 +4085,26 @@ more expensive, because it produces publishable-looking nulls.
   - **Laptop pilot running** (1,500 updates, 32 worlds, quick held-out gate every 250 updates). **The full run goes to
     Modal (cap $3) only if the pilot's held-out reliance is rising.**
 
+- **W2 world retune sweep: NO config passes** (`docs/data/w2_retune/`; 8 configs; the same learner and budget per config;
+  frozen-policy evaluation with reproduction + parent-paid juvenile J 500; gates on lives born during the evaluation).
+  - **P1m PASSES everywhere:** blind median 668-1,510 vs random 61-152.
+  - **P4 FAILS everywhere:** blind median life 668-1,510 < 2,000.
+  - **P2m FAILS everywhere:** median offspring 0-1 for both; median intake per step identical (0.0015-0.0087).
+  - **The structural finding (means, offspring lives):** information **extends life** (oracle vs blind 1,978 vs 1,366;
+    2,580 vs 998 with relocation) but **does not raise reproduction** (offspring per life x0.67-1.00; lower in every
+    relocating world).
+    - **Intake per step equals metabolic need under a homeostatic drive** (an agent eats what it burns), so it cannot
+      show the value of information.
+    - Setpoint reproduction (E >= 0.8 held 50 steps) is rate-limited by the hold, not by how much food an agent finds.
+  - **Reading:** in this world, knowing where food is doesn't convert into fitness. Retuning drain, patches or
+    relocation won't change that; **the reproduction rule is the bottleneck.**
+  - **Options for Cam (world rules, not agents):**
+    - (i) reproduction paid from surplus: an energy store above the setpoint, an offspring whenever the store reaches
+      the cost, so more food found means more offspring;
+    - (ii) a one-sided drive (the earlier fallback), so eating beyond need is rewarded and stored;
+    - (iii) P2m measured on births per 1,000 steps per world (population growth) rather than per-life medians, which
+      are coarse integers here.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
