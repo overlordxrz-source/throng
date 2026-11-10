@@ -3944,6 +3944,31 @@ more expensive, because it produces publishable-looking nulls.
     heritable trait); a pretrained listening prior (navigators trained with a scripted speaker); or brains that learn
     across lives.
 
+- **Cam, Nov 10 ~00:35: two gate failures.**
+  - **(f) FAIL accepted.** Before any rerun, a free check: **does material matter to the listener?** VoI on saved params,
+    or a scripted listener: deliveries when told fire + material vs fire only. If the gap is < 25%, the world gives no
+    reason to name material: fix the world first (reward depends on the right material). If the gap is real, rerun
+    once with material on its own freshly initialised input rows (not the old noise dims), vocab unchanged, same gate,
+    cap $1. **Dedupe by segment from now on.**
+  - **W2 learnability FAIL accepted** (the 4 → 16 positive-control fix was right). Cam's reading: reward-only PPO on
+    ~600 steps of own data can't learn a 9-way mapping; a learning-mechanism problem, not a language problem. Levers,
+    in order:
+    1. **Juvenile provisioning becomes the W2 default** (the parent pays; the newborn spawns next to the parent).
+       **Re-report P1 / P2 on MEDIANS** with it on; P2 (oracle >= 2x blind) must hold on medians.
+    2. **Predictive learning:** an auxiliary self-supervised loss on a shared trunk, heard messages as input,
+       predicting the next observation window, own energy change, and food-in-view a few steps ahead. Dense signal
+       every step, no designed meanings; the start of the world model the curiosity drive needs.
+    3. **Sleep replay:** after each rollout, K extra passes (K = 8) over the agent's own recent memory, predictive
+       loss only. Report gradient steps per life.
+    4. Rerun the learnability gate (16-episode test, >= 50% of lives) for baseline+1, +2, +2+3.
+    5. **M APPROVED (Nov 10) copying elders' actions as a permanent inborn trait for the young:** an extra arm
+       +2+3+copy-actions (behaviour cloning on nearby elders' obs → action, weighted like the signal-copying drive,
+       young only), alongside the others.
+    - **Not allowed:** navigators pretrained with a scripted speaker (that teaches our code).
+    - If all fail: a generic fast-learner prior (meta-learned on many random codes, RL^2-style memory), design only.
+      Laptop only; cap $0.5 if anything needs Modal.
+  - (e): analyse when it lands, deduped by segment.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
