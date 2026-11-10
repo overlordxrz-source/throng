@@ -82,6 +82,9 @@ def main():
     ap.add_argument("--fifth-fire", action="store_true", help="a 5th fire (centre), in the obs from update 0, lit only from --lit-from")
     ap.add_argument("--lit-from", type=int, default=7500)
     ap.add_argument("--out", required=True)
+    ap.add_argument("--log-imit", action="store_true", help="diagnostic (Cam Nov 10, 4b): log each newborn's copy loss and token agreement with the copied elders, before each copy step")
+    ap.add_argument("--copy-diag", default=None, help="diagnostic: load these brains (msgpack), roll out once, and compare each brain's argmax tokens with every other brain's on the same sender inputs; exit")
+    ap.add_argument("--copy-diag-ages", type=int, nargs="*", default=[], help="the brains' ages at the saved update (to say who copied whom)")
     ap.add_argument("--ckpt", default=None, help="checkpoint path: resume from it if present (Cam Nov 10)")
     ap.add_argument("--ckpt-every", type=int, default=250)
     ap.add_argument("--stop-after", type=int, default=0, help="test only: exit abruptly after this update (simulated preemption)")
@@ -404,6 +407,29 @@ def main():
         print(json.dumps(res, indent=1), flush=True); emit(dict(phase="selftest", **res))
         raise SystemExit(0 if res["PASS"] else 1)
 
+    if a.copy_diag:                                   # 4b: did newborns come to emit their elders' tokens on the same inputs?
+        S = jax.tree_util.tree_map(jnp.asarray, flax.serialization.from_bytes(S, open(a.copy_diag, "rb").read()))
+        sch = brains.pair_schedule(W, B, np.random.default_rng(0)); ids = brains.agent_brain_map(*sch)
+        _, R = rollout(S, ids, init_state(jax.random.PRNGKey(5)), jax.random.PRNGKey(6))
+        R = jax.tree_util.tree_map(np.asarray, R); T_, N_ = R["obs"].shape[:2]
+        idsT = np.broadcast_to(ids, (T_, N_)).reshape(-1); snd = ~np.broadcast_to(is_lis, (T_, N_)).reshape(-1)
+        obs = jnp.asarray(R["obs"].reshape(T_ * N_, -1)); car = jnp.zeros((obs.shape[0], H))
+        def argtok(Sx, b):
+            _, _, _, _, tl, _ = fwd(Sx, jnp.full(obs.shape[0], b), car, obs)
+            return np.stack([np.asarray(t.argmax(-1)) for t in tl], 1)
+        tok = {b: argtok(S, b) for b in range(B)}
+        fresh = brains.stack([nav_params((B + j) % len(a.navs)) for j in range(B)])     # untrained navigators: chance
+        tokf = {b: argtok(fresh, b) for b in range(B)}
+        out = dict(ages=a.copy_diag_ages, pairs=[])
+        for e in range(B):                            # on brain e's own sender inputs
+            rows = snd & (idsT == e)
+            for b in range(B):
+                if b == e:
+                    continue
+                ag = float((tok[b][rows] == tok[e][rows]).mean()); ch = float(np.mean([(tokf[j][rows] == tok[e][rows]).mean() for j in range(B)]))
+                out["pairs"].append(dict(copier=b, elder=e, agreement=ag, chance_fresh_navigators=ch, rows=int(rows.sum())))
+        print("COPYDIAG", json.dumps(out), flush=True); raise SystemExit(0)
+
     key = jax.random.PRNGKey(a.seed)
     state = init_state(jax.random.fold_in(key, 1))
     elder_buf = None
@@ -481,6 +507,17 @@ def main():
                     rows_all.append(pick); own.append(np.full(a.imit_batch, b))
             if rows_all:
                 rr = np.concatenate(rows_all); ob = jnp.asarray(flat["obs"][rr]); tk = jnp.asarray(flat["token_actions"][rr])
+                if a.log_imit:                        # before the copy step: CE and argmax agreement on the copied inputs
+                    ownv = np.concatenate(own)
+                    _, _, _, _, tl_, _ = fwd(S, jnp.asarray(ownv), jnp.zeros((len(rr), H)), ob)
+                    ce_ = sum(-np.take_along_axis(np.asarray(jax.nn.log_softmax(tl_[i], -1)), np.asarray(tk)[:, i:i + 1], -1)[:, 0] for i in range(3))
+                    am = np.stack([np.asarray(tl_[i].argmax(-1)) for i in range(3)], 1); tkn = np.asarray(tk)
+                    shuf = tkn[np.random.default_rng(u).permutation(len(tkn))]
+                    for b in newb:
+                        m_ = ownv == b
+                        if m_.any():
+                            emit(dict(phase="imit", update=u, newborn=int(b), age=int(ages[b]), ce=float(ce_[m_].mean()),
+                                      agree=float((am[m_] == tkn[m_]).mean()), agree_shuffled=float((am[m_] == shuf[m_]).mean())))
                 gi = imit_grads(S, ob, tk, jnp.asarray(np.concatenate(own)), jnp.ones(len(rr)))
                 gi = jax.tree_util.tree_map(lambda x: x * a.imit, gi)
                 S, OS = apply(S, OS, gi, u)
