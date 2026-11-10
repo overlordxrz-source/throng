@@ -4267,6 +4267,17 @@ more expensive, because it produces publishable-looking nulls.
       seed-1 sweep value of 1,002 was the high draw.
     - Learner-seed spread of the blind median is wide: 796-1,389 for the runner-up, with offspring-life counts 653-2,739.
   - Per the rule: **report**. No world chosen; the W2 comm run waits.
+  - **Caveat (measurement):**
+    - `retune.py` counts lives still alive at the 6,000-step horizon at their cut-off length (censored, line 53). The
+      blind and oracle medians are therefore biased low. The oracle is biased more, since more of its lives are still
+      running at the end, so P2 is understated too.
+    - The registered verdict stands on the registered measurement. A censoring-corrected read (Kaplan-Meier median, or
+      only lives born early enough to finish within the horizon) is offered to Cam, not run.
+- **Fast-learner harness note:**
+    - The 1.000 intake ratio shows the gate and the training rollout agree with each other (agent = navigator 0, same
+      keys): self-consistency.
+    - It has NOT been checked against navigator 0's intake in its own native evaluation.
+    - The fast-learner harness runs on the prototype world (P6, d0 0.008), not on a retune candidate.
 
 ## Part 3 — Fossils
 
