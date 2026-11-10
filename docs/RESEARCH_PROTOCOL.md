@@ -4430,6 +4430,13 @@ more expensive, because it produces publishable-looking nulls.
     - The median lifespan of the lives that ended moves only 986 -> 1,102.
     - Mean offspring per life is ~0.84 in every config, and ~half of the lives that ended had a child.
     - So the drain lever is nearly exhausted for P4.
+  - **Reading of the rule (flagged for Cam).** I registered 1,100 as the per-seed P4 bar, before the data. Cam's text
+    also reads as: the gates per seed at 1,000, plus the margin on the 4-seed median (>= 1,100).
+    - Under the registered reading: no pick.
+    - Under the alternative: both sweep (c) configs pass 4/4 at 1,000 with medians >= 1,100. The largest-P2 pick
+      would be **d0 0.0013** (median 1,107, clearing the margin by 7; P2 5.18x); d0 0.0012 is sturdier on P4 (1,141)
+      with P2 4.04x.
+    - Not adopted: Cam to say which reading was meant.
   - **Options for Cam:**
     - (i) a fresh confirmation of the runner-up on 4 NEW learner seeds (4-7) under the same rule. It passed the rule
       on its re-read; fresh seeds avoid picking from the re-read. ~35 min laptop.
