@@ -12,7 +12,7 @@ import modal
 
 _REQUIREMENTS = str(Path(__file__).resolve().parents[1] / "requirements.txt")
 
-PINNED_SHA = "bc63ba0d672c2c121ea7dfafe73cc68a93ab8f38"  # comm-toy branch (Nov 9: + --tau / --reinit-msg; default path bit-identical)
+PINNED_SHA = "24f3925c34e70ff2adb6613ab77b6ca08695c56d"  # comm-toy branch (Nov 10: + --spoil-wrong / --material-rows; default path bit-identical)
 REPO_URL = "https://github.com/overlordxrz-source/throng.git"
 VOLUME_NAME = "throng-runs"
 VOLUME_MOUNT = "/mnt/throng-runs"
@@ -32,7 +32,7 @@ image = (
 )
 
 
-@app.function(image=image, cpu=2.0, memory=4096, timeout=6 * 60 * 60, retries=0, volumes={VOLUME_MOUNT: volume})
+@app.function(image=image, cpu=2.0, memory=4096, timeout=2 * 60 * 60, retries=0, volumes={VOLUME_MOUNT: volume})   # tight (Cam Nov 9)
 def run_toy(tag: str, args: list) -> str:
     import os
     import subprocess
@@ -129,6 +129,16 @@ PLANS: dict = {
                                       "--wire-init-scale", "0.06", "--craft-cost", "0.45", "--ps", "1.99", "--wire-blind", "1",
                                       "--comp", "--vq-vocab", "4", "--reinit-msg", "--tau", "0.63",
                                       "--eval-at", "1000", "2000", "--tag", "S6R_COMP"]) for s in range(310, 315)],
+    # (f) step-6 rerun 2 (Cam Nov 10 ~02:25): world fix (a wrong-material Craft re-rolls the pair) + material on fresh input
+    # rows; otherwise as step6r (reinit message head, tau 0.63); NOSIG x2 for the new rules' baseline
+    "step6f": ([(f"step6f_comp_s{s}", ["--arm", "COMM", "--seed", str(s), "--updates", "3000", "--warm-start", _W,
+                                       "--wire-init-scale", "0.06", "--craft-cost", "0.45", "--ps", "1.99", "--wire-blind", "1",
+                                       "--comp", "--vq-vocab", "4", "--reinit-msg", "--tau", "0.63", "--spoil-wrong",
+                                       "--material-rows", "--eval-at", "1000", "2000", "--tag", "S6F_COMP"]) for s in range(330, 335)]
+               + [(f"step6f_nosig_s{s}", ["--arm", "NOSIG", "--seed", str(s), "--updates", "3000", "--warm-start", _W,
+                                          "--wire-init-scale", "0.06", "--craft-cost", "0.45", "--ps", "1.99", "--wire-blind", "1",
+                                          "--comp", "--vq-vocab", "4", "--reinit-msg", "--tau", "0.63", "--spoil-wrong",
+                                          "--material-rows", "--tag", "S6F_NOSIG"]) for s in (335, 336)]),
     # (d) separate brains: 8 G-12 navigators by ORACLE0's own recipe (founders 260-263, newborn pool 264-267), then the G0
     # word-bias gate: the C1 formation recipe to 1,500 from navigators 260 (seeds 280 / 281) and 261 (seeds 282 / 283)
     "nav": [(f"nav_s{s}", ["--arm", "ORACLE", "--seed", str(s), "--updates", "1500", "--craft-cost", "0.45",

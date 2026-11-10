@@ -4031,6 +4031,19 @@ more expensive, because it produces publishable-looking nulls.
        written), laptop first, cap $3.
   - (e): analyse when it lands.
 
+- **(f) world-fix VoI check (free): gap 75.6%** (`docs/data/step6r/voi_spoil.txt`). Told fire + material: 24.75
+  deliveries, net +66.8; fire only: 6.04, net +8.2. The gap is real (>= 25%; Cam expected ~75%).
+- **REGISTERED: (f) rerun 2, plan `step6f`** (comm-toy `24f3925`, deploy + spawn; toy function timeout tightened to
+  2 h).
+  - COMM x5 (seeds 330-334) + **NOSIG x2 (335 / 336) for the new rules' baseline**, 3,000 updates.
+  - Flags: `--comp --vq-vocab 4 --reinit-msg --tau 0.63 --spoil-wrong --material-rows`:
+    - **world fix:** a wrong-material Craft at the lit fire re-rolls the pair;
+    - **material on 4 new input dims before the wire**, rows freshly initialised (ORACLE0's 59-dim weights expanded);
+      the old noise slots carry noise.
+  - **Same gate:** >= 12 distinct messages at u1000 in >= 4/5 COMM seeds, else stop before reading compositionality.
+    Then `analyze_step6.py`. Cap $1 (estimate ~$0.9).
+  - Checks: default path bit-identical (15/15 rows); the new flags run end to end (laptop smoke).
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under

@@ -1,0 +1,4 @@
+world fix (wrong-material Craft spoils the opportunity): True
+FULL      (fire + material): deliveries/world/128 steps 24.75, net reward +66.82
+FIRE-ONLY (fire only)      : deliveries/world/128 steps 6.04, net reward +8.16
+GAP in deliveries = 75.6% (Cam's line: 25%) -> REAL: rerun with material on fresh input rows | gap in net reward 87.8%
