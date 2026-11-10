@@ -4491,6 +4491,14 @@ more expensive, because it produces publishable-looking nulls.
   - **Rule:** switch to d0 0.0012 iff the median over the 8 navigators is < 1,000 OR fewer than 6/8 (3/4) reach >= 1,000.
   - Output: `w2_out/nav_w13/` (comm-toy `1b6077e`).
 
+- **RESULT (Nov 10 ~02:20): pick confirmation via the navigator retrain: PICK STANDS (d0 0.0013 / 8 / 0.001)**
+  (`docs/data/nav_w13/`).
+  - Blind KM medians of the 8 navigators (lives born in the retune eval): 1001 / 961 / 1064 / 1062 / 1052 / 1148 / 1113 / 1003.
+  - **Median 1057; 7/8 reach >= 1,000.** The registered switch condition (median < 1,000 or < 6/8) is not met.
+  - Margin note: the median is 4% above the old 1,000 bar. Seed noise is as wide as the gap between candidates.
+  - The 8 navigators are the W2 newborn starting weights for this world. Navigator gate (each >= 0.7x the best):
+    8/8.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
