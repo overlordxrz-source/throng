@@ -4368,6 +4368,32 @@ more expensive, because it produces publishable-looking nulls.
     ~1 token value too. To be measured when the harnesses move to the retuned world (4b). Relocating food there will
     vary the message within a life somewhat.
 
+- **RESULT: the fast learner has the same coverage hole** (`fastlearner.py --coverage`, comm-toy `4cecd27`; prototype
+  world, 64 lives x 4 listeners, adapt + test = 600 steps, navigator-trunk policy).
+  - Median distinct heard tokens per life:
+    - **useful topics:** nearest-food **1** (160/256 lives hear a single token), richest-patch **1** (221/256),
+      distance band **1**;
+    - useless topics: nearest-agent 6, energy band 2, noise 8.
+  - So the topics that carry value are near-constant within a life. A life cannot identify a code from one token, and
+    the swap test hands it a token it never heard. **This alone explains the null pilot** (reliance 0 in and out of
+    distribution), independent of the meta-learner.
+  - Meanwhile the useless topics vary, so "the message changes" in-life is predictive of nothing useful: a prior that
+    learned to ignore changing tokens would be the rational one.
+- **Item 1 decision: checkpoint + resume** (not non-preemptible).
+  - Modal's non-preemptible containers cost 3x the list price for CPU and memory.
+  - Preemption cost (e) about 23% extra (~89k updates run for 72k needed, before the incident).
+  - Resume will be built and verified bit-identical on a short chunk before the next run over 2 h. The 4 reruns in
+    flight have none.
+- **Guard r3 live** (`~/throng-smoke/cap_guard_r3.sh`).
+  - It refuses to start without an explicit CAP, or with CAP at or below metered spend (both tested).
+  - Heartbeat file every tick; `guard_check.sh` reports its age and flags a dead guard after 3 min.
+- **(f) exploratory compositionality (no claim)**, step6v8 s340 / s342 / s344 at U = 2000
+  (`docs/data/step6v8/exploratory_comp.txt`):
+  - **topsim above the permutation null in 3/3** (rho 0.49 / 0.53 / 0.60 vs null p95 ~0.17-0.19);
+  - **held-out generalisation 0/3** (at or below chance 1/16; indistinguishable from shuffled);
+  - rho is identical at u1000 and u2000: the meaning-to-message map is frozen from u1000.
+  - So the codes are structured but do not generalise to unseen combinations.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
