@@ -271,10 +271,13 @@ def main():
         (s, eaten), _ = jax.lax.scan(body, (s, 0.0), jax.random.split(jax.random.fold_in(key, 2), 300))
         return eaten
 
-    def intake_gate(p, n=32):
+    def intake_gate(p, n=64):
+        """the agent (no messages) vs its reference navigator, same worlds and keys. For the side memory the reference is
+        the navigator its trunk was loaded from (navigator 0); for a clone, the pool (one navigator per life)"""
         perms = jnp.asarray(FA[np.random.default_rng(7).integers(0, len(FA), n)])
         keys = jax.random.split(jax.random.PRNGKey(4242), n)
-        navi = jax.tree_util.tree_map(lambda x: x[np.arange(n) % KN], NAVP)
+        idx = np.zeros(n, int) if a.arch == "sidemem" else np.arange(n) % KN
+        navi = jax.tree_util.tree_map(lambda x: x[idx], NAVP)
         nv = np.asarray(jax.jit(jax.vmap(nav_life))(navi, perms, keys))
         fl = np.asarray(lt(p, perms, keys[:, None], 0, a.adapt, 0, True))[:, 0]           # no messages
         return dict(nav_median=float(np.median(nv)), fl_median=float(np.median(fl)),
