@@ -1,0 +1,202 @@
+{
+ "nearest_food_dir": {
+  "scripted": {
+   "lives": 128,
+   "eligible": 54,
+   "eligibility_rate": 0.421875,
+   "pass_frac": 0.0,
+   "ci95": [
+    6.938893903907228e-18,
+    0.06641586678100189
+   ],
+   "stratified": {
+    "5": {
+     "n": 24,
+     "pass_frac": 0.0
+    },
+    "6": {
+     "n": 14,
+     "pass_frac": 0.0
+    },
+    "7-8": {
+     "n": 16,
+     "pass_frac": 0.0
+    }
+   },
+   "median_distinct": 8.0,
+   "median_well": 3.0,
+   "voi": {
+    "eaten_true": 8.652255058288574,
+    "eaten_silence": 3.299351453781128,
+    "ratio": 2.622410774230957,
+    "paired_z": 16.204301955018856
+   }
+  },
+  "scripted_rfb": {
+   "lives": 128,
+   "eligible": 56,
+   "eligibility_rate": 0.4375,
+   "pass_frac": 0.07142857142857142,
+   "ci95": [
+    0.028125581246379636,
+    0.16975682831486205
+   ],
+   "stratified": {
+    "5": {
+     "n": 20,
+     "pass_frac": 0.1
+    },
+    "6": {
+     "n": 16,
+     "pass_frac": 0.0625
+    },
+    "7-8": {
+     "n": 20,
+     "pass_frac": 0.05
+    }
+   },
+   "median_distinct": 8.0,
+   "median_well": 3.5,
+   "voi": {
+    "eaten_true": 12.59742259979248,
+    "eaten_silence": 8.000487327575684,
+    "ratio": 1.5745818614959717,
+    "paired_z": 10.773785810743815
+   }
+  },
+  "nonlistener": {
+   "lives": 128,
+   "eligible": 54,
+   "eligibility_rate": 0.421875,
+   "pass_frac": 0.0,
+   "ci95": [
+    6.938893903907228e-18,
+    0.06641586678100189
+   ],
+   "stratified": {
+    "5": {
+     "n": 30,
+     "pass_frac": 0.0
+    },
+    "6": {
+     "n": 9,
+     "pass_frac": 0.0
+    },
+    "7-8": {
+     "n": 15,
+     "pass_frac": 0.0
+    }
+   },
+   "median_distinct": 6.0,
+   "median_well": 4.0
+  },
+  "gate": {
+   "positive_ok": false,
+   "negative_ok": true,
+   "voi_nav_ok": true,
+   "voi_rand_ok": true,
+   "enough_eligible": true,
+   "PASS": false
+  }
+ },
+ "second_nearest_patch_dir": {
+  "scripted": {
+   "lives": 128,
+   "eligible": 12,
+   "eligibility_rate": 0.09375,
+   "pass_frac": 0.08333333333333333,
+   "ci95": [
+    0.014864709450773478,
+    0.35388592179859524
+   ],
+   "stratified": {
+    "5": {
+     "n": 2,
+     "pass_frac": 0.0
+    },
+    "6": {
+     "n": 9,
+     "pass_frac": 0.1111111111111111
+    },
+    "7-8": {
+     "n": 1,
+     "pass_frac": 0.0
+    }
+   },
+   "median_distinct": 6.0,
+   "median_well": 2.0,
+   "voi": {
+    "eaten_true": 8.53064250946045,
+    "eaten_silence": 2.849076509475708,
+    "ratio": 2.994178056716919,
+    "paired_z": 14.46171001713528
+   }
+  },
+  "scripted_rfb": {
+   "lives": 128,
+   "eligible": 17,
+   "eligibility_rate": 0.1328125,
+   "pass_frac": 0.058823529411764705,
+   "ci95": [
+    0.01046013064516424,
+    0.269825452035628
+   ],
+   "stratified": {
+    "5": {
+     "n": 6,
+     "pass_frac": 0.0
+    },
+    "6": {
+     "n": 10,
+     "pass_frac": 0.1
+    },
+    "7-8": {
+     "n": 1,
+     "pass_frac": 0.0
+    }
+   },
+   "median_distinct": 6.0,
+   "median_well": 2.0,
+   "voi": {
+    "eaten_true": 10.542692184448242,
+    "eaten_silence": 7.085727214813232,
+    "ratio": 1.4878772497177124,
+    "paired_z": 5.90904322476217
+   }
+  },
+  "nonlistener": {
+   "lives": 128,
+   "eligible": 46,
+   "eligibility_rate": 0.359375,
+   "pass_frac": 0.0,
+   "ci95": [
+    -6.938893903907228e-18,
+    0.07707617732978073
+   ],
+   "stratified": {
+    "5": {
+     "n": 27,
+     "pass_frac": 0.0
+    },
+    "6": {
+     "n": 14,
+     "pass_frac": 0.0
+    },
+    "7-8": {
+     "n": 5,
+     "pass_frac": 0.0
+    }
+   },
+   "median_distinct": 6.0,
+   "median_well": 4.0
+  },
+  "gate": {
+   "positive_ok": false,
+   "negative_ok": true,
+   "voi_nav_ok": true,
+   "voi_rand_ok": false,
+   "enough_eligible": false,
+   "PASS": false
+  }
+ }
+}

@@ -4940,6 +4940,36 @@ more expensive, because it produces publishable-looking nulls.
     - Reading (not tested): the target (food within the 7x7 view four steps ahead) may be barely informed by a
       direction to a patch beyond view.
 
+- **RESULT (Nov 10 ~19:15): fast-learner recalibration (free, laptop): NOT CALIBRATED. The positive control fails
+  under every probe design; STOP for Cam** (comm-toy `a824ffa`, `fastlearner.py --calib`; `docs/data/fl_calib/`).
+  - **Design ported from the frozen learnability test:**
+    - a life = one listener's 800-step adaptation in one world;
+    - well-heard tokens = >= 25x during adaptation; eligible iff >= 5 well-heard;
+    - probes true vs a derangement among the life's well-heard tokens, last-heard credit;
+    - pass = drop >= 30% AND paired > 2 SE over the probes; Wilson CIs, stratified 5 / 6 / 7-8.
+    - Positive control = a scripted decoder (decodes the life's code perfectly, walks the decoded direction). Negative
+      control = the untrained side memory (zero side head = the navigator, message-blind). VoI = scripted true vs
+      silence, navigator AND random fallback.
+  - **Three probe designs, nearest-food (picked world, spread 6 + walk, family B):**
+
+    | probe design | eligible | positive (nav / random fallback) | negative | VoI nav | VoI random |
+    |---|---|---|---|---|---|
+    | in place (continue the adapted state, 8 x 300) | 25 / 64 | 0% / 4% | 0% | 1.58x (z 3.4) | 1.06x (z 1.2) |
+    | fresh world, new patches (24 x 600) | 54 / 128 | 3.7% / 12.5% | 0% | 2.42x (z 17) | 1.70x (z 15) |
+    | fresh world, the life's patches (24 x 600) | 54 / 128 | 0% / 7% | 0% | 2.62x (z 16) | 1.57x (z 11) |
+
+  - **So in this harness the code has clear value** (VoI both forms >= 1.5x with fresh probes) and the negative control
+    is clean. But **a perfect decoder does not lose >= 30% of its credited food when its well-heard tokens are
+    deranged** (learnability's identical design: 92%).
+    - The cause is not found. Candidates: fewer well-heard tokens per life (median 3-4 vs 6-8 in learnability, so
+      derangements are often near-adjacent); hearing only from wandering speakers within radius 9 for a few steps
+      before the decoder walks out of range.
+    - Not tuned further on my own: three designs tried, and more would be forking paths.
+  - **New held-out topic, candidate second_nearest_patch_dir (topic 6): NOT viable.**
+    - Scripted eligibility is 12-17 / 128: the decoder walks away from the speakers.
+    - VoI random fallback 1.49x.
+    - No held-out topic is registered yet; the FL track stays parked.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under

@@ -1,0 +1,102 @@
+{
+ "nearest_food_dir": {
+  "scripted": {
+   "lives": 128,
+   "eligible": 54,
+   "eligibility_rate": 0.421875,
+   "pass_frac": 0.037037037037037035,
+   "ci95": [
+    0.010216153585413057,
+    0.12535409343403314
+   ],
+   "stratified": {
+    "5": {
+     "n": 24,
+     "pass_frac": 0.041666666666666664
+    },
+    "6": {
+     "n": 14,
+     "pass_frac": 0.0
+    },
+    "7-8": {
+     "n": 16,
+     "pass_frac": 0.0625
+    }
+   },
+   "median_distinct": 8.0,
+   "median_well": 3.0,
+   "voi": {
+    "eaten_true": 8.2003812789917,
+    "eaten_silence": 3.3830296993255615,
+    "ratio": 2.4239754676818848,
+    "paired_z": 17.285247311502918
+   }
+  },
+  "scripted_rfb": {
+   "lives": 128,
+   "eligible": 56,
+   "eligibility_rate": 0.4375,
+   "pass_frac": 0.125,
+   "ci95": [
+    0.06188990138969254,
+    0.23625720697639396
+   ],
+   "stratified": {
+    "5": {
+     "n": 20,
+     "pass_frac": 0.15
+    },
+    "6": {
+     "n": 16,
+     "pass_frac": 0.0625
+    },
+    "7-8": {
+     "n": 20,
+     "pass_frac": 0.15
+    }
+   },
+   "median_distinct": 8.0,
+   "median_well": 3.5,
+   "voi": {
+    "eaten_true": 12.360856056213379,
+    "eaten_silence": 7.280355930328369,
+    "ratio": 1.6978367567062378,
+    "paired_z": 15.308297393550545
+   }
+  },
+  "nonlistener": {
+   "lives": 128,
+   "eligible": 54,
+   "eligibility_rate": 0.421875,
+   "pass_frac": 0.0,
+   "ci95": [
+    6.938893903907228e-18,
+    0.06641586678100189
+   ],
+   "stratified": {
+    "5": {
+     "n": 30,
+     "pass_frac": 0.0
+    },
+    "6": {
+     "n": 9,
+     "pass_frac": 0.0
+    },
+    "7-8": {
+     "n": 15,
+     "pass_frac": 0.0
+    }
+   },
+   "median_distinct": 6.0,
+   "median_well": 4.0
+  },
+  "gate": {
+   "positive_ok": false,
+   "negative_ok": true,
+   "voi_nav_ok": true,
+   "voi_rand_ok": true,
+   "enough_eligible": true,
+   "PASS": false
+  }
+ }
+}
