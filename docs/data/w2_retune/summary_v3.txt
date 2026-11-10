@@ -1,0 +1,9 @@
+Retune sweep 2 (in-between), gates on MEDIANS of lives born in the eval: P1m blind >= 3x random; P4 blind >= 1,000; P2 oracle >= 2x blind
+d0 0.0015 P12 rel 0.001: random  174 | blind  1458 (n 1602) | oracle  2116 (n 1300) | P1m True  P4 True  P2 False (1.45x)
+d0 0.0015 P8 rel 0.001: random  173 | blind  1002 (n 2218) | oracle  2983 (n 1169) | P1m True  P4 True  P2 True  (2.98x)
+d0 0.0018 P10 rel 0.0008: random  160 | blind  1056 (n 2739) | oracle  2832 (n 1256) | P1m True  P4 True  P2 True  (2.68x)
+d0 0.0018 P10 rel 0.0012: random  160 | blind  1092 (n 1311) | oracle  2092 (n 988) | P1m True  P4 True  P2 False (1.92x)
+d0 0.002 P12 rel 0.001: random  152 | blind  1384 (n 1438) | oracle  1797 (n 1127) | P1m True  P4 True  P2 False (1.30x)
+d0 0.002 P8 rel 0.001: random  151 | blind   884 (n 2825) | oracle  2194 (n 1232) | P1m True  P4 False P2 True  (2.48x)
+
+== PICK (passes all three, largest P2 margin): {'L': 96, 'P': 8, 'patch_sigma': 1.0, 'd0': 0.0015, 'relocate': 0.001} (2.98x)

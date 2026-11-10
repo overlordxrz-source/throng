@@ -4158,6 +4158,23 @@ more expensive, because it produces publishable-looking nulls.
     3. if cloning can't reach the intake gate, switch to the navigator MLP trunk + GRU side memory.
   - (e): analyse when it lands.
 
+- **W2 retune sweep 2 (in-between): PICK = d0 0.0015, 8 patches, relocation 0.001** (`docs/data/w2_retune/summary_v3.txt`).
+  - Medians, lives born in the eval: **random 173, blind 1,002, oracle 2,983; P1m PASS, P4 PASS, P2 PASS 2.98x.**
+  - Also passing all three: d0 0.0018 / 10 / 0.0008 (random 160, blind 1,056, oracle 2,832, 2.68x).
+  - **Caveat:** the pick's P4 margin is razor-thin (1,002 vs 1,000) on one learner seed. Suggest confirming on 2-3 more
+    seeds before the comm run (the runner-up is sturdier on P4).
+  - Others: d0 0.0015 / 12 / 0.001 (1.45x), d0 0.0018 / 10 / 0.0012 (1.92x), d0 0.002 / 12 / 0.001 (1.30x),
+    d0 0.002 / 8 / 0.001 (P4 fails, 884).
+- **Fast learner: behaviour cloning FAILED the intake gate; the side-memory fallback PASSES it.**
+  - Cloning (DAgger, 300-1,500 updates): clone intake ~0 vs the navigators' 29.4 per 300 steps.
+    - The navigators are near-uniform on the clone's states (entropy 1.6 of 1.79), and KL 0.17-0.43 doesn't fall.
+    - Even with expert roll-in the logged intake stayed ~13x below the navigators' in the same world: an unresolved
+      cloning-pipeline issue (not chased, since Cam's fallback was approved for exactly this case).
+  - **Side memory (`--arch sidemem`):** navigator MLP trunk (weights loaded) + GRU over [heard, previous action,
+    previous reward] adding to the policy logits through a zero-initialised head. **Intake gate PASS: 28.6 vs 29.4
+    (0.97x).**
+  - Meta-training pilot running (1,500 updates, BC 0.1 kept on, quick held-out gate every 250).
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
