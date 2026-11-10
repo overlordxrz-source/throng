@@ -359,6 +359,10 @@ def main():
     res = dict(null_code=a.null_code, held_out=dict(topic=TOPICS[HELD_TOPIC], family="B"), per_topic=per_topic, leak_check_A=gA,
                G1_pass=held["pass_frac"] >= 0.5, G2_useless_unchanged=bool(useless_ok),
                G3_leak_ok=abs(gA["median_drop"] - held["median_drop"]) < 0.1)
+    # diagnostics (Nov 10): in-distribution reliance (a training family + a useful training topic) and G4 foraging of the
+    # TRAINED agent (no messages) vs its reference navigator(s), same worlds and keys
+    res["in_dist_A_nearest_food"] = gate(FA, a.eval_lives, "A", TOPICS.index("nearest_food_dir"))
+    ig = intake_gate(params); res["G4_intake_trained"] = ig; res["G4_pass"] = ig["pass"]
     print(json.dumps(res)); json.dump(res, open(f"{a.out}/gates{'_null' if a.null_code else ''}.json", "w"), indent=1)
 
 
