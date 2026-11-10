@@ -20,6 +20,7 @@ from __future__ import annotations
 import argparse
 import functools
 import json
+import os
 import sys
 import time
 from pathlib import Path
@@ -81,6 +82,9 @@ def main():
     ap.add_argument("--fifth-fire", action="store_true", help="a 5th fire (centre), in the obs from update 0, lit only from --lit-from")
     ap.add_argument("--lit-from", type=int, default=7500)
     ap.add_argument("--out", required=True)
+    ap.add_argument("--ckpt", default=None, help="checkpoint path: resume from it if present (Cam Nov 10)")
+    ap.add_argument("--ckpt-every", type=int, default=250)
+    ap.add_argument("--stop-after", type=int, default=0, help="test only: exit abruptly after this update (simulated preemption)")
     a = ap.parse_args()
 
     G, W, T, B, H = a.grid, a.worlds, a.steps, a.brains, 64
@@ -404,7 +408,20 @@ def main():
     state = init_state(jax.random.fold_in(key, 1))
     elder_buf = None
     prev_head = [head_vec(S, b) for b in range(B)]
-    for u in range(1, a.updates + 1):
+    u0 = 1
+    if a.ckpt:
+        import ckpt as _ck
+        C = _ck.load(a.ckpt)
+        if C is not None:                                      # resume: restore the loop state, drop rows after it
+            out_f.flush(); _ck.truncate(a.out, C["out_offset"]); out_f.seek(0, 2)
+            S, OS, pop, born, gen, repl = C["S"], C["OS"], C["pop"], C["born"], C["gen"], C["repl"]
+            nav_of, next_nav, rng, key, state, elder_buf, prev_head = (C["nav_of"], C["next_nav"], C["rng"], C["key"],
+                                                                       C["state"], C["elder_buf"], C["prev_head"])
+            S = jax.tree_util.tree_map(jnp.asarray, S); OS = jax.tree_util.tree_map(jnp.asarray, OS)
+            key = jnp.asarray(key); state = jax.tree_util.tree_map(jnp.asarray, state)
+            u0 = C["u"] + 1
+            emit(dict(phase="resume", update=C["u"]))
+    for u in range(u0, a.updates + 1):
         t0 = time.time()
         if u in repl:                                         # a newborn replaces slot b
             b = repl.pop(u)
@@ -478,6 +495,14 @@ def main():
         if u in a.save_at and a.save_prefix:
             Path(a.save_prefix).parent.mkdir(parents=True, exist_ok=True)
             Path(f"{a.save_prefix}_u{u}_brains.msgpack").write_bytes(flax.serialization.to_bytes(S))
+        if a.ckpt and (u % a.ckpt_every == 0) and u < a.updates:
+            import ckpt as _ck
+            out_f.flush()
+            _ck.save(a.ckpt, dict(u=u, out_offset=os.path.getsize(a.out), S=S, OS=OS, pop=pop, born=born, gen=gen, repl=repl,
+                                  nav_of=nav_of, next_nav=next_nav, rng=rng, key=key, state=state, elder_buf=elder_buf,
+                                  prev_head=prev_head))
+        if a.stop_after and u == a.stop_after:
+            out_f.flush(); os._exit(3)
 
 
 if __name__ == "__main__":
