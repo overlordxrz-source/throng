@@ -305,6 +305,11 @@ def main():
     else:
         S, Pm, Tp, Hh, PA, PR = fresh(W, FA); t_life = 0; key = jax.random.PRNGKey(a.seed + 1); log = open(f"{a.out}/train.jsonl", "w")
         nav_w = jax.tree_util.tree_map(lambda x: x[rng.integers(0, KN, W)], NAVP)
+        if a.bc_pretrain == 0:              # side memory: the intake gate on the untouched initial weights (agent = navigator)
+            ig = intake_gate(params); print("intake gate", json.dumps(ig), flush=True)
+            log.write(json.dumps(dict(update=0, intake_gate=ig)) + "\n"); log.flush()
+            if not ig["pass"] and not a.continue_on_fail:
+                print("STOP: intake gate failed"); return
         for it in range(a.bc_pretrain + a.updates):
             phase1 = it < a.bc_pretrain
             t0 = time.time()
