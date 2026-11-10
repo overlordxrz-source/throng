@@ -4499,6 +4499,22 @@ more expensive, because it produces publishable-looking nulls.
   - The 8 navigators are the W2 newborn starting weights for this world. Navigator gate (each >= 0.7x the best):
     8/8.
 
+- **Item 4 DONE: checkpoint + resume** (comm-toy `1fd73d0`).
+  - `scripts/ckpt.py`: atomic save (tmp + fsync + os.replace) and load. `pop_toy.py --ckpt PATH --ckpt-every N`
+    saves the full loop state:
+    - brains, optimiser, per-brain PopArt, birth/generation tables, replacement schedule, navigator assignment;
+    - the numpy Generator and the JAX key, the env state, the head-drift reference;
+    - the output file's byte offset. On resume the JSONL is truncated to that offset, so rows written after the
+      checkpoint are not duplicated.
+  - **Test** (`tests/test_pop_ckpt.py`, 55 s): a tiny run straight through vs the same run killed after u5
+    (checkpoints at u2 / u4) and restarted on the same input.
+    - It really resumes from u4; births fall after the resume point; train updates are 1..6 with no duplicates.
+    - **Every row and the final brains are identical: PASS.**
+    - Mutation check: restoring a fresh numpy Generator instead of the saved one FAILS the test, so the test has
+      teeth.
+  - **Default path (no --ckpt) is row-identical to the pinned 5c5b07a** (21/21 rows on the same tiny config).
+  - The W2 comm-run harness will use the same `ckpt.py`.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
