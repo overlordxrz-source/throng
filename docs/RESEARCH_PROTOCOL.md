@@ -4778,6 +4778,60 @@ more expensive, because it produces publishable-looking nulls.
 - **RECORDED (Cam): "Separate-brains toy population: the founders' code dies through turnover in both arms; cultural
   transmission not shown. Consistent with W2: one-life learnability is the bottleneck." The toy population is CLOSED.**
 
+- **RESULT (Nov 10, read ~18:10): LEARNABILITY 2 ARMS x 5 SEEDS (frozen test): ALL-ON FAIL, reliance RISING with age;
+  NO-LEVER FAIL, flat zero.** (`docs/data/learn_arms/`: per-seed JSONs + logs, `summarize.py` (registered),
+  `age_trend.py`; Modal `62b6758`; all 10 exited 0.)
+  - **No levers:**
+    - pass 0/934 eligible lives (0.0% in every seed; CI upper bounds ~2%);
+    - eligibility 15-20%; median lifespan ~340; **12 gradient steps per life**;
+    - 0% at every snapshot age (250 / 500 / 1,000).
+  - **All levers:**
+    - pass 4-11% per seed (s0 11.0%, s1 9.1%, s2 10.1%, s3 3.9%, s4 4.7%); **pooled 90/1,164 = 7.7%** (bar >= 50%):
+      FAIL in 5/5 seeds;
+    - eligibility 58-64%; median lifespan ~890; 476-510 gradient steps per life.
+  - **Eligibility differs by 43 points**, so stratified per the ruling. All-on by sector count: 5 -> 1-7%, 6 -> 3-12%,
+    7-8 -> 4-17%. No-lever: 0% in every stratum. The all-on > no-lever difference holds within every stratum.
+  - **Age trend (all-on, pooled):** age 250 2.7% (32/1,164) -> 500 6.4% (74/1,164) -> 1,000 10.4% (69/661).
+    - Two-proportion z: +4.2 and +3.1, so **RISING** under the registered rule (1000 > 500 > 250, each step z > 2).
+    - Caveat: the 1,000 set is the lives that survived to 1,000 (a subset), so survivor selection may flatter the late
+      point.
+  - **Extrapolation to 30% is model-dependent:**
+    - linear: +10.2 points per 1,000 steps -> **30% at age ~2,900** (~3.3x the median lifespan of ~890);
+    - log-age: +5.5 points per e-fold -> ~36,000.
+    - Both fits use only 3 points.
+  - **First reliance:** 9.5-17% of eligible all-on lives ever pass at a snapshot or at death; the median first age
+    among those is 500 (s1: 735), against a median lifespan of ~890.
+  - **Confound in the no-lever arm (flagged):** with juvenile 0, newborns live ~340 steps and get ~12 gradient steps
+    (40x fewer than all-on). The no-lever 0% therefore cannot separate "the levers teach" from "longer lives give more
+    gradient steps". The ablations would separate them.
+  - **Branch (Cam's registered tree): ALL-ON FAIL with reliance rising -> learning is real but too slow for one life.
+    Report the slope and extrapolation; LAUNCH NOTHING.** Cam to choose between a longer childhood and stronger levers.
+- **RESULT: gate rerun at `62b6758` (`app_gate_voir`) reproduces the frozen gate exactly** (scripted 91.88%,
+  non-listener 0%, 197 eligible).
+  - **Appetite-free VoI (random fallback, reported): true 25.6 vs silence 8.3 = 3.09x, paired z 55.**
+  - Navigator-fallback form: 3.42x. Both forms are >= 1.5x.
+- **RESULT: (e) final record, 7 seeds** (`docs/data/pop_e/analyze_pop_final_7seeds.txt`, `transmission_diag_7seeds.txt`;
+  dictionaries `docs/data/for_m/pop_e_dictionaries_7seeds.json`).
+  - **Primary 0/4 POP seeds** (s322: cross drop +1%, true-message 0.45 vs gain bar 1.42). **Secondary FAIL** (POP
+    median 0.010 vs control 0.006). **Fire 5: 0/3** (s322 has no fire-5 probe).
+  - s326 complete. **s322 incomplete** (stopped at u8692 in its 7th segment), but its u7500 primary and MI are
+    complete. s324 cancelled per Cam.
+  - Transmission diagnostic on 7 seeds, unchanged: founders' reliance at u1500 43-53% (s322 52%); newborn-founder word
+    agreement 0.00 in every seed.
+  - **VERDICT FAIL as registered; toy population CLOSED.**
+- **COST OVERRUN, disclosed (my error):** (e) cost ~$15.15 against its $12 cap (throng-pop $6.51 on Nov 9 + $8.57
+  on Nov 10, throng-pop-ck $0.08): **26% over, beyond the 25% leeway.**
+  - s322 was preempted yet again at ~11:30 and restarted from u1 on the un-checkpointed app.
+  - When I moved s324 to the checkpointed app, I did not move s322.
+  - My session ended ~07:20 and took the Mac guard with it (heartbeat stale from 07:21). Nothing watched s322 until
+    the operator stopped throng-pop at ~17:40.
+  - The global $41 guard cap was never at risk (metered $24.76).
+  - **Lessons:**
+    - any run over 2 h goes on a checkpointed app from launch;
+    - a dead guard must be noticed (`guard_check.sh` at the start of every session);
+    - per-item caps need their own watch, not only the global guard.
+  - New-work batch (cap $8): throng-w2jobs $2.75 + pop-ck $0.08 = ~$2.83.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under

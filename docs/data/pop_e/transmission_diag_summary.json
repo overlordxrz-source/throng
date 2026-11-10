@@ -11,6 +11,16 @@
  },
  {
   "tag": "POPCTL",
+  "seed": 326,
+  "reliance_u1500": null,
+  "founders_mi_u1500": 1.7339598172575803,
+  "newborn_max_mi": 0.6572795167477016,
+  "newborn_max_agree": 0.0,
+  "newborns_with_mi_ge_0_5": 1,
+  "newborn_obs": 17
+ },
+ {
+  "tag": "POPCTL",
   "seed": 327,
   "reliance_u1500": null,
   "founders_mi_u1500": 1.5437432168127423,
@@ -38,6 +48,16 @@
   "newborn_max_agree": 0.0,
   "newborns_with_mi_ge_0_5": 1,
   "newborn_obs": 17
+ },
+ {
+  "tag": "POP",
+  "seed": 322,
+  "reliance_u1500": 0.5237741456166419,
+  "founders_mi_u1500": 1.5299741921458934,
+  "newborn_max_mi": 0.5061415762559376,
+  "newborn_max_agree": 0.0,
+  "newborns_with_mi_ge_0_5": 1,
+  "newborn_obs": 13
  },
  {
   "tag": "POP",

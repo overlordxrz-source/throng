@@ -1,0 +1,50 @@
+== POPCTL seed 325: population cross-spot reliance by update: 
+   u1500: b0 gen2 age0 MI +0.00 agree 0.00 | b1 gen1 age1500 MI +1.95 agree 0.25 | b2 gen1 age1500 MI +1.59 agree 0.25 | b3 gen1 age1500 MI +2.00 agree 0.50
+   u3500: b0 gen3 age0 MI +0.00 agree 0.00 | b1 gen2 age1500 MI +0.34 agree 0.00 | b2 gen2 age1000 MI +0.73 agree 0.00 | b3 gen2 age500 MI +0.53 agree 0.00
+   u5500: b0 gen4 age0 MI +0.01 agree 0.00 | b1 gen3 age1500 MI +0.01 agree 0.00 | b2 gen3 age1000 MI +0.04 agree 0.00 | b3 gen3 age500 MI +0.06 agree 0.00
+   u7500: b0 gen5 age0 MI +0.02 agree 0.00 | b1 gen4 age1500 MI +0.01 agree 0.00 | b2 gen4 age1000 MI +0.01 agree 0.00 | b3 gen4 age500 MI +0.00 agree 0.00
+   u9000: b0 gen5 age1500 MI +0.00 agree 0.00 | b1 gen5 age1000 MI +0.01 agree 0.00 | b2 gen5 age500 MI +0.02 agree 0.00 | b3 gen5 age0 MI +0.62 agree 0.00
+== POPCTL seed 326: population cross-spot reliance by update: 
+   u1500: b0 gen2 age0 MI -0.00 agree 0.00 | b1 gen1 age1500 MI +1.60 agree 0.25 | b2 gen1 age1500 MI +1.60 agree 0.50 | b3 gen1 age1500 MI +2.00 agree 0.25
+   u3500: b0 gen3 age0 MI -0.01 agree 0.00 | b1 gen2 age1500 MI +0.18 agree 0.00 | b2 gen2 age1000 MI +0.31 agree 0.00 | b3 gen2 age500 MI +0.31 agree 0.00
+   u5500: b0 gen4 age0 MI -0.00 agree 0.00 | b1 gen3 age1500 MI +0.02 agree 0.00 | b2 gen3 age1000 MI +0.05 agree 0.00 | b3 gen3 age500 MI +0.08 agree 0.00
+   u7500: b0 gen5 age0 MI +0.01 agree 0.00 | b1 gen4 age1500 MI +0.01 agree 0.00 | b2 gen4 age1000 MI +0.01 agree 0.00 | b3 gen4 age500 MI +0.01 agree 0.00
+   u9000: b0 gen5 age1500 MI +0.01 agree 0.00 | b1 gen5 age1000 MI +0.02 agree 0.00 | b2 gen5 age500 MI +0.04 agree 0.00 | b3 gen5 age0 MI +0.66 agree 0.00
+== POPCTL seed 327: population cross-spot reliance by update: 
+   u1500: b0 gen2 age0 MI -0.01 agree 0.00 | b1 gen1 age1500 MI +1.06 agree 0.50 | b2 gen1 age1500 MI +1.57 agree 0.25 | b3 gen1 age1500 MI +2.00 agree 0.25
+   u3500: b0 gen3 age0 MI -0.01 agree 0.00 | b1 gen2 age1500 MI +0.59 agree 0.00 | b2 gen2 age1000 MI +0.82 agree 0.00 | b3 gen2 age500 MI +0.69 agree 0.00
+   u5500: b0 gen4 age0 MI -0.00 agree 0.00 | b1 gen3 age1500 MI +0.01 agree 0.00 | b2 gen3 age1000 MI +0.07 agree 0.00 | b3 gen3 age500 MI +0.09 agree 0.00
+   u7500: b0 gen5 age0 MI +0.01 agree 0.00 | b1 gen4 age1500 MI +0.01 agree 0.00 | b2 gen4 age1000 MI +0.01 agree 0.00 | b3 gen4 age500 MI -0.01 agree 0.00
+   u9000: b0 gen5 age1500 MI +0.01 agree 0.00 | b1 gen5 age1000 MI +0.01 agree 0.00 | b2 gen5 age500 MI +0.02 agree 0.00 | b3 gen5 age0 MI +0.66 agree 0.00
+== POP seed 320: population cross-spot reliance by update: u1500 +52%, u3500 +1%, u5500 -4%, u7500 +1%, u9000 -1%
+   u1500: b0 gen2 age0 MI -0.01 agree 0.00 | b1 gen1 age1500 MI +1.11 agree 0.50 | b2 gen1 age1500 MI +1.57 agree 0.25 | b3 gen1 age1500 MI +1.90 agree 0.25
+   u3500: b0 gen3 age0 MI -0.00 agree 0.00 | b1 gen2 age1500 MI +0.28 agree 0.00 | b2 gen2 age1000 MI +0.25 agree 0.00 | b3 gen2 age500 MI +0.35 agree 0.00
+   u5500: b0 gen4 age0 MI +0.01 agree 0.00 | b1 gen3 age1500 MI +0.02 agree 0.00 | b2 gen3 age1000 MI +0.07 agree 0.00 | b3 gen3 age500 MI +0.11 agree 0.00
+   u7500: b0 gen5 age0 MI +0.01 agree 0.00 | b1 gen4 age1500 MI +0.02 agree 0.00 | b2 gen4 age1000 MI +0.01 agree 0.00 | b3 gen4 age500 MI +0.00 agree 0.00
+   u9000: b0 gen5 age1500 MI +0.01 agree 0.00 | b1 gen5 age1000 MI +0.01 agree 0.00 | b2 gen5 age500 MI +0.01 agree 0.00 | b3 gen5 age0 MI +0.62 agree 0.00
+== POP seed 321: population cross-spot reliance by update: u1500 +53%, u3500 +7%, u5500 -1%, u7500 +0%, u9000 +0%
+   u1500: b0 gen2 age0 MI +0.00 agree 0.00 | b1 gen1 age1500 MI +1.08 agree 0.25 | b2 gen1 age1500 MI +1.61 agree 0.25 | b3 gen1 age1500 MI +1.99 agree 0.50
+   u3500: b0 gen3 age0 MI +0.01 agree 0.00 | b1 gen2 age1500 MI +0.28 agree 0.00 | b2 gen2 age1000 MI +0.27 agree 0.00 | b3 gen2 age500 MI +0.23 agree 0.00
+   u5500: b0 gen4 age0 MI -0.01 agree 0.00 | b1 gen3 age1500 MI +0.01 agree 0.00 | b2 gen3 age1000 MI +0.05 agree 0.00 | b3 gen3 age500 MI +0.06 agree 0.00
+   u7500: b0 gen5 age0 MI +0.01 agree 0.00 | b1 gen4 age1500 MI +0.01 agree 0.00 | b2 gen4 age1000 MI +0.00 agree 0.00 | b3 gen4 age500 MI +0.00 agree 0.00
+   u9000: b0 gen5 age1500 MI +0.01 agree 0.00 | b1 gen5 age1000 MI +0.03 agree 0.00 | b2 gen5 age500 MI +0.09 agree 0.00 | b3 gen5 age0 MI +0.62 agree 0.00
+== POP seed 322: population cross-spot reliance by update: u1500 +52%, u3500 +6%, u5500 -3%, u7500 +1%
+   u1500: b0 gen2 age0 MI -0.00 agree 0.00 | b1 gen1 age1500 MI +1.05 agree 0.75 | b2 gen1 age1500 MI +1.55 agree 0.25 | b3 gen1 age1500 MI +1.99 agree 0.00
+   u3500: b0 gen3 age0 MI -0.00 agree 0.00 | b1 gen2 age1500 MI +0.14 agree 0.00 | b2 gen2 age1000 MI +0.51 agree 0.00 | b3 gen2 age500 MI +0.39 agree 0.00
+   u5500: b0 gen4 age0 MI -0.00 agree 0.00 | b1 gen3 age1500 MI +0.00 agree 0.00 | b2 gen3 age1000 MI +0.08 agree 0.00 | b3 gen3 age500 MI +0.12 agree 0.00
+   u7500: b0 gen5 age0 MI +0.01 agree 0.00 | b1 gen4 age1500 MI +0.00 agree 0.00 | b2 gen4 age1000 MI +0.01 agree 0.00 | b3 gen4 age500 MI +0.01 agree 0.00
+== POP seed 323: population cross-spot reliance by update: u1500 +43%, u3500 +2%, u5500 +5%, u7500 -3%, u9000 +1%
+   u1500: b0 gen2 age0 MI +0.00 agree 0.00 | b1 gen1 age1500 MI +1.58 agree 0.50 | b2 gen1 age1500 MI +1.58 agree 0.25 | b3 gen1 age1500 MI +2.00 agree 0.25
+   u3500: b0 gen3 age0 MI +0.01 agree 0.00 | b1 gen2 age1500 MI +0.13 agree 0.00 | b2 gen2 age1000 MI +0.34 agree 0.00 | b3 gen2 age500 MI +0.22 agree 0.00
+   u5500: b0 gen4 age0 MI -0.00 agree 0.00 | b1 gen3 age1500 MI +0.01 agree 0.00 | b2 gen3 age1000 MI +0.06 agree 0.00 | b3 gen3 age500 MI +0.09 agree 0.00
+   u7500: b0 gen5 age0 MI +0.01 agree 0.00 | b1 gen4 age1500 MI +0.04 agree 0.00 | b2 gen4 age1000 MI +0.03 agree 0.00 | b3 gen4 age500 MI +0.01 agree 0.00
+   u9000: b0 gen5 age1500 MI +0.01 agree 0.00 | b1 gen5 age1000 MI +0.02 agree 0.00 | b2 gen5 age500 MI +0.04 agree 0.00 | b3 gen5 age0 MI +0.64 agree 0.00
+
+== SUMMARY
+{"tag": "POPCTL", "seed": 325, "reliance_u1500": null, "founders_mi_u1500": 1.8447743081941717, "newborn_max_mi": 0.7291156558015595, "newborn_max_agree": 0.0, "newborns_with_mi_ge_0_5": 3, "newborn_obs": 17}
+{"tag": "POPCTL", "seed": 326, "reliance_u1500": null, "founders_mi_u1500": 1.7339598172575803, "newborn_max_mi": 0.6572795167477016, "newborn_max_agree": 0.0, "newborns_with_mi_ge_0_5": 1, "newborn_obs": 17}
+{"tag": "POPCTL", "seed": 327, "reliance_u1500": null, "founders_mi_u1500": 1.5437432168127423, "newborn_max_mi": 0.817899458817086, "newborn_max_agree": 0.0, "newborns_with_mi_ge_0_5": 4, "newborn_obs": 17}
+{"tag": "POP", "seed": 320, "reliance_u1500": 0.5158520475561426, "founders_mi_u1500": 1.5278705692529337, "newborn_max_mi": 0.6189726313252449, "newborn_max_agree": 0.0, "newborns_with_mi_ge_0_5": 1, "newborn_obs": 17}
+{"tag": "POP", "seed": 321, "reliance_u1500": 0.5264000000000001, "founders_mi_u1500": 1.5589605455394953, "newborn_max_mi": 0.6190393304205811, "newborn_max_agree": 0.0, "newborns_with_mi_ge_0_5": 1, "newborn_obs": 17}
+{"tag": "POP", "seed": 322, "reliance_u1500": 0.5237741456166419, "founders_mi_u1500": 1.5299741921458934, "newborn_max_mi": 0.5061415762559376, "newborn_max_agree": 0.0, "newborns_with_mi_ge_0_5": 1, "newborn_obs": 13}
+{"tag": "POP", "seed": 323, "reliance_u1500": 0.43083003952569177, "founders_mi_u1500": 1.7192574131870373, "newborn_max_mi": 0.6360190538073471, "newborn_max_agree": 0.0, "newborns_with_mi_ge_0_5": 1, "newborn_obs": 17}

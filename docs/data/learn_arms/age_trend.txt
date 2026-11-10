@@ -1,0 +1,10 @@
+== allon: age 250: 32/1164 = 0.027, age 500: 74/1164 = 0.064, age 1000: 69/661 = 0.104
+   250 -> 500: z +4.18
+   500 -> 1000: z +3.12
+   RISING (every step z > 2): True
+   linear fit: 0.102 per 1,000 steps -> 30% at age ~2,884
+   log-age fit: 0.055 per e-fold -> 30% at age ~35,641
+== nolev: age 250: 0/932 = 0.000, age 500: 0/666 = 0.000, age 1000: 0/380 = 0.000
+   250 -> 500: z +0.00
+   500 -> 1000: z +0.00
+   RISING (every step z > 2): False
