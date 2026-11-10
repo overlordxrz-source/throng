@@ -4,6 +4,8 @@ Retune the WORLD (drain, patch count, relocation), never the agents: the same le
 reproduction (setpoint rule) and parent-paid provisioning (J 500): 16 worlds x 64 slots, 32 founders, 6,000 steps.
 Per life: lifespan, offspring, energy intake per step (lives still alive at the end count as censored at their
 current values).
+Nov 10 (Cam ~05:15): medians are also reported as Kaplan-Meier with right-censoring at the horizon (km_median_life);
+the old naive medians stay in the output for comparison. --save-lives writes the per-life arrays (npz).
   P1m: learned blind median lifespan >= 3x random's.
   P4:  learned blind median lifespan >= 2,000 steps.
   P2m: median offspring per life, oracle >= 2x blind (if both medians are 0: median energy intake per step,
@@ -23,6 +25,7 @@ import numpy as np
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from w2 import env, learn  # noqa: E402
+from w2.km import km_median  # noqa: E402
 
 
 def evaluate(cfg, params, net, oracle, policy, worlds=16, T=6000, seed=5, founders=32):
@@ -53,12 +56,16 @@ def evaluate(cfg, params, net, oracle, policy, worlds=16, T=6000, seed=5, founde
     lifes = np.concatenate([L[ended], life[alive]]); offs = np.concatenate([Kd[ended], kids[alive]])
     ints = np.concatenate([In[ended], intake[alive]]); per = ints / np.maximum(lifes, 1)
     isoff = np.concatenate([Off[ended], off_end[alive]])             # lives born in the run (provisioned) vs founders
+    event = np.concatenate([np.ones(int(ended.sum()), bool), np.zeros(int(alive.sum()), bool)])   # False = censored
+    evaluate.last = dict(life=lifes, event=event, offspring_born=isoff, offs=offs, intake_per_step=per)
     def st(mask):
         if mask.sum() == 0:
             return dict(lives=0)
         return dict(lives=int(mask.sum()), median_life=float(np.median(lifes[mask])), mean_life=float(lifes[mask].mean()),
                     median_offspring=float(np.median(offs[mask])), mean_offspring=float(offs[mask].mean()),
-                    median_intake_per_step=float(np.median(per[mask])))
+                    median_intake_per_step=float(np.median(per[mask])),
+                    km_median_life=km_median(lifes[mask], event[mask])[0], km_reached=km_median(lifes[mask], event[mask])[1],
+                    censored=int((~event[mask]).sum()))
     return dict(offspring_lives=st(isoff), all_lives=st(np.ones_like(isoff, bool)))
 
 
@@ -68,14 +75,18 @@ if __name__ == "__main__":
     ap.add_argument("--sigma", type=float, default=1.0); ap.add_argument("--relocate", type=float, default=0.0)
     ap.add_argument("--updates", type=int, default=400); ap.add_argument("--out", default=None)
     ap.add_argument("--seed", type=int, default=0, help="learner seed (Cam Nov 10 ~04:35: confirmation on seeds 1-3)")
+    ap.add_argument("--save-lives", default=None, help="npz of per-life arrays for every policy")
     a = ap.parse_args()
     base = dict(L=96, P=a.P, patch_sigma=a.sigma, d0=a.d0, relocate=a.relocate)
     tcfg = env.Cfg(N=64, reproduce=False, A_max=100_000, **base)                     # training world (as before)
     ecfg = env.Cfg(N=64, reproduce=True, rep_mode="setpoint", juvenile=500, A_max=100_000, **base)   # evaluation world
     pb, nb = learn.train(False, a.updates, a.seed, juvenile=500, cfg=tcfg)
     po, no = learn.train(True, a.updates, a.seed, juvenile=500, cfg=tcfg)
-    R = dict(random=evaluate(ecfg, pb, nb, False, "random"), blind=evaluate(ecfg, pb, nb, False, "policy"),
-             oracle=evaluate(ecfg, po, no, True, "policy"))
+    R, arr = {}, {}
+    for nm, args in (("random", (pb, nb, False, "random")), ("blind", (pb, nb, False, "policy")), ("oracle", (po, no, True, "policy"))):
+        R[nm] = evaluate(ecfg, *args); arr.update({f"{nm}_{k}": v for k, v in evaluate.last.items()})
+    if a.save_lives:
+        np.savez_compressed(a.save_lives, **arr)
     # gates on the lives born during the evaluation (provisioned newborns); random has none, so P1m uses its all-lives median
     b, o = R["blind"]["offspring_lives"], R["oracle"]["offspring_lives"]; r = R["random"]["all_lives"]
     ok_b, ok_o = b.get("lives", 0) >= 20, o.get("lives", 0) >= 20
