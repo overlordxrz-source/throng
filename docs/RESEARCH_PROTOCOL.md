@@ -4009,6 +4009,28 @@ more expensive, because it produces publishable-looking nulls.
     `docs/W2_FAST_LEARNER_DESIGN.md`. Two cheaper one-flag variants are listed there (copying inside replay; a
     young-plasticity trait).
 
+- **Cam, Nov 10 ~02:25: rulings.**
+  - **(f) world fix APPROVED:** a wrong-material Craft spoils the opportunity (the pair re-rolls).
+    - Re-run the free scripted VoI check first; the gap must be >= 25% (Cam expects ~75%).
+    - Then ONE rerun with the world fix AND material on freshly initialised input rows. Same gate (>= 12 distinct
+      messages at u1000 in >= 4/5), cap $1. Recompute NOSIG for the new rules.
+  - **W2 WORLD RETUNE (blocks any comm run).** New gates, all on MEDIANS, juvenile provisioning on, parents paying:
+    - P1m: learned blind median life >= 3x random;
+    - P4: learned blind median life >= 2,000 steps;
+    - P2m: informed vs blind on reproductive success, not lifespan: median offspring per life (or energy intake per
+      step), oracle >= 2x blind.
+    - Levers: lower drain, food that moves or relocates, patch density. Retune the world, never the agents. Laptop.
+  - **Learnability:** the four FAILs accepted; the copy arm with scripted elders is acceptable for the gate. Next
+    (laptop, same gate):
+    1. a free diagnostic: does the predictive head learn the code within a life? Food-in-view prediction accuracy with
+       the true vs a swapped message at end of life. If not, go straight to the fast learner;
+    2. copying inside replay (K = 8 passes over the copy loss too; never replay PPO);
+    3. young plasticity: learning rate x4 at birth, decaying to the lineage speed by the end of the juvenile period.
+       Arms: 2, 3, 2+3;
+    4. if all fail: **the fast-learner design is APPROVED to build** (random code each life, leak test, gates as
+       written), laptop first, cap $3.
+  - (e): analyse when it lands.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
