@@ -1,0 +1,52 @@
+[
+ {
+  "tag": "POPCTL",
+  "seed": 325,
+  "reliance_u1500": null,
+  "founders_mi_u1500": 1.8447743081941717,
+  "newborn_max_mi": 0.7291156558015595,
+  "newborn_max_agree": 0.0,
+  "newborns_with_mi_ge_0_5": 3,
+  "newborn_obs": 17
+ },
+ {
+  "tag": "POPCTL",
+  "seed": 327,
+  "reliance_u1500": null,
+  "founders_mi_u1500": 1.5437432168127423,
+  "newborn_max_mi": 0.817899458817086,
+  "newborn_max_agree": 0.0,
+  "newborns_with_mi_ge_0_5": 4,
+  "newborn_obs": 17
+ },
+ {
+  "tag": "POP",
+  "seed": 320,
+  "reliance_u1500": 0.5158520475561426,
+  "founders_mi_u1500": 1.5278705692529337,
+  "newborn_max_mi": 0.6189726313252449,
+  "newborn_max_agree": 0.0,
+  "newborns_with_mi_ge_0_5": 1,
+  "newborn_obs": 17
+ },
+ {
+  "tag": "POP",
+  "seed": 321,
+  "reliance_u1500": 0.5264000000000001,
+  "founders_mi_u1500": 1.5589605455394953,
+  "newborn_max_mi": 0.6190393304205811,
+  "newborn_max_agree": 0.0,
+  "newborns_with_mi_ge_0_5": 1,
+  "newborn_obs": 17
+ },
+ {
+  "tag": "POP",
+  "seed": 323,
+  "reliance_u1500": 0.43083003952569177,
+  "founders_mi_u1500": 1.7192574131870373,
+  "newborn_max_mi": 0.6360190538073471,
+  "newborn_max_agree": 0.0,
+  "newborns_with_mi_ge_0_5": 1,
+  "newborn_obs": 17
+ }
+]

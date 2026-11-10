@@ -4754,6 +4754,30 @@ more expensive, because it produces publishable-looking nulls.
     two-proportion z-test between consecutive ages (pooled over an arm's seeds), the later set being a subset of the
     earlier. Rising = 1000 > 500 > 250 with each step z > 2. Per-life snapshot outcomes are to be stored in later runs.
 
+- **RESULT: (e) transmission diagnostic (free, from the existing dumps; 5 complete seeds; s322 / s326 to be appended)**
+  (`docs/data/pop_e/transmission_diag.py`, output `transmission_diag_5seeds.txt`; dictionaries for M in
+  `docs/data/for_m/pop_e_dictionaries_5seeds.json`).
+  - **Q2: was there a working channel to pass on? YES.**
+    - At u1500 (all founders except slot 0, just replaced) POP population cross-spot reliance is **52% / 53% / 43%**
+      (s320 / s321 / s323), with founders' speaker MI 1.1-2.0 bits per brain.
+    - It collapses after turnover: 1-7% at u3500, ~0 from u5500 on.
+  - **Q1: did any newborn (gen >= 2) acquire the founders' code? NO.**
+    - Across 17 newborn observations per seed (each brain at each eval point), **a newborn's modal word per fire never
+      matches the founders' pooled modal word (agreement 0.00 everywhere)**.
+    - POP gen-2 newborns carry only 0.13-0.35 bits at u3500 (ages 500-1,500); gen 3+ ~0.
+  - **Caveats:**
+    - The founders do not share one code: each founder's words match the founders' pooled dictionary on only 25-50% of
+      fires (separate brains, separate words).
+    - Control-arm (wire-off) newborns carry MORE fire information than POP's (0.34-0.82 bits at u3500) although no
+      listener can use it. Newborn MI is not evidence of transmission.
+    - The ~0.62 bits of the age-0 brain at u9000 in every seed is an inborn correlation of a fresh navigator once fire 5
+      is lit, not acquired code.
+  - **Reading:** the founders had a working channel; nothing of it was passed on. Each new generation starts from a
+    navigator with no code, and one life with copying (imit 1.0, sensitive period 1,000) does not acquire the elders'
+    words. This is the toy analogue of the W2 one-life learnability bottleneck.
+- **RECORDED (Cam): "Separate-brains toy population: the founders' code dies through turnover in both arms; cultural
+  transmission not shown. Consistent with W2: one-life learnability is the bottleneck." The toy population is CLOSED.**
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
