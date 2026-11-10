@@ -484,6 +484,7 @@ def main():
                 sk = np.asarray(evp(Pk, C[ii], keys[ii], jnp.asarray(der[ii]), BP[ii], SM[ii]))
                 pk = np.array([_life_pass(tk[j], sk[j]) for j in range(len(idx))])
                 for j, i in enumerate(idx):
+                    res[i].setdefault("snap_pass", {})[str(k_)] = bool(pk[j])     # per-life, for paired age trends
                     if pk[j]:
                         first[i] = min(first[i], k_)
                 byage[str(k_)] = dict(n=len(idx), pass_frac=float(pk.mean()), ci95=_wilson(int(pk.sum()), len(idx)))
