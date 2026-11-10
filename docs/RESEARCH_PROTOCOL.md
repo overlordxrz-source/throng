@@ -4199,6 +4199,30 @@ more expensive, because it produces publishable-looking nulls.
     it is not the navigator's natural-W2 intake.
 - **W2 pick confirmation running:** pick and runner-up x seeds 1-3 (`w2/retune.py --seed`).
 
+- **RESULT (Nov 9 ~23:45): (f) last toy try step6v8 (vocab 8): gate FAIL, 3/5** (`docs/data/step6v8/gate.txt`).
+  - Distinct messages at u2000 (of 14 meanings): 14 / 11 / 13 / 9 / 12; the bar was >= 12 in >= 4/5.
+  - Every seed has the same count at u1000 and u2000: the code settles by u1000 and does not grow afterwards.
+  - Up from vocab 4 (7-10 distinct at u1000) but short of the gate. NOSIG deliveries/world 0.09 / 0.31; COMM 2.4-6.0.
+  - **Per the ruling: step 6 is parked in the toy; compositionality moves to W2.** Compositionality was not read.
+- **INCIDENT (Nov 9 23:39), my error: the spend guard stopped all three deployed apps.**
+  - The guard (`~/throng-smoke/cap_guard_r2.sh`) had exited at 22:32: a transient empty app list ended its loop.
+  - I restarted it without `CAP=41`. The script's default was still 15; metered spend was 16.82. On its first tick it
+    stopped throng-pop, throng-comm-toy and throng-w2.
+  - Lost: 4 population runs in flight. pop_on_s322 at u6496, pop_on_s324 u6158, pop_ctl_s326 u6508, pop_ctl_s327
+    u2222.
+    - The runs had also been restarting from scratch on preemption before this (2-4 segments each).
+    - s327 had an earlier segment reach u8827, past the u7500 primary readout.
+  - Not lost: step6v8 (all 7 complete at u2000 before the stop). Population s320 / s321 / s323 / s325 (complete at
+    u9000).
+  - **Fixes:**
+    - the guard's default CAP is now 41;
+    - it no longer exits on an empty app list;
+    - it was restarted at 23:42 with CAP=41.
+  - **Relaunched the 4 lost runs unchanged at 23:43** (same pinned commit 5c5b07a, same seeds and args; deploy + spawn).
+  - Cost: throng-pop so far ~$6.51 of the $12 cap (~$0.073 per 1,000 updates, restarts included). The 4 reruns are
+    ~29k updates, ~$2.1-3.5, so (e) stays inside its cap.
+  - Analysis: deduped by segment; the last complete segment (u9000) per seed. Lands ~08:00 if not preempted.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
