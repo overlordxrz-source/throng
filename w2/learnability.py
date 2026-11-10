@@ -137,9 +137,11 @@ def main():
         hd = tw(jnp.round(jnp.cos(ang) * 3), jnp.round(jnp.sin(ang) * 3))
         return jnp.where(here >= 0.2, env.EAT, jnp.where(seen, vis, jnp.where(h[:, 8] > 0.5, hd, fallback)))
 
-    def step_all(P, s, key, shift, young, perm=None):
+    def step_all(P, s, key, shift, young, perm=None, mute=False):
         k1, k2 = jax.random.split(key)
         h = hear(s, shift, perm)
+        if mute:                                  # silence: nobody hears anything (VoI baseline)
+            h = jnp.zeros_like(h)
         o = jnp.concatenate([env.observe(cfg, s)[NB:], h], 1)                              # (M, D)
         lg, v, _ = jax.vmap(lambda p, x: net.apply(p, x[None]))(P, o[:NL]); lg, v = lg[:, 0], v[:, 0]
         act_l = jax.random.categorical(k1, lg)
@@ -226,7 +228,7 @@ def main():
             return optax.apply_updates(p, jax.tree_util.tree_map(lambda x: x * f_, u)), os_
         return jax.vmap(jax.vmap(one))(P, OS, f, o, m, eo, ea, em)
 
-    def eval_life(p, centres, key, shift_mode, perm=None, bpos=None, smask=None):
+    def eval_life(p, centres, key, shift_mode, perm=None, bpos=None, smask=None, mute=False):
         s = env.reset(cfg, key)
         s = s._replace(centres=centres, cap=env.capacity(cfg, centres), food=env.capacity(cfg, centres))
         s, _ = beacons_reset(s, jax.random.fold_in(key, 3))
@@ -241,17 +243,17 @@ def main():
             s, eaten, last = c
             if smask is not None:                     # the TRUE sector heard now (before any swap), for attribution
                 ht = hear(s, 0)[0]; last = jnp.where(ht[8] > 0.5, jnp.argmax(ht[:8]), last)
-            s2, rec = step_all(P1, s, k, sh, jnp.zeros(NL, bool), perm)
+            s2, rec = step_all(P1, s, k, sh, jnp.zeros(NL, bool), perm, mute)
             s2 = s2._replace(alive=s2.alive.at[NB + 1:].set(False))                      # only this learner (no elders)
             credit = 1.0 if smask is None else jnp.where(last >= 0, smask[jnp.maximum(last, 0)], 0.0)
             return (s2, eaten + rec[6][0] * credit, last), None
         (s, eaten, _), _ = jax.lax.scan(body, (s, 0.0, jnp.int32(-1)), jax.random.split(jax.random.fold_in(key, 5), a.test_window))
         return eaten
     ev = jax.jit(jax.vmap(jax.vmap(eval_life, in_axes=(None, None, 0, None)), in_axes=(0, 0, 0, None)))
-    def make_evp():   # the heard25 test: per-life, per-episode sector permutation (identity = true message); traced on first call
+    def make_evp(mute=False):   # the heard25 test: per-life, per-episode sector permutation (identity = true message); traced on first call
         life_start = a.test_start == "life"; lh = a.score == "last-heard"
         def one(p, c, k, q, b, m):
-            return eval_life(p, c, k, 0, q, b if life_start else None, m if lh else None)
+            return eval_life(p, c, k, 0, q, b if life_start else None, m if lh else None, mute)
         f = jax.jit(jax.vmap(jax.vmap(one, in_axes=(None, None, 0, 0, None, None)), in_axes=(0, 0, 0, 0, 0, 0)))
         return lambda p, c, k, q, b, m: f(p, c, k, q, b, m)
 
@@ -380,11 +382,12 @@ def main():
         true = np.asarray(evp(Pz, C, keys, jnp.asarray(ident), BP, SM)); swap = np.asarray(evp(Pz, C, keys, jnp.asarray(der), BP, SM))
     else:
         true = np.asarray(ev(Pz, C, keys, 0)); swap = np.asarray(ev(Pz, C, keys, 1))
-    blind = None
-    if a.no_train and a.sanity:              # the blind comparison on the SAME lives / keys: the navigator policy
+    blind = silent = None
+    if a.no_train and a.sanity and a.test == "heard25":   # the blind comparison on the SAME lives / keys: the navigator policy
         a.sanity = False
         blind = np.asarray(make_evp()(Pz, C, keys, jnp.asarray(np.tile(np.arange(8), (len(lives), a.eval_eps, 1))), BP, SM))
         a.sanity = True
+        silent = np.asarray(make_evp(mute=True)(Pz, C, keys, jnp.asarray(np.tile(np.arange(8), (len(lives), a.eval_eps, 1))), BP, SM))
     res = []
     for i, x in enumerate(lives):
         t, s_ = true[i], swap[i]; d = t - s_; se = d.std(ddof=1) / np.sqrt(len(d))
@@ -415,6 +418,8 @@ def main():
             eb = float(np.mean([r_["eaten_blind"] for r_ in res])); summ["apparatus"]["eaten_blind_mean"] = eb
             summ["apparatus"]["scripted_over_blind"] = float(summ["eaten_true_mean"] / max(eb, 1e-9))
             summ["apparatus"]["gate_ii"] = bool(frac >= 0.9 and summ["eaten_true_mean"] >= 2 * eb)
+            es = float(silent.mean()); summ["apparatus"]["eaten_scripted_silence_mean"] = es
+            summ["apparatus"]["scripted_true_over_silence"] = float(summ["eaten_true_mean"] / max(es, 1e-9))
     os.makedirs(os.path.dirname(a.out), exist_ok=True)
     json.dump(dict(summary=summ, lives=res), open(a.out, "w"), indent=1, default=lambda z: z.tolist() if hasattr(z, "tolist") else str(z))
     print(json.dumps(summ))
