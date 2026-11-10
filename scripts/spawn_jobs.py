@@ -31,11 +31,13 @@ def load(name):
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
-    ap.add_argument("kind", choices=["pop", "toy"]); ap.add_argument("plan", nargs="?", default=None)
+    ap.add_argument("kind", choices=["pop", "toy", "w2"]); ap.add_argument("plan", nargs="?", default=None)
     ap.add_argument("--only", default="")
     a = ap.parse_args()
     if a.kind == "pop":
         jobs = load("modal_pop").POP_JOBS; fn = modal.Function.from_name("throng-pop", "run_pop")
+    elif a.kind == "w2":
+        m = load("modal_w2jobs"); jobs = m.PLANS[a.plan]; fn = modal.Function.from_name("throng-w2jobs", "run_w2")
     else:
         m = load("modal_comm_toy"); jobs = m.PLANS[a.plan]; fn = modal.Function.from_name("throng-comm-toy", "run_toy")
     if a.only:

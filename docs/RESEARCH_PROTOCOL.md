@@ -4589,6 +4589,56 @@ more expensive, because it produces publishable-looking nulls.
   - Recommended: (a) at >= 5 with last-heard scoring and 48 x 600. It is the smallest change, and the scripted control
     clears 90% on the eligible lives.
 
+- **Cam, Nov 10 (rulings on the ~04:30 update).**
+  1. **Gate (ii) test:**
+     - "last-heard" scoring is ACCEPTED as THE metric for the scripted control, the negative control and every learner
+       arm (calibrated before any learner data, applied identically to all arms);
+     - **(a) ACCEPTED:** a life is scorable iff it heard >= 5 sectors >= 25x;
+     - **denominator = eligible lives only:** >= 50 eligible lives per arm (add lives if short), eligibility rate
+       reported per arm;
+     - if an arm's eligibility differs from the no-lever arm by > 15 points, also report pass rates stratified by
+       sector count (5 / 6 / 7-8);
+     - (b) as a free secondary, no bar: the pass rate on probes whose swap moved >= 90 degrees.
+  2. **Negative control:** a non-listener (wire-off navigator) on the same eligible lives must pass in <= 10%. Both
+     control rates are reported with CIs. If the non-listener passes > 10%, the test is too easy: stop and report, don't
+     tune.
+  3. **VoI half of (ii):** the scripted listener with true messages vs the same listener with silence, same lives and
+     keys. **Bar: true-message food >= 1.5x silence, paired > 2 SE.** If it fails, the code isn't worth learning here:
+     stop and report.
+  4. **Young-seek:** accepted for the apparatus only, as test scaffolding, iff it triggers on geometry (no speaker within
+     the hearing radius), never on the message channel. It stays out of the W2 comm run unless M approves it as an
+     inborn trait.
+  5. **Fast learner:** 1,100-step lives accepted. Richest-patch: try a faster beacon walk for margin (wider spread is
+     ruled out). Score held-out generalisation on qualifying lives only, and report how many qualify.
+  6. **Freeze:** once (2) and (3) pass, freeze the test (commit hash here). Then learnability 2 arms x 5 seeds (no
+     levers vs all approved levers), then fast-learner 4c with the trunk frozen. Bars as registered; batch cap $8 total.
+  7. **Laptop: only checks under ~10 min.** The ~20 min apparatus jobs and both arm runs go to Modal (small CPU
+     containers, --ckpt on).
+  8. **(e):** dedupe, then analyze_pop.py against the registered u7500 bars. Send the first three seeds as they land;
+     the verdict waits for s322.
+- **Implemented** (comm-toy `b61afb2`):
+  - `--min-sectors 5` eligibility; pass over eligible lives with Wilson 95% CIs; stratified 5 / 6 / 7-8;
+  - the >= 90 degree secondary, defined as **probes whose derangement moves the well-heard sectors >= 90 degrees on
+    average** (requiring every sector to move >= 90 degrees left no qualifying probes in a smoke run). Lives need
+    >= 4 such probes;
+  - negative control = the untrained navigator (zero hearing rows: a non-listener), true vs swap on the same lives and
+    keys;
+  - VoI = the scripted listener with true messages vs muted hearing, same lives and keys;
+  - young-seek now triggers on geometry (Chebyshev distance to the nearest beacon > R_HEAR). This is identical to the
+    old trigger whenever hearing is not muted, so the earlier apparatus numbers stand.
+  - **`learnability.py --ckpt`:** bit-identity test (all levers; prototype world so deaths follow the resume), and a
+    mutation (fresh rng) fails it.
+  - **Fast learner `--beacon-speed`:** speed 2 and 3 do NOT add margin. Richest-patch stays at 4 distinct / 3 heard
+    >= 25x, and the heard fraction falls 0.62 -> 0.34 / 0.30 (speakers outrun listeners). Speed stays 1.
+  - Modal: new app `throng-w2jobs` (`scripts/modal_w2jobs.py`): CPU 4 cores; --ckpt to the volume, committed every
+    2 min.
+- **REGISTERED (before data): apparatus gate (ii) run `app_gate_scripted`** (Modal, ~$0.2).
+  - Picked world, nav_w13; spread 6 + walk + young-seek; heard25 + last-heard; >= 5 sectors >= 25x; 48 probes x 600
+    steps; 16 worlds x 150 updates; no training; scripted listeners.
+  - **Gate (ii) PASSES iff:** >= 50 eligible lives AND scripted control >= 90% (eligible) AND non-listener <= 10% AND
+    VoI true >= 1.5x silence with paired > 2 SE.
+  - **If it passes, the test is frozen at `b61afb2`.**
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
