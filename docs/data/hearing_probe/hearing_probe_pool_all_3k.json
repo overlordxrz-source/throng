@@ -1,0 +1,142 @@
+{
+ "checks": {
+  "input_dim": 111,
+  "heard_dims": "100:108 one-hot sector, 108 flag, 109:111 offset / R_HEAR",
+  "kernel_rows": 111,
+  "onehot_sums_to_1": true,
+  "offset_within_unit": true,
+  "unheard_all_zero": true,
+  "heard_frac_alive_states": 0.3280694997218299,
+  "code_driven_frac_heard_heldout": 0.4504344741975528,
+  "beacon_offsets_unclipped": [
+   [
+    -24,
+    -3
+   ],
+   [
+    9,
+    15
+   ],
+   [
+    5,
+    19
+   ],
+   [
+    5,
+    15
+   ]
+  ],
+  "r_oracle": 16,
+  "broadcast_sector": [
+   4,
+   1,
+   2,
+   2
+  ],
+  "true_direction_sector": [
+   4,
+   1,
+   2,
+   2
+  ],
+  "broadcast_eq_true_direction": 1.0,
+  "target_eq_heading_of_heard_sector_codedriven": 1.0,
+  "codedriven_action_hist": [
+   0,
+   3225,
+   1669,
+   66,
+   120,
+   0
+  ],
+  "dense0_tanh_saturated_frac(|tanh|>0.99)": 0.0007578125,
+  "dense0_preact_abs_median": 0.33879315853118896
+ },
+ "grad_heard_rows_step0": 2.1724820137023926,
+ "n_train_heard": 22998,
+ "n_heldout_heard": 11278,
+ "n_heldout_code_driven": 5080,
+ "navigator_accuracy": {
+  "all": 0.423328125,
+  "code_driven": 0.15299970947123764
+ },
+ "navigator_gate": {
+  "pass_frac": 0.0,
+  "median_drop": 0.0,
+  "eaten_true": 4.0587310791015625,
+  "eaten_swap": 4.0587310791015625
+ },
+ "runs": {
+  "x16": {
+   "coverage": {
+    "distinct_sectors_heard_per_learner_median": 8.0,
+    "distinct_sectors_hist": [
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     64
+    ],
+    "acc_codedriven_seen_sector": 0.859375,
+    "acc_codedriven_unseen_sector": null,
+    "frac_codedriven_unseen": 0.0,
+    "train_acc_all": 0.96739453125,
+    "train_acc_code_driven": 0.951903078202995
+   },
+   "lr": 0.0048,
+   "steps": 3000,
+   "heldout_accuracy_all": 0.77093359375,
+   "heldout_accuracy_code_driven": 0.859375,
+   "curve": [
+    [
+     50,
+     0.66879296875,
+     0.6886893521208599
+    ],
+    [
+     100,
+     0.70987890625,
+     0.7466952353282975
+    ],
+    [
+     200,
+     0.73016796875,
+     0.7782176060429983
+    ],
+    [
+     300,
+     0.7418984375,
+     0.7970475014526438
+    ],
+    [
+     1000,
+     0.7617890625,
+     0.8441948721673446
+    ],
+    [
+     2000,
+     0.77454296875,
+     0.8659028181289947
+    ],
+    [
+     3000,
+     0.77093359375,
+     0.859375
+    ]
+   ],
+   "gate": {
+    "pass_frac": 0.296875,
+    "median_drop": 0.4952881932258606,
+    "eaten_true": 8.575225830078125,
+    "eaten_swap": 4.060617446899414
+   },
+   "gate_pass": false,
+   "accuracy_pass": false,
+   "logit_change_on_sector_flip": 3.059410810470581
+  }
+ }
+}

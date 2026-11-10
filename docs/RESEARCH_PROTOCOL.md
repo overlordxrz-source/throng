@@ -4362,6 +4362,20 @@ more expensive, because it produces publishable-looking nulls.
     - **x16: gate 53% PASS** (median drop 60%; code-driven accuracy 0.76; all-states accuracy 0.65).
     - **x1: gate 39%** (drop 55%; accuracy still rising at step 300: 0.41 -> 0.61 on code-driven).
     - The 90% accuracy bar is not met in 300 steps at either rate. It is slower than expected, but it learns.
+  - **Follow-up (comm-toy `b28c591`): with coverage the pathway is SLOW, not blocked; the gate is noisy.**
+    - A pooled rerun at x16 (head only) gave **gate 47%** (the first run gave 53%; only the batch sampling differed).
+      So the x16 "pass" is at the line, not a pass.
+    - **Training-set accuracy is also < 90% at 300 steps:** code-driven 0.62 / 0.73 (x1 / x16, head only); all layers
+      0.73 / 0.83.
+    - **3,000 steps, all layers, x16:** training accuracy 0.97 (code-driven 0.95); held-out code-driven 0.86, all
+      states 0.77. But **gate only 30%** (median swap drop 50%; the scripted positive control passes 65%).
+    - **Reading:**
+      - coverage is necessary;
+      - with coverage, the mapping is learnable, but it needs ~10x the gradient steps a life gets (~300);
+      - the life-test gate is noisy even for a well-fit listener.
+  - **Coverage in a retuned candidate world** (fast learner, `--world 0.0013,8,0.001`): useful topics still give a
+    median of 1-2 distinct tokens per life (nearest-food 1.5, richest-patch 1, distance band 2). **Moving to the
+    retuned world (4b) does not fix coverage by itself.**
   - **Judgment call (flagged):** copy-in-replay was NOT rerun at x16. Its data has the same one-message coverage, so it
     would test nothing new until coverage is fixed.
   - **Implication for the fast learner:** its beacons are clustered the same way (offsets +-2), so a life likely hears
