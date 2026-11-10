@@ -67,6 +67,9 @@ def main():
     ap.add_argument("--young", type=int, default=1000); ap.add_argument("--n-elders", type=int, default=2)
     ap.add_argument("--n-learners", type=int, default=4)
     ap.add_argument("--eval-eps", type=int, default=16); ap.add_argument("--sanity", action="store_true")
+    ap.add_argument("--copy-replay", action="store_true", help="Cam Nov 10: the K replay passes also cover the copy loss (supervised)")
+    ap.add_argument("--young-lr", type=float, default=1.0, help="young plasticity: update x this at birth, linear to x1 by the end of --juvenile")
+    ap.add_argument("--diag", type=int, default=0, help="free diagnostic: on this many lives, does the predictive head use the message?")
     ap.add_argument("--seed", type=int, default=0); ap.add_argument("--out", default="w2_out/learnability.json")
     a = ap.parse_args()
     NL = a.n_learners; NE = a.n_elders if a.copy > 0 else 0; M = NL + NE
@@ -173,17 +176,26 @@ def main():
         return L
 
     @jax.jit
-    def upd(P, OS, *b):
-        def one(p, os_, *bb):
-            g = jax.grad(loss)(p, *bb); u, os_ = opt.update(g, os_, p); return optax.apply_updates(p, u), os_
-        return jax.vmap(jax.vmap(one))(P, OS, *b)
+    def upd(P, OS, f, *b):
+        def one(p, os_, f_, *bb):
+            g = jax.grad(loss)(p, *bb); u, os_ = opt.update(g, os_, p)
+            return optax.apply_updates(p, jax.tree_util.tree_map(lambda x: x * f_, u)), os_
+        return jax.vmap(jax.vmap(one))(P, OS, f, *b)
+
+    def replay_loss(q, o, m, eo, ea, em):
+        L = a.pred * pred_loss(q, o, m > 0) if a.pred else 0.0
+        if a.copy_replay and a.copy and NE:
+            lge, _, _ = net.apply(q, eo)
+            ce = -jnp.take_along_axis(jax.nn.log_softmax(lge), ea[:, None], 1)[:, 0]
+            L = L + a.copy * (ce * em).sum() / (em.sum() + 1e-8)
+        return L
 
     @jax.jit
-    def upd_replay(P, OS, o, m):
-        def one(p, os_, o, m):
-            g = jax.grad(lambda q: a.pred * pred_loss(q, o, m > 0))(p); u, os_ = opt.update(g, os_, p)
-            return optax.apply_updates(p, u), os_
-        return jax.vmap(jax.vmap(one))(P, OS, o, m)
+    def upd_replay(P, OS, f, o, m, eo, ea, em):
+        def one(p, os_, f_, o, m, eo, ea, em):
+            g = jax.grad(replay_loss)(p, o, m, eo, ea, em); u, os_ = opt.update(g, os_, p)
+            return optax.apply_updates(p, jax.tree_util.tree_map(lambda x: x * f_, u)), os_
+        return jax.vmap(jax.vmap(one))(P, OS, f, o, m, eo, ea, em)
 
     def eval_life(p, centres, key, shift_mode):
         s = env.reset(cfg, key)
@@ -208,7 +220,7 @@ def main():
     S = jax.tree_util.tree_map(lambda *x: jnp.stack(x), *states)
     nav_of = rng.integers(0, K, (W, NL))
     P = jax.tree_util.tree_map(lambda x: x[nav_of], NAV); OS = jax.vmap(jax.vmap(opt.init))(P)
-    mem_o, mem_m = [], []                       # replay memory: the last a.mem rollouts, (W, NL, T, D) each
+    mem_o, mem_m, mem_e = [], [], []            # replay memory: the last a.mem rollouts, (W, NL, T, D) each (+ elder data)
     since_birth = np.zeros((W, NL), int)        # rollouts since birth (replay uses own memory only)
     gsteps = np.zeros((W, NL), int)
     lives = []
@@ -232,16 +244,21 @@ def main():
             EM = jnp.asarray(np.swapaxes(em, 1, 2).reshape(W, NL, T * NE))
         else:
             EO = jnp.zeros((W, NL, 1, Dd)); EA = jnp.zeros((W, NL, 1), jnp.int32); EM = jnp.zeros((W, NL, 1))
+        agel = np.asarray(S.age)[:, NB:NB + NL]
+        fy = jnp.asarray(1.0 + (a.young_lr - 1.0) * np.clip(1.0 - agel / max(a.juvenile, 1), 0.0, 1.0), jnp.float32)
         for _ in range(a.epochs):
-            P, OS = upd(P, OS, tr(o), tr(act), tr(lp), tr(A.astype(np.float32)), tr(ret.astype(np.float32)), tr(m), EO, EA, EM)
+            P, OS = upd(P, OS, fy, tr(o), tr(act), tr(lp), tr(A.astype(np.float32)), tr(ret.astype(np.float32)), tr(m), EO, EA, EM)
         gsteps += a.epochs
         since_birth += 1
-        if a.replay and a.pred:
-            mem_o.append(np.swapaxes(o, 1, 2)); mem_m.append(np.swapaxes(m, 1, 2)); mem_o, mem_m = mem_o[-a.mem:], mem_m[-a.mem:]
+        if a.replay and (a.pred or a.copy_replay):
+            mem_o.append(np.swapaxes(o, 1, 2)); mem_m.append(np.swapaxes(m, 1, 2)); mem_e.append((EO, EA, np.asarray(EM)))
+            mem_o, mem_m, mem_e = mem_o[-a.mem:], mem_m[-a.mem:], mem_e[-a.mem:]
             for _ in range(a.replay):
                 for j in range(len(mem_o)):          # own memory since birth only: older rollouts masked per learner
                     age_ok = (len(mem_o) - j) <= since_birth
-                    P, OS = upd_replay(P, OS, jnp.asarray(mem_o[j]), jnp.asarray(mem_m[j] * age_ok[..., None]))
+                    eoj, eaj, emj = mem_e[j]
+                    P, OS = upd_replay(P, OS, fy, jnp.asarray(mem_o[j]), jnp.asarray(mem_m[j] * age_ok[..., None]),
+                                       eoj, eaj, jnp.asarray(emj * age_ok[..., None]))
             gsteps += a.replay * len(mem_o)
         dead = ~np.asarray(S.alive)[:, NB:NB + NL]
         ages = np.asarray(S.age)[:, NB:NB + NL]
@@ -262,6 +279,38 @@ def main():
             S = S._replace(pos=jnp.asarray(pos), energy=jnp.asarray(E), age=jnp.asarray(age), alive=jnp.asarray(al))
     if not lives:
         print("no completed lives"); return
+    diag = None
+    if a.diag and a.pred:
+        def pred_trace(p, centres, key):
+            """a true-message test episode; at each step the head's food-in-view-4-ahead prediction with the heard
+            sector as heard and with it shifted by +4 (on the SAME observation), plus the realised target"""
+            s = env.reset(cfg, key)
+            s = s._replace(centres=centres, cap=env.capacity(cfg, centres), food=env.capacity(cfg, centres))
+            s, _ = beacons_reset(s, jax.random.fold_in(key, 3))
+            s = s._replace(alive=jnp.array([True] * NB + [True] + [False] * (M - 1)))
+            P1 = jax.tree_util.tree_map(lambda x: jnp.broadcast_to(x, (NL,) + x.shape), p)
+            def body(s, k):
+                h = hear(s, 0); o = jnp.concatenate([env.observe(cfg, s)[NB:], h], 1)[0]
+                osw = o.at[100:108].set(jnp.roll(o[100:108], 4))
+                _, _, y = net.apply(p, o[None]); _, _, ys = net.apply(p, osw[None])
+                s2, _ = step_all(P1, s, k, 0, jnp.zeros(NL, bool))
+                s2 = s2._replace(alive=s2.alive.at[NB + 1:].set(False))
+                return s2, (y[0, 99], ys[0, 99], o[:49].max(), o[108] > 0.5)
+            _, (yt, ys, fv, heard) = jax.lax.scan(body, s, jax.random.split(jax.random.fold_in(key, 5), 300))
+            return yt, ys, fv, heard
+        idx = np.linspace(0, len(lives) - 1, min(a.diag, len(lives))).astype(int)
+        errs_t, errs_s = [], []
+        for i in idx:
+            for e in range(4):
+                yt, ys, fv, hd = (np.asarray(x) for x in jax.jit(pred_trace)(lives[i]["params"], jnp.asarray(lives[i]["centres"]),
+                                                                              jax.random.PRNGKey(9000 + 10 * int(i) + e)))
+                tgt = np.concatenate([fv[4:], np.full(4, np.nan)]); mk = hd & ~np.isnan(tgt)
+                if mk.sum() > 5:
+                    errs_t.append(np.mean((yt[mk] - tgt[mk]) ** 2)); errs_s.append(np.mean((ys[mk] - tgt[mk]) ** 2))
+        et, es_ = np.array(errs_t), np.array(errs_s); dd = es_ - et
+        diag = dict(n=len(et), mse_true=float(et.mean()), mse_swapped=float(es_.mean()),
+                    swap_increase=float(dd.mean() / max(et.mean(), 1e-9)), paired_z=float(dd.mean() / (dd.std(ddof=1) / np.sqrt(len(dd)) + 1e-12)))
+        print("DIAG predictive head uses the message?", json.dumps(diag), flush=True)
     Pz = jax.tree_util.tree_map(lambda *x: jnp.stack(x), *[x["params"] for x in lives])
     C = jnp.asarray(np.stack([x["centres"] for x in lives]))
     keys = jax.vmap(lambda i: jax.random.split(jax.random.PRNGKey(7000 + i), a.eval_eps))(jnp.arange(len(lives)))
@@ -274,12 +323,14 @@ def main():
                         drop=float(drop), passed=bool(drop >= 0.30 and d.mean() > 2 * se)))
     frac = np.mean([r_["passed"] for r_ in res])
     summ = dict(variant=dict(juvenile=a.juvenile, long_life=a.long_life, pred=a.pred, replay=a.replay, copy=a.copy,
+                             copy_replay=a.copy_replay, young_lr=a.young_lr,
                              n_elders=NE, sanity=a.sanity, random_code=a.random_code, updates=a.updates, T=T, epochs=a.epochs),
                 lives=len(res), pass_frac=float(frac), median_drop=float(np.median([r_["drop"] for r_ in res])),
                 median_lifespan=float(np.median([r_["lifespan"] for r_ in res])),
                 median_grad_steps_per_life=float(np.median([r_["grad_steps"] for r_ in res])),
                 eaten_true_mean=float(np.mean([r_["eaten_true"] for r_ in res])),
-                eaten_swap_mean=float(np.mean([r_["eaten_swap"] for r_ in res])), gate="PASS" if frac >= 0.5 else "FAIL")
+                eaten_swap_mean=float(np.mean([r_["eaten_swap"] for r_ in res])), gate="PASS" if frac >= 0.5 else "FAIL",
+                diag=diag)
     os.makedirs(os.path.dirname(a.out), exist_ok=True)
     json.dump(dict(summary=summ, lives=res), open(a.out, "w"), indent=1)
     print(json.dumps(summ))
