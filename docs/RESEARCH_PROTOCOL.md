@@ -3969,6 +3969,16 @@ more expensive, because it produces publishable-looking nulls.
       Laptop only; cap $0.5 if anything needs Modal.
   - (e): analyse when it lands, deduped by segment.
 
+- **(f) material VoI check (Cam Nov 10; free; `throng-toy/scripts/calc_step6_voi.py`, scripted listeners in the exact
+  step-6 rules, 4,096 worlds x 128 steps, 4 seeds):**
+  - told fire + material: 24.7 deliveries per world, net reward +66.7;
+  - told fire only (tries materials until one works, each miss costs 0.45): 19.0 deliveries, net +38.4.
+  - **Delivery gap 23.1% (sd 0.1% over seeds), under Cam's 25% line** (the reward gap is 42%, because the misses cost
+    craft fees).
+  - **Rule outcome: the world gives too little reason to name material, so fix the world first; no rerun.** A candidate
+    fix for Cam: a wrong-material Craft spoils the opportunity (the pair re-rolls). A fire-only listener would then
+    succeed ~1/4 of the time per opportunity, a delivery gap of ~70%.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
