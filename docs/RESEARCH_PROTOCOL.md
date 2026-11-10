@@ -4326,6 +4326,48 @@ more expensive, because it produces publishable-looking nulls.
     - The old pick's 4 seeds are the same runs as its re-read, so it is reference only, not a candidate (Cam: "don't
       pick from that re-read alone"). The runner-up re-read is reported only.
 
+- **RESULT (Nov 10 ~01:00): 4a hearing probe: FAIL as specified. The pipeline bug is DATA COVERAGE: within a life,
+  a learner hears ONE message** (`docs/data/hearing_probe/`; comm-toy `3541b79`; `learnability.py --hearing-probe`).
+  - **Setup:**
+    - train only the heard rows (Dense_0 rows 100:111) + the policy head of each learner, from its navigator;
+    - cross-entropy on the scripted listener's actions, on the states where it hears a beacon;
+    - Adam 3e-4 x {1, 4, 16}, 300 steps x batch 128, from its own world's teacher data;
+    - held-out accuracy measured on other worlds; the harness's unchanged 16-episode life-test gate.
+  - **As specified: FAIL at every rate.**
+    - Held-out accuracy 0.475 / 0.458 / 0.391 (x1 / x4 / x16). On "code-driven" states (nothing underfoot or in
+      view, so the action depends only on the message): 0.35 / 0.36 / 0.37.
+    - Gate 1.6% at every rate. The curves are flat from step 50.
+  - **Pipeline checks: all OK.**
+    - Input 111 dims (100 obs + 8 one-hot sector + flag + 2 offset / 9); kernel rows 111; one-hot sums to 1; unheard
+      states all zero.
+    - The broadcast sector equals the unclipped beacon -> nearest-patch direction (4/4; the r_oracle 16 clip did not
+      bite here).
+    - On code-driven states, the teacher's action is the heading of the heard sector in 100% of states.
+    - Gradient reaches the heard rows (max |g| 2.2 at step 0). Dense_0 is not saturated (0.08% of units with
+      |tanh| > 0.99).
+    - Training ALL layers fails the same way (code-driven 0.36, gate 0%).
+  - **The bug: coverage.** The 4 beacons sit within a 4x4 square, so they point at the same nearest patch. The patches
+    don't move, and a learner hears only its nearest beacon.
+    - Distinct sectors a learner hears in its whole training stream: **median 1** (43/64 learners hear 1, 19 hear 2,
+      2 hear 3).
+    - Code-driven accuracy is 0.72-0.76 on held-out states whose sector the learner heard, and 0.27 on unheard ones.
+      82% of held-out code-driven states carry an unheard sector.
+    - The life test re-places the beacons and the swap shifts the sector: it asks for a mapping the life's data never
+      contained.
+    - **This bounds every learnability arm so far:** gradient, predictive, replay, copy and copy-in-replay (elders hear
+      the same clustered beacons).
+    - The positive control passed (65%) because the scripted listener has the mapping built in.
+  - **The pathway works when coverage is fixed.** Diagnostic `--probe-pool`: every learner trains on teacher data pooled
+    over all 16 worlds (all 8 sectors).
+    - **x16: gate 53% PASS** (median drop 60%; code-driven accuracy 0.76; all-states accuracy 0.65).
+    - **x1: gate 39%** (drop 55%; accuracy still rising at step 300: 0.41 -> 0.61 on code-driven).
+    - The 90% accuracy bar is not met in 300 steps at either rate. It is slower than expected, but it learns.
+  - **Judgment call (flagged):** copy-in-replay was NOT rerun at x16. Its data has the same one-message coverage, so it
+    would test nothing new until coverage is fixed.
+  - **Implication for the fast learner:** its beacons are clustered the same way (offsets +-2), so a life likely hears
+    ~1 token value too. To be measured when the harnesses move to the retuned world (4b). Relocating food there will
+    vary the message within a life somewhat.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
