@@ -84,6 +84,8 @@ def main():
     ap.add_argument("--score", default="window", choices=["window", "last-heard"], help="last-heard: in the heard25 test, only food eaten while the last heard TRUE sector is one the life heard >= --min-heard times counts")
     ap.add_argument("--test-start", default="fresh", choices=["fresh", "life"], help="life: each probe episode starts in the life's own world at its end (patch centres + beacon positions), the learner beside a random beacon")
     ap.add_argument("--snap-ages", default="", help="comma-separated ages: snapshot each life's weights there; the heard25 test also runs on them (steps to first reliance)")
+    ap.add_argument("--diag-only", action="store_true", help="with --diag (and e.g. --ckpt of a finished run): run the predictive-head swap check and exit")
+    ap.add_argument("--log-levers", action="store_true", help="diagnostic (Cam Nov 10, 4a): per update, each lever's own signal (pred loss, copy CE + rows, replay passes + loss, young-lr factor) to <out>.levers.jsonl")
     ap.add_argument("--ckpt", default=None, help="checkpoint path; resume from it if present (Cam Nov 10: --ckpt on for Modal runs)")
     ap.add_argument("--ckpt-every", type=int, default=25)
     ap.add_argument("--stop-after", type=int, default=0, help="test only: exit abruptly after this many updates (simulated preemption)")
@@ -323,10 +325,34 @@ def main():
             EO = jnp.zeros((W, NL, 1, Dd)); EA = jnp.zeros((W, NL, 1), jnp.int32); EM = jnp.zeros((W, NL, 1))
         agel = np.asarray(S.age)[:, NB:NB + NL]
         fy = jnp.asarray(1.0 + (a.young_lr - 1.0) * np.clip(1.0 - agel / max(a.juvenile, 1), 0.0, 1.0), jnp.float32)
+        if a.log_levers:                              # each lever's own signal, on this rollout, before the updates
+            if "lev_f" not in dir():
+                def _lev(p, o, m, eo, ea, em):
+                    pl = pred_loss(p, o, m > 0) if a.pred else 0.0
+                    if a.copy and NE:
+                        lge, _, _ = net.apply(p, eo)
+                        ce = -jnp.take_along_axis(jax.nn.log_softmax(lge), ea[:, None], 1)[:, 0]
+                        cl = (ce * em).sum() / (em.sum() + 1e-8)
+                    else:
+                        cl = 0.0
+                    return jnp.asarray(pl), jnp.asarray(cl), em.sum()
+                lev_f = jax.jit(jax.vmap(jax.vmap(_lev)))
+            pl_, cl_, cn_ = (np.asarray(x) for x in lev_f(P, tr(o), tr(m), EO, EA, EM))
+            young_m = agel < a.juvenile if a.juvenile else np.zeros_like(agel, bool)
+            rec_ = dict(update=it, pred_loss_mean=float(pl_.mean()), copy_ce_mean=float(cl_[cn_ > 0].mean()) if (cn_ > 0).any() else None,
+                        copy_rows=float(cn_.sum()), learners_copying=int((cn_ > 0).sum()),
+                        replay_passes=int(a.replay * len(mem_o)) if (a.replay and (a.pred or a.copy_replay)) else 0,
+                        young_lr_factor_young=float(np.asarray(fy)[young_m].mean()) if young_m.any() else None,
+                        young_lr_factor_all=float(np.asarray(fy).mean()), mean_age=float(agel.mean()))
+            open(a.out + ".levers.jsonl", "a").write(json.dumps(rec_) + "\n")
         for _ in range(0 if a.no_train else a.epochs):
             P, OS = upd(P, OS, fy, tr(o), tr(act), tr(lp), tr(A.astype(np.float32)), tr(ret.astype(np.float32)), tr(m), EO, EA, EM)
         gsteps += a.epochs
         since_birth += 1
+        if a.log_levers:                              # after the PPO epochs, before replay (isolates replay's effect)
+            pl1, cl1, cn1 = (np.asarray(x) for x in lev_f(P, tr(o), tr(m), EO, EA, EM))
+            open(a.out + ".levers.jsonl", "a").write(json.dumps(dict(update=it, after_epochs=True, pred_loss_mean=float(pl1.mean()),
+                                                                      copy_ce_mean=float(cl1[cn1 > 0].mean()) if (cn1 > 0).any() else None)) + "\n")
         if a.replay and (a.pred or a.copy_replay) and not a.no_train:
             mem_o.append(np.swapaxes(o, 1, 2)); mem_m.append(np.swapaxes(m, 1, 2)); mem_e.append((EO, EA, np.asarray(EM)))
             mem_o, mem_m, mem_e = mem_o[-a.mem:], mem_m[-a.mem:], mem_e[-a.mem:]
@@ -337,6 +363,10 @@ def main():
                     P, OS = upd_replay(P, OS, fy, jnp.asarray(mem_o[j]), jnp.asarray(mem_m[j] * age_ok[..., None]),
                                        eoj, eaj, jnp.asarray(emj * age_ok[..., None]))
             gsteps += a.replay * len(mem_o)
+            if a.log_levers:                          # replay's own effect: the same rollout's losses after the replay passes
+                pl2, cl2, cn2 = (np.asarray(x) for x in lev_f(P, tr(o), tr(m), EO, EA, EM))
+                open(a.out + ".levers.jsonl", "a").write(json.dumps(dict(update=it, after_replay=True, pred_loss_mean=float(pl2.mean()),
+                                                                          copy_ce_mean=float(cl2[cn2 > 0].mean()) if (cn2 > 0).any() else None)) + "\n")
         dead = ~np.asarray(S.alive)[:, NB:NB + NL]
         ages = np.asarray(S.age)[:, NB:NB + NL]
         for k_ in SNAP:                             # weights snapshot when a life first reaches age k_
@@ -399,6 +429,8 @@ def main():
         diag = dict(n=len(et), mse_true=float(et.mean()), mse_swapped=float(es_.mean()),
                     swap_increase=float(dd.mean() / max(et.mean(), 1e-9)), paired_z=float(dd.mean() / (dd.std(ddof=1) / np.sqrt(len(dd)) + 1e-12)))
         print("DIAG predictive head uses the message?", json.dumps(diag), flush=True)
+        if a.diag_only:
+            os.makedirs(os.path.dirname(a.out) or ".", exist_ok=True); json.dump(diag, open(a.out, "w"), indent=1); return
     Pz = jax.tree_util.tree_map(lambda *x: jnp.stack(x), *[x["params"] for x in lives])
     C = jnp.asarray(np.stack([x["centres"] for x in lives]))
     keys = jax.vmap(lambda i: jax.random.split(jax.random.PRNGKey(7000 + i), a.eval_eps))(jnp.arange(len(lives)))
