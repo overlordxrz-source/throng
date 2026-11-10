@@ -3991,6 +3991,24 @@ more expensive, because it produces publishable-looking nulls.
     call. Candidates: denser or larger patches, or a lower drain so a typical post-juvenile agent can find food, while
     information still doubles the median life.
 
+- **W2 learnability gate with Cam's levers: ALL FAIL** (16-episode test, 16 worlds x 150 updates;
+  `docs/data/w2_learnability/gate_*_summary.json`):
+
+  | arm | lives | pass | median drop | grad steps per life (median) |
+  |---|---|---|---|---|
+  | baseline + 1 (juvenile 500) | 637 | 0.3% | 0.0 | 18 |
+  | + 2 (predictive trunk) | 682 | 0.4% | 0.0 | 18 |
+  | + 2 + 3 (sleep replay K = 8) | 758 | 0.9% | 0.0 | 306 |
+  | + 2 + 3 + copy elders' actions (M-approved trait) | 732 | 1.1% | 0.0 | 306 |
+
+  - **Why replay didn't help:** it trains only the predictive loss (by design). The behaviour-shaping losses (PPO,
+    and the copying loss) still get ~18 gradient steps per life.
+  - **Disclosure on the copy arm:** the elders are scripted listeners (the gate's code is scripted). In real W2 the
+    elders are the population.
+  - **Per Cam's rule, next lever = a generic fast-learner prior** (RL^2, meta-learned on random codes): design only,
+    `docs/W2_FAST_LEARNER_DESIGN.md`. Two cheaper one-flag variants are listed there (copying inside replay; a
+    young-plasticity trait).
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
