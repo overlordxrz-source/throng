@@ -1,0 +1,111 @@
+{
+ "world": "0.0013,8,0.001",
+ "steps": 600,
+ "beacon_spread": 6,
+ "beacon_walk": true,
+ "per_topic": {
+  "nearest_food_dir": {
+   "distinct_tokens_median": 6.0,
+   "tokens_ge25_median": 4.0,
+   "hist": [
+    0,
+    0,
+    3,
+    18,
+    30,
+    55,
+    53,
+    50,
+    47
+   ],
+   "heard_frac": 0.6236979166666666,
+   "gate_i": true
+  },
+  "richest_patch_dir": {
+   "distinct_tokens_median": 3.0,
+   "tokens_ge25_median": 2.0,
+   "hist": [
+    0,
+    9,
+    68,
+    65,
+    67,
+    29,
+    10,
+    6,
+    2
+   ],
+   "heard_frac": 0.6236979166666666,
+   "gate_i": false
+  },
+  "food_distance_band": {
+   "distinct_tokens_median": 5.0,
+   "tokens_ge25_median": 4.0,
+   "hist": [
+    0,
+    0,
+    0,
+    18,
+    63,
+    70,
+    68,
+    32,
+    5
+   ],
+   "heard_frac": 0.6236979166666666,
+   "gate_i": true
+  },
+  "nearest_agent_dir": {
+   "distinct_tokens_median": 8.0,
+   "tokens_ge25_median": 5.0,
+   "hist": [
+    0,
+    0,
+    0,
+    0,
+    7,
+    6,
+    9,
+    18,
+    216
+   ],
+   "heard_frac": 0.6236979166666666,
+   "gate_i": true
+  },
+  "speaker_energy_band": {
+   "distinct_tokens_median": 2.0,
+   "tokens_ge25_median": 1.0,
+   "hist": [
+    0,
+    0,
+    256,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "heard_frac": 0.6236979166666666,
+   "gate_i": false
+  },
+  "noise": {
+   "distinct_tokens_median": 8.0,
+   "tokens_ge25_median": 8.0,
+   "hist": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    256
+   ],
+   "heard_frac": 0.6236979166666666,
+   "gate_i": true
+  }
+ },
+ "gate_i_useful": false
+}

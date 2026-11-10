@@ -4515,6 +4515,40 @@ more expensive, because it produces publishable-looking nulls.
   - **Default path (no --ckpt) is row-identical to the pinned 5c5b07a** (21/21 rows on the same tiny config).
   - The W2 comm-run harness will use the same `ckpt.py`.
 
+- **Coverage apparatus (ruling 2) built** (comm-toy `65b9bd3`, defaults unchanged; learnability default path verified
+  row-identical, 14/14 lives).
+  - **Beacons:** `--beacon-spread k` puts the 4 beacons at (+-k, +-k); `--beacon-walk` = one random move per step (agent
+    speed). The code is as registered: each beacon broadcasts the sector to its own nearest patch.
+  - **Deviation (flagged): `--young-seek`.** A young (juvenile period) that hears nothing steps toward the nearest
+    beacon instead of standing still. Otherwise wandering beacons leave the young out of range for good.
+  - **Life test `--test heard25`:** the swap is a random derangement among the sectors that life heard >= 25 times
+    (other sectors unchanged). A life with < 2 such sectors cannot be scored and counts as a fail.
+  - **`--no-train`:** the apparatus gate; with `--sanity`, the blind navigator is also run on the same lives and keys.
+- **APPARATUS GATE (i) coverage: PASS in both harnesses** (picked world 0.0013 / 8 / 0.001, navigators `nav_w13`,
+  spread 6 + walk; `docs/data/apparatus/`).
+  - **Learnability (natural lives):**
+    - scripted-listener lives (n 264, median lifespan 2,144): median 8 distinct sectors, 6 sectors heard >= 25x;
+    - navigator-policy lives (n 428, median lifespan 891): 7 distinct and 5 >= 25x.
+  - **Fast learner:**
+    - at its old 600-step lives, richest-patch FAILS (3 distinct, 2 >= 25x): every speaker points at the same single
+      richest patch, so its direction moves slowly;
+    - **with 1,100-step lives (adapt 800 + test 300; the W2 median lifespan, Cam's ~1,100): all 3 useful topics
+      PASS** (nearest-food 7 / 4, richest-patch 4 / 3, distance band 5.5 / 4). Spread 9 gives the same.
+    - **Richest-patch is exactly at the bar.**
+    - **Change (flagged): fast-learner lives become 1,100 steps.**
+- **APPARATUS GATE (ii) scripted control: FAILS so far.** Fixing the test, not the bar.
+  - 16 trials x 300 steps: pass 58.7% (true 14.8 vs swap 8.8).
+    - The failures are dilution: 88 of 109 have drop < 30%; only 21 are significance failures.
+    - Pass rises with the number of well-heard sectors: 0% at 2, 21% at 3, 43-55% at 4-6, 85-87% at 7-8. The probe
+      episode re-places the beacons, so much of what it hears falls outside the life's set and is not swapped.
+  - **48 trials x 600 steps (Cam's named fixes): 68.2%.** All 84 failures are drop < 30%; zero significance failures.
+    More trials cannot close a dilution gap.
+  - **Next test fix (running): `--test-start life`.** Each probe episode starts in the life's own world at its end
+    (patch centres + the beacons where they were; the learner beside a random beacon).
+  - **Deliveries vs blind: passes trivially** (scripted 41-60x blind). In this low-drain world the homeostatic
+    navigator eats only ~0.25-0.7 per window, because it barely needs to. **Flag: this half of (ii) is not
+    informative here.**
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
