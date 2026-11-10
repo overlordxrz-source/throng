@@ -4573,6 +4573,19 @@ more expensive, because it produces publishable-looking nulls.
       whose well-heard sectors are all adjacent could not be scored.
     - (c) **more coverage** (wider spread or faster beacons) to thin out the few-sector tail. An apparatus change; the
       code is unchanged.
+  - **Option (c) tried (within the apparatus brief, beacons still at agent speed): spread 9, last-heard, 48 x 600 ->
+    68.8%** (260 lives). It is WORSE than spread 6 (79.9%), and the 2-4-sector tail is not thinner (65 vs 66 lives).
+    Coverage medians are unchanged (8 / 6 scripted, 7 / 5 navigator). Wider spacing does not fix it.
+  - **Last-heard scoring is a metric change, not only a test fix.** "Drop" becomes food credited to well-heard
+    sectors, and it would also become the learner's scoring. Cam to accept.
+  - **Denominator question for (a):** if lives below the minimum are unscorable and count as fails, ~40% of
+    navigator-policy lives are ineligible at >= 5. "Reliance in >= 50% of lives" would then need ~83% of eligible
+    lives, a much stricter bar.
+    - Suggest: the 50% is over ELIGIBLE lives, with a minimum count of eligible lives per arm (e.g. >= 50).
+    - Eligibility reported per arm, since a lever that changes movement changes how many sectors a life hears.
+  - **Suggested replacement for the "2x blind" half of (ii):** scripted with true messages vs the same scripted
+    listener with silence, on the same lives and keys. That is the VoI of the code in this harness (built,
+    \`--no-train --sanity\`; not yet run).
   - Recommended: (a) at >= 5 with last-heard scoring and 48 x 600. It is the smallest change, and the scripted control
     clears 90% on the eligible lives.
 
