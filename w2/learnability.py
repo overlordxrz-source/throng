@@ -71,6 +71,11 @@ def main():
     ap.add_argument("--young-lr", type=float, default=1.0, help="young plasticity: update x this at birth, linear to x1 by the end of --juvenile")
     ap.add_argument("--diag", type=int, default=0, help="free diagnostic: on this many lives, does the predictive head use the message?")
     ap.add_argument("--seed", type=int, default=0); ap.add_argument("--out", default="w2_out/learnability.json")
+    ap.add_argument("--hearing-probe", action="store_true", help="Cam Nov 10 ~05:15: supervised probe of the hearing pathway")
+    ap.add_argument("--probe-steps", type=int, default=300); ap.add_argument("--probe-lrs", default="1,4,16")
+    ap.add_argument("--probe-collect", type=int, default=32, help="teacher rollouts (x T steps) per data set")
+    ap.add_argument("--probe-pool", action="store_true", help="diagnostic: every learner trains on teacher data pooled over all training worlds (full sector coverage)")
+    ap.add_argument("--probe-train", default="hear", choices=["hear", "all"], help="hear: heard rows + policy head only; all: every layer (diagnostic)")
     a = ap.parse_args()
     NL = a.n_learners; NE = a.n_elders if a.copy > 0 else 0; M = NL + NE
     cfg = env.Cfg(L=96, N=NB + M, P=6, patch_sigma=1.0, d0=0.004 if a.long_life else 0.008, reproduce=False, A_max=3000)
@@ -220,6 +225,8 @@ def main():
     S = jax.tree_util.tree_map(lambda *x: jnp.stack(x), *states)
     nav_of = rng.integers(0, K, (W, NL))
     P = jax.tree_util.tree_map(lambda x: x[nav_of], NAV); OS = jax.vmap(jax.vmap(opt.init))(P)
+    if a.hearing_probe:
+        return hearing_probe(a, cfg, net, opt, NAV, nav_of, S, roll_w, ev, hear, W, NL, T, M)
     mem_o, mem_m, mem_e = [], [], []            # replay memory: the last a.mem rollouts, (W, NL, T, D) each (+ elder data)
     since_birth = np.zeros((W, NL), int)        # rollouts since birth (replay uses own memory only)
     gsteps = np.zeros((W, NL), int)
@@ -334,6 +341,165 @@ def main():
     os.makedirs(os.path.dirname(a.out), exist_ok=True)
     json.dump(dict(summary=summ, lives=res), open(a.out, "w"), indent=1)
     print(json.dumps(summ))
+
+
+def hearing_probe(a, cfg, net, opt, NAV, nav_of, S, roll_w, ev, hear, W, NL, T, M):
+    """Cam Nov 10 ~05:15 (4a). Train ONLY the hearing rows (Dense_0 kernel rows 100:111) + the policy head (Dense_2)
+    of each learner, starting from its navigator, by cross-entropy on the scripted listener's actions given
+    (obs, heard), Adam at the arm's rate (3e-4) x a multiplier, --probe-steps steps of batch 128 from the learner's own
+    world's teacher data. Report held-out action accuracy (other worlds) and the harness's unchanged life-test gate.
+    Pipeline checks: the input layout, the heard sector vs an independent beacon -> nearest-patch sector, the
+    gradient reaching the heard rows, the heard input changing the logits after training."""
+    P0 = jax.tree_util.tree_map(lambda x: x[nav_of], NAV)
+    a.sanity = True                                           # the scripted listener drives the collection rollouts
+
+    def collect(S, seed):
+        key = jax.random.PRNGKey(seed); Os, As, Ms = [], [], []
+        for _ in range(a.probe_collect):
+            key, k = jax.random.split(key)
+            S, rec = roll_w(P0, S, jax.random.split(k, W))
+            Os.append(np.asarray(rec[0])); As.append(np.asarray(rec[1])); Ms.append(np.asarray(rec[10]))
+        return np.concatenate(Os, 1), np.concatenate(As, 1), np.concatenate(Ms, 1)       # (W, Tn, NL, ...)
+
+    def fresh_worlds(base):
+        st = []
+        for w in range(W):
+            s0 = env.reset(cfg, jax.random.PRNGKey(base + w))
+            c = jax.random.randint(jax.random.PRNGKey(base + 500 + w), (2,), 0, cfg.L)
+            bpos = (c[None] + jnp.array([[-2, -2], [-2, 2], [2, -2], [2, 2]])) % cfg.L
+            mpos = (c[None] + jax.random.randint(jax.random.PRNGKey(base + 900 + w), (M, 2), -3, 4)) % cfg.L
+            st.append(s0._replace(pos=jnp.concatenate([bpos, mpos], 0)))
+        return jax.tree_util.tree_map(lambda *x: jnp.stack(x), *st)
+
+    O, A, Mk = collect(S, 11)
+    Oh, Ah, Mh = collect(fresh_worlds(30_000), 12)                                     # held-out worlds
+    a.sanity = False                                          # the life test (traced below) uses the learners' own policy
+    D = O.shape[-1]
+    heard = (O[..., 108] > 0.5) & Mk; heard_h = (Oh[..., 108] > 0.5) & Mh
+    # code-driven states: nothing to eat underfoot (centre cell < 0.2) and no food seen (> 0.2) in view
+    def code_driven(o):
+        r = cfg.r; wv = o[..., :(2 * r + 1) ** 2]; centre = wv[..., ((2 * r + 1) ** 2) // 2]
+        return (centre < 0.2) & (wv.max(-1) <= 0.2)
+    cd_h = heard_h & code_driven(Oh)
+
+    # ---- pipeline checks
+    chk = dict(input_dim=int(D), heard_dims="100:108 one-hot sector, 108 flag, 109:111 offset / R_HEAR",
+               kernel_rows=int(P0["params"]["Dense_0"]["kernel"].shape[-2]))
+    oh = O[heard]; chk["onehot_sums_to_1"] = bool(np.allclose(oh[:, 100:108].sum(1), 1.0))
+    chk["offset_within_unit"] = bool(np.abs(oh[:, 109:111]).max() <= 1.0 + 1e-6)
+    chk["unheard_all_zero"] = bool(np.abs(O[(O[..., 108] < 0.5) & Mk][:, 100:111]).max() == 0.0) if ((O[..., 108] < 0.5) & Mk).any() else True
+    chk["heard_frac_alive_states"] = float(heard.sum() / max(Mk.sum(), 1))
+    chk["code_driven_frac_heard_heldout"] = float(cd_h.sum() / max(heard_h.sum(), 1))
+    # independent sector: each world's beacons -> nearest patch, unclipped torus offset, vs the beacon's broadcast
+    s_ = jax.tree_util.tree_map(lambda x: x[0], S)
+    bp = np.asarray(s_.pos[:NB]); cen = np.asarray(s_.centres); L = cfg.L
+    d = (cen[None] - bp[:, None] + L // 2) % L - L // 2; i = np.abs(d).sum(-1).argmin(1); off = d[np.arange(NB), i]
+    true_sec = np.mod(np.round(np.arctan2(off[:, 1], off[:, 0]) / (2 * np.pi / 8)).astype(int), 8)
+    bc_sec = np.asarray(sector(env.oracle_offset(cfg, s_))[:NB])
+    chk["beacon_offsets_unclipped"] = off.tolist(); chk["r_oracle"] = int(cfg.r_oracle)
+    chk["broadcast_sector"] = bc_sec.tolist(); chk["true_direction_sector"] = true_sec.tolist()
+    chk["broadcast_eq_true_direction"] = float((bc_sec == true_sec).mean())
+    print("PIPELINE", json.dumps(chk), flush=True)
+
+    tm = {"params": {k: {kk: jnp.zeros_like(vv) for kk, vv in v.items()} for k, v in P0["params"].items()}}
+    for k in tm["params"]:
+        for kk in tm["params"][k]:
+            tm["params"][k][kk] = jnp.ones_like(tm["params"][k][kk]) if k == "Dense_2" else tm["params"][k][kk]
+    tm["params"]["Dense_0"]["kernel"] = jnp.zeros_like(tm["params"]["Dense_0"]["kernel"]).at[..., 100:, :].set(1.0)
+    if a.probe_train == "all":
+        tm = jax.tree_util.tree_map(jnp.ones_like, tm)
+    tm1 = jax.tree_util.tree_map(lambda x: x[0, 0], tm)
+    # target consistency: on heard code-driven states the scripted action must be the heading of the heard sector
+    def heading(sec):
+        ang = sec * (2 * np.pi / 8); dx = np.round(np.cos(ang) * 3); dy = np.round(np.sin(ang) * 3)
+        return np.where(np.abs(dx) >= np.abs(dy), np.where(dx < 0, 1, 2), np.where(dy > 0, 3, 4))
+    Ocd, Acd = Oh[cd_h], Ah[cd_h]
+    chk["target_eq_heading_of_heard_sector_codedriven"] = float((heading(Ocd[:, 100:108].argmax(1)) == Acd).mean()) if len(Acd) else None
+    chk["codedriven_action_hist"] = np.bincount(Acd, minlength=6).tolist() if len(Acd) else None
+    # first-layer saturation of the navigator trunk on heard states
+    p00 = jax.tree_util.tree_map(lambda x: x[0, 0], P0)
+    pre = np.asarray(jnp.asarray(oh[:2000]) @ p00["params"]["Dense_0"]["kernel"] + p00["params"]["Dense_0"]["bias"])
+    chk["dense0_tanh_saturated_frac(|tanh|>0.99)"] = float((np.abs(np.tanh(pre)) > 0.99).mean())
+    chk["dense0_preact_abs_median"] = float(np.median(np.abs(pre)))
+    print("PIPELINE2", json.dumps(chk), flush=True)
+
+    def ce(p, o, y):
+        lg, _, _ = net.apply(p, o)
+        return -jnp.take_along_axis(jax.nn.log_softmax(lg), y[:, None], 1)[:, 0].mean()
+
+    def one(p, os_, o, y, f):
+        g = jax.tree_util.tree_map(lambda x, m: x * m, jax.grad(ce)(p, o, y), tm1)
+        u, os_ = opt.update(g, os_, p)
+        return optax.apply_updates(p, jax.tree_util.tree_map(lambda x: x * f, u)), os_
+    upd = jax.jit(jax.vmap(jax.vmap(one, in_axes=(0, 0, 0, 0, None)), in_axes=(0, 0, 0, 0, None)))
+    g0 = jax.grad(ce)(jax.tree_util.tree_map(lambda x: x[0, 0], P0), jnp.asarray(oh[:128]), jnp.asarray(A[heard][:128]))
+    chk_g = float(jnp.abs(g0["params"]["Dense_0"]["kernel"][100:]).max())
+    print("PIPELINE grad into heard rows at step 0 (max |g|):", chk_g, flush=True)
+
+    rng = np.random.default_rng(a.seed + 77)
+    Opool, Apool = O[heard], A[heard]
+    idx = [[np.where(heard[w, :, l])[0] for l in range(NL)] for w in range(W)]
+    Ohh, Ahh = Oh[heard_h], Ah[heard_h]; CDm = code_driven(Ohh)
+    sub = rng.choice(len(Ohh), min(4000, len(Ohh)), replace=False); Ohs, Ahs, CDs = jnp.asarray(Ohh[sub]), Ahh[sub], CDm[sub]
+    acc_f = jax.jit(jax.vmap(jax.vmap(lambda p: net.apply(p, Ohs)[0].argmax(-1))))
+
+    def accuracy(P):
+        pr = np.asarray(acc_f(P)); hit = pr == Ahs[None, None]
+        return float(hit.mean()), float(hit[..., CDs].mean()) if CDs.any() else float("nan")
+
+    out = dict(checks=chk, grad_heard_rows_step0=chk_g, n_train_heard=int(heard.sum()), n_heldout_heard=int(heard_h.sum()),
+               n_heldout_code_driven=int(cd_h.sum()))
+    a0 = accuracy(P0); out["navigator_accuracy"] = dict(all=a0[0], code_driven=a0[1])
+    print("navigator (untrained) held-out accuracy all / code-driven:", a0, flush=True)
+    C = jnp.asarray(np.repeat(np.asarray(S.centres), NL, 0))
+    keys = jax.vmap(lambda i: jax.random.split(jax.random.PRNGKey(7000 + i), a.eval_eps))(jnp.arange(W * NL))
+
+    def gate(P):
+        Pz = jax.tree_util.tree_map(lambda x: x.reshape((W * NL,) + x.shape[2:]), P)
+        t = np.asarray(ev(Pz, C, keys, 0)); s2 = np.asarray(ev(Pz, C, keys, 1)); dd = t - s2
+        se = dd.std(1, ddof=1) / np.sqrt(dd.shape[1]); drop = 1 - s2.sum(1) / np.maximum(t.sum(1), 1e-9)
+        ok = (drop >= 0.30) & (dd.mean(1) > 2 * se)
+        return dict(pass_frac=float(ok.mean()), median_drop=float(np.median(drop)), eaten_true=float(t.mean()), eaten_swap=float(s2.mean()))
+    out["navigator_gate"] = gate(P0); print("navigator gate", json.dumps(out["navigator_gate"]), flush=True)
+    out["runs"] = {}
+    for fm in [float(x) for x in a.probe_lrs.split(",")]:
+        P = P0; OS = jax.vmap(jax.vmap(opt.init))(P0); curve = []
+        for st in range(a.probe_steps):
+            if a.probe_pool:
+                j = rng.choice(len(Opool), (W, NL, 128)); ob = jnp.asarray(Opool[j]); yb = jnp.asarray(Apool[j])
+            else:
+                b = np.stack([np.stack([rng.choice(idx[w][l], 128) if len(idx[w][l]) else np.zeros(128, int) for l in range(NL)]) for w in range(W)])
+                ob = jnp.asarray(O[np.arange(W)[:, None, None], b, np.arange(NL)[None, :, None]])
+                yb = jnp.asarray(A[np.arange(W)[:, None, None], b, np.arange(NL)[None, :, None]])
+            P, OS = upd(P, OS, ob, yb, fm)
+            if (st + 1) in (50, 100, 200, a.probe_steps):
+                curve.append((st + 1,) + accuracy(P))
+        acc = accuracy(P); g = gate(P)
+        # the heard input reaches the policy: flip the heard sector by 4 on held-out code-driven states
+        o_sw = Ohs.at[:, 100:108].set(jnp.roll(Ohs[:, 100:108], 4, axis=1))
+        l1 = np.asarray(jax.vmap(jax.vmap(lambda p: net.apply(p, Ohs)[0]))(P)); l2 = np.asarray(jax.vmap(jax.vmap(lambda p: net.apply(p, o_sw)[0]))(P))
+        # coverage: which heard sectors did each learner see in training? accuracy on held-out code-driven states split
+        # by whether the state's sector was among them
+        seen = np.zeros((W, NL, 8), bool)
+        for w in range(W):
+            for l in range(NL):
+                if a.probe_pool:
+                    seen[w, l, np.unique(Opool[:, 100:108].argmax(1))] = True
+                elif len(idx[w][l]):
+                    seen[w, l, np.unique(O[w, idx[w][l], l, 100:108].argmax(1))] = True
+        secs = np.asarray(Ohs[:, 100:108]).argmax(1)
+        prd = np.asarray(acc_f(P)); hit = prd == Ahs[None, None]
+        sm = seen[:, :, secs] & CDs[None, None]; um = (~seen[:, :, secs]) & CDs[None, None]
+        cov = dict(distinct_sectors_heard_per_learner_median=float(np.median(seen.sum(-1))),
+                   distinct_sectors_hist=np.bincount(seen.sum(-1).ravel(), minlength=9).tolist(),
+                   acc_codedriven_seen_sector=float(hit[sm].mean()) if sm.any() else None,
+                   acc_codedriven_unseen_sector=float(hit[um].mean()) if um.any() else None,
+                   frac_codedriven_unseen=float(um.sum() / max(sm.sum() + um.sum(), 1)))
+        r = dict(coverage=cov, lr=3e-4 * fm, steps=a.probe_steps, heldout_accuracy_all=acc[0], heldout_accuracy_code_driven=acc[1],
+                 curve=curve, gate=g, gate_pass=g["pass_frac"] >= 0.5, accuracy_pass=acc[0] >= 0.9,
+                 logit_change_on_sector_flip=float(np.abs(l1 - l2).mean()))
+        out["runs"][f"x{fm:g}"] = r; print("PROBE", json.dumps(r), flush=True)
+    os.makedirs(os.path.dirname(a.out), exist_ok=True); json.dump(out, open(a.out, "w"), indent=1)
 
 
 if __name__ == "__main__":
