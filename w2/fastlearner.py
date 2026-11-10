@@ -34,6 +34,7 @@ import optax
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from w2 import env  # noqa: E402
+from w2.learn import Net  # noqa: E402
 
 NB, NL, R_HEAR, H = 4, 4, 9, 128
 PERMS_A = PERMS_B = None
@@ -75,6 +76,10 @@ def main():
     ap.add_argument("--seed", type=int, default=0); ap.add_argument("--out", default="w2_out/fastlearner")
     ap.add_argument("--eval-only", default=None)
     ap.add_argument("--pilot-every", type=int, default=0, help="quick held-out gate every N updates (pilot trend)")
+    ap.add_argument("--navs", default="w2_out/nav/*.msgpack", help="W2 navigators to clone (Cam Nov 10 ~03:55)")
+    ap.add_argument("--bc-pretrain", type=int, default=0, help="phase 1: N updates of behaviour cloning (no messages)")
+    ap.add_argument("--continue-on-fail", action="store_true")
+    ap.add_argument("--bc", type=float, default=0.0, help="phase 2: BC loss weight kept on during meta-training")
     a = ap.parse_args()
     os.makedirs(a.out, exist_ok=True)
     cfg = env.Cfg(L=96, N=NB + NL, P=6, patch_sigma=1.0, d0=0.008, reproduce=False, A_max=100_000)
@@ -82,6 +87,11 @@ def main():
     D = 100 + 11 + 6 + 1
     params = net.init(jax.random.PRNGKey(a.seed), jnp.zeros((1, H)), jnp.zeros((1, D)))
     FA, FB = code_families()
+    import glob as _g
+    nav_net = Net(); nt = nav_net.init(jax.random.PRNGKey(0), jnp.zeros((1, 100)))
+    NAVP = jax.tree_util.tree_map(lambda *x: jnp.stack(x), *[flax.serialization.from_bytes(nt, open(f, "rb").read())
+                                                            for f in sorted(_g.glob(a.navs))])
+    KN = jax.tree_util.tree_leaves(NAVP)[0].shape[0]
     opt = optax.chain(optax.clip_by_global_norm(1.0), optax.adam(a.lr)); ost = opt.init(params)
 
     def topic_values(s, key):
@@ -143,8 +153,9 @@ def main():
         return s, h, pa, pr, R
     roll_w = jax.jit(jax.vmap(roll, in_axes=(None, 0, 0, 0, 0, 0, 0, 0)))
 
-    def loss(p, x, h0, act, lp0, adv, ret):
-        """recompute the GRU over the chunk from its stored start state (truncated BPTT over T)"""
+    def loss(p, x, h0, act, lp0, adv, ret, navp, w_rl, w_bc):
+        """recompute the GRU over the chunk from its stored start state (truncated BPTT over T); + BC (DAgger) toward the
+        world's navigator's action distribution on the agent's own states (obs only, no messages)"""
         def body(h, xt):
             h2, lg, v = net.apply(p, h, xt)
             return h2, (lg, v)
@@ -152,11 +163,15 @@ def main():
         ls = jax.nn.log_softmax(lg); lp = jnp.take_along_axis(ls, act[..., None], -1)[..., 0]
         ratio = jnp.exp(lp - lp0)
         pg = -jnp.minimum(ratio * adv, jnp.clip(ratio, 0.8, 1.2) * adv)
-        return (pg + 0.5 * (v - ret) ** 2 + 0.01 * (jnp.exp(ls) * ls).sum(-1)).mean()
+        L = w_rl * (pg + 0.5 * (v - ret) ** 2 + 0.01 * (jnp.exp(ls) * ls).sum(-1)).mean()
+        nl, _ = nav_net.apply(navp, x[..., :100])
+        L = L + w_bc * (-(jax.nn.softmax(nl) * ls).sum(-1)).mean()
+        return L
 
     @jax.jit
-    def upd(p, ost, x, h0, act, lp0, adv, ret):
-        g = jax.grad(lambda q: jax.vmap(loss, in_axes=(None, 0, 0, 0, 0, 0, 0))(q, x, h0, act, lp0, adv, ret).mean())(p)
+    def upd(p, ost, x, h0, act, lp0, adv, ret, navp, w_rl, w_bc):
+        g = jax.grad(lambda q: jax.vmap(loss, in_axes=(None, 0, 0, 0, 0, 0, 0, 0, None, None))(q, x, h0, act, lp0, adv, ret, navp,
+                                                                                             w_rl, w_bc).mean())(p)
         u, ost = opt.update(g, ost, p); return optax.apply_updates(p, u), ost
 
     rng = np.random.default_rng(a.seed)
@@ -201,11 +216,36 @@ def main():
             nom = np.asarray(lt(p, perms, keys, 0, a.adapt, topic, True))          # no messages at all
             out.update(eaten_no_msg=float(nom.mean()), msg_vs_silence=float(tru.mean() / max(nom.mean(), 1e-9) - 1))
         return out
+    def nav_life(navp, perm, key):
+        s, _ = new_world(key, perm)
+        def body(c, k):
+            s, eaten = c
+            k1, k2 = jax.random.split(k)
+            lg, _ = nav_net.apply(navp, env.observe(cfg, s)[NB:]); act = jax.random.categorical(k1, lg)
+            s2, _, info = env.step(cfg, s, jnp.concatenate([jnp.zeros(NB, jnp.int32), act]), k2)
+            E = s2.energy.at[:NB].set(1.0).at[NB:].set(jnp.maximum(s2.energy[NB:], 0.02))
+            s2 = s2._replace(energy=E, alive=s2.alive.at[:].set(True))
+            return (s2, eaten + jnp.where(jnp.arange(1) >= 0, info["take"][NB:].sum(), 0.0)[0]), None
+        (s, _), _ = jax.lax.scan(body, (s, 0.0), jax.random.split(jax.random.fold_in(key, 1), a.adapt))
+        (s, eaten), _ = jax.lax.scan(body, (s, 0.0), jax.random.split(jax.random.fold_in(key, 2), 300))
+        return eaten
+
+    def intake_gate(p, n=32):
+        perms = jnp.asarray(FA[np.random.default_rng(7).integers(0, len(FA), n)])
+        keys = jax.random.split(jax.random.PRNGKey(4242), n)
+        navi = jax.tree_util.tree_map(lambda x: x[np.arange(n) % KN], NAVP)
+        nv = np.asarray(jax.jit(jax.vmap(nav_life))(navi, perms, keys))
+        fl = np.asarray(lt(p, perms, keys[:, None], 0, a.adapt, 0, True))[:, 0]           # no messages
+        return dict(nav_median=float(np.median(nv)), fl_median=float(np.median(fl)),
+                    ratio=float(np.median(fl) / max(np.median(nv), 1e-9)), **{"pass": bool(np.median(fl) >= 0.9 * np.median(nv))})
+
     if a.eval_only:
         params = flax.serialization.from_bytes(params, open(a.eval_only, "rb").read())
     else:
         S, Pm, Tp, Hh, PA, PR = fresh(W, FA); t_life = 0; key = jax.random.PRNGKey(a.seed + 1); log = open(f"{a.out}/train.jsonl", "w")
-        for it in range(a.updates):
+        nav_w = jax.tree_util.tree_map(lambda x: x[rng.integers(0, KN, W)], NAVP)
+        for it in range(a.bc_pretrain + a.updates):
+            phase1 = it < a.bc_pretrain
             t0 = time.time()
             key, k = jax.random.split(key)
             S, Hh, PA, PR, (x, act, lp, v, r, take, h0s) = roll_w(params, S, Pm, Tp, Hh, PA, PR, jax.random.split(k, W))
@@ -216,11 +256,21 @@ def main():
                 last = r_[:, t] + 0.99 * nv - v_[:, t] + 0.99 * 0.95 * last; adv[:, t] = last
             ret = adv + v_; A = (adv - adv.mean()) / (adv.std() + 1e-8)
             for _ in range(2):
-                params, ost = upd(params, ost, x, h0s[:, 0], act, lp, jnp.asarray(A, jnp.float32), jnp.asarray(ret, jnp.float32))
+                params, ost = upd(params, ost, x, h0s[:, 0], act, lp, jnp.asarray(A, jnp.float32), jnp.asarray(ret, jnp.float32),
+                                  nav_w, 0.0 if phase1 else 1.0, 1.0 if phase1 else a.bc)
             t_life += T
             if t_life >= a.life:                                                        # every life ends: new code, new world
                 S, Pm, Tp, Hh, PA, PR = fresh(W, FA); t_life = 0
-            if a.pilot_every and (it + 1) % a.pilot_every == 0:
+                nav_w = jax.tree_util.tree_map(lambda x: x[rng.integers(0, KN, W)], NAVP)
+            if a.bc_pretrain and it + 1 == a.bc_pretrain:                               # the intake gate before meta-training
+                ig = intake_gate(params)
+                log.write(json.dumps(dict(update=it + 1, intake_gate=ig)) + "\n"); log.flush(); print("intake gate", json.dumps(ig), flush=True)
+                if not ig["pass"] and not a.continue_on_fail:
+                    open(f"{a.out}/params_bc.msgpack", "wb").write(flax.serialization.to_bytes(params)); print("STOP: intake gate failed"); return
+                open(f"{a.out}/params_bc.msgpack", "wb").write(flax.serialization.to_bytes(params))
+            if it < a.bc_pretrain:
+                continue
+            if a.pilot_every and (it + 1 - a.bc_pretrain) % a.pilot_every == 0:
                 g = gate(FB, 16, "B", HELD_TOPIC, quick=True)
                 log.write(json.dumps(dict(update=it + 1, pilot_heldout=g)) + "\n"); log.flush()
                 print("pilot", it + 1, json.dumps(g), flush=True)
