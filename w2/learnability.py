@@ -39,6 +39,7 @@ import optax
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from w2 import env  # noqa: E402
 from w2.learn import Net  # noqa: E402
+from w2.worlds import world_kw  # noqa: E402
 
 NB, R_HEAR, HD = 4, 9, 11
 
@@ -71,6 +72,7 @@ def main():
     ap.add_argument("--young-lr", type=float, default=1.0, help="young plasticity: update x this at birth, linear to x1 by the end of --juvenile")
     ap.add_argument("--diag", type=int, default=0, help="free diagnostic: on this many lives, does the predictive head use the message?")
     ap.add_argument("--seed", type=int, default=0); ap.add_argument("--out", default="w2_out/learnability.json")
+    ap.add_argument("--world", default="proto", help='"proto" or "d0,P,relocate" (Cam Nov 10 4b)')
     ap.add_argument("--hearing-probe", action="store_true", help="Cam Nov 10 ~05:15: supervised probe of the hearing pathway")
     ap.add_argument("--probe-steps", type=int, default=300); ap.add_argument("--probe-lrs", default="1,4,16")
     ap.add_argument("--probe-collect", type=int, default=32, help="teacher rollouts (x T steps) per data set")
@@ -78,7 +80,10 @@ def main():
     ap.add_argument("--probe-train", default="hear", choices=["hear", "all"], help="hear: heard rows + policy head only; all: every layer (diagnostic)")
     a = ap.parse_args()
     NL = a.n_learners; NE = a.n_elders if a.copy > 0 else 0; M = NL + NE
-    cfg = env.Cfg(L=96, N=NB + M, P=6, patch_sigma=1.0, d0=0.004 if a.long_life else 0.008, reproduce=False, A_max=3000)
+    if a.world == "proto":
+        cfg = env.Cfg(L=96, N=NB + M, P=6, patch_sigma=1.0, d0=0.004 if a.long_life else 0.008, reproduce=False, A_max=3000)
+    else:
+        cfg = env.Cfg(L=96, N=NB + M, patch_sigma=1.0, reproduce=False, A_max=3000, **world_kw(a.world))
     W, T = a.worlds, a.T; net = NetP()
     navs = sorted(glob.glob(a.navs)); K = len(navs)
     D0 = int(env.observe(cfg, env.reset(cfg, jax.random.PRNGKey(0))).shape[1])          # 100

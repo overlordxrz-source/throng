@@ -84,6 +84,7 @@ def code_families(seed=0):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--updates", type=int, default=300); ap.add_argument("--worlds", type=int, default=32)
+    ap.add_argument("--world", default="proto", help='"proto" or "d0,P,relocate" (Cam Nov 10 4b)')
     ap.add_argument("--T", type=int, default=64); ap.add_argument("--life", type=int, default=640)
     ap.add_argument("--adapt", type=int, default=300); ap.add_argument("--lr", type=float, default=3e-4)
     ap.add_argument("--null-code", action="store_true", help="G2 control: tokens carry no information")
@@ -99,7 +100,8 @@ def main():
     ap.add_argument("--bc", type=float, default=0.0, help="phase 2: BC loss weight kept on during meta-training")
     a = ap.parse_args()
     os.makedirs(a.out, exist_ok=True)
-    cfg = env.Cfg(L=96, N=NB + NL, P=6, patch_sigma=1.0, d0=0.008, reproduce=False, A_max=100_000)
+    from w2.worlds import world_kw
+    cfg = env.Cfg(L=96, N=NB + NL, patch_sigma=1.0, reproduce=False, A_max=100_000, **world_kw(a.world))
     W, T = a.worlds, a.T; net = SideMem() if a.arch == "sidemem" else Agent()
     D = 100 + 11 + 6 + 1
     params = net.init(jax.random.PRNGKey(a.seed), jnp.zeros((1, H)), jnp.zeros((1, D)))

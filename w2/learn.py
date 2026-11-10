@@ -99,8 +99,8 @@ def train(oracle: bool, updates: int, seed: int, W=8, T=128, gamma=0.99, lam=0.9
     return params, net
 
 
-def eval_lifespan(params, net, oracle, worlds=16, T=3000, seed=3, juvenile=0, random_policy=False, stat="mean"):
-    cfg = CFG
+def eval_lifespan(params, net, oracle, worlds=16, T=3000, seed=3, juvenile=0, random_policy=False, stat="mean", cfg=None):
+    cfg = cfg or CFG
 
     def one(k):
         s = env.reset(cfg, k)

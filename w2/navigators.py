@@ -13,18 +13,25 @@ from pathlib import Path
 import flax.serialization
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-from w2 import learn  # noqa: E402
+from w2 import env, learn  # noqa: E402
+from w2.worlds import world_kw  # noqa: E402
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--n", type=int, default=8); ap.add_argument("--updates", type=int, default=400)
     ap.add_argument("--out", default="w2_out/nav")
+    ap.add_argument("--world", default="proto", help='"proto" or "d0,P,relocate" (non-proto: trained as retune.py trains its blind learner, juvenile 500)')
     a = ap.parse_args()
     Path(a.out).mkdir(parents=True, exist_ok=True)
     res = []
     for i in range(a.n):
-        p, net = learn.train(False, a.updates, seed=1000 + i)                  # blind (no oracle), k = 0 (own reward)
-        life, se = learn.eval_lifespan(p, net, False)
+        if a.world == "proto":
+            p, net = learn.train(False, a.updates, seed=1000 + i)              # blind (no oracle), k = 0 (own reward)
+            life, se = learn.eval_lifespan(p, net, False)
+        else:
+            wc = env.Cfg(L=96, N=64, patch_sigma=1.0, reproduce=False, A_max=100_000, **world_kw(a.world))
+            p, net = learn.train(False, a.updates, seed=1000 + i, juvenile=500, cfg=wc)
+            life, se = learn.eval_lifespan(p, net, False, cfg=wc, T=6000, stat="median")
         Path(f"{a.out}/w2nav_s{1000 + i}.msgpack").write_bytes(flax.serialization.to_bytes(p))
         res.append(dict(seed=1000 + i, lifespan=life, se=se)); print(res[-1], flush=True)
     best = max(r["lifespan"] for r in res)
