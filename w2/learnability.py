@@ -477,7 +477,7 @@ def hearing_probe(a, cfg, net, opt, NAV, nav_of, S, roll_w, ev, hear, W, NL, T, 
                 ob = jnp.asarray(O[np.arange(W)[:, None, None], b, np.arange(NL)[None, :, None]])
                 yb = jnp.asarray(A[np.arange(W)[:, None, None], b, np.arange(NL)[None, :, None]])
             P, OS = upd(P, OS, ob, yb, fm)
-            if (st + 1) in (50, 100, 200, a.probe_steps):
+            if (st + 1) in (50, 100, 200, 300, 1000, 2000, a.probe_steps):
                 curve.append((st + 1,) + accuracy(P))
         acc = accuracy(P); g = gate(P)
         # the heard input reaches the policy: flip the heard sector by 4 on held-out code-driven states
@@ -500,6 +500,12 @@ def hearing_probe(a, cfg, net, opt, NAV, nav_of, S, roll_w, ev, hear, W, NL, T, 
                    acc_codedriven_seen_sector=float(hit[sm].mean()) if sm.any() else None,
                    acc_codedriven_unseen_sector=float(hit[um].mean()) if um.any() else None,
                    frac_codedriven_unseen=float(um.sum() / max(sm.sum() + um.sum(), 1)))
+        # training-set accuracy (pooled mode: on a sample of the pooled training states; code-driven split)
+        if a.probe_pool:
+            jt = rng.choice(len(Opool), min(4000, len(Opool)), replace=False)
+            Ot, At = jnp.asarray(Opool[jt]), Apool[jt]; CDt = code_driven(Opool[jt])
+            pt = np.asarray(jax.vmap(jax.vmap(lambda p: net.apply(p, Ot)[0].argmax(-1)))(P)); ht = pt == At[None, None]
+            cov["train_acc_all"] = float(ht.mean()); cov["train_acc_code_driven"] = float(ht[..., CDt].mean())
         r = dict(coverage=cov, lr=3e-4 * fm, steps=a.probe_steps, heldout_accuracy_all=acc[0], heldout_accuracy_code_driven=acc[1],
                  curve=curve, gate=g, gate_pass=g["pass_frac"] >= 0.5, accuracy_pass=acc[0] >= 0.9,
                  logit_change_on_sector_flip=float(np.abs(l1 - l2).mean()))
