@@ -67,12 +67,13 @@ if __name__ == "__main__":
     ap.add_argument("--d0", type=float, default=0.008); ap.add_argument("--P", type=int, default=6)
     ap.add_argument("--sigma", type=float, default=1.0); ap.add_argument("--relocate", type=float, default=0.0)
     ap.add_argument("--updates", type=int, default=400); ap.add_argument("--out", default=None)
+    ap.add_argument("--seed", type=int, default=0, help="learner seed (Cam Nov 10 ~04:35: confirmation on seeds 1-3)")
     a = ap.parse_args()
     base = dict(L=96, P=a.P, patch_sigma=a.sigma, d0=a.d0, relocate=a.relocate)
     tcfg = env.Cfg(N=64, reproduce=False, A_max=100_000, **base)                     # training world (as before)
     ecfg = env.Cfg(N=64, reproduce=True, rep_mode="setpoint", juvenile=500, A_max=100_000, **base)   # evaluation world
-    pb, nb = learn.train(False, a.updates, 0, juvenile=500, cfg=tcfg)
-    po, no = learn.train(True, a.updates, 0, juvenile=500, cfg=tcfg)
+    pb, nb = learn.train(False, a.updates, a.seed, juvenile=500, cfg=tcfg)
+    po, no = learn.train(True, a.updates, a.seed, juvenile=500, cfg=tcfg)
     R = dict(random=evaluate(ecfg, pb, nb, False, "random"), blind=evaluate(ecfg, pb, nb, False, "policy"),
              oracle=evaluate(ecfg, po, no, True, "policy"))
     # gates on the lives born during the evaluation (provisioned newborns); random has none, so P1m uses its all-lives median
