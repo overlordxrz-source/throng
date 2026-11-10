@@ -4394,7 +4394,7 @@ more expensive, because it produces publishable-looking nulls.
   - rho is identical at u1000 and u2000: the meaning-to-message map is frozen from u1000.
   - So the codes are structured but do not generalise to unseen combinations.
 
-- **RESULT (Nov 10 ~01:20): W2 KM re-read + sweep (c): NO PICK. Report** (`docs/data/w2_retune/summary_km.txt`; per-life
+- **RESULT (Nov 10 ~00:45): W2 KM re-read + sweep (c): NO PICK. Report** (`docs/data/w2_retune/summary_km.txt`; per-life
   arrays in `km_lives/`).
   - **Instrument check:** the reruns reproduce every old naive median and life count exactly (16/16 cells checked on
     the first 4 runs; same seeds, deterministic), so this is a true re-read.
