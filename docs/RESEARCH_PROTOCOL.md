@@ -4068,6 +4068,23 @@ more expensive, because it produces publishable-looking nulls.
     with all-lives medians reported).
   - The sweep is running.
 
+- **Cam, Nov 10 ~03:15: fast-learner addition. REGISTERED (`w2/fastlearner.py`, comm-toy):**
+  - **Each life's code is about a randomly drawn topic.**
+    - Useful (affect intake): nearest-food direction, richest-patch direction (the patch with the most food within 2
+      cells of its centre), food-distance band (Manhattan distance to the nearest patch / 6, capped at 7).
+    - Useless: nearest-agent direction, the speaker's energy band, pure noise.
+    - A random token mapping per life.
+  - **Held out:** the topic richest-patch direction (training topics: the other 5) and code family B (permutations
+    with odd sigma(0)).
+  - **Gates:**
+    - G1 reliance >= 30% (paired > 2 SE over 16 branches) in >= 50% of lives on the held-out topic x family;
+    - G2 useless-topic (and no-code) messages leave intake unchanged within 5% vs silence;
+    - G3 leak: held-out vs training family within 0.1 in median drop;
+    - G4 foraging kept: median intake within 10% of the plain W2 navigator's (comparison added before the full run).
+  - Reliance reported per topic.
+  - **Laptop pilot running** (1,500 updates, 32 worlds, quick held-out gate every 250 updates). **The full run goes to
+    Modal (cap $3) only if the pilot's held-out reliance is rising.**
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
