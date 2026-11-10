@@ -4105,6 +4105,19 @@ more expensive, because it produces publishable-looking nulls.
     - (iii) P2m measured on births per 1,000 steps per world (population growth) rather than per-life medians, which
       are coarse integers here.
 
+- **Fast-learner laptop pilot: NOT RISING, no Modal run (Cam's rule).** 1,500 updates, 32 worlds x 4 learners, 0.41 s
+  per update.
+  - **The agent never learned to forage:** training food eaten per step 0.0001 in every quintile.
+  - Held-out reliance pass fraction 0.00-0.06 at every 250-update check. True = swapped intake everywhere; the
+    "median drop 1.000" is 1 - 0/0 on lives that eat nothing (meaningless).
+  - All six topics are identical (messages ignored).
+  - **Cause:** the RL^2 GRU starts from scratch, without the navigators' foraging, and 1,500 small updates (128 agents
+    x 64 steps) don't find food. The W2 navigators had 400 updates of 8 worlds x 64 agents x 128 steps.
+  - **Proposed fix (Cam's call; not run):** give the meta-learner the navigators' foraging first, by behaviour-cloning
+    the W2 navigators' actions (no messages; our own W2 agents, no code taught). Then meta-train on random topics and
+    codes, and re-pilot. Alternatively keep the navigator MLP as the policy trunk and add the GRU as a side memory
+    whose state feeds the policy.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
