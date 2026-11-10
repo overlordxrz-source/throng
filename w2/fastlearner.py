@@ -88,6 +88,12 @@ def main():
     ap.add_argument("--beacon-spread", type=int, default=2, help="speakers at (+-k, +-k) around the cluster centre (Cam Nov 10 coverage)")
     ap.add_argument("--beacon-walk", action="store_true", help="speakers random-walk at agent speed")
     ap.add_argument("--beacon-speed", type=int, default=1, help="with --beacon-walk: unit random moves per step (Cam Nov 10: faster walk for richest-patch margin)")
+    ap.add_argument("--freeze-trunk", action="store_true", help="Cam Nov 10 (4c): only the side memory (side_enc, gru, side_head) and the value head learn")
+    ap.add_argument("--min-tokens", type=int, default=5, help="a listener-life qualifies iff it heard >= this many tokens >= --min-heard x during adaptation")
+    ap.add_argument("--min-heard", type=int, default=25)
+    ap.add_argument("--score", default="window", choices=["window", "last-heard"], help="last-heard (Cam Nov 10 metric): only food eaten while the last TRUE token heard is one the life heard >= --min-heard x in adaptation counts")
+    ap.add_argument("--voi-fallback", default="policy", choices=["policy", "random"], help="scripted listener's move when it hears nothing and sees no food: the agent's own policy (navigator) or a random move")
+    ap.add_argument("--scripted-voi", action="store_true", help="4c VoI: a scripted listener that decodes the life's code and follows the direction, true vs silence (direction topics)")
     ap.add_argument("--coverage", action="store_true", help="diagnostic: distinct heard tokens per life (adapt + test), per topic")
     ap.add_argument("--T", type=int, default=64); ap.add_argument("--life", type=int, default=640)
     ap.add_argument("--adapt", type=int, default=300); ap.add_argument("--lr", type=float, default=3e-4)
@@ -158,7 +164,19 @@ def main():
         ok = cheb[jnp.arange(NL), j] <= R_HEAR
         return jnp.concatenate([jax.nn.one_hot(tok[j], 8), jnp.ones((NL, 1)), dj / R_HEAR], 1) * ok[:, None]
 
-    def step(p, s, perm, h, pa, pr, key, shift, null, topic, no_msg=False, expert=None):
+    def scripted_act(s, hd, perm, fallback):
+        """eats on food, heads for visible food, else walks the direction the heard token decodes to (through the
+        life's own code: the scripted listener knows the mapping), else the fallback"""
+        pos = s.pos[NB:]; here = s.food[pos[:, 0], pos[:, 1]]
+        wv = env.window(cfg, s.food, pos, cfg.r).reshape(NL, -1); best = jnp.argmax(wv, 1); seen = wv.max(1) > 0.2
+        o_ = jnp.arange(-cfg.r, cfg.r + 1)
+        tw = lambda dx, dy: jnp.where(jnp.abs(dx) >= jnp.abs(dy), jnp.where(dx < 0, 1, 2), jnp.where(dy > 0, 3, 4))  # noqa: E731
+        vis = tw(o_[best // (2 * cfg.r + 1)], o_[best % (2 * cfg.r + 1)])
+        inv = jnp.argsort(perm); sec = inv[jnp.argmax(hd[:, :8], 1)]; ang = sec * (2 * jnp.pi / 8)
+        hdg = tw(jnp.round(jnp.cos(ang) * 3), jnp.round(jnp.sin(ang) * 3))
+        return jnp.where(here >= 0.2, env.EAT, jnp.where(seen, vis, jnp.where(hd[:, 8] > 0.5, hdg, fallback)))
+
+    def step(p, s, perm, h, pa, pr, key, shift, null, topic, no_msg=False, expert=None, scripted=False):
         k1, k2, k3 = jax.random.split(key, 3)
         hd = hear(s, perm, shift, k3, null, topic)
         if no_msg:
@@ -166,6 +184,9 @@ def main():
         x = jnp.concatenate([env.observe(cfg, s)[NB:], hd, jax.nn.one_hot(pa, 6), pr[:, None]], 1)
         h2, lg, v = net.apply(p, h, x)
         act = jax.random.categorical(k1, lg)
+        if scripted:
+            fb = jax.random.randint(jax.random.fold_in(k1, 5), (NL,), 1, 5) if a.voi_fallback == "random" else act
+            act = scripted_act(s, hd, perm, fb)
         if expert is not None:                     # DAgger roll-in: the navigator drives, the clone learns on its states
             nlg, _ = nav_net.apply(expert, x[:, :100]); act = jax.random.categorical(jax.random.fold_in(k1, 3), nlg)
         lp = jnp.take_along_axis(jax.nn.log_softmax(lg), act[:, None], 1)[:, 0]
@@ -225,6 +246,9 @@ def main():
     def upd(p, ost, x, h0, act, lp0, adv, ret, navp, w_rl, w_bc):
         g = jax.grad(lambda q: jax.vmap(loss, in_axes=(None, 0, 0, 0, 0, 0, 0, 0, None, None))(q, x, h0, act, lp0, adv, ret, navp,
                                                                                              w_rl, w_bc).mean())(p)
+        if a.freeze_trunk:
+            g = {"params": {k: (jax.tree_util.tree_map(jnp.zeros_like, v) if k in ("Dense_0", "Dense_1", "Dense_2") else v)
+                            for k, v in g["params"].items()}}
         u, ost = opt.update(g, ost, p); return optax.apply_updates(p, u), ost
 
     rng = np.random.default_rng(a.seed)
@@ -254,6 +278,63 @@ def main():
         return eaten
     lt = jax.jit(jax.vmap(jax.vmap(life_test, in_axes=(None, None, 0, None, None, None, None)), in_axes=(None, 0, 0, None, None, None, None)),
                  static_argnums=(3, 4, 6))
+
+    def life_test_l(p, perm, key, shift_mode, adapt, topic, no_msg=False, scripted=False):
+        """per-listener version (Cam Nov 10): food eaten per listener in the 300-step test, and each listener's TRUE heard
+        token counts during adaptation (qualification)"""
+        s, _ = new_world(key, perm)
+        h = jnp.zeros((NL, H)); pa = jnp.zeros(NL, jnp.int32); pr = jnp.zeros(NL)
+        def body(c, k):
+            s, h, pa, pr, cnt = c
+            ht = hear(s, perm, 0, jax.random.fold_in(k, 3), a.null_code, topic)        # what the life truly hears
+            cnt = cnt + ht[:, :8] * (ht[:, 8:9] > 0.5)
+            s2, h2, act, rr, _ = step(p, s, perm, h, pa, pr, k, 0, a.null_code, topic, no_msg, scripted=scripted)
+            return (s2, h2, act, rr, cnt), None
+        (s, h, pa, pr, cnt), _ = jax.lax.scan(body, (s, h, pa, pr, jnp.zeros((NL, 8))), jax.random.split(jax.random.fold_in(key, 1), adapt))
+        sh = jax.random.randint(jax.random.fold_in(key, 9), (), 1, 8) * shift_mode
+        well = cnt >= a.min_heard                                                     # (NL, 8) well-heard tokens
+        def body2(c, k):
+            s, h, pa, pr, eaten, last = c
+            ht = hear(s, perm, 0, jax.random.fold_in(k, 3), a.null_code, topic)
+            last = jnp.where(ht[:, 8] > 0.5, jnp.argmax(ht[:, :8], 1), last)
+            s2, h2, act, rr, rec = step(p, s, perm, h, pa, pr, k, sh, a.null_code, topic, no_msg, scripted=scripted)
+            cr = jnp.where(last >= 0, well[jnp.arange(NL), jnp.maximum(last, 0)], False).astype(jnp.float32) if a.score == "last-heard" else 1.0
+            return (s2, h2, act, rr, eaten + rec[5] * cr, last), None
+        (_, _, _, _, eaten, _), _ = jax.lax.scan(body2, (s, h, pa, pr, jnp.zeros(NL), jnp.full(NL, -1, jnp.int32)),
+                                                 jax.random.split(jax.random.fold_in(key, 2), 300))
+        return eaten, cnt
+    ltl = jax.jit(jax.vmap(jax.vmap(life_test_l, in_axes=(None, None, 0, None, None, None, None, None)), in_axes=(None, 0, 0, None, None, None, None, None)),
+                  static_argnums=(3, 4, 6, 7))
+
+    def gate_q(fam, n, tag, topic, cur=None, scripted=False):
+        """qualifying-lives scoring: a listener-life qualifies iff it heard >= min-tokens tokens >= min-heard x during
+        adaptation; pass = drop >= 30% AND paired > 2 SE over the branches; reported over qualifying lives"""
+        p = params if cur is None else cur
+        perms = jnp.asarray(fam[np.random.default_rng(99).integers(0, len(fam), n)])
+        keys = jax.vmap(lambda i: jax.random.split(jax.random.PRNGKey(5000 + i), a.branches))(jnp.arange(n))
+        tru, cnt = (np.asarray(x) for x in ltl(p, perms, keys, 0, a.adapt, topic, False, scripted))   # (n, B, NL), (n, B, NL, 8)
+        swp, _ = (np.asarray(x) for x in ltl(p, perms, keys, 1, a.adapt, topic, False, scripted))
+        nom, _ = (np.asarray(x) for x in ltl(p, perms, keys, 0, a.adapt, topic, True, scripted))
+        qe = (cnt >= a.min_heard).sum(-1) >= a.min_tokens                       # (n, B, NL): qualifying episodes
+        oks, drops = [], []
+        for i in range(n):
+            t_, s_ = tru[i][qe[i]], swp[i][qe[i]]
+            if len(t_) >= 4:
+                dd = t_ - s_; dr = 1 - s_.sum() / max(t_.sum(), 1e-9)
+                oks.append(bool(dr >= 0.30 and dd.mean() > 2 * dd.std(ddof=1) / np.sqrt(len(dd)))); drops.append(float(dr))
+        tq, nq = tru[qe], nom[qe]; dv = tq - nq
+        out = dict(family=tag, topic=TOPICS[topic], scripted=scripted, codes=n, episodes=int(qe.size), qualifying_episodes=int(qe.sum()),
+                   qualifying_frac=float(qe.mean()), scorable_codes=len(oks), pass_frac_scorable=float(np.mean(oks)) if oks else None,
+                   median_drop=float(np.median(drops)) if drops else None,
+                   eaten_true=float(tq.mean()) if qe.any() else None, eaten_silence=float(nq.mean()) if qe.any() else None)
+        if qe.sum() > 1:
+            out["voi_ratio"] = float(tq.mean() / max(nq.mean(), 1e-9)); out["voi_paired_z"] = float(dv.mean() / max(dv.std(ddof=1) / np.sqrt(len(dv)), 1e-12))
+            out["voi_ok"] = bool(out["voi_ratio"] >= 1.5 and out["voi_paired_z"] > 2)
+        return out
+
+    if a.scripted_voi:
+        res = {TOPICS[t]: gate_q(FB, a.eval_lives, "B", t, scripted=True) for t in (0, 1)}
+        print("SCRIPTED_VOI", json.dumps(res)); os.makedirs(a.out, exist_ok=True); json.dump(res, open(f"{a.out}/scripted_voi.json", "w"), indent=1); return
 
     def gate(fam, n, tag, topic, quick=False, cur=None):
         p = params if cur is None else cur
