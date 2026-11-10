@@ -4419,7 +4419,8 @@ more expensive, because it produces publishable-looking nulls.
   - **Options for Cam:**
     - (i) a fresh confirmation of the runner-up on 4 NEW learner seeds (4-7) under the same rule. It passed the rule
       on its re-read; fresh seeds avoid picking from the re-read. ~35 min laptop.
-    - (ii) accept a 5% P4 margin (both sweep (c) configs pass 4/4 at >= 1,050? To be computed only if asked).
+    - (ii) a smaller P4 margin. Any new bar is now set after seeing these numbers, so it would need fresh seeds to
+      count.
     - (iii) a different world lever for lifespan (e.g. the reproduction cost c_rep or the provisioning cost).
 
 ## Part 3 — Fossils
