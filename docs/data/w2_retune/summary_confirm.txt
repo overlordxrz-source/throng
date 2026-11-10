@@ -1,0 +1,17 @@
+W2 pick confirmation (Cam Nov 10 ~04:35). Same basis as summary_v3: random = median of all lives; blind / oracle =
+median of lives born in the eval. Gates: P1m blind >= 3x random; P2 oracle >= 2x blind; P4 blind >= 1,000.
+A config stands iff all three pass on the MEDIAN across its 4 seeds AND in >= 3/4 seeds.
+== pick d0.0015_P8_rel0.001: 4 seeds
+  r2_d0.0015_P8_rel0.001.json            random  173 | blind  1002 (n 2218) | oracle  2983 (n 1169) | P1m True  P2 True  (2.98x) P4 True  -> all
+  c_d0.0015_P8_rel0.001_s1.json          random  173 | blind   922 (n 1293) | oracle  2160 (n 1088) | P1m True  P2 True  (2.34x) P4 False -> x
+  c_d0.0015_P8_rel0.001_s2.json          random  173 | blind   951 (n 2107) | oracle  3169 (n 865) | P1m True  P2 True  (3.33x) P4 False -> x
+  c_d0.0015_P8_rel0.001_s3.json          random  173 | blind   937 (n 701) | oracle  3494 (n 959) | P1m True  P2 True  (3.73x) P4 False -> x
+  median across seeds: random 173 | blind 944 | oracle 3076 | P1m True P2 True (3.26x) P4 False; seeds passing all three 1/4 -> FAILS
+== runner-up d0.0018_P10_rel0.0008: 4 seeds
+  r2_d0.0018_P10_rel0.0008.json          random  160 | blind  1056 (n 2739) | oracle  2832 (n 1256) | P1m True  P2 True  (2.68x) P4 True  -> all
+  c_d0.0018_P10_rel0.0008_s1.json        random  160 | blind   796 (n 653) | oracle  4460 (n 825) | P1m True  P2 True  (5.60x) P4 False -> x
+  c_d0.0018_P10_rel0.0008_s2.json        random  160 | blind  1389 (n 2169) | oracle  2699 (n 950) | P1m True  P2 False (1.94x) P4 True  -> x
+  c_d0.0018_P10_rel0.0008_s3.json        random  160 | blind   917 (n 1201) | oracle  2005 (n 1299) | P1m True  P2 True  (2.19x) P4 False -> x
+  median across seeds: random 160 | blind 986 | oracle 2765 | P1m True P2 True (2.80x) P4 False; seeds passing all three 1/4 -> FAILS
+
+== DECISION: neither stands -> report

@@ -4223,7 +4223,7 @@ more expensive, because it produces publishable-looking nulls.
     ~29k updates, ~$2.1-3.5, so (e) stays inside its cap.
   - Analysis: deduped by segment; the last complete segment (u9000) per seed. Lands ~08:00 if not preempted.
 
-- **RESULT (Nov 10 ~00:20): fast-learner side-memory pilot (laptop, 1,500 updates, BC 0.1): FAIL, no rise. No Modal**
+- **RESULT (Nov 9 ~23:50): fast-learner side-memory pilot (laptop, 1,500 updates, BC 0.1): FAIL, no rise. No Modal**
   **(pilot rule).** Data in `docs/data/fl_pilot/`; comm-toy `54bd6bc`.
   - **Intake-gate fix first.**
     - The earlier 0.89 compared the navigator-0 trunk with the 8-navigator pool. The reference is now navigator 0, on 64
@@ -4250,6 +4250,23 @@ more expensive, because it produces publishable-looking nulls.
       eat? If ~0, there is nothing to learn here;
     - (iii) longer meta-training;
     - (iv) stop the fast-learner track and carry W2 comm with the population/turnover route.
+
+- **RESULT (Nov 9 ~23:58): W2 pick confirmation: NEITHER STANDS** (`docs/data/w2_retune/summary_confirm.txt`, script
+  `confirm_summary.py`; same basis as summary_v3).
+  - **Pick (d0 0.0015 / 8 / 0.001):**
+    - blind medians 1002 / 922 / 951 / 937 -> median 944;
+    - oracle 2983 / 2160 / 3169 / 3494 (P2 3.26x on the median);
+    - **P4 fails on the median (944 < 1,000); all three pass in 1/4 seeds -> FAILS.**
+  - **Runner-up (d0 0.0018 / 10 / 0.0008):**
+    - blind 1056 / 796 / 1389 / 917 -> median 986;
+    - oracle 2832 / 4460 / 2699 / 2005 (P2 2.80x on the median; seed 2 fails P2 at 1.94x);
+    - **P4 fails on the median (986); 1/4 seeds -> FAILS.**
+  - **Pattern:**
+    - P1m passes 8/8 (blind 5-8x random). P2 passes 7/8 seeds, with large margins on the medians.
+    - **P4 (blind median >= 1,000) is the only binding gate.** It misses by 5.6% (pick) and 1.4% (runner-up). The
+      seed-1 sweep value of 1,002 was the high draw.
+    - Learner-seed spread of the blind median is wide: 796-1,389 for the runner-up, with offspring-life counts 653-2,739.
+  - Per the rule: **report**. No world chosen; the W2 comm run waits.
 
 ## Part 3 — Fossils
 
