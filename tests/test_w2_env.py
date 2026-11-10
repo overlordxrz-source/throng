@@ -138,3 +138,24 @@ def test_inclusive_reward():
             assert np.isclose(float(r[0]), own0) and np.isclose(float(r[1]), own1)
         else:                                                                     # + 0.5 x the kin's reduction
             assert np.isclose(float(r[0]), own0 + 0.5 * own1, atol=1e-6) and np.isclose(float(r[1]), own1 + 0.5 * own0, atol=1e-6)
+
+
+def test_parent_pays_juvenile_provisioning():
+    cfg = env.Cfg(L=16, N=2, P=1, reproduce=True, juvenile=10, regrow=0.0, d0=0.01, d_move=0.0, rep_hold=10_000)
+    s = full(cfg, [[2, 2], [9, 9]], [0.9, 0.3], [True, True], parent=[-1, 0])
+    s = s._replace(age=jnp.array([200, 3], jnp.int32))
+    s2, _, _ = env.step(cfg, s, jnp.zeros(2, jnp.int32), jax.random.PRNGKey(0))
+    assert np.isclose(float(s2.energy[1]), cfg.E0)                                # young topped up to E0
+    paid = cfg.E0 - (0.3 - 0.01)
+    assert np.isclose(float(s2.energy[0]), 0.9 - 0.01 - paid, atol=1e-6)          # the parent paid exactly that
+    s = s._replace(age=jnp.array([200, 50], jnp.int32))                            # past the juvenile period: no top-up
+    s3, _, _ = env.step(cfg, s, jnp.zeros(2, jnp.int32), jax.random.PRNGKey(0))
+    assert np.isclose(float(s3.energy[1]), 0.3 - 0.01)
+
+
+def test_food_relocates():
+    cfg = env.Cfg(L=32, N=1, P=4, relocate=1.0)
+    s = env.reset(cfg, jax.random.PRNGKey(0))
+    s2, _, _ = env.step(cfg, s, jnp.zeros(1, jnp.int32), jax.random.PRNGKey(1))
+    assert not np.array_equal(np.asarray(s2.centres), np.asarray(s.centres))
+    assert float(jnp.max(s2.food - s2.cap)) <= 1e-6                                # food never exceeds the new capacity

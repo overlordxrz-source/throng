@@ -32,8 +32,8 @@ class Net(nn.Module):
         return nn.Dense(6)(h), nn.Dense(1)(h)[..., 0]
 
 
-def train(oracle: bool, updates: int, seed: int, W=8, T=128, gamma=0.99, lam=0.95, lr=3e-4, juvenile=0):
-    cfg = CFG; net = Net()
+def train(oracle: bool, updates: int, seed: int, W=8, T=128, gamma=0.99, lam=0.95, lr=3e-4, juvenile=0, cfg=None):
+    cfg = cfg or CFG; net = Net()
     D = int(env.observe(cfg, env.reset(cfg, jax.random.PRNGKey(0)), oracle).shape[1])
     params = net.init(jax.random.PRNGKey(seed), jnp.zeros((1, D)))
     opt = optax.chain(optax.clip_by_global_norm(1.0), optax.adam(lr)); ost = opt.init(params)

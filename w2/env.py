@@ -40,6 +40,8 @@ class Cfg(NamedTuple):
     E_set: float = 0.8
     drive_n: float = 2.0
     inclusive: bool = False      # inclusive-fitness reward: + mean over living kin of relatedness x their drive reduction
+    juvenile: int = 0            # Cam Nov 10: for the first J steps of life a newborn is topped up to E0 by its living parent
+    relocate: float = 0.0        # per-step probability that each food patch jumps to a random location
 
 
 class State(NamedTuple):
@@ -116,7 +118,14 @@ def step(cfg: Cfg, s: State, act, key):
     n_here = jnp.zeros((cfg.L, cfg.L)).at[pos[:, 0], pos[:, 1]].add(eat.astype(jnp.float32))[pos[:, 0], pos[:, 1]]
     take = jnp.where(eat, jnp.minimum(cfg.bite, here / jnp.maximum(n_here, 1.0)), 0.0)
     food = s.food.at[pos[:, 0], pos[:, 1]].add(-take)
-    food = food + cfg.regrow * (s.cap - food)
+    cap, centres = s.cap, s.centres
+    if cfg.relocate > 0:           # food that relocates: fresh information keeps its value
+        kr1, kr2 = jax.random.split(jax.random.fold_in(key, 77))
+        jump = jax.random.uniform(kr1, (cfg.P,)) < cfg.relocate
+        centres = jnp.where(jump[:, None], jax.random.randint(kr2, (cfg.P, 2), 0, cfg.L), centres)
+        cap = capacity(cfg, centres)
+        food = jnp.minimum(food, cap)
+    food = food + cfg.regrow * (cap - food)
     E_prev = s.energy
     E = jnp.clip(E_prev + cfg.eff * take - (cfg.d0 + cfg.d_move * moved) * alive, 0.0, 1.0)
     age = s.age + alive.astype(jnp.int32)
@@ -165,5 +174,13 @@ def step(cfg: Cfg, s: State, act, key):
         rel = jnp.where(births[None, :], rel.T, rel)
         rel = rel * (1.0 - jnp.eye(cfg.N))
         alive2 = alive2 | births
-    s2 = State(food, s.cap, s.centres, pos, E, age, alive2, fed, rel, par)
+    if cfg.juvenile and cfg.reproduce:   # parent-paid provisioning
+        young = alive2 & (age < cfg.juvenile) & (par >= 0)
+        pidx = jnp.clip(par, 0, cfg.N - 1)
+        need = jnp.where(young & alive2[pidx], jnp.maximum(cfg.E0 - E, 0.0), 0.0)
+        paid = jnp.minimum(need, jnp.zeros(cfg.N).at[pidx].add(0.0) + E[pidx])        # can't pay more than it has
+        E = E + paid
+        E = E - jnp.zeros(cfg.N).at[pidx].add(paid)
+        E = jnp.clip(E, 0.0, 1.0)
+    s2 = State(food, cap, centres, pos, E, age, alive2, fed, rel, par)
     return s2, r, dict(dead=dead, births=births, take=take, moved=moved)
