@@ -4795,15 +4795,28 @@ more expensive, because it produces publishable-looking nulls.
     - Two-proportion z: +4.2 and +3.1, so **RISING** under the registered rule (1000 > 500 > 250, each step z > 2).
     - Caveat: the 1,000 set is the lives that survived to 1,000 (a subset), so survivor selection may flatter the late
       point.
-  - **Extrapolation to 30% is model-dependent:**
-    - linear: +10.2 points per 1,000 steps -> **30% at age ~2,900** (~3.3x the median lifespan of ~890);
-    - log-age: +5.5 points per e-fold -> ~36,000.
-    - Both fits use only 3 points.
+  - **Extrapolation (corrected ~18:20; see `age_trend.txt`).** What is extrapolated is the FRACTION OF LIVES
+    PASSING. The registered arm bar is 50% of eligible lives; "30%" is also given, since Cam's wording allows either.
+    - Segment slopes:
+      - 250 -> 500: **14.4 points per 1,000 steps** (the SAME 1,164 lives at both ages, so no survivor selection);
+      - 500 -> 1,000: **8.2 points per 1,000** (survivors only; the flatter step).
+    - **To 50% (the bar): ~3,700-5,800 steps** (steep to shallow slope; the 3-point linear fit gives ~4,850). That is
+      ~4-7x the median lifespan of ~890.
+    - **To 30%: ~2,400-3,400** (linear ~2,900).
+    - A log-age fit gives ~36,000 to 30%: the curvature is unknown from 3 points.
+    - The unpaired z understates the paired z (pass outcomes correlate within a life), so the deviation is
+      conservative.
+  - **Reliance is not stable within a life:** the share of all-on lives that pass at ANY point (9.5-17%) exceeds the
+    end-of-life pass rate (3.9-11%). Some lives pass at a snapshot and later stop passing.
   - **First reliance:** 9.5-17% of eligible all-on lives ever pass at a snapshot or at death; the median first age
     among those is 500 (s1: 735), against a median lifespan of ~890.
-  - **Confound in the no-lever arm (flagged):** with juvenile 0, newborns live ~340 steps and get ~12 gradient steps
-    (40x fewer than all-on). The no-lever 0% therefore cannot separate "the levers teach" from "longer lives give more
-    gradient steps". The ablations would separate them.
+  - **Lifespan confound in the no-lever arm, partly resolved by the matched-age snapshots:**
+    - With juvenile 0, no-lever newborns live ~340 steps (~12 gradient steps per life vs 476 all-on).
+    - **At age 1,000 both arms have had about the same number of PPO updates: no-lever 0/380 eligible lives pass,
+      all-on 69/661 (10.4%).**
+    - So plain RL gives 0% at the age where the lever package gives ~10%. "The levers beat plain RL at matched age" is
+      supported; WHICH lever carries it is not (that is what the ablations would show).
+    - A longer childhood with NO levers has a 0% data point behind it.
   - **Branch (Cam's registered tree): ALL-ON FAIL with reliance rising -> learning is real but too slow for one life.
     Report the slope and extrapolation; LAUNCH NOTHING.** Cam to choose between a longer childhood and stronger levers.
 - **RESULT: gate rerun at `62b6758` (`app_gate_voir`) reproduces the frozen gate exactly** (scripted 91.88%,

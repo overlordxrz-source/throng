@@ -8,3 +8,9 @@
    250 -> 500: z +0.00
    500 -> 1000: z +0.00
    RISING (every step z > 2): False
+
+== follow-up (Nov 10 ~18:20): crossings of the registered arm bar (50% of lives) and of 30%, per segment slope
+segment 250->500 (same 1,164 lives, no survivor selection): 14.4 points per 1,000 steps
+segment 500->1000 (survivors only): 8.2 points per 1,000 steps
+pass fraction 30%: from age 1,000 at the steep slope ~2,355; at the shallow slope ~3,396; 3-point linear fit ~2,884
+pass fraction 50%: from age 1,000 at the steep slope ~3,741; at the shallow slope ~5,847; 3-point linear fit ~4,848
