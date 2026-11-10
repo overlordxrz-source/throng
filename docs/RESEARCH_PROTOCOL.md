@@ -4585,7 +4585,7 @@ more expensive, because it produces publishable-looking nulls.
     - Eligibility reported per arm, since a lever that changes movement changes how many sectors a life hears.
   - **Suggested replacement for the "2x blind" half of (ii):** scripted with true messages vs the same scripted
     listener with silence, on the same lives and keys. That is the VoI of the code in this harness (built,
-    \`--no-train --sanity\`; not yet run).
+    `--no-train --sanity`; not yet run).
   - Recommended: (a) at >= 5 with last-heard scoring and 48 x 600. It is the smallest change, and the scripted control
     clears 90% on the eligible lives.
 
