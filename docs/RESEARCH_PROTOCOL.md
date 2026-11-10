@@ -4175,6 +4175,18 @@ more expensive, because it produces publishable-looking nulls.
     (0.97x).**
   - Meta-training pilot running (1,500 updates, BC 0.1 kept on, quick held-out gate every 250).
 
+- **Cam, Nov 10 ~04:35: rulings. REGISTERED:**
+  - **W2 pick confirmation:** run the pick (d0 0.0015 / 8 / reloc 0.001) and the runner-up (d0 0.0018 / 10 / 0.0008) on
+    3 more learner seeds each (seeds 1-3; the existing runs are seed 0). **The pick stands iff all three gates pass on
+    the median across its 4 seeds AND in >= 3/4 seeds;** otherwise the runner-up by the same rule; if neither,
+    report.
+  - **Fast learner:** side memory accepted (intake 0.97x); the pilot rule is unchanged (Modal <= $3 only if held-out
+    reliance rises). Before Modal, two apparatus checks: (a) heard messages enter the GRU side memory; (b) a
+    no-message run gives ~0 reliance.
+  - **Noted (doesn't block): the cloning roll-in bug.** The navigator itself, driving the roll-in, got ~1/13 of its
+    usual food. **Rule: any harness used later must reproduce the navigator's own W2 intake first.**
+  - (f) / (e): analyse when they land.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
