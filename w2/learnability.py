@@ -143,7 +143,7 @@ def main():
         hd = tw(jnp.round(jnp.cos(ang) * 3), jnp.round(jnp.sin(ang) * 3))
         return jnp.where(here >= 0.2, env.EAT, jnp.where(seen, vis, jnp.where(h[:, 8] > 0.5, hd, fallback)))
 
-    def step_all(P, s, key, shift, young, perm=None, mute=False, seek_ok=True):
+    def step_all(P, s, key, shift, young, perm=None, mute=False, seek_ok=True, rand_fb=False):
         k1, k2 = jax.random.split(key)
         h = hear(s, shift, perm)
         if mute:                                  # silence: nobody hears anything (VoI baseline)
@@ -151,7 +151,8 @@ def main():
         o = jnp.concatenate([env.observe(cfg, s)[NB:], h], 1)                              # (M, D)
         lg, v, _ = jax.vmap(lambda p, x: net.apply(p, x[None]))(P, o[:NL]); lg, v = lg[:, 0], v[:, 0]
         act_l = jax.random.categorical(k1, lg)
-        sc = scripted(s, h, jnp.concatenate([act_l, jax.random.randint(k2, (NE,), 1, 5)]))
+        fb_l = jax.random.randint(jax.random.fold_in(key, 79), (NL,), 1, 5) if rand_fb else act_l
+        sc = scripted(s, h, jnp.concatenate([fb_l, jax.random.randint(k2, (NE,), 1, 5)]))
         if a.sanity:
             act_l = sc[:NL]
         if a.young_seek and a.seek_age and seek_ok:       # scaffolding independent of the juvenile lever (Cam Nov 10)
@@ -241,7 +242,7 @@ def main():
             return optax.apply_updates(p, jax.tree_util.tree_map(lambda x: x * f_, u)), os_
         return jax.vmap(jax.vmap(one))(P, OS, f, o, m, eo, ea, em)
 
-    def eval_life(p, centres, key, shift_mode, perm=None, bpos=None, smask=None, mute=False):
+    def eval_life(p, centres, key, shift_mode, perm=None, bpos=None, smask=None, mute=False, rand_fb=False):
         s = env.reset(cfg, key)
         s = s._replace(centres=centres, cap=env.capacity(cfg, centres), food=env.capacity(cfg, centres))
         s, _ = beacons_reset(s, jax.random.fold_in(key, 3))
@@ -256,17 +257,17 @@ def main():
             s, eaten, last = c
             if smask is not None:                     # the TRUE sector heard now (before any swap), for attribution
                 ht = hear(s, 0)[0]; last = jnp.where(ht[8] > 0.5, jnp.argmax(ht[:8]), last)
-            s2, rec = step_all(P1, s, k, sh, jnp.zeros(NL, bool), perm, mute, seek_ok=False)
+            s2, rec = step_all(P1, s, k, sh, jnp.zeros(NL, bool), perm, mute, seek_ok=False, rand_fb=rand_fb)
             s2 = s2._replace(alive=s2.alive.at[NB + 1:].set(False))                      # only this learner (no elders)
             credit = 1.0 if smask is None else jnp.where(last >= 0, smask[jnp.maximum(last, 0)], 0.0)
             return (s2, eaten + rec[6][0] * credit, last), None
         (s, eaten, _), _ = jax.lax.scan(body, (s, 0.0, jnp.int32(-1)), jax.random.split(jax.random.fold_in(key, 5), a.test_window))
         return eaten
     ev = jax.jit(jax.vmap(jax.vmap(eval_life, in_axes=(None, None, 0, None)), in_axes=(0, 0, 0, None)))
-    def make_evp(mute=False):   # the heard25 test: per-life, per-episode sector permutation (identity = true message); traced on first call
+    def make_evp(mute=False, rand_fb=False):   # the heard25 test: per-life, per-episode sector permutation (identity = true message); traced on first call
         life_start = a.test_start == "life"; lh = a.score == "last-heard"
         def one(p, c, k, q, b, m):
-            return eval_life(p, c, k, 0, q, b if life_start else None, m if lh else None, mute)
+            return eval_life(p, c, k, 0, q, b if life_start else None, m if lh else None, mute, rand_fb)
         f = jax.jit(jax.vmap(jax.vmap(one, in_axes=(None, None, 0, 0, None, None)), in_axes=(0, 0, 0, 0, 0, 0)))
         return lambda p, c, k, q, b, m: f(p, c, k, q, b, m)
 
@@ -421,14 +422,18 @@ def main():
         true = np.asarray(evp(Pz, C, keys, jnp.asarray(ident), BP, SM)); swap = np.asarray(evp(Pz, C, keys, jnp.asarray(der), BP, SM))
     else:
         true = np.asarray(ev(Pz, C, keys, 0)); swap = np.asarray(ev(Pz, C, keys, 1))
-    blind = silent = blind_swap = None
+    blind = silent = blind_swap = None; evaluate_voi_r = None
     if a.no_train and a.sanity and a.test == "heard25":   # the blind comparison on the SAME lives / keys: the navigator policy
         a.sanity = False
         evn = make_evp()
         blind = np.asarray(evn(Pz, C, keys, jnp.asarray(np.tile(np.arange(8), (len(lives), a.eval_eps, 1))), BP, SM))
         blind_swap = np.asarray(evn(Pz, C, keys, jnp.asarray(der), BP, SM))        # negative control: the non-listener's life test
         a.sanity = True
-        silent = np.asarray(make_evp(mute=True)(Pz, C, keys, jnp.asarray(np.tile(np.arange(8), (len(lives), a.eval_eps, 1))), BP, SM))
+        I8 = jnp.asarray(np.tile(np.arange(8), (len(lives), a.eval_eps, 1)))
+        silent = np.asarray(make_evp(mute=True)(Pz, C, keys, I8, BP, SM))
+        # appetite-free VoI (Nov 10): the scripted listener's own uninformed move (random) when it hears nothing, both arms
+        true_r = np.asarray(make_evp(rand_fb=True)(Pz, C, keys, I8, BP, SM)); silent_r = np.asarray(make_evp(mute=True, rand_fb=True)(Pz, C, keys, I8, BP, SM))
+        evaluate_voi_r = (true_r, silent_r)
     res = []
     for i, x in enumerate(lives):
         t, s_ = true[i], swap[i]; d = t - s_; se = d.std(ddof=1) / np.sqrt(len(d))
@@ -463,6 +468,11 @@ def main():
             summ["apparatus"]["scripted_true_over_silence"] = float(summ["eaten_true_mean"] / max(es, 1e-9))
     if a.test == "heard25":
         summ["heard25"] = heard25_report(a, lives, res, scorable, true, swap, der, blind, blind_swap, silent)
+        if evaluate_voi_r is not None:
+            el = np.asarray(scorable); tm, sm = evaluate_voi_r[0][el].mean(1), evaluate_voi_r[1][el].mean(1); d = tm - sm
+            summ["heard25"]["voi_random_fallback"] = dict(eaten_true=float(tm.mean()), eaten_silence=float(sm.mean()),
+                                                          ratio=float(tm.mean() / max(sm.mean(), 1e-9)),
+                                                          paired_z=float(d.mean() / max(d.std(ddof=1) / np.sqrt(len(d)), 1e-12)))
         if SNAP:                                     # the same test on the age snapshots: steps to first reliance
             byage = {}; first = np.full(len(lives), np.inf)
             for k_ in SNAP:
