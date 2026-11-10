@@ -285,7 +285,7 @@ def main():
     gsteps = np.zeros((W, NL), int)
     cnt = np.zeros((W, NL, 8), np.int64)       # per-life heard-sector counts (coverage)
     SNAP = [int(x) for x in a.snap_ages.split(",")] if a.snap_ages else []
-    snaps = {}; prev_age = np.zeros((W, NL), np.int64)
+    snaps = {}; snap_gs = {}; prev_age = np.zeros((W, NL), np.int64)
     lives = []
     it0 = 0
     if a.ckpt:
@@ -297,7 +297,7 @@ def main():
             P, OS, S = tj(Ck["P"]), tj(Ck["OS"]), tj(Ck["S"]); key = jnp.asarray(Ck["key"]); rng = Ck["rng"]
             mem_o, mem_m = Ck["mem_o"], Ck["mem_m"]; mem_e = [(jnp.asarray(e0), jnp.asarray(e1), e2) for e0, e1, e2 in Ck["mem_e"]]
             since_birth, gsteps, cnt, lives, nav_of = Ck["since_birth"], Ck["gsteps"], Ck["cnt"], Ck["lives"], Ck["nav_of"]
-            snaps, prev_age = Ck.get("snaps", {}), Ck.get("prev_age", prev_age)
+            snaps, prev_age, snap_gs = Ck.get("snaps", {}), Ck.get("prev_age", prev_age), Ck.get("snap_gs", {})
             it0 = Ck["it"] + 1; print(f"resumed from update {Ck['it'] + 1}", flush=True)
     for it in range(it0, a.updates):
         key, k = jax.random.split(key)
@@ -342,11 +342,12 @@ def main():
         for k_ in SNAP:                             # weights snapshot when a life first reaches age k_
             for w, l in zip(*np.where((prev_age < k_) & (ages >= k_) & ~dead)):
                 snaps.setdefault((int(w), int(l)), []).append((k_, jax.tree_util.tree_map(lambda x: np.asarray(x[w, l]), P)))
+                snap_gs.setdefault((int(w), int(l)), {})[str(k_)] = int(gsteps[w, l])
         prev_age = np.where(dead, 0, ages)
         for w, l in zip(*np.where(dead)):
             lives.append(dict(lifespan=int(ages[w, l]), grad_steps=int(gsteps[w, l]), heard=cnt[w, l].copy(), bpos=np.asarray(S.pos)[w, :NB].copy(),
                               params=jax.tree_util.tree_map(lambda x: x[w, l], P), centres=np.asarray(S.centres[w]),
-                              snaps=snaps.pop((int(w), int(l)), [])))
+                              snaps=snaps.pop((int(w), int(l)), []), snap_gsteps=snap_gs.pop((int(w), int(l)), {})))
             nav_of[w, l] = rng.integers(0, K)
         if dead.any():
             fresh = jax.tree_util.tree_map(lambda x: x[nav_of], NAV); dm = jnp.asarray(dead)
@@ -361,7 +362,7 @@ def main():
             S = S._replace(pos=jnp.asarray(pos), energy=jnp.asarray(E), age=jnp.asarray(age), alive=jnp.asarray(al))
         if a.ckpt and (it + 1) % a.ckpt_every == 0 and it + 1 < a.updates:
             _ck.save(a.ckpt, dict(it=it, P=P, OS=OS, S=S, key=key, rng=rng, mem_o=mem_o, mem_m=mem_m, mem_e=mem_e,
-                                  since_birth=since_birth, gsteps=gsteps, cnt=cnt, lives=lives, nav_of=nav_of, snaps=snaps, prev_age=prev_age))
+                                  since_birth=since_birth, gsteps=gsteps, cnt=cnt, lives=lives, nav_of=nav_of, snaps=snaps, prev_age=prev_age, snap_gs=snap_gs))
         if a.stop_after and it + 1 == a.stop_after:
             os._exit(3)
     if not lives:
@@ -485,6 +486,7 @@ def main():
                 pk = np.array([_life_pass(tk[j], sk[j]) for j in range(len(idx))])
                 for j, i in enumerate(idx):
                     res[i].setdefault("snap_pass", {})[str(k_)] = bool(pk[j])     # per-life, for paired age trends
+                    res[i].setdefault("snap_gsteps", {})[str(k_)] = lives[i]["snap_gsteps"].get(str(k_))
                     if pk[j]:
                         first[i] = min(first[i], k_)
                 byage[str(k_)] = dict(n=len(idx), pass_frac=float(pk.mean()), ci95=_wilson(int(pk.sum()), len(idx)))
