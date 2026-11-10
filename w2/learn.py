@@ -32,7 +32,7 @@ class Net(nn.Module):
         return nn.Dense(6)(h), nn.Dense(1)(h)[..., 0]
 
 
-def train(oracle: bool, updates: int, seed: int, W=8, T=128, gamma=0.99, lam=0.95, lr=3e-4):
+def train(oracle: bool, updates: int, seed: int, W=8, T=128, gamma=0.99, lam=0.95, lr=3e-4, juvenile=0):
     cfg = CFG; net = Net()
     D = int(env.observe(cfg, env.reset(cfg, jax.random.PRNGKey(0)), oracle).shape[1])
     params = net.init(jax.random.PRNGKey(seed), jnp.zeros((1, D)))
@@ -53,6 +53,8 @@ def train(oracle: bool, updates: int, seed: int, W=8, T=128, gamma=0.99, lam=0.9
             a = jax.random.categorical(k1, lg)
             lp = jnp.take_along_axis(jax.nn.log_softmax(lg), a[:, None], 1)[:, 0]
             s2, r, info = env.step(cfg, s, a, k2)
+            if juvenile:   # provisioning: energy >= E0 for the first `juvenile` steps of life (nobody pays here)
+                s2 = s2._replace(energy=jnp.where((s2.age < juvenile) & s2.alive, jnp.maximum(s2.energy, cfg.E0), s2.energy))
             return s2, (o, a, lp, v, r, info["dead"].astype(jnp.float32))
         return jax.lax.scan(body, s, jax.random.split(k, T))
 
@@ -97,7 +99,7 @@ def train(oracle: bool, updates: int, seed: int, W=8, T=128, gamma=0.99, lam=0.9
     return params, net
 
 
-def eval_lifespan(params, net, oracle, worlds=16, T=3000, seed=3):
+def eval_lifespan(params, net, oracle, worlds=16, T=3000, seed=3, juvenile=0, random_policy=False, stat="mean"):
     cfg = CFG
 
     def one(k):
@@ -105,12 +107,18 @@ def eval_lifespan(params, net, oracle, worlds=16, T=3000, seed=3):
         def body(c, kk):
             s, life = c
             lg, _ = net.apply(params, env.observe(cfg, s, oracle))
-            a = jax.random.categorical(kk, lg)
+            a = jax.random.randint(kk, (cfg.N,), 0, 6) if random_policy else jax.random.categorical(kk, lg)
             s2, _, _ = env.step(cfg, s, a, kk)
+            if juvenile:
+                s2 = s2._replace(energy=jnp.where((s2.age < juvenile) & s2.alive, jnp.maximum(s2.energy, cfg.E0), s2.energy))
             return (s2, life + s2.alive), None
         (s, life), _ = jax.lax.scan(body, (s, jnp.zeros(cfg.N, jnp.int32)), jax.random.split(jax.random.fold_in(k, 7), T))
         return life
     lives = jax.jit(jax.vmap(one))(jax.random.split(jax.random.PRNGKey(seed), worlds))
+    if stat == "median":
+        L = np.asarray(lives).ravel(); bs = np.random.default_rng(0)
+        meds = [np.median(bs.choice(L, L.size)) for _ in range(200)]
+        return float(np.median(L)), float(np.std(meds))           # median and its bootstrap SE
     return float(lives.mean()), float(lives.std() / np.sqrt(lives.size))
 
 
