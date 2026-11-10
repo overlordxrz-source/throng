@@ -95,6 +95,7 @@ def main():
     ap.add_argument("--bc-pretrain", type=int, default=0, help="phase 1: N updates of behaviour cloning (no messages)")
     ap.add_argument("--continue-on-fail", action="store_true")
     ap.add_argument("--arch", default="gru", choices=["gru", "sidemem"])
+    ap.add_argument("--apparatus", action="store_true", help="Cam Nov 10 ~04:35: messages enter the side memory; no-message reliance ~0")
     ap.add_argument("--bc", type=float, default=0.0, help="phase 2: BC loss weight kept on during meta-training")
     a = ap.parse_args()
     os.makedirs(a.out, exist_ok=True)
@@ -278,6 +279,26 @@ def main():
         fl = np.asarray(lt(p, perms, keys[:, None], 0, a.adapt, 0, True))[:, 0]           # no messages
         return dict(nav_median=float(np.median(nv)), fl_median=float(np.median(fl)),
                     ratio=float(np.median(fl) / max(np.median(nv), 1e-9)), **{"pass": bool(np.median(fl) >= 0.9 * np.median(nv))})
+
+    if a.apparatus:
+        p0 = params if a.eval_only is None else flax.serialization.from_bytes(params, open(a.eval_only, "rb").read())
+        r_ = np.random.default_rng(0); x = jnp.asarray(r_.normal(size=(16, D)), jnp.float32); h = jnp.zeros((16, H))
+        xa = x.at[:, 100:108].set(jax.nn.one_hot(jnp.zeros(16, jnp.int32), 8)); xb = x.at[:, 100:108].set(jax.nn.one_hot(jnp.full(16, 5), 8))
+        ha, la, _ = net.apply(p0, h, xa); hb, lb, _ = net.apply(p0, h, xb)
+        res = dict(heard_changes_gru_state=float(jnp.abs(ha - hb).max()) > 0, gru_state_diff=float(jnp.abs(ha - hb).max()),
+                   logits_diff_at_this_params=float(jnp.abs(la - lb).max()))
+        if a.arch == "sidemem":   # a nonzero side head makes the GRU difference reach the policy
+            q = jax.tree_util.tree_map(lambda v: v, p0); q = {"params": dict(q["params"])}
+            q["params"]["side_head"] = {"kernel": jnp.ones_like(p0["params"]["side_head"]["kernel"]) * 0.1, "bias": p0["params"]["side_head"]["bias"]}
+            _, la2, _ = net.apply(q, h, xa); _, lb2, _ = net.apply(q, h, xb)
+            res["heard_reaches_policy_with_nonzero_head"] = float(jnp.abs(la2 - lb2).max()) > 0
+        n = 16; perms = jnp.asarray(FB[np.random.default_rng(3).integers(0, len(FB), n)])
+        keys = jax.vmap(lambda i: jax.random.split(jax.random.PRNGKey(6000 + i), 4))(jnp.arange(n))
+        t0 = np.asarray(lt(p0, perms, keys, 0, a.adapt, HELD_TOPIC, True)); t1 = np.asarray(lt(p0, perms, keys, 1, a.adapt, HELD_TOPIC, True))
+        res["no_message_true_vs_swap_identical"] = bool(np.allclose(t0, t1)); res["no_message_drop"] = float(1 - t1.sum() / max(t0.sum(), 1e-9))
+        res["PASS"] = bool(res["heard_changes_gru_state"] and res["no_message_true_vs_swap_identical"]
+                           and res.get("heard_reaches_policy_with_nonzero_head", True))
+        print("APPARATUS", json.dumps(res)); return
 
     if a.eval_only:
         params = flax.serialization.from_bytes(params, open(a.eval_only, "rb").read())
