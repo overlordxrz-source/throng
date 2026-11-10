@@ -79,6 +79,7 @@ def main():
     ap.add_argument("--no-train", action="store_true", help="apparatus gate: no learning; per-life coverage + life test (+ blind on the same lives)")
     ap.add_argument("--test", default="shift", choices=["shift", "heard25"], help="heard25: swap = a derangement among the sectors that life heard >= --min-heard times")
     ap.add_argument("--min-heard", type=int, default=25); ap.add_argument("--test-window", type=int, default=300)
+    ap.add_argument("--min-sectors", type=int, default=2, help="Cam Nov 10: a life is scorable only if it heard >= this many sectors >= --min-heard times (ruled: 5); pass rates over eligible lives")
     ap.add_argument("--score", default="window", choices=["window", "last-heard"], help="last-heard: in the heard25 test, only food eaten while the last heard TRUE sector is one the life heard >= --min-heard times counts")
     ap.add_argument("--test-start", default="fresh", choices=["fresh", "life"], help="life: each probe episode starts in the life's own world at its end (patch centres + beacon positions), the learner beside a random beacon")
     ap.add_argument("--hearing-probe", action="store_true", help="Cam Nov 10 ~05:15: supervised probe of the hearing pathway")
@@ -153,7 +154,8 @@ def main():
                 db = (s.pos[:NB][None] - s.pos[NB:NB + NL][:, None] + cfg.L // 2) % cfg.L - cfg.L // 2
                 dn_ = db[jnp.arange(NL), jnp.argmin(jnp.abs(db).max(-1), 1)]
                 seek = jnp.where(jnp.abs(dn_[:, 0]) >= jnp.abs(dn_[:, 1]), jnp.where(dn_[:, 0] < 0, 1, 2), jnp.where(dn_[:, 1] > 0, 3, 4))
-                act_l = jnp.where(young & (h[:NL, 8] < 0.5), seek, act_l)
+                far = jnp.abs(db).max(-1).min(1) > R_HEAR                  # geometry, never the message channel (Cam)
+                act_l = jnp.where(young & far, seek, act_l)
             else:
                 act_l = jnp.where(young & (h[:NL, 8] < 0.5), 0, act_l)
         lp = jnp.take_along_axis(jax.nn.log_softmax(lg), act_l[:, None], 1)[:, 0]
@@ -369,8 +371,10 @@ def main():
         ident = np.tile(np.arange(8), (len(lives), E_, 1)); der = ident.copy()
         for i, x in enumerate(lives):
             Sset = np.where(x["heard"] >= a.min_heard)[0]
+            if len(Sset) < max(2, a.min_sectors):
+                scorable[i] = False
             if len(Sset) < 2:
-                scorable[i] = False; continue
+                continue
             for e in range(E_):
                 while True:
                     q = rq.permutation(Sset)
@@ -382,10 +386,12 @@ def main():
         true = np.asarray(evp(Pz, C, keys, jnp.asarray(ident), BP, SM)); swap = np.asarray(evp(Pz, C, keys, jnp.asarray(der), BP, SM))
     else:
         true = np.asarray(ev(Pz, C, keys, 0)); swap = np.asarray(ev(Pz, C, keys, 1))
-    blind = silent = None
+    blind = silent = blind_swap = None
     if a.no_train and a.sanity and a.test == "heard25":   # the blind comparison on the SAME lives / keys: the navigator policy
         a.sanity = False
-        blind = np.asarray(make_evp()(Pz, C, keys, jnp.asarray(np.tile(np.arange(8), (len(lives), a.eval_eps, 1))), BP, SM))
+        evn = make_evp()
+        blind = np.asarray(evn(Pz, C, keys, jnp.asarray(np.tile(np.arange(8), (len(lives), a.eval_eps, 1))), BP, SM))
+        blind_swap = np.asarray(evn(Pz, C, keys, jnp.asarray(der), BP, SM))        # negative control: the non-listener's life test
         a.sanity = True
         silent = np.asarray(make_evp(mute=True)(Pz, C, keys, jnp.asarray(np.tile(np.arange(8), (len(lives), a.eval_eps, 1))), BP, SM))
     res = []
@@ -420,9 +426,64 @@ def main():
             summ["apparatus"]["gate_ii"] = bool(frac >= 0.9 and summ["eaten_true_mean"] >= 2 * eb)
             es = float(silent.mean()); summ["apparatus"]["eaten_scripted_silence_mean"] = es
             summ["apparatus"]["scripted_true_over_silence"] = float(summ["eaten_true_mean"] / max(es, 1e-9))
+    if a.test == "heard25":
+        summ["heard25"] = heard25_report(a, lives, res, scorable, true, swap, der, blind, blind_swap, silent)
+        summ["gate"] = "PASS" if summ["heard25"]["learner_pass_frac_eligible"] >= 0.5 else "FAIL"
     os.makedirs(os.path.dirname(a.out), exist_ok=True)
     json.dump(dict(summary=summ, lives=res), open(a.out, "w"), indent=1, default=lambda z: z.tolist() if hasattr(z, "tolist") else str(z))
     print(json.dumps(summ))
+
+
+def _life_pass(t, s_):
+    d = t - s_; se = d.std(ddof=1) / np.sqrt(len(d)) if len(d) > 1 else np.inf
+    return bool((1 - s_.sum() / max(t.sum(), 1e-9)) >= 0.30 and d.mean() > 2 * se)
+
+
+def _wilson(k, n, z=1.96):
+    if n == 0:
+        return [float("nan"), float("nan")]
+    p = k / n; c = (p + z * z / (2 * n)) / (1 + z * z / n); h = z * np.sqrt(p * (1 - p) / n + z * z / (4 * n * n)) / (1 + z * z / n)
+    return [float(c - h), float(c + h)]
+
+
+def heard25_report(a, lives, res, scorable, true, swap, der, blind, blind_swap, silent):
+    """Cam Nov 10 rulings: last-heard metric; a life is eligible iff it heard >= min-sectors sectors >= min-heard x; pass
+    rates over ELIGIBLE lives (>= 50 needed), eligibility rate, stratified 5 / 6 / 7-8; secondary (no bar): probes whose
+    swap moved the well-heard sectors >= 90 degrees on average; apparatus: negative control (non-listener) and VoI (true vs silence)."""
+    el = np.asarray(scorable); n_el = int(el.sum()); gm = np.array([r_["sectors_ge_min"] for r_ in res])
+    passed = np.array([r_["passed"] for r_ in res])
+    out = dict(min_sectors=a.min_sectors, min_heard=a.min_heard, score=a.score, lives=len(res), eligible=n_el,
+               eligibility_rate=float(el.mean()), enough_eligible=n_el >= 50,
+               learner_pass_frac_eligible=float(passed[el].mean()) if n_el else float("nan"),
+               learner_pass_ci95=_wilson(int(passed[el].sum()), n_el))
+    out["stratified"] = {k: dict(n=int(m.sum()), pass_frac=float(passed[m].mean()) if m.any() else None)
+                         for k, m in (("5", el & (gm == 5)), ("6", el & (gm == 6)), ("7-8", el & (gm >= 7)))}
+    # secondary: per life, only the probes whose derangement moved every well-heard sector >= 90 degrees (>= 2 sectors)
+    sec = []
+    for i, x in enumerate(lives):
+        if not el[i]:
+            continue
+        S_ = np.where(x["heard"] >= a.min_heard)[0]
+        mv = np.abs(der[i][:, S_] - S_[None]); mv = np.minimum(mv, 8 - mv)
+        ok = mv.mean(1) >= 2                        # mean move over the well-heard sectors >= 90 degrees (2 sector steps)
+        if ok.sum() >= 4:
+            sec.append(_life_pass(true[i][ok], swap[i][ok]))
+    out["secondary_swap_ge90deg"] = dict(lives_with_ge4_such_probes=len(sec), pass_frac=float(np.mean(sec)) if sec else None)
+    if blind_swap is not None:
+        neg = np.array([_life_pass(blind[i], blind_swap[i]) for i in range(len(lives))])
+        out["negative_control_nonlistener"] = dict(pass_frac=float(neg[el].mean()) if n_el else None,
+                                                   ci95=_wilson(int(neg[el].sum()), n_el), ok=bool(neg[el].mean() <= 0.10) if n_el else False)
+        out["scripted_control"] = dict(pass_frac=out["learner_pass_frac_eligible"], ci95=out["learner_pass_ci95"],
+                                       ok=bool(out["learner_pass_frac_eligible"] >= 0.90))
+    if silent is not None:
+        tm, sm = true[el].mean(1), silent[el].mean(1); d = tm - sm; se = d.std(ddof=1) / np.sqrt(len(d))
+        ratio = float(tm.mean() / max(sm.mean(), 1e-9))
+        out["voi_true_vs_silence"] = dict(eaten_true=float(tm.mean()), eaten_silence=float(sm.mean()), ratio=ratio,
+                                          paired_z=float(d.mean() / max(se, 1e-12)), ok=bool(ratio >= 1.5 and d.mean() > 2 * se))
+    if blind_swap is not None and silent is not None:
+        out["gate_ii"] = bool(out["scripted_control"]["ok"] and out["negative_control_nonlistener"]["ok"]
+                              and out["voi_true_vs_silence"]["ok"] and out["enough_eligible"])
+    return out
 
 
 def hearing_probe(a, cfg, net, opt, NAV, nav_of, S, roll_w, ev, hear, W, NL, T, M):
