@@ -4321,8 +4321,10 @@ more expensive, because it produces publishable-looking nulls.
     - P2: oracle >= 2x blind;
     - P4: blind >= 1,100.
     - If S(t) never reaches 0.5, the median is reported as "> horizon" and counts as passing P4.
-  - **Pick:** among the sweep (c) configs and the old pick, all three on the 4-seed median AND in >= 3/4 seeds; the
-    largest P2 margin among passers. The re-read of the old pick / runner-up is reported only, not picked from.
+  - **Pick: candidates are the two sweep (c) configs only.** All three gates on the 4-seed median AND in >= 3/4 seeds;
+    the largest P2 margin among passers.
+    - The old pick's 4 seeds are the same runs as its re-read, so it is reference only, not a candidate (Cam: "don't
+      pick from that re-read alone"). The runner-up re-read is reported only.
 
 ## Part 3 — Fossils
 
