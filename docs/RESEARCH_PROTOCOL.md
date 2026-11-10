@@ -4549,6 +4549,33 @@ more expensive, because it produces publishable-looking nulls.
     navigator eats only ~0.25-0.7 per window, because it barely needs to. **Flag: this half of (ii) is not
     informative here.**
 
+- **RESULT (Nov 10 ~03:35): apparatus gate (ii): the scripted control does not reach 90% under any test fix tried.
+  STOP for Cam** (comm-toy `e1353c9`; `docs/data/apparatus/k6_scripted_*.json`; 264 scripted-listener lives each).
+
+  | test variant | trials x window | pass | fails: drop < 30% / significance |
+  |---|---|---|---|
+  | heard25, whole-window food | 16 x 300 | 58.7% | 88 / 21 |
+  | same | 48 x 600 | 68.2% | 84 / 0 |
+  | + probe starts in the life's own world | 16 x 300 | 46.6% | 95 / 46 |
+  | same | 48 x 600 | 61.0% | 98 / 5 |
+  | **heard25, food credited to the last heard TRUE sector (`--score last-heard`)** | 16 x 300 | 58.3% | 57 / 53 |
+  | **same** | **48 x 600** | **79.9%** | 50 / 3 |
+
+  - **What limits it: lives with few well-heard sectors.**
+    - Best variant by number of sectors heard >= 25x: 2 -> 17%, 3 -> 50%, 4 -> 53%, 5 -> 80%, 6 -> 88%, 7-8 -> 100%.
+    - With 2-4 sectors (often adjacent), the derangement is mostly a 45-degree turn, which costs a perfect follower
+      little food.
+    - At 48 x 600, failures are drop < 30%, not noise; more trials will not close it.
+  - **Options for Cam** (each changes what counts as a scorable life or a swap, so it is Cam's call):
+    - (a) **a life is scorable only if it heard >= 5 sectors >= 25x.** Scripted control: 91.9% pass on the 75% of lives
+      that are eligible. Navigator-policy lives eligible: 60%. At >= 6: 96.5% pass, 54% / 34% eligible. At >= 4: 86.8%.
+    - (b) **a true cross-direction swap:** every heard sector maps to one >= 90 degrees away. Not implemented; lives
+      whose well-heard sectors are all adjacent could not be scored.
+    - (c) **more coverage** (wider spread or faster beacons) to thin out the few-sector tail. An apparatus change; the
+      code is unchanged.
+  - Recommended: (a) at >= 5 with last-heard scoring and 48 x 600. It is the smallest change, and the scripted control
+    clears 90% on the eligible lives.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
