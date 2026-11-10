@@ -4279,6 +4279,51 @@ more expensive, because it produces publishable-looking nulls.
     - It has NOT been checked against navigator 0's intake in its own native evaluation.
     - The fast-learner harness runs on the prototype world (P6, d0 0.008), not on a retune candidate.
 
+- **Cam, Nov 10 ~05:15: combined rulings.**
+  1. **Guard incident:** the handling is accepted. Also:
+     - the guard refuses to start without an explicit CAP;
+     - it writes a heartbeat every tick.
+     - Runs over 2 h get checkpoint + resume (bit-identity verified on a short chunk) or non-preemptible containers,
+       whichever is cheaper.
+     - (e) reruns: analyse when they land.
+  2. **(f) step6v8:** parked as registered. Free and exploratory (no claim): the registered compositionality analysis
+     on the 3 seeds with >= 12 distinct messages, labelled exploratory.
+  3. **W2 pick:**
+     - "neither stands" accepted;
+     - censoring is an instrument bug, so **lifespan medians are Kaplan-Meier with right-censoring at the horizon
+       from now on**;
+     - re-read the 8 runs with KM and report, but do not pick from that re-read;
+     - **sweep (c):** d0 0.0012-0.0013, 8 patches (+ the old pick for reference), 4 learner seeds, KM medians;
+     - **pick rule:** all three gates on the 4-seed median AND in >= 3/4 seeds, AND blind KM median >= 1,100 (P4
+       margin >= 10%). Same P1m / P2. If none passes, report.
+  4. **Learnability + fast learner: apparatus first (laptop only).**
+     - (a) **Hearing probe** in the learnability harness:
+       - train only the hearing rows + policy head, by cross-entropy on the scripted listener's actions given
+         (obs, heard), at the arm's learning rate, ~300 steps;
+       - expected: held-out accuracy >= 90% and gate >= 50% of lives;
+       - check that the heard message reaches the trunk input with the expected values;
+       - if it fails: a pipeline bug, found before further work;
+       - if it passes only at a higher learning rate: rerun copy-in-replay at that rate.
+     - (b) Move both harnesses to the retuned W2 world.
+     - (c) Then: a VoI check (scripted nearest-food listener vs silence); if it gains, freeze the trunk and train only
+       the side memory; longer meta-training only after rising reliance. Don't drop the track.
+- **REGISTERED (before data): W2 KM re-read + sweep (c)** (comm-toy `cb813cf`; `w2/km.py` + 4 tests;
+  `w2_out/retune/run_km.sh`, laptop).
+  - **Configs, seeds 0-3 each (seed 0 = the original sweep's learner seed):**
+    - the old pick 0.0015 / 8 / 0.001 (reference + re-read);
+    - the runner-up 0.0018 / 10 / 0.0008 (re-read);
+    - **sweep (c): d0 0.0012 / 8 / 0.001 and d0 0.0013 / 8 / 0.001** (relocation kept at 0.001).
+  - **Instrument:** the same evaluation; the per-life KM median over lives born in the eval (blind, oracle) and over all
+    lives (random). Per-life arrays are saved (npz), so later instrument changes need no retraining.
+  - **Reproducibility check:** the old naive medians must reproduce exactly in the rerun.
+  - **Gates on KM medians:**
+    - P1m: blind >= 3x random;
+    - P2: oracle >= 2x blind;
+    - P4: blind >= 1,100.
+    - If S(t) never reaches 0.5, the median is reported as "> horizon" and counts as passing P4.
+  - **Pick:** among the sweep (c) configs and the old pick, all three on the 4-seed median AND in >= 3/4 seeds; the
+    largest P2 margin among passers. The re-read of the old pick / runner-up is reported only, not picked from.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
