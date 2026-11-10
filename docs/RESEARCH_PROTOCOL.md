@@ -4444,6 +4444,53 @@ more expensive, because it produces publishable-looking nulls.
       count.
     - (iii) a different world lever for lifespan (e.g. the reproduction cost c_rep or the provisioning cost).
 
+- **Cam, Nov 10 (rulings on the ~00:50 report).**
+  0. **Budget:** ~$17 of $42 spent; the guard stays at $41. **Cap for everything below: $8 total** (25% leeway); the rest
+     is held for the W2 comm run.
+  1. **Pick rule, as intended:** "blind KM median >= 1,100" meant the 4-seed MEDIAN. Per seed, the standard gates
+     (P1m >= 3x, P2 >= 2x, P4 >= 1,000) in >= 3/4 seeds.
+     - **W2 WORLD PICKED: d0 0.0013, 8 patches, relocation 0.001** (P2 5.18x, blind KM median 1,107, lowest seed 1,055).
+       **Picked under Cam's clarified reading; the registered strict reading gave no pick.**
+     - **Free confirmation, registered now:** the navigator retrain in the picked world re-measures the blind KM median
+       on the retune evaluation. If the median over navigators is < 1,000, or fewer than 3/4 of the navigators reach
+       >= 1,000, switch to d0 0.0012 and retrain there. Nothing else changes the pick.
+  2. **Coverage: option (a).** A code cannot be learned from one word.
+     - **Recorded: every learnability and fast-learner null so far tells us nothing about the levers. It is NOT
+       evidence against them.** Learners heard ~1 message per life, so no lever could have been tested.
+     - **Fix in the apparatus, not the world** (the pick stands): beacons are spread out and wander (a random walk at
+       about agent speed), so a roaming listener hears several of them. The code's definition stays as registered
+       (each beacon broadcasts the sector to ITS nearest patch); only where the beacons are and how they move changes.
+       The same change goes to the fast learner's topics.
+     - **APPARATUS GATE** (scripted beacons, no learner training; registered before any learning arm):
+       - (i) **Coverage:** median distinct sectors heard per life >= 4 of 8, AND in the median life >= 3 sectors heard
+         >= 25 times each. Fast learner: >= 4 tokens per useful topic, same rule.
+       - (ii) **The scripted-listener control** passes the life test in >= 90% of lives AND beats blind (the navigator)
+         >= 2x on deliveries (food eaten in the test window). If (ii) fails, fix the test (more probe trials per life,
+         longer windows), not the bar.
+       - **Fallback,** only if wandering / spread beacons cannot meet (i): faster food relocation (a world change: then
+         re-check P1 / P2 / P4 on 4 seeds first).
+     - **Learner bar unchanged:** cross-direction reliance >= 30% within one life in >= 50% of lives. It is now scored
+       only on the sectors that life heard >= 25 times.
+  3. **Order after the apparatus gate passes:**
+     - (a) **learnability rerun, 2 arms x 5 seeds:** no levers vs ALL approved levers on (juvenile, predictive aux,
+       sleep replay, copy signals, copy actions, young plasticity). Ablate only if all-on passes.
+     - (b) **fast-learner VoI check** (4c) with the trunk FROZEN, same coverage rule.
+     - For both, report steps to first reliance against the median lifespan (~1,100).
+  4. **Checkpoint + resume:** build now (code + unit test, laptop, < 10 min). Required before any run over 2 h,
+     including the W2 comm run.
+  5. **Step 6:** stays parked. Structure without generalisation is what a holistic code with a regular layout looks
+     like. In W2, compositionality is measured with held-out combos registered from the start.
+  6. **(e):** when the 4 reruns land, `analyze_pop.py` against the registered u7500 bars, deduped by segment. No design
+     changes.
+  7. Guard r3 accepted; still waiting on M for the throng-guard-token secret.
+- **REGISTERED (before data): navigator retrain in the picked world = the pick confirmation.**
+  - 8 navigators (seeds 1000-1007), each trained exactly as retune.py trains its blind learner (learn.train, blind, 400
+    updates, juvenile 500, world d0 0.0013 / 8 / 0.001).
+  - Each is evaluated with retune.evaluate (setpoint reproduction, provisioning J 500, 16 worlds x 64 slots, 32
+    founders, 6,000 steps): KM median lifespan of the lives born in the eval.
+  - **Rule:** switch to d0 0.0012 iff the median over the 8 navigators is < 1,000 OR fewer than 6/8 (3/4) reach >= 1,000.
+  - Output: `w2_out/nav_w13/` (comm-toy `1b6077e`).
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
