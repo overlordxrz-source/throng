@@ -85,6 +85,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--updates", type=int, default=300); ap.add_argument("--worlds", type=int, default=32)
     ap.add_argument("--world", default="proto", help='"proto" or "d0,P,relocate" (Cam Nov 10 4b)')
+    ap.add_argument("--coverage", action="store_true", help="diagnostic: distinct heard tokens per life (adapt + test), per topic")
     ap.add_argument("--T", type=int, default=64); ap.add_argument("--life", type=int, default=640)
     ap.add_argument("--adapt", type=int, default=300); ap.add_argument("--lr", type=float, default=3e-4)
     ap.add_argument("--null-code", action="store_true", help="G2 control: tokens carry no information")
@@ -284,6 +285,27 @@ def main():
         fl = np.asarray(lt(p, perms, keys[:, None], 0, a.adapt, 0, True))[:, 0]           # no messages
         return dict(nav_median=float(np.median(nv)), fl_median=float(np.median(fl)),
                     ratio=float(np.median(fl) / max(np.median(nv), 1e-9)), **{"pass": bool(np.median(fl) >= 0.9 * np.median(nv))})
+
+    if a.coverage:
+        def cov_life(p, perm, key, topic):
+            s, _ = new_world(key, perm)
+            h = jnp.zeros((NL, H)); pa = jnp.zeros(NL, jnp.int32); pr = jnp.zeros(NL)
+            def body(c, k):
+                s, h, pa, pr = c
+                hd = hear(s, perm, 0, jax.random.fold_in(k, 7), a.null_code, topic)
+                s2, h2, act, rr, _ = step(p, s, perm, h, pa, pr, k, 0, a.null_code, topic, False)
+                return (s2, h2, act, rr), (hd[:, :8].argmax(1), hd[:, 8] > 0.5)
+            _, (tok, okh) = jax.lax.scan(body, (s, h, pa, pr), jax.random.split(jax.random.fold_in(key, 1), a.adapt + 300))
+            return tok, okh
+        f = jax.jit(jax.vmap(cov_life, in_axes=(None, 0, 0, None)), static_argnums=(3,))
+        n = 64; perms = jnp.asarray(FA[np.random.default_rng(5).integers(0, len(FA), n)]); keys = jax.random.split(jax.random.PRNGKey(31), n)
+        out = {}
+        for t in range(6):
+            tok, okh = (np.asarray(x) for x in f(params, perms, keys, t))            # (n, steps, NL)
+            d = [len(np.unique(tok[i, :, l][okh[i, :, l]])) for i in range(n) for l in range(NL)]
+            out[TOPICS[t]] = dict(distinct_tokens_median=float(np.median(d)), hist=np.bincount(d, minlength=9).tolist(),
+                                  heard_frac=float(okh.mean()))
+        print("COVERAGE", json.dumps(dict(world=a.world, steps=a.adapt + 300, per_topic=out))); return
 
     if a.apparatus:
         p0 = params if a.eval_only is None else flax.serialization.from_bytes(params, open(a.eval_only, "rb").read())
