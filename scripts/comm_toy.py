@@ -195,6 +195,9 @@ def main():
                     help="north star (Cam, 2026-11-08): build a dictionary (fire -> modal sender triple) from frozen control "
                          "rollouts, then 'speak to them': replace the sender's broadcast by the dictionary word for fire "
                          "X = T + s and count listener Crafts at X, vs the control and vs the sender's own words for X")
+    ap.add_argument("--spoil-wrong", action="store_true", help="step 6 world fix (Cam Nov 10): a wrong-material Craft at the lit fire re-rolls the pair")
+    ap.add_argument("--material-rows", action="store_true",
+                    help="step 6: material on 4 NEW input dims before the wire (freshly initialised rows); the old noise slots carry noise")
     ap.add_argument("--tau", type=float, default=None, help="token temperature override (default 0.08)")
     ap.add_argument("--reinit-msg", action="store_true",
                     help="step-6 rerun: after the warm start, re-initialise the message head (gwt_comms_1, head_signal_slot*) "
@@ -218,7 +221,10 @@ def main():
                     help="after warm start, scale the (never-trained) wire-input rows of enc_0 and gwt_comms_1 (fidelity calibration)")
     ap.add_argument("--measure-sens", action="store_true", help="print listener sensitivity at the loaded params and exit")
     a = ap.parse_args()
-    global TAU
+    global TAU, O_WIRE, D
+    O_MAT = O_NOISE
+    if a.material_rows:            # obs: pos 2 | fire offsets 8 | informed 1 | need 4 | noise 4 | material 4 | wire 40 -> D 63
+        O_MAT, O_WIRE, D = 19, 23, 63
     if a.tau is not None:          # step-6 rerun (Cam Nov 9): token temperature override; default path keeps 0.08
         TAU = a.tau
 
@@ -258,7 +264,14 @@ def main():
     params = model.init(k_init, jnp.zeros((1, H)), jnp.zeros((1, D)))
     fresh_init = params
     if a.warm_start:
-        if a.credit == "joint":
+        if a.credit == "joint" and a.material_rows:   # load the 59-dim warm start, then insert 4 FRESH material rows at 19
+            p59 = flax.serialization.from_bytes(model.init(k_init, jnp.zeros((1, H)), jnp.zeros((1, 59))), Path(a.warm_start).read_bytes())
+            pp = {k: dict(v) for k, v in p59["params"].items()}
+            for n in ("enc_0", "gwt_comms_1"):
+                k0 = jnp.asarray(pp[n]["kernel"]); kf = jnp.asarray(fresh_init["params"][n]["kernel"])
+                pp[n]["kernel"] = jnp.concatenate([k0[:19], kf[19:23], k0[19:]], 0)
+            params = {"params": pp}
+        elif a.credit == "joint":
             params = flax.serialization.from_bytes(params, Path(a.warm_start).read_bytes())
         else:   # the warm start has no credit heads: load the shared structure, keep the new heads at init
             base = ToyNet(H).init(k_init, jnp.zeros((1, H)), jnp.zeros((1, D)))
@@ -337,6 +350,9 @@ def main():
             inf_ = informed
         need = jax.nn.one_hot(jnp.repeat(fire_of(active), 2), 4) * inf_[:, None]
         heard = wire.reshape(W, 2, -1)[:, ::-1].reshape(N, -1) if live_wire else jnp.zeros((N, SIG))
+        if a.material_rows:
+            mat_ = jax.nn.one_hot(jnp.repeat(active % 4, 2), 4) * inf_[:, None]
+            return jnp.concatenate([pos / G, hr, inf_[:, None].astype(jnp.float32), need, jax.random.normal(k, (N, 4)), mat_, heard], -1)
         noise = (jax.nn.one_hot(jnp.repeat(active % 4, 2), 4) * inf_[:, None]) if COMP else jax.random.normal(k, (N, 4))
         return jnp.concatenate([pos / G, hr, inf_[:, None].astype(jnp.float32), need, noise, heard], -1)
 
@@ -446,6 +462,8 @@ def main():
             dep_w = dep.reshape(W, 2).any(1)
             since2 = since + 1
             reroll = dep_w | (since2 >= a.reroll)
+            if COMP and a.spoil_wrong:   # world fix: a wrong-material Craft at the lit fire spoils the opportunity
+                reroll = reroll | (craft & at_active & ~dep).reshape(W, 2).any(1)
             if COMP:   # re-roll to a different pair from the pool (training pool, or the held-out pool in the frozen test)
                 pl = TRAIN_POOL if pool is None else pool
                 cur = jnp.argmax(pl[None, :] == active[:, None], -1)
@@ -491,7 +509,7 @@ def main():
             snd = jnp.ones_like(snd)
         Tl = jnp.argmax(obs[:, O_NEED:O_NEED + 4], -1)
         if COMP:
-            Tl = Tl * 4 + jnp.argmax(obs[:, O_NOISE:O_NOISE + 4], -1)
+            Tl = Tl * 4 + jnp.argmax(obs[:, O_MAT:O_MAT + 4], -1)
         w_s = snd.astype(jnp.float32)
         mi = 0.0
         for lg in token_logits(params, o.z_e, TAU):
@@ -1464,7 +1482,7 @@ def main():
         hf = np.asarray(HEARTHS)[actv // 4]
         dd = np.abs(np.rint(pos) - hf); dd = np.minimum(dd, G - dd).max(-1)
         ok_dep = bool(((act[dep] == np.asarray(CRAFT_ACTS)[actv[dep] % 4]) & (dd[dep] <= 1)).all())
-        mat = Rq["obs"][:, :, O_NOISE:O_NOISE + 4]
+        mat = Rq["obs"][:, :, O_MAT:O_MAT + 4]
         ok_mat = bool((mat[:, lisq] == 0).all() and np.allclose(mat[:, ~lisq].sum(-1), 1))
         ok_held = not np.isin(Rq["active"], HELD).any()
         res.update(deposits=int(dep.sum()), deposit_rule_ok=ok_dep, material_dims_ok=ok_mat, no_heldout_active=ok_held)

@@ -32,7 +32,7 @@ def step_toward(p, h):
     return p
 
 
-def run(mode, reroll=96, seed=0):
+def run(mode, reroll=96, seed=0, spoil=False):
     rng = np.random.default_rng(seed)
     cells = np.stack(np.meshgrid(np.arange(G), np.arange(G), indexing="ij"), -1).reshape(-1, 2)
     dd = np.abs(cells[:, None] - HEARTHS[None]); dd = np.minimum(dd, G - dd).max(-1)
@@ -51,6 +51,8 @@ def run(mode, reroll=96, seed=0):
                     pos = valid[rng.integers(len(valid))].copy()
                 else:
                     rew[w] -= COST; tried.append(m)
+                    if spoil:                      # world fix (Cam Nov 10): a wrong-material Craft spoils the opportunity
+                        delivered = True           # -> the pair re-rolls (no reward)
             else:
                 pos = step_toward(pos, h)
             since += 1
@@ -61,7 +63,10 @@ def run(mode, reroll=96, seed=0):
 
 
 if __name__ == "__main__":
-    full = run("full"); fo = run("fire_only")
+    import sys
+    spoil = "--spoil" in sys.argv
+    full = run("full", spoil=spoil); fo = run("fire_only", spoil=spoil)
+    print(f"world fix (wrong-material Craft spoils the opportunity): {spoil}")
     print(f"FULL      (fire + material): deliveries/world/128 steps {full[0]:.2f}, net reward {full[1]:+.2f}")
     print(f"FIRE-ONLY (fire only)      : deliveries/world/128 steps {fo[0]:.2f}, net reward {fo[1]:+.2f}")
     gap = 1 - fo[0] / full[0]; rgap = 1 - fo[1] / full[1]
