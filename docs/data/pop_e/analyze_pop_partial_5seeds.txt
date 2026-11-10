@@ -1,0 +1,19 @@
+== PRIMARY at u7500 (control-population true-message deliveries 0.41; gain bar 1.41)
+   seed 320: cross drop +1% (paired 0.00 SE 0.01) | true-message 0.42 | same-spot +0% -> reliance x gain x clean ok
+   seed 321: cross drop -0% (paired -0.00 SE 0.01) | true-message 0.52 | same-spot -2% -> reliance x gain x clean ok
+   seed 323: cross drop -3% (paired -0.01 SE 0.01) | true-message 0.44 | same-spot +1% -> reliance x gain x clean x
+== RUNG 3 (population): 0/3 -> FAIL
+
+== SECONDARY: shuffle-corrected joint MI (bits) per generation
+   POP seed 320: u1500 +1.141  u3500 +0.219  u5500 +0.050  u7500 +0.010
+   POP seed 321: u1500 +1.173  u3500 +0.193  u5500 +0.025  u7500 +0.000
+   POP seed 323: u1500 +1.289  u3500 +0.169  u5500 +0.040  u7500 +0.014
+   CTL seed 325: u1500 +1.381  u3500 +0.397  u5500 +0.029  u7500 +0.006
+   CTL seed 327: u1500 +1.155  u3500 +0.516  u5500 +0.044  u7500 +0.006
+== SECONDARY at u7500: POP median 0.010 vs control median 0.006 -> FAIL (>= 2x and >= +0.2)
+
+== FIRE 5 at u9000
+   seed 320: crafts at fire 5 control 0.50 -> told fire 5 0.47 (paired -0.03 SE 0.02) -> x | brain ages at 7,500: [0, 1500, 1000, 500]
+   seed 321: crafts at fire 5 control 0.10 -> told fire 5 0.09 (paired -0.01 SE 0.01) -> x | brain ages at 7,500: [0, 1500, 1000, 500]
+   seed 323: crafts at fire 5 control 0.55 -> told fire 5 0.55 (paired 0.00 SE 0.01) -> x | brain ages at 7,500: [0, 1500, 1000, 500]
+== FIRE 5: 0/3 -> FAIL

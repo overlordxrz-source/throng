@@ -4639,6 +4639,27 @@ more expensive, because it produces publishable-looking nulls.
     VoI true >= 1.5x silence with paired > 2 SE.
   - **If it passes, the test is frozen at `b61afb2`.**
 
+- **RESULT (Nov 10 ~06:35), PARTIAL: (e) population, 5 of 8 seeds complete** (deduped: the last complete segment;
+  `docs/data/pop_e/analyze_pop_partial_5seeds.txt`; POP s320 / s321 / s323, control s325 / s327).
+  - **Primary at u7500:** cross-spot drop +1% / -0% / -3% (paired ~0, SE 0.01); true-message deliveries 0.42 / 0.52 /
+    0.44 vs the gain bar 1.41 (control 0.41 + 1.0). **0/3 POP seeds pass.**
+    - **The primary outcome is already determined: at most 2/5 < 3/5 -> rung 3 FAIL**, whatever s322 / s324 show.
+      The formal verdict waits for s322, per Cam.
+  - **Secondary MI (bits, shuffle-corrected):**
+    - POP: 1.14-1.29 at u1500 -> 0.17-0.22 at u3500 -> 0.03-0.05 at u5500 -> 0.00-0.01 at u7500.
+    - Control: 1.16-1.38 -> 0.40-0.52 -> 0.03-0.04 -> 0.006.
+    - The founders' code dies out through turnover in BOTH arms by generation 3; use does not keep it alive. POP
+      median at u7500 0.010 vs control 0.006: FAIL.
+  - **Fire 5 at u9000:** 0/3 (told-fire-5 crafts no higher than control).
+  - **Remaining:**
+    - s322 and s326 are finishing (5c5b07a).
+    - **s324 was preempted AGAIN at ~u6329 (~05:35) and restarted from u1.** I cancelled that restart and relaunched
+      s324 at 06:32 on `throng-pop-ck`, which is checkpointed: comm-toy `003ed2c`, default path row-identical to
+      5c5b07a, `--ckpt` every 250 updates, volume committed every 2 min. Same seed and args; output
+      `pop_on_s324_003ed2c.jsonl`; ETA ~14:30.
+  - **Cost:** (e) ~$10.1 so far (estimated from metered spend); finishing adds ~$1.3, so ~$11.4 against the $12 cap.
+    Option for Cam: cancel s324 (~$1.0 saved); the primary outcome is already fixed.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
