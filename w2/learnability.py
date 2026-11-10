@@ -75,6 +75,7 @@ def main():
     ap.add_argument("--world", default="proto", help='"proto" or "d0,P,relocate" (Cam Nov 10 4b)')
     ap.add_argument("--beacon-spread", type=int, default=2, help="beacons at (+-k, +-k) around the cluster centre (Cam Nov 10 coverage: spread)")
     ap.add_argument("--beacon-walk", action="store_true", help="beacons random-walk at agent speed (one random move per step)")
+    ap.add_argument("--seek-age", type=int, default=0, help="young-seek applies while age < this (0: during the juvenile period, as before); the same scaffolding in every arm, independent of the juvenile lever")
     ap.add_argument("--young-seek", action="store_true", help="a young that hears nothing steps toward the nearest beacon (was: stays)")
     ap.add_argument("--no-train", action="store_true", help="apparatus gate: no learning; per-life coverage + life test (+ blind on the same lives)")
     ap.add_argument("--test", default="shift", choices=["shift", "heard25"], help="heard25: swap = a derangement among the sectors that life heard >= --min-heard times")
@@ -82,6 +83,7 @@ def main():
     ap.add_argument("--min-sectors", type=int, default=2, help="Cam Nov 10: a life is scorable only if it heard >= this many sectors >= --min-heard times (ruled: 5); pass rates over eligible lives")
     ap.add_argument("--score", default="window", choices=["window", "last-heard"], help="last-heard: in the heard25 test, only food eaten while the last heard TRUE sector is one the life heard >= --min-heard times counts")
     ap.add_argument("--test-start", default="fresh", choices=["fresh", "life"], help="life: each probe episode starts in the life's own world at its end (patch centres + beacon positions), the learner beside a random beacon")
+    ap.add_argument("--snap-ages", default="", help="comma-separated ages: snapshot each life's weights there; the heard25 test also runs on them (steps to first reliance)")
     ap.add_argument("--ckpt", default=None, help="checkpoint path; resume from it if present (Cam Nov 10: --ckpt on for Modal runs)")
     ap.add_argument("--ckpt-every", type=int, default=25)
     ap.add_argument("--stop-after", type=int, default=0, help="test only: exit abruptly after this many updates (simulated preemption)")
@@ -141,7 +143,7 @@ def main():
         hd = tw(jnp.round(jnp.cos(ang) * 3), jnp.round(jnp.sin(ang) * 3))
         return jnp.where(here >= 0.2, env.EAT, jnp.where(seen, vis, jnp.where(h[:, 8] > 0.5, hd, fallback)))
 
-    def step_all(P, s, key, shift, young, perm=None, mute=False):
+    def step_all(P, s, key, shift, young, perm=None, mute=False, seek_ok=True):
         k1, k2 = jax.random.split(key)
         h = hear(s, shift, perm)
         if mute:                                  # silence: nobody hears anything (VoI baseline)
@@ -152,7 +154,13 @@ def main():
         sc = scripted(s, h, jnp.concatenate([act_l, jax.random.randint(k2, (NE,), 1, 5)]))
         if a.sanity:
             act_l = sc[:NL]
-        if a.juvenile:                                    # the young stay within hearing range of the beacons
+        if a.young_seek and a.seek_age and seek_ok:       # scaffolding independent of the juvenile lever (Cam Nov 10)
+            db = (s.pos[:NB][None] - s.pos[NB:NB + NL][:, None] + cfg.L // 2) % cfg.L - cfg.L // 2
+            dn_ = db[jnp.arange(NL), jnp.argmin(jnp.abs(db).max(-1), 1)]
+            seek = jnp.where(jnp.abs(dn_[:, 0]) >= jnp.abs(dn_[:, 1]), jnp.where(dn_[:, 0] < 0, 1, 2), jnp.where(dn_[:, 1] > 0, 3, 4))
+            far = jnp.abs(db).max(-1).min(1) > R_HEAR
+            act_l = jnp.where((s.age[NB:NB + NL] < a.seek_age) & far, seek, act_l)
+        elif a.juvenile:                                  # the young stay within hearing range of the beacons
             if a.young_seek:                              # ... by stepping toward the nearest beacon (beacons may wander)
                 db = (s.pos[:NB][None] - s.pos[NB:NB + NL][:, None] + cfg.L // 2) % cfg.L - cfg.L // 2
                 dn_ = db[jnp.arange(NL), jnp.argmin(jnp.abs(db).max(-1), 1)]
@@ -248,7 +256,7 @@ def main():
             s, eaten, last = c
             if smask is not None:                     # the TRUE sector heard now (before any swap), for attribution
                 ht = hear(s, 0)[0]; last = jnp.where(ht[8] > 0.5, jnp.argmax(ht[:8]), last)
-            s2, rec = step_all(P1, s, k, sh, jnp.zeros(NL, bool), perm, mute)
+            s2, rec = step_all(P1, s, k, sh, jnp.zeros(NL, bool), perm, mute, seek_ok=False)
             s2 = s2._replace(alive=s2.alive.at[NB + 1:].set(False))                      # only this learner (no elders)
             credit = 1.0 if smask is None else jnp.where(last >= 0, smask[jnp.maximum(last, 0)], 0.0)
             return (s2, eaten + rec[6][0] * credit, last), None
@@ -275,6 +283,8 @@ def main():
     since_birth = np.zeros((W, NL), int)        # rollouts since birth (replay uses own memory only)
     gsteps = np.zeros((W, NL), int)
     cnt = np.zeros((W, NL, 8), np.int64)       # per-life heard-sector counts (coverage)
+    SNAP = [int(x) for x in a.snap_ages.split(",")] if a.snap_ages else []
+    snaps = {}; prev_age = np.zeros((W, NL), np.int64)
     lives = []
     it0 = 0
     if a.ckpt:
@@ -286,6 +296,7 @@ def main():
             P, OS, S = tj(Ck["P"]), tj(Ck["OS"]), tj(Ck["S"]); key = jnp.asarray(Ck["key"]); rng = Ck["rng"]
             mem_o, mem_m = Ck["mem_o"], Ck["mem_m"]; mem_e = [(jnp.asarray(e0), jnp.asarray(e1), e2) for e0, e1, e2 in Ck["mem_e"]]
             since_birth, gsteps, cnt, lives, nav_of = Ck["since_birth"], Ck["gsteps"], Ck["cnt"], Ck["lives"], Ck["nav_of"]
+            snaps, prev_age = Ck.get("snaps", {}), Ck.get("prev_age", prev_age)
             it0 = Ck["it"] + 1; print(f"resumed from update {Ck['it'] + 1}", flush=True)
     for it in range(it0, a.updates):
         key, k = jax.random.split(key)
@@ -327,9 +338,14 @@ def main():
             gsteps += a.replay * len(mem_o)
         dead = ~np.asarray(S.alive)[:, NB:NB + NL]
         ages = np.asarray(S.age)[:, NB:NB + NL]
+        for k_ in SNAP:                             # weights snapshot when a life first reaches age k_
+            for w, l in zip(*np.where((prev_age < k_) & (ages >= k_) & ~dead)):
+                snaps.setdefault((int(w), int(l)), []).append((k_, jax.tree_util.tree_map(lambda x: np.asarray(x[w, l]), P)))
+        prev_age = np.where(dead, 0, ages)
         for w, l in zip(*np.where(dead)):
             lives.append(dict(lifespan=int(ages[w, l]), grad_steps=int(gsteps[w, l]), heard=cnt[w, l].copy(), bpos=np.asarray(S.pos)[w, :NB].copy(),
-                              params=jax.tree_util.tree_map(lambda x: x[w, l], P), centres=np.asarray(S.centres[w])))
+                              params=jax.tree_util.tree_map(lambda x: x[w, l], P), centres=np.asarray(S.centres[w]),
+                              snaps=snaps.pop((int(w), int(l)), [])))
             nav_of[w, l] = rng.integers(0, K)
         if dead.any():
             fresh = jax.tree_util.tree_map(lambda x: x[nav_of], NAV); dm = jnp.asarray(dead)
@@ -344,7 +360,7 @@ def main():
             S = S._replace(pos=jnp.asarray(pos), energy=jnp.asarray(E), age=jnp.asarray(age), alive=jnp.asarray(al))
         if a.ckpt and (it + 1) % a.ckpt_every == 0 and it + 1 < a.updates:
             _ck.save(a.ckpt, dict(it=it, P=P, OS=OS, S=S, key=key, rng=rng, mem_o=mem_o, mem_m=mem_m, mem_e=mem_e,
-                                  since_birth=since_birth, gsteps=gsteps, cnt=cnt, lives=lives, nav_of=nav_of))
+                                  since_birth=since_birth, gsteps=gsteps, cnt=cnt, lives=lives, nav_of=nav_of, snaps=snaps, prev_age=prev_age))
         if a.stop_after and it + 1 == a.stop_after:
             os._exit(3)
     if not lives:
@@ -447,6 +463,29 @@ def main():
             summ["apparatus"]["scripted_true_over_silence"] = float(summ["eaten_true_mean"] / max(es, 1e-9))
     if a.test == "heard25":
         summ["heard25"] = heard25_report(a, lives, res, scorable, true, swap, der, blind, blind_swap, silent)
+        if SNAP:                                     # the same test on the age snapshots: steps to first reliance
+            byage = {}; first = np.full(len(lives), np.inf)
+            for k_ in SNAP:
+                idx = [i for i, x in enumerate(lives) if scorable[i] and any(kk == k_ for kk, _ in x["snaps"])]
+                if not idx:
+                    byage[str(k_)] = dict(n=0); continue
+                Pk = jax.tree_util.tree_map(lambda *z: jnp.stack([jnp.asarray(q) for q in z]), *[dict(x["snaps"])[k_] for x in (lives[i] for i in idx)])
+                ii = np.array(idx); tk = np.asarray(evp(Pk, C[ii], keys[ii], jnp.asarray(ident[ii]), BP[ii], SM[ii]))
+                sk = np.asarray(evp(Pk, C[ii], keys[ii], jnp.asarray(der[ii]), BP[ii], SM[ii]))
+                pk = np.array([_life_pass(tk[j], sk[j]) for j in range(len(idx))])
+                for j, i in enumerate(idx):
+                    if pk[j]:
+                        first[i] = min(first[i], k_)
+                byage[str(k_)] = dict(n=len(idx), pass_frac=float(pk.mean()), ci95=_wilson(int(pk.sum()), len(idx)))
+            endp = np.array([r_["passed"] for r_ in res])
+            for i in range(len(lives)):
+                if scorable[i] and endp[i]:
+                    first[i] = min(first[i], lives[i]["lifespan"])
+            fe = first[np.asarray(scorable)]
+            summ["heard25"]["by_age"] = byage
+            summ["heard25"]["first_reliance"] = dict(ever_frac=float(np.isfinite(fe).mean()) if len(fe) else None,
+                                                     median_age_among_ever=float(np.median(fe[np.isfinite(fe)])) if np.isfinite(fe).any() else None,
+                                                     median_lifespan=float(np.median([x["lifespan"] for x in lives])))
         summ["gate"] = "PASS" if summ["heard25"]["learner_pass_frac_eligible"] >= 0.5 else "FAIL"
     os.makedirs(os.path.dirname(a.out), exist_ok=True)
     json.dump(dict(summary=summ, lives=res), open(a.out, "w"), indent=1, default=lambda z: z.tolist() if hasattr(z, "tolist") else str(z))
