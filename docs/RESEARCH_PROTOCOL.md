@@ -4970,8 +4970,8 @@ more expensive, because it produces publishable-looking nulls.
     - VoI random fallback 1.49x.
     - No held-out topic is registered yet; the FL track stays parked.
 
-- **RESULT (Nov 10, read ~23:05): DOSE-RESPONSE: NO ARM PASSES; MORE IN-LIFE COMPUTE DOES NOTHING; A LONGER
-  CHILDHOOD DOES NOT HELP PAST AGE ~1,000** (`docs/data/dose/`: 13 per-seed JSONs + logs, all exited 0;
+- **RESULT (Nov 10, read ~23:05): DOSE-RESPONSE: NO ARM PASSES; MORE REPLAY PASSES DO NOTHING; J2000 DOES NOT HELP
+  PAST AGE ~1,000 (two confounds below)** (`docs/data/dose/`: 13 per-seed JSONs + logs, all exited 0;
   `dose_summary.py`, output `dose_summary.txt`; item spend $3.54 of the $4 cap).
 
   | arm | eligible (rate) | pass at death | ever | age 250 / 500 / 1,000 (/ 2,000) | grad steps / life | median lifespan |
@@ -4985,7 +4985,7 @@ more expensive, because it produces publishable-looking nulls.
     - R32: 250 -> 500 z +3.0; 500 -> 1,000 z 0.0.
     - R128: +1.9; +1.6.
     - **J2000: +3.8; +2.8; then 1,000 -> 2,000 z -1.9** (47 lives lost reliance, 30 gained).
-  - **Pass vs cumulative gradient steps (quartile bins), flat in the R arms:** R32 4.8 / 4.5 / 2.4 / 5.0%; R128 3.5 /
+  - **Pass vs cumulative gradient steps (quartile bins; the steps are mostly replay / copy passes), flat in the R arms:** R32 4.8 / 4.5 / 2.4 / 5.0%; R128 3.5 /
     3.5 / 2.4 / 4.5%. In J2000 it rises with steps, but steps track age there.
   - **Registered decision:**
     - any arm >= 50% at death: **none**;
@@ -4993,11 +4993,28 @@ more expensive, because it produces publishable-looking nulls.
       more gradient steps per life. Not compute-limited;
     - J2000: rises within life to age 1,000, as the base does, then turns down. At age 1,000 it is no different from
       the base (11.4% vs 10.4%, z +0.6). The extra childhood (1,000 -> 2,000+) adds nothing.
-    - **Reading: "all flat" (with respect to dose) -> the learner is the limit, not the dose.** Flagged as a judgment
-      call: J2000's within-life rise to age 1,000 could be read as "J2000 rises", but the rise is the same as the
-      base's and does not continue.
-  - Per the tree, **the fast learner becomes the priority. But its test is NOT calibrated** (positive control 0-12%
-    under 3 probe designs; above). Next steps need Cam.
+    - **Registered branch: "all flat" (with respect to dose).** Flagged: J2000's within-life rise to age 1,000 could
+      be read as "J2000 rises", but it is the base's rise and does not continue.
+  - **CONFOUNDS (found after the read; defaults confirmed in learnability.py): the dose arms did not vary what they
+    were meant to vary.**
+    1. **`--mem 4`:** replay re-passes the SAME 4 most recent rollouts (256 steps). R32 / R128 add passes over the
+       same small memory, not more distinct experience.
+       - Replay trains only the predictive loss and copy-in-replay, and check (c) shows the predictive head ignores
+         the message.
+       - The "gradient steps per life" (1,820 / 7,196) are mostly these replay passes; the PPO policy updates per life
+         were the same in every R arm.
+       - **So the finding is "more replay passes over a 4-rollout memory do not help", NOT "in-life compute is not the
+         limit".**
+    2. **`--young 1000`:** copying elders' actions stops at age 1,000 in EVERY arm, J2000 included (J2000 lengthened
+       provisioning and the young-lr decay, not the copy window).
+       - **J2000's downturn 1,000 -> 2,000 (paired z -1.9) starts exactly when copying stops.** This is consistent
+         with reliance being carried by copying and fading after it ends.
+       - J2000 therefore did not cleanly test "a longer childhood".
+    - So "the learner is the limit -> fast-learner priority" is **premature**. The fast-learner branch is blocked
+      anyway (its positive control does not calibrate).
+    - Arms these confounds point to (not launched; Cam's call): **J2000 with `--young 2000`** (copying lasts the whole
+      childhood) and **R32 with a larger `--mem`** (replay sees more distinct experience).
+    - Batch headroom: $2.83 + $3.54 = **~$6.37 of $8 used, ~$1.63 left.**
   - Note: the guard and item watch died with the session again at ~20:23; all 13 jobs had finished at 20:13 (no
     unwatched spend). Guard restarted 23:03.
 
