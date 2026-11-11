@@ -4970,6 +4970,37 @@ more expensive, because it produces publishable-looking nulls.
     - VoI random fallback 1.49x.
     - No held-out topic is registered yet; the FL track stays parked.
 
+- **RESULT (Nov 10, read ~23:05): DOSE-RESPONSE: NO ARM PASSES; MORE IN-LIFE COMPUTE DOES NOTHING; A LONGER
+  CHILDHOOD DOES NOT HELP PAST AGE ~1,000** (`docs/data/dose/`: 13 per-seed JSONs + logs, all exited 0;
+  `dose_summary.py`, output `dose_summary.txt`; item spend $3.54 of the $4 cap).
+
+  | arm | eligible (rate) | pass at death | ever | age 250 / 500 / 1,000 (/ 2,000) | grad steps / life | median lifespan |
+  |---|---|---|---|---|---|---|
+  | all-on R8 (base, learn_arms) | 1,164 (61%) | 7.7% | ~13% | 2.7 / 6.4 / 10.4% | 476 | ~890 |
+  | R32 x5 | 1,302 (59%) | 6.5% | 13.4% | 4.8 / 7.0 / 9.8% | 1,820 | ~865 |
+  | R128 x3 | 880 (58%) | 6.0% | 13.1% | 3.5 / 5.2 / 9.2% | ~7,100 | ~855 |
+  | J2000 x5 | 807 (82%) | 9.7% | 19.7% | 4.5 / 8.6 / 11.4 / 9.3% | ~1,350 | ~2,540 |
+
+  - **Paired age trends** (McNemar on the same lives; per-life snapshots now stored):
+    - R32: 250 -> 500 z +3.0; 500 -> 1,000 z 0.0.
+    - R128: +1.9; +1.6.
+    - **J2000: +3.8; +2.8; then 1,000 -> 2,000 z -1.9** (47 lives lost reliance, 30 gained).
+  - **Pass vs cumulative gradient steps (quartile bins), flat in the R arms:** R32 4.8 / 4.5 / 2.4 / 5.0%; R128 3.5 /
+    3.5 / 2.4 / 4.5%. In J2000 it rises with steps, but steps track age there.
+  - **Registered decision:**
+    - any arm >= 50% at death: **none**;
+    - **R rises with dose: NO.** Age-1,000 pass: R8 10.4% -> R32 9.8% (z -0.4) -> R128 9.2% (z -0.3), with 4x / 15x
+      more gradient steps per life. Not compute-limited;
+    - J2000: rises within life to age 1,000, as the base does, then turns down. At age 1,000 it is no different from
+      the base (11.4% vs 10.4%, z +0.6). The extra childhood (1,000 -> 2,000+) adds nothing.
+    - **Reading: "all flat" (with respect to dose) -> the learner is the limit, not the dose.** Flagged as a judgment
+      call: J2000's within-life rise to age 1,000 could be read as "J2000 rises", but the rise is the same as the
+      base's and does not continue.
+  - Per the tree, **the fast learner becomes the priority. But its test is NOT calibrated** (positive control 0-12%
+    under 3 probe designs; above). Next steps need Cam.
+  - Note: the guard and item watch died with the session again at ~20:23; all 13 jobs had finished at 20:13 (no
+    unwatched spend). Guard restarted 23:03.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under

@@ -1,0 +1,34 @@
+== r32: eligible 1302 (mean eligibility 59%); PASS AT DEATH 85/1302 = 0.065; ever 0.134
+   dose_r32_s0_bd: eligible 257 (57%) pass 0.054 | median lifespan 860 | grad steps/life 1820
+   dose_r32_s1_bd: eligible 265 (61%) pass 0.053 | median lifespan 854 | grad steps/life 1820
+   dose_r32_s2_bd: eligible 258 (59%) pass 0.085 | median lifespan 882 | grad steps/life 1820
+   dose_r32_s3_bd: eligible 256 (57%) pass 0.066 | median lifespan 863 | grad steps/life 1820
+   dose_r32_s4_bd: eligible 266 (60%) pass 0.068 | median lifespan 873 | grad steps/life 1820
+   by age: 250: 63/1302 = 0.048, 500: 91/1302 = 0.070, 1000: 59/603 = 0.098
+   paired 250 -> 500: n 1302, gained 58, lost 30, McNemar z +2.98
+   paired 500 -> 1000: n 603, gained 32, lost 32, McNemar z +0.00
+   pass vs cumulative gradient steps (quartile bins): [328-520] 0.048, [520-1040] 0.045, [1040-1040] 0.024, [1040-2080] 0.050
+== r128: eligible 880 (mean eligibility 58%); PASS AT DEATH 53/880 = 0.060; ever 0.131
+   dose_r128_s0_b: eligible 278 (55%) pass 0.065 | median lifespan 865 | grad steps/life 7196
+   dose_r128_s1_b: eligible 306 (59%) pass 0.052 | median lifespan 859 | grad steps/life 7196
+   dose_r128_s2_b: eligible 296 (59%) pass 0.064 | median lifespan 840 | grad steps/life 6942
+   by age: 250: 31/880 = 0.035, 500: 46/880 = 0.052, 1000: 32/348 = 0.092
+   paired 250 -> 500: n 880, gained 38, lost 23, McNemar z +1.92
+   paired 500 -> 1000: n 348, gained 21, lost 12, McNemar z +1.57
+   pass vs cumulative gradient steps (quartile bins): [1288-2056] 0.035, [2056-4112] 0.035, [4112-4112] 0.024, [4112-8224] 0.045
+== j2000: eligible 807 (mean eligibility 82%); PASS AT DEATH 78/807 = 0.097; ever 0.197
+   dose_j2000_s0_: eligible 160 (82%) pass 0.100 | median lifespan 2659 | grad steps/life 1428
+   dose_j2000_s1_: eligible 170 (86%) pass 0.088 | median lifespan 2462 | grad steps/life 1326
+   dose_j2000_s2_: eligible 164 (84%) pass 0.122 | median lifespan 2487 | grad steps/life 1326
+   dose_j2000_s3_: eligible 159 (82%) pass 0.075 | median lifespan 2503 | grad steps/life 1326
+   dose_j2000_s4_: eligible 154 (79%) pass 0.097 | median lifespan 2574 | grad steps/life 1360
+   by age: 250: 36/807 = 0.045, 500: 69/807 = 0.086, 1000: 92/807 = 0.114, 2000: 75/807 = 0.093
+   paired 250 -> 500: n 807, gained 54, lost 21, McNemar z +3.81
+   paired 500 -> 1000: n 807, gained 46, lost 23, McNemar z +2.77
+   paired 1000 -> 2000: n 807, gained 30, lost 47, McNemar z -1.94
+   pass vs cumulative gradient steps (quartile bins): [88-202] 0.045, [202-384] 0.086, [384-668] 0.114, [668-1088] 0.093
+
+== DECISION (registered)
+any arm >= 50% at death: none
+age-1000 pass: base R8 69/661 = 0.104 | R32 59/603 = 0.098 (z vs R8 -0.39) | R128 32/348 = 0.092 (z vs R32 -0.30) -> R rises with dose: False
+J2000 age-1000 pass 92/807 = 0.114 (z vs R8 +0.59); J2000 by age {250: (36, 807), 500: (69, 807), 1000: (92, 807), 2000: (75, 807)}

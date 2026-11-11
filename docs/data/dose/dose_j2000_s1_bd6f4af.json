@@ -1,0 +1,4505 @@
+{
+ "summary": {
+  "variant": {
+   "juvenile": 2000,
+   "long_life": false,
+   "pred": 1.0,
+   "replay": 8,
+   "copy": 1.0,
+   "copy_replay": true,
+   "young_lr": 4.0,
+   "n_elders": 2,
+   "sanity": false,
+   "random_code": false,
+   "updates": 150,
+   "T": 64,
+   "epochs": 2
+  },
+  "lives": 197,
+  "pass_frac": 0.07614213197969544,
+  "median_drop": 0.04978364706039429,
+  "median_lifespan": 2462.0,
+  "median_grad_steps_per_life": 1326.0,
+  "eaten_true_mean": 2.1724708430064226,
+  "eaten_swap_mean": 1.7122633922416786,
+  "gate": "FAIL",
+  "diag": null,
+  "heard25": {
+   "min_sectors": 5,
+   "min_heard": 25,
+   "score": "last-heard",
+   "lives": 197,
+   "eligible": 170,
+   "eligibility_rate": 0.8629441624365483,
+   "enough_eligible": true,
+   "learner_pass_frac_eligible": 0.08823529411764706,
+   "learner_pass_ci95": [
+    0.05419991529001811,
+    0.14046925480505695
+   ],
+   "stratified": {
+    "5": {
+     "n": 47,
+     "pass_frac": 0.0851063829787234
+    },
+    "6": {
+     "n": 50,
+     "pass_frac": 0.02
+    },
+    "7-8": {
+     "n": 73,
+     "pass_frac": 0.136986301369863
+    }
+   },
+   "secondary_swap_ge90deg": {
+    "lives_with_ge4_such_probes": 170,
+    "pass_frac": 0.08823529411764706
+   },
+   "by_age": {
+    "250": {
+     "n": 170,
+     "pass_frac": 0.058823529411764705,
+     "ci95": [
+      0.032261865536997426,
+      0.10488367385058298
+     ]
+    },
+    "500": {
+     "n": 170,
+     "pass_frac": 0.09411764705882353,
+     "ci95": [
+      0.058763852148011386,
+      0.14741004408856256
+     ]
+    },
+    "1000": {
+     "n": 170,
+     "pass_frac": 0.10588235294117647,
+     "ci95": [
+      0.0680306976225958,
+      0.161152650896976
+     ]
+    },
+    "2000": {
+     "n": 170,
+     "pass_frac": 0.08823529411764706,
+     "ci95": [
+      0.05419991529001811,
+      0.14046925480505695
+     ]
+    }
+   },
+   "first_reliance": {
+    "ever_frac": 0.21176470588235294,
+    "median_age_among_ever": 500.0,
+    "median_lifespan": 2462.0
+   }
+  }
+ },
+ "lives": [
+  {
+   "lifespan": 2147,
+   "grad_steps": 1108,
+   "eaten_true": 0.08750000596046448,
+   "eaten_swap": 0.06948614865541458,
+   "drop": 0.20587259531021118,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 8,
+   "sectors_ge_min": 7,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 88,
+    "500": 224,
+    "1000": 496,
+    "2000": 1040
+   }
+  },
+  {
+   "lifespan": 2256,
+   "grad_steps": 1176,
+   "eaten_true": 6.590649127960205,
+   "eaten_swap": 5.312803268432617,
+   "drop": 0.19388771057128906,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 8,
+   "sectors_ge_min": 6,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 88,
+    "500": 224,
+    "1000": 496,
+    "2000": 1040
+   }
+  },
+  {
+   "lifespan": 2365,
+   "grad_steps": 1210,
+   "eaten_true": 0.7859135270118713,
+   "eaten_swap": 0.7933838963508606,
+   "drop": -0.009505391120910645,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 8,
+   "sectors_ge_min": 6,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 88,
+    "500": 224,
+    "1000": 496,
+    "2000": 1040
+   }
+  },
+  {
+   "lifespan": 2346,
+   "grad_steps": 1210,
+   "eaten_true": 2.6880877017974854,
+   "eaten_swap": 2.310826063156128,
+   "drop": 0.14034581184387207,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 7,
+   "sectors_ge_min": 6,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": true,
+    "500": false,
+    "1000": true,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 88,
+    "500": 224,
+    "1000": 496,
+    "2000": 1040
+   }
+  },
+  {
+   "lifespan": 2432,
+   "grad_steps": 1244,
+   "eaten_true": 5.6364593505859375,
+   "eaten_swap": 4.282956600189209,
+   "drop": 0.24013352394104004,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 8,
+   "sectors_ge_min": 5,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 88,
+    "500": 224,
+    "1000": 496,
+    "2000": 1040
+   }
+  },
+  {
+   "lifespan": 2393,
+   "grad_steps": 1244,
+   "eaten_true": 0.21811795234680176,
+   "eaten_swap": 0.08333758264780045,
+   "drop": 0.6179242134094238,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 8,
+   "sectors_ge_min": 6,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": true
+   },
+   "snap_gsteps": {
+    "250": 88,
+    "500": 224,
+    "1000": 496,
+    "2000": 1040
+   }
+  },
+  {
+   "lifespan": 2425,
+   "grad_steps": 1244,
+   "eaten_true": 0.014295618049800396,
+   "eaten_swap": 0.0021549880038946867,
+   "drop": 0.8492553234100342,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 7,
+   "sectors_ge_min": 5,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 88,
+    "500": 224,
+    "1000": 496,
+    "2000": 1040
+   }
+  },
+  {
+   "lifespan": 2411,
+   "grad_steps": 1244,
+   "eaten_true": 8.525690078735352,
+   "eaten_swap": 7.65170431137085,
+   "drop": 0.10251206159591675,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 8,
+   "sectors_ge_min": 5,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 88,
+    "500": 224,
+    "1000": 496,
+    "2000": 1040
+   }
+  },
+  {
+   "lifespan": 2395,
+   "grad_steps": 1244,
+   "eaten_true": 3.8716232776641846,
+   "eaten_swap": 4.105560779571533,
+   "drop": -0.06042361259460449,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 8,
+   "sectors_ge_min": 7,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 88,
+    "500": 224,
+    "1000": 496,
+    "2000": 1040
+   }
+  },
+  {
+   "lifespan": 2418,
+   "grad_steps": 1244,
+   "eaten_true": 12.489167213439941,
+   "eaten_swap": 7.719751834869385,
+   "drop": 0.3818841576576233,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 8,
+   "sectors_ge_min": 7,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": true,
+    "2000": true
+   },
+   "snap_gsteps": {
+    "250": 88,
+    "500": 224,
+    "1000": 496,
+    "2000": 1040
+   }
+  },
+  {
+   "lifespan": 2407,
+   "grad_steps": 1244,
+   "eaten_true": 2.8873932361602783,
+   "eaten_swap": 1.9085454940795898,
+   "drop": 0.3390074372291565,
+   "passed": true,
+   "scorable": true,
+   "distinct_heard": 8,
+   "sectors_ge_min": 8,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": true,
+    "500": true,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 88,
+    "500": 224,
+    "1000": 496,
+    "2000": 1040
+   }
+  },
+  {
+   "lifespan": 2404,
+   "grad_steps": 1244,
+   "eaten_true": 11.53966236114502,
+   "eaten_swap": 6.748458385467529,
+   "drop": 0.4151945114135742,
+   "passed": true,
+   "scorable": true,
+   "distinct_heard": 8,
+   "sectors_ge_min": 8,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": true,
+    "500": true,
+    "1000": true,
+    "2000": true
+   },
+   "snap_gsteps": {
+    "250": 88,
+    "500": 224,
+    "1000": 496,
+    "2000": 1040
+   }
+  },
+  {
+   "lifespan": 2461,
+   "grad_steps": 1278,
+   "eaten_true": 2.174973249435425,
+   "eaten_swap": 1.878639578819275,
+   "drop": 0.13624703884124756,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 7,
+   "sectors_ge_min": 6,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 88,
+    "500": 224,
+    "1000": 496,
+    "2000": 1040
+   }
+  },
+  {
+   "lifespan": 2441,
+   "grad_steps": 1278,
+   "eaten_true": 5.2948384284973145,
+   "eaten_swap": 5.621551036834717,
+   "drop": -0.061704039573669434,
+   "passed": false,
+   "scorable": false,
+   "distinct_heard": 6,
+   "sectors_ge_min": 4,
+   "eaten_blind": null
+  },
+  {
+   "lifespan": 2453,
+   "grad_steps": 1278,
+   "eaten_true": 8.357661247253418,
+   "eaten_swap": 6.721848964691162,
+   "drop": 0.19572609663009644,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 8,
+   "sectors_ge_min": 5,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": true,
+    "500": false,
+    "1000": true,
+    "2000": true
+   },
+   "snap_gsteps": {
+    "250": 88,
+    "500": 224,
+    "1000": 496,
+    "2000": 1040
+   }
+  },
+  {
+   "lifespan": 2460,
+   "grad_steps": 1278,
+   "eaten_true": 7.7727837562561035,
+   "eaten_swap": 5.114490032196045,
+   "drop": 0.34200018644332886,
+   "passed": true,
+   "scorable": true,
+   "distinct_heard": 6,
+   "sectors_ge_min": 5,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": true,
+    "1000": true,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 88,
+    "500": 224,
+    "1000": 496,
+    "2000": 1040
+   }
+  },
+  {
+   "lifespan": 2462,
+   "grad_steps": 1278,
+   "eaten_true": 9.001809120178223,
+   "eaten_swap": 8.369271278381348,
+   "drop": 0.07026785612106323,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 8,
+   "sectors_ge_min": 6,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 88,
+    "500": 224,
+    "1000": 496,
+    "2000": 1040
+   }
+  },
+  {
+   "lifespan": 2451,
+   "grad_steps": 1278,
+   "eaten_true": 3.284891366958618,
+   "eaten_swap": 1.690769076347351,
+   "drop": 0.48528921604156494,
+   "passed": true,
+   "scorable": true,
+   "distinct_heard": 8,
+   "sectors_ge_min": 7,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": true,
+    "500": false,
+    "1000": false,
+    "2000": true
+   },
+   "snap_gsteps": {
+    "250": 88,
+    "500": 224,
+    "1000": 496,
+    "2000": 1040
+   }
+  },
+  {
+   "lifespan": 2457,
+   "grad_steps": 1278,
+   "eaten_true": 8.957115173339844,
+   "eaten_swap": 5.970129489898682,
+   "drop": 0.33347630500793457,
+   "passed": false,
+   "scorable": false,
+   "distinct_heard": 6,
+   "sectors_ge_min": 4,
+   "eaten_blind": null
+  },
+  {
+   "lifespan": 2457,
+   "grad_steps": 1278,
+   "eaten_true": 6.618326663970947,
+   "eaten_swap": 7.811391353607178,
+   "drop": -0.18026673793792725,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 6,
+   "sectors_ge_min": 5,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 88,
+    "500": 224,
+    "1000": 496,
+    "2000": 1040
+   }
+  },
+  {
+   "lifespan": 2444,
+   "grad_steps": 1278,
+   "eaten_true": 16.30504035949707,
+   "eaten_swap": 15.604300498962402,
+   "drop": 0.04297691583633423,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 8,
+   "sectors_ge_min": 8,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 88,
+    "500": 224,
+    "1000": 496,
+    "2000": 1040
+   }
+  },
+  {
+   "lifespan": 2453,
+   "grad_steps": 1278,
+   "eaten_true": 3.210042715072632,
+   "eaten_swap": 4.249619960784912,
+   "drop": -0.32385146617889404,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 8,
+   "sectors_ge_min": 5,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 88,
+    "500": 224,
+    "1000": 496,
+    "2000": 1040
+   }
+  },
+  {
+   "lifespan": 2460,
+   "grad_steps": 1278,
+   "eaten_true": 18.963441848754883,
+   "eaten_swap": 15.727703094482422,
+   "drop": 0.17063039541244507,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 8,
+   "sectors_ge_min": 7,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 88,
+    "500": 224,
+    "1000": 496,
+    "2000": 1040
+   }
+  },
+  {
+   "lifespan": 2460,
+   "grad_steps": 1278,
+   "eaten_true": 12.86536693572998,
+   "eaten_swap": 12.792892456054688,
+   "drop": 0.005633294582366943,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 8,
+   "sectors_ge_min": 7,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 88,
+    "500": 224,
+    "1000": 496,
+    "2000": 1040
+   }
+  },
+  {
+   "lifespan": 2434,
+   "grad_steps": 1278,
+   "eaten_true": 0.6458648443222046,
+   "eaten_swap": 0.6942707896232605,
+   "drop": -0.07494747638702393,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 8,
+   "sectors_ge_min": 8,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": true,
+    "1000": true,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 88,
+    "500": 224,
+    "1000": 496,
+    "2000": 1040
+   }
+  },
+  {
+   "lifespan": 2460,
+   "grad_steps": 1278,
+   "eaten_true": 9.455016136169434,
+   "eaten_swap": 5.068488597869873,
+   "drop": 0.46393656730651855,
+   "passed": true,
+   "scorable": true,
+   "distinct_heard": 8,
+   "sectors_ge_min": 6,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": true
+   },
+   "snap_gsteps": {
+    "250": 88,
+    "500": 224,
+    "1000": 496,
+    "2000": 1040
+   }
+  },
+  {
+   "lifespan": 2462,
+   "grad_steps": 1278,
+   "eaten_true": 10.374373435974121,
+   "eaten_swap": 10.858757019042969,
+   "drop": -0.04669046401977539,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 8,
+   "sectors_ge_min": 7,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 88,
+    "500": 224,
+    "1000": 496,
+    "2000": 1040
+   }
+  },
+  {
+   "lifespan": 2434,
+   "grad_steps": 1278,
+   "eaten_true": 1.9421008825302124,
+   "eaten_swap": 1.306617021560669,
+   "drop": 0.32721465826034546,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 8,
+   "sectors_ge_min": 6,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": true,
+    "500": false,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 88,
+    "500": 224,
+    "1000": 496,
+    "2000": 1040
+   }
+  },
+  {
+   "lifespan": 2448,
+   "grad_steps": 1278,
+   "eaten_true": 8.528353691101074,
+   "eaten_swap": 6.867331027984619,
+   "drop": 0.19476467370986938,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 8,
+   "sectors_ge_min": 5,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": true,
+    "500": true,
+    "1000": true,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 88,
+    "500": 224,
+    "1000": 496,
+    "2000": 1040
+   }
+  },
+  {
+   "lifespan": 2453,
+   "grad_steps": 1278,
+   "eaten_true": 10.473816871643066,
+   "eaten_swap": 7.867777347564697,
+   "drop": 0.2488146424293518,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 8,
+   "sectors_ge_min": 7,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": true,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 88,
+    "500": 224,
+    "1000": 496,
+    "2000": 1040
+   }
+  },
+  {
+   "lifespan": 2462,
+   "grad_steps": 1278,
+   "eaten_true": 6.705572128295898,
+   "eaten_swap": 4.60443115234375,
+   "drop": 0.31334251165390015,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 8,
+   "sectors_ge_min": 5,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": true,
+    "500": true,
+    "1000": true,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 88,
+    "500": 224,
+    "1000": 496,
+    "2000": 1040
+   }
+  },
+  {
+   "lifespan": 2446,
+   "grad_steps": 1278,
+   "eaten_true": 13.168389320373535,
+   "eaten_swap": 5.32053804397583,
+   "drop": 0.5959613919258118,
+   "passed": true,
+   "scorable": true,
+   "distinct_heard": 8,
+   "sectors_ge_min": 8,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": true,
+    "1000": true,
+    "2000": true
+   },
+   "snap_gsteps": {
+    "250": 88,
+    "500": 224,
+    "1000": 496,
+    "2000": 1040
+   }
+  },
+  {
+   "lifespan": 2453,
+   "grad_steps": 1278,
+   "eaten_true": 3.7439606189727783,
+   "eaten_swap": 3.632902145385742,
+   "drop": 0.029663383960723877,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 8,
+   "sectors_ge_min": 8,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": true,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 88,
+    "500": 224,
+    "1000": 496,
+    "2000": 1040
+   }
+  },
+  {
+   "lifespan": 2448,
+   "grad_steps": 1278,
+   "eaten_true": 10.488885879516602,
+   "eaten_swap": 4.7317280769348145,
+   "drop": 0.5488817691802979,
+   "passed": true,
+   "scorable": true,
+   "distinct_heard": 7,
+   "sectors_ge_min": 5,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": true,
+    "2000": true
+   },
+   "snap_gsteps": {
+    "250": 88,
+    "500": 224,
+    "1000": 496,
+    "2000": 1040
+   }
+  },
+  {
+   "lifespan": 2532,
+   "grad_steps": 1312,
+   "eaten_true": 0.5381293296813965,
+   "eaten_swap": 0.6782698035240173,
+   "drop": -0.2604215145111084,
+   "passed": false,
+   "scorable": false,
+   "distinct_heard": 5,
+   "sectors_ge_min": 2,
+   "eaten_blind": null
+  },
+  {
+   "lifespan": 2534,
+   "grad_steps": 1312,
+   "eaten_true": 1.281664490699768,
+   "eaten_swap": 1.0104432106018066,
+   "drop": 0.21161645650863647,
+   "passed": false,
+   "scorable": false,
+   "distinct_heard": 6,
+   "sectors_ge_min": 3,
+   "eaten_blind": null
+  },
+  {
+   "lifespan": 2589,
+   "grad_steps": 1346,
+   "eaten_true": 2.5799319744110107,
+   "eaten_swap": 2.282496213912964,
+   "drop": 0.11528819799423218,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 8,
+   "sectors_ge_min": 8,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": true,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 88,
+    "500": 224,
+    "1000": 496,
+    "2000": 1040
+   }
+  },
+  {
+   "lifespan": 2614,
+   "grad_steps": 1346,
+   "eaten_true": 8.233323097229004,
+   "eaten_swap": 6.703037261962891,
+   "drop": 0.18586492538452148,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 7,
+   "sectors_ge_min": 5,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 88,
+    "500": 224,
+    "1000": 496,
+    "2000": 1040
+   }
+  },
+  {
+   "lifespan": 2680,
+   "grad_steps": 1380,
+   "eaten_true": 2.641191244125366,
+   "eaten_swap": 2.3249309062957764,
+   "drop": 0.11974161863327026,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 8,
+   "sectors_ge_min": 7,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": true
+   },
+   "snap_gsteps": {
+    "250": 88,
+    "500": 224,
+    "1000": 496,
+    "2000": 1040
+   }
+  },
+  {
+   "lifespan": 2657,
+   "grad_steps": 1380,
+   "eaten_true": 11.84111499786377,
+   "eaten_swap": 4.813232421875,
+   "drop": 0.5935152769088745,
+   "passed": true,
+   "scorable": true,
+   "distinct_heard": 8,
+   "sectors_ge_min": 7,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": true,
+    "500": false,
+    "1000": true,
+    "2000": true
+   },
+   "snap_gsteps": {
+    "250": 88,
+    "500": 224,
+    "1000": 496,
+    "2000": 1040
+   }
+  },
+  {
+   "lifespan": 2778,
+   "grad_steps": 1448,
+   "eaten_true": 9.248007774353027,
+   "eaten_swap": 6.848226070404053,
+   "drop": 0.2594917416572571,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 8,
+   "sectors_ge_min": 6,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": true,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 88,
+    "500": 224,
+    "1000": 496,
+    "2000": 1040
+   }
+  },
+  {
+   "lifespan": 2781,
+   "grad_steps": 1448,
+   "eaten_true": 7.778954982757568,
+   "eaten_swap": 7.330605983734131,
+   "drop": 0.057636141777038574,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 8,
+   "sectors_ge_min": 7,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 88,
+    "500": 224,
+    "1000": 496,
+    "2000": 1040
+   }
+  },
+  {
+   "lifespan": 2834,
+   "grad_steps": 1482,
+   "eaten_true": 6.890714168548584,
+   "eaten_swap": 4.5448384284973145,
+   "drop": 0.34044015407562256,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 8,
+   "sectors_ge_min": 6,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": true,
+    "1000": true,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 88,
+    "500": 224,
+    "1000": 496,
+    "2000": 1040
+   }
+  },
+  {
+   "lifespan": 3000,
+   "grad_steps": 1550,
+   "eaten_true": 4.509359836578369,
+   "eaten_swap": 4.052240371704102,
+   "drop": 0.10137122869491577,
+   "passed": false,
+   "scorable": false,
+   "distinct_heard": 8,
+   "sectors_ge_min": 4,
+   "eaten_blind": null
+  },
+  {
+   "lifespan": 3000,
+   "grad_steps": 1550,
+   "eaten_true": 7.4440178871154785,
+   "eaten_swap": 5.632569789886475,
+   "drop": 0.2433428168296814,
+   "passed": false,
+   "scorable": false,
+   "distinct_heard": 8,
+   "sectors_ge_min": 4,
+   "eaten_blind": null
+  },
+  {
+   "lifespan": 3000,
+   "grad_steps": 1550,
+   "eaten_true": 11.020977020263672,
+   "eaten_swap": 6.312417507171631,
+   "drop": 0.4272361397743225,
+   "passed": true,
+   "scorable": true,
+   "distinct_heard": 8,
+   "sectors_ge_min": 7,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": true,
+    "1000": true,
+    "2000": true
+   },
+   "snap_gsteps": {
+    "250": 88,
+    "500": 224,
+    "1000": 496,
+    "2000": 1040
+   }
+  },
+  {
+   "lifespan": 3000,
+   "grad_steps": 1550,
+   "eaten_true": 1.4335298538208008,
+   "eaten_swap": 1.3855504989624023,
+   "drop": 0.03346937894821167,
+   "passed": false,
+   "scorable": false,
+   "distinct_heard": 7,
+   "sectors_ge_min": 4,
+   "eaten_blind": null
+  },
+  {
+   "lifespan": 3000,
+   "grad_steps": 1550,
+   "eaten_true": 10.352991104125977,
+   "eaten_swap": 10.432097434997559,
+   "drop": -0.007640957832336426,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 8,
+   "sectors_ge_min": 8,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": true,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 88,
+    "500": 224,
+    "1000": 496,
+    "2000": 1040
+   }
+  },
+  {
+   "lifespan": 3000,
+   "grad_steps": 1550,
+   "eaten_true": 8.804280281066895,
+   "eaten_swap": 5.756866455078125,
+   "drop": 0.3461286425590515,
+   "passed": true,
+   "scorable": true,
+   "distinct_heard": 8,
+   "sectors_ge_min": 5,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": true
+   },
+   "snap_gsteps": {
+    "250": 88,
+    "500": 224,
+    "1000": 496,
+    "2000": 1040
+   }
+  },
+  {
+   "lifespan": 3000,
+   "grad_steps": 1550,
+   "eaten_true": 4.814512877260313e-08,
+   "eaten_swap": 2.1715715448067385e-08,
+   "drop": 0.5489529967308044,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 7,
+   "sectors_ge_min": 6,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 88,
+    "500": 224,
+    "1000": 496,
+    "2000": 1040
+   }
+  },
+  {
+   "lifespan": 3000,
+   "grad_steps": 1550,
+   "eaten_true": 1.2601526975631714,
+   "eaten_swap": 1.192517638206482,
+   "drop": 0.05367213487625122,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 7,
+   "sectors_ge_min": 6,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 88,
+    "500": 224,
+    "1000": 496,
+    "2000": 1040
+   }
+  },
+  {
+   "lifespan": 3000,
+   "grad_steps": 1550,
+   "eaten_true": 6.754976749420166,
+   "eaten_swap": 5.183590412139893,
+   "drop": 0.23262649774551392,
+   "passed": false,
+   "scorable": false,
+   "distinct_heard": 7,
+   "sectors_ge_min": 4,
+   "eaten_blind": null
+  },
+  {
+   "lifespan": 3000,
+   "grad_steps": 1550,
+   "eaten_true": 3.407580614089966,
+   "eaten_swap": 3.318086624145508,
+   "drop": 0.02626323699951172,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 8,
+   "sectors_ge_min": 8,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 88,
+    "500": 224,
+    "1000": 496,
+    "2000": 1040
+   }
+  },
+  {
+   "lifespan": 3000,
+   "grad_steps": 1550,
+   "eaten_true": 0.08273375779390335,
+   "eaten_swap": 0.0833333358168602,
+   "drop": -0.007246971130371094,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 8,
+   "sectors_ge_min": 6,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": true,
+    "1000": true,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 88,
+    "500": 224,
+    "1000": 496,
+    "2000": 1040
+   }
+  },
+  {
+   "lifespan": 3000,
+   "grad_steps": 1550,
+   "eaten_true": 3.6058151721954346,
+   "eaten_swap": 2.9858391284942627,
+   "drop": 0.17193782329559326,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 8,
+   "sectors_ge_min": 7,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 88,
+    "500": 224,
+    "1000": 496,
+    "2000": 1040
+   }
+  },
+  {
+   "lifespan": 3000,
+   "grad_steps": 1550,
+   "eaten_true": 1.1299809217453003,
+   "eaten_swap": 1.141471266746521,
+   "drop": -0.01016855239868164,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 8,
+   "sectors_ge_min": 8,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 88,
+    "500": 224,
+    "1000": 496,
+    "2000": 1040
+   }
+  },
+  {
+   "lifespan": 3000,
+   "grad_steps": 1550,
+   "eaten_true": 7.8534722328186035,
+   "eaten_swap": 3.015639066696167,
+   "drop": 0.6160119771957397,
+   "passed": true,
+   "scorable": true,
+   "distinct_heard": 8,
+   "sectors_ge_min": 8,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": true
+   },
+   "snap_gsteps": {
+    "250": 88,
+    "500": 224,
+    "1000": 496,
+    "2000": 1040
+   }
+  },
+  {
+   "lifespan": 3000,
+   "grad_steps": 1550,
+   "eaten_true": 2.137500047683716,
+   "eaten_swap": 1.4916667938232422,
+   "drop": 0.30214422941207886,
+   "passed": true,
+   "scorable": true,
+   "distinct_heard": 8,
+   "sectors_ge_min": 7,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 88,
+    "500": 224,
+    "1000": 496,
+    "2000": 1040
+   }
+  },
+  {
+   "lifespan": 3000,
+   "grad_steps": 1550,
+   "eaten_true": 2.6105635166168213,
+   "eaten_swap": 2.4927217960357666,
+   "drop": 0.04514026641845703,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 8,
+   "sectors_ge_min": 7,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 88,
+    "500": 224,
+    "1000": 496,
+    "2000": 1040
+   }
+  },
+  {
+   "lifespan": 3000,
+   "grad_steps": 1550,
+   "eaten_true": 2.72961163520813,
+   "eaten_swap": 1.6024445295333862,
+   "drop": 0.41294050216674805,
+   "passed": true,
+   "scorable": true,
+   "distinct_heard": 8,
+   "sectors_ge_min": 8,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 88,
+    "500": 224,
+    "1000": 496,
+    "2000": 1040
+   }
+  },
+  {
+   "lifespan": 3000,
+   "grad_steps": 1550,
+   "eaten_true": 2.0962631702423096,
+   "eaten_swap": 2.7825047969818115,
+   "drop": -0.3273642063140869,
+   "passed": false,
+   "scorable": false,
+   "distinct_heard": 5,
+   "sectors_ge_min": 2,
+   "eaten_blind": null
+  },
+  {
+   "lifespan": 3000,
+   "grad_steps": 1550,
+   "eaten_true": 2.9385719299316406,
+   "eaten_swap": 2.505635976791382,
+   "drop": 0.14732873439788818,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 8,
+   "sectors_ge_min": 8,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 88,
+    "500": 224,
+    "1000": 496,
+    "2000": 1040
+   }
+  },
+  {
+   "lifespan": 3000,
+   "grad_steps": 1550,
+   "eaten_true": 3.9616518020629883,
+   "eaten_swap": 3.4812405109405518,
+   "drop": 0.12126535177230835,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 8,
+   "sectors_ge_min": 5,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 88,
+    "500": 224,
+    "1000": 496,
+    "2000": 1040
+   }
+  },
+  {
+   "lifespan": 2996,
+   "grad_steps": 1550,
+   "eaten_true": 7.845992565155029,
+   "eaten_swap": 5.549588680267334,
+   "drop": 0.29268497228622437,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 7,
+   "sectors_ge_min": 5,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": true,
+    "1000": true,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 88,
+    "500": 224,
+    "1000": 496,
+    "2000": 1040
+   }
+  },
+  {
+   "lifespan": 2176,
+   "grad_steps": 1156,
+   "eaten_true": 0.08201973885297775,
+   "eaten_swap": 0.06754080206155777,
+   "drop": 0.1765298843383789,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 8,
+   "sectors_ge_min": 5,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 136,
+    "500": 272,
+    "1000": 544,
+    "2000": 1088
+   }
+  },
+  {
+   "lifespan": 2218,
+   "grad_steps": 1190,
+   "eaten_true": 1.7107876539230347,
+   "eaten_swap": 0.8248149752616882,
+   "drop": 0.5178741216659546,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 8,
+   "sectors_ge_min": 7,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 136,
+    "500": 272,
+    "1000": 544,
+    "2000": 1088
+   }
+  },
+  {
+   "lifespan": 2354,
+   "grad_steps": 1258,
+   "eaten_true": 0.28430506587028503,
+   "eaten_swap": 0.2590920031070709,
+   "drop": 0.0886831283569336,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 5,
+   "sectors_ge_min": 5,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 136,
+    "500": 272,
+    "1000": 544,
+    "2000": 1088
+   }
+  },
+  {
+   "lifespan": 2140,
+   "grad_steps": 1156,
+   "eaten_true": 0.3524910509586334,
+   "eaten_swap": 0.2942967414855957,
+   "drop": 0.16509443521499634,
+   "passed": false,
+   "scorable": false,
+   "distinct_heard": 6,
+   "sectors_ge_min": 4,
+   "eaten_blind": null
+  },
+  {
+   "lifespan": 2276,
+   "grad_steps": 1224,
+   "eaten_true": 0.2768312394618988,
+   "eaten_swap": 0.2932882606983185,
+   "drop": -0.05944788455963135,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 8,
+   "sectors_ge_min": 6,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 136,
+    "500": 272,
+    "1000": 544,
+    "2000": 1088
+   }
+  },
+  {
+   "lifespan": 2180,
+   "grad_steps": 1190,
+   "eaten_true": 1.148054380450958e-07,
+   "eaten_swap": 5.0962231767925914e-08,
+   "drop": 0.5560991764068604,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 8,
+   "sectors_ge_min": 7,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 136,
+    "500": 272,
+    "1000": 544,
+    "2000": 1088
+   }
+  },
+  {
+   "lifespan": 2303,
+   "grad_steps": 1224,
+   "eaten_true": 0.6353809237480164,
+   "eaten_swap": 0.6526640057563782,
+   "drop": -0.027201175689697266,
+   "passed": false,
+   "scorable": false,
+   "distinct_heard": 5,
+   "sectors_ge_min": 3,
+   "eaten_blind": null
+  },
+  {
+   "lifespan": 2232,
+   "grad_steps": 1190,
+   "eaten_true": 0.4250936508178711,
+   "eaten_swap": 0.4801121652126312,
+   "drop": -0.12942683696746826,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 8,
+   "sectors_ge_min": 5,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 136,
+    "500": 272,
+    "1000": 544,
+    "2000": 1088
+   }
+  },
+  {
+   "lifespan": 2278,
+   "grad_steps": 1224,
+   "eaten_true": 1.1624608039855957,
+   "eaten_swap": 1.2939221858978271,
+   "drop": -0.11308884620666504,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 6,
+   "sectors_ge_min": 6,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 136,
+    "500": 272,
+    "1000": 544,
+    "2000": 1088
+   }
+  },
+  {
+   "lifespan": 2294,
+   "grad_steps": 1224,
+   "eaten_true": 1.0676981210708618,
+   "eaten_swap": 0.8367231488227844,
+   "drop": 0.21632981300354004,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 8,
+   "sectors_ge_min": 8,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 136,
+    "500": 272,
+    "1000": 544,
+    "2000": 1088
+   }
+  },
+  {
+   "lifespan": 2261,
+   "grad_steps": 1224,
+   "eaten_true": 0.18024997413158417,
+   "eaten_swap": 0.199958935379982,
+   "drop": -0.10934245586395264,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 8,
+   "sectors_ge_min": 5,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 136,
+    "500": 272,
+    "1000": 544,
+    "2000": 1088
+   }
+  },
+  {
+   "lifespan": 2342,
+   "grad_steps": 1258,
+   "eaten_true": 0.15272293984889984,
+   "eaten_swap": 0.15273058414459229,
+   "drop": -5.0067901611328125e-05,
+   "passed": false,
+   "scorable": false,
+   "distinct_heard": 3,
+   "sectors_ge_min": 2,
+   "eaten_blind": null
+  },
+  {
+   "lifespan": 2149,
+   "grad_steps": 1156,
+   "eaten_true": 0.903740644454956,
+   "eaten_swap": 0.7674674987792969,
+   "drop": 0.15078788995742798,
+   "passed": false,
+   "scorable": false,
+   "distinct_heard": 8,
+   "sectors_ge_min": 4,
+   "eaten_blind": null
+  },
+  {
+   "lifespan": 2346,
+   "grad_steps": 1258,
+   "eaten_true": 0.018143678084015846,
+   "eaten_swap": 0.008707644417881966,
+   "drop": 0.5200728178024292,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 8,
+   "sectors_ge_min": 6,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 136,
+    "500": 272,
+    "1000": 544,
+    "2000": 1088
+   }
+  },
+  {
+   "lifespan": 2358,
+   "grad_steps": 1258,
+   "eaten_true": 0.30065879225730896,
+   "eaten_swap": 0.2737327814102173,
+   "drop": 0.08955669403076172,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 8,
+   "sectors_ge_min": 6,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 136,
+    "500": 272,
+    "1000": 544,
+    "2000": 1088
+   }
+  },
+  {
+   "lifespan": 2395,
+   "grad_steps": 1292,
+   "eaten_true": 0.2517101466655731,
+   "eaten_swap": 0.2395181655883789,
+   "drop": 0.048436522483825684,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 6,
+   "sectors_ge_min": 5,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 136,
+    "500": 272,
+    "1000": 544,
+    "2000": 1088
+   }
+  },
+  {
+   "lifespan": 2331,
+   "grad_steps": 1258,
+   "eaten_true": 0.03087683580815792,
+   "eaten_swap": 0.037500012665987015,
+   "drop": -0.21450304985046387,
+   "passed": false,
+   "scorable": false,
+   "distinct_heard": 6,
+   "sectors_ge_min": 2,
+   "eaten_blind": null
+  },
+  {
+   "lifespan": 2404,
+   "grad_steps": 1292,
+   "eaten_true": 0.3992183208465576,
+   "eaten_swap": 0.38076940178871155,
+   "drop": 0.04621255397796631,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 5,
+   "sectors_ge_min": 5,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 136,
+    "500": 272,
+    "1000": 544,
+    "2000": 1088
+   }
+  },
+  {
+   "lifespan": 2437,
+   "grad_steps": 1326,
+   "eaten_true": 0.21549616754055023,
+   "eaten_swap": 0.21967393159866333,
+   "drop": -0.019386768341064453,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 6,
+   "sectors_ge_min": 5,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 136,
+    "500": 272,
+    "1000": 544,
+    "2000": 1088
+   }
+  },
+  {
+   "lifespan": 2462,
+   "grad_steps": 1326,
+   "eaten_true": 0.008333333767950535,
+   "eaten_swap": 0.008333333767950535,
+   "drop": 0.0,
+   "passed": false,
+   "scorable": false,
+   "distinct_heard": 6,
+   "sectors_ge_min": 2,
+   "eaten_blind": null
+  },
+  {
+   "lifespan": 2450,
+   "grad_steps": 1326,
+   "eaten_true": 2.2893214225769043,
+   "eaten_swap": 2.261190414428711,
+   "drop": 0.012287914752960205,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 8,
+   "sectors_ge_min": 7,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 136,
+    "500": 272,
+    "1000": 544,
+    "2000": 1088
+   }
+  },
+  {
+   "lifespan": 2517,
+   "grad_steps": 1360,
+   "eaten_true": 0.12500004470348358,
+   "eaten_swap": 0.09166672080755234,
+   "drop": 0.2666665315628052,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 8,
+   "sectors_ge_min": 8,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 136,
+    "500": 272,
+    "1000": 544,
+    "2000": 1088
+   }
+  },
+  {
+   "lifespan": 2565,
+   "grad_steps": 1394,
+   "eaten_true": 0.20187030732631683,
+   "eaten_swap": 0.1173640787601471,
+   "drop": 0.4186164140701294,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 8,
+   "sectors_ge_min": 7,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": true
+   },
+   "snap_gsteps": {
+    "250": 136,
+    "500": 272,
+    "1000": 544,
+    "2000": 1088
+   }
+  },
+  {
+   "lifespan": 2549,
+   "grad_steps": 1360,
+   "eaten_true": 0.5228725075721741,
+   "eaten_swap": 0.5061301589012146,
+   "drop": 0.03202003240585327,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 7,
+   "sectors_ge_min": 6,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 136,
+    "500": 272,
+    "1000": 544,
+    "2000": 1088
+   }
+  },
+  {
+   "lifespan": 2555,
+   "grad_steps": 1360,
+   "eaten_true": 0.005897086579352617,
+   "eaten_swap": 0.005897181574255228,
+   "drop": -1.609325408935547e-05,
+   "passed": false,
+   "scorable": false,
+   "distinct_heard": 5,
+   "sectors_ge_min": 4,
+   "eaten_blind": null
+  },
+  {
+   "lifespan": 2289,
+   "grad_steps": 1224,
+   "eaten_true": 0.16509497165679932,
+   "eaten_swap": 0.16730761528015137,
+   "drop": -0.013402223587036133,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 6,
+   "sectors_ge_min": 5,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 136,
+    "500": 272,
+    "1000": 544,
+    "2000": 1088
+   }
+  },
+  {
+   "lifespan": 2947,
+   "grad_steps": 1598,
+   "eaten_true": 0.22229468822479248,
+   "eaten_swap": 0.20267285406589508,
+   "drop": 0.08826947212219238,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 6,
+   "sectors_ge_min": 5,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 136,
+    "500": 272,
+    "1000": 544,
+    "2000": 1088
+   }
+  },
+  {
+   "lifespan": 2146,
+   "grad_steps": 1156,
+   "eaten_true": 0.6477252840995789,
+   "eaten_swap": 0.757105827331543,
+   "drop": -0.16886866092681885,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 8,
+   "sectors_ge_min": 5,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 136,
+    "500": 272,
+    "1000": 544,
+    "2000": 1088
+   }
+  },
+  {
+   "lifespan": 2236,
+   "grad_steps": 1190,
+   "eaten_true": 1.6039079427719116,
+   "eaten_swap": 1.1847752332687378,
+   "drop": 0.261319637298584,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 8,
+   "sectors_ge_min": 6,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 136,
+    "500": 272,
+    "1000": 544,
+    "2000": 1088
+   }
+  },
+  {
+   "lifespan": 2625,
+   "grad_steps": 1428,
+   "eaten_true": 0.27917370200157166,
+   "eaten_swap": 0.258364737033844,
+   "drop": 0.07453775405883789,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 8,
+   "sectors_ge_min": 5,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 136,
+    "500": 272,
+    "1000": 544,
+    "2000": 1088
+   }
+  },
+  {
+   "lifespan": 2229,
+   "grad_steps": 1190,
+   "eaten_true": 0.8739275336265564,
+   "eaten_swap": 0.9026789665222168,
+   "drop": -0.03289914131164551,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 8,
+   "sectors_ge_min": 6,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 136,
+    "500": 272,
+    "1000": 544,
+    "2000": 1088
+   }
+  },
+  {
+   "lifespan": 2274,
+   "grad_steps": 1224,
+   "eaten_true": 1.131181240081787,
+   "eaten_swap": 1.0857452154159546,
+   "drop": 0.04016685485839844,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 7,
+   "sectors_ge_min": 5,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 136,
+    "500": 272,
+    "1000": 544,
+    "2000": 1088
+   }
+  },
+  {
+   "lifespan": 2844,
+   "grad_steps": 1530,
+   "eaten_true": 4.425085544586182,
+   "eaten_swap": 2.5456717014312744,
+   "drop": 0.4247180223464966,
+   "passed": true,
+   "scorable": true,
+   "distinct_heard": 8,
+   "sectors_ge_min": 7,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": true,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 136,
+    "500": 272,
+    "1000": 544,
+    "2000": 1088
+   }
+  },
+  {
+   "lifespan": 2250,
+   "grad_steps": 1224,
+   "eaten_true": 0.23487909138202667,
+   "eaten_swap": 0.31893154978752136,
+   "drop": -0.35785412788391113,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 8,
+   "sectors_ge_min": 7,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 136,
+    "500": 272,
+    "1000": 544,
+    "2000": 1088
+   }
+  },
+  {
+   "lifespan": 2280,
+   "grad_steps": 1224,
+   "eaten_true": 0.08341626077890396,
+   "eaten_swap": 0.07982464879751205,
+   "drop": 0.04305654764175415,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 8,
+   "sectors_ge_min": 8,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 136,
+    "500": 272,
+    "1000": 544,
+    "2000": 1088
+   }
+  },
+  {
+   "lifespan": 2275,
+   "grad_steps": 1224,
+   "eaten_true": 0.18160097301006317,
+   "eaten_swap": 0.2035575658082962,
+   "drop": -0.12090575695037842,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 6,
+   "sectors_ge_min": 5,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 136,
+    "500": 272,
+    "1000": 544,
+    "2000": 1088
+   }
+  },
+  {
+   "lifespan": 2261,
+   "grad_steps": 1224,
+   "eaten_true": 0.34176310896873474,
+   "eaten_swap": 0.3317212462425232,
+   "drop": 0.02938246726989746,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 8,
+   "sectors_ge_min": 6,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 136,
+    "500": 272,
+    "1000": 544,
+    "2000": 1088
+   }
+  },
+  {
+   "lifespan": 2312,
+   "grad_steps": 1258,
+   "eaten_true": 0.1923903375864029,
+   "eaten_swap": 0.19934821128845215,
+   "drop": -0.03616535663604736,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 6,
+   "sectors_ge_min": 5,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 136,
+    "500": 272,
+    "1000": 544,
+    "2000": 1088
+   }
+  },
+  {
+   "lifespan": 2358,
+   "grad_steps": 1258,
+   "eaten_true": 0.7405622601509094,
+   "eaten_swap": 0.7499653697013855,
+   "drop": -0.012697219848632812,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 8,
+   "sectors_ge_min": 7,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 136,
+    "500": 272,
+    "1000": 544,
+    "2000": 1088
+   }
+  },
+  {
+   "lifespan": 3000,
+   "grad_steps": 1598,
+   "eaten_true": 0.0038088522851467133,
+   "eaten_swap": 0.004190397914499044,
+   "drop": -0.1001734733581543,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 5,
+   "sectors_ge_min": 5,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 136,
+    "500": 272,
+    "1000": 544,
+    "2000": 1088
+   }
+  },
+  {
+   "lifespan": 2384,
+   "grad_steps": 1292,
+   "eaten_true": 0.33464479446411133,
+   "eaten_swap": 0.32037898898124695,
+   "drop": 0.0426296591758728,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 8,
+   "sectors_ge_min": 6,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 136,
+    "500": 272,
+    "1000": 544,
+    "2000": 1088
+   }
+  },
+  {
+   "lifespan": 3000,
+   "grad_steps": 1598,
+   "eaten_true": 0.3312493860721588,
+   "eaten_swap": 0.26499876379966736,
+   "drop": 0.20000219345092773,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 7,
+   "sectors_ge_min": 6,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 136,
+    "500": 272,
+    "1000": 544,
+    "2000": 1088
+   }
+  },
+  {
+   "lifespan": 3000,
+   "grad_steps": 1598,
+   "eaten_true": 0.23317883908748627,
+   "eaten_swap": 0.2512122690677643,
+   "drop": -0.07733738422393799,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 8,
+   "sectors_ge_min": 6,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 136,
+    "500": 272,
+    "1000": 544,
+    "2000": 1088
+   }
+  },
+  {
+   "lifespan": 3000,
+   "grad_steps": 1598,
+   "eaten_true": 0.052876900881528854,
+   "eaten_swap": 0.03203197196125984,
+   "drop": 0.3942161202430725,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 6,
+   "sectors_ge_min": 6,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 136,
+    "500": 272,
+    "1000": 544,
+    "2000": 1088
+   }
+  },
+  {
+   "lifespan": 3000,
+   "grad_steps": 1598,
+   "eaten_true": 0.532818615436554,
+   "eaten_swap": 0.468705415725708,
+   "drop": 0.12032836675643921,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 8,
+   "sectors_ge_min": 8,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 136,
+    "500": 272,
+    "1000": 544,
+    "2000": 1088
+   }
+  },
+  {
+   "lifespan": 3000,
+   "grad_steps": 1598,
+   "eaten_true": 0.19543975591659546,
+   "eaten_swap": 0.16708879172801971,
+   "drop": 0.14506244659423828,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 8,
+   "sectors_ge_min": 8,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 136,
+    "500": 272,
+    "1000": 544,
+    "2000": 1088
+   }
+  },
+  {
+   "lifespan": 3000,
+   "grad_steps": 1598,
+   "eaten_true": 0.0029019517824053764,
+   "eaten_swap": 6.793370266677812e-05,
+   "drop": 0.9765903353691101,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 6,
+   "sectors_ge_min": 6,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 136,
+    "500": 272,
+    "1000": 544,
+    "2000": 1088
+   }
+  },
+  {
+   "lifespan": 2974,
+   "grad_steps": 1598,
+   "eaten_true": 0.13930626213550568,
+   "eaten_swap": 0.10482235997915268,
+   "drop": 0.24754023551940918,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 8,
+   "sectors_ge_min": 5,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": true,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 136,
+    "500": 272,
+    "1000": 544,
+    "2000": 1088
+   }
+  },
+  {
+   "lifespan": 2683,
+   "grad_steps": 1428,
+   "eaten_true": 0.03697057068347931,
+   "eaten_swap": 0.04301341995596886,
+   "drop": -0.1634502410888672,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 7,
+   "sectors_ge_min": 6,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 136,
+    "500": 272,
+    "1000": 544,
+    "2000": 1088
+   }
+  },
+  {
+   "lifespan": 3000,
+   "grad_steps": 1598,
+   "eaten_true": 0.042195554822683334,
+   "eaten_swap": 0.06518589705228806,
+   "drop": -0.5448522567749023,
+   "passed": false,
+   "scorable": false,
+   "distinct_heard": 7,
+   "sectors_ge_min": 4,
+   "eaten_blind": null
+  },
+  {
+   "lifespan": 3000,
+   "grad_steps": 1598,
+   "eaten_true": 8.850737557793923e-20,
+   "eaten_swap": 0.00014598885900340974,
+   "drop": -7007464.5,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 8,
+   "sectors_ge_min": 8,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 136,
+    "500": 272,
+    "1000": 544,
+    "2000": 1088
+   }
+  },
+  {
+   "lifespan": 2658,
+   "grad_steps": 1428,
+   "eaten_true": 0.003749566851183772,
+   "eaten_swap": 0.012082899920642376,
+   "drop": -2.2224788665771484,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 7,
+   "sectors_ge_min": 7,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 136,
+    "500": 272,
+    "1000": 544,
+    "2000": 1088
+   }
+  },
+  {
+   "lifespan": 3000,
+   "grad_steps": 1598,
+   "eaten_true": 0.3406551778316498,
+   "eaten_swap": 0.38220688700675964,
+   "drop": -0.12197589874267578,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 8,
+   "sectors_ge_min": 5,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 136,
+    "500": 272,
+    "1000": 544,
+    "2000": 1088
+   }
+  },
+  {
+   "lifespan": 3000,
+   "grad_steps": 1598,
+   "eaten_true": 0.23417411744594574,
+   "eaten_swap": 0.26069921255111694,
+   "drop": -0.11327087879180908,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 8,
+   "sectors_ge_min": 5,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 136,
+    "500": 272,
+    "1000": 544,
+    "2000": 1088
+   }
+  },
+  {
+   "lifespan": 2756,
+   "grad_steps": 1496,
+   "eaten_true": 0.0028113005682826042,
+   "eaten_swap": 8.63524085570333e-10,
+   "drop": 0.9999997019767761,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 8,
+   "sectors_ge_min": 7,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 136,
+    "500": 272,
+    "1000": 544,
+    "2000": 1088
+   }
+  },
+  {
+   "lifespan": 3000,
+   "grad_steps": 1598,
+   "eaten_true": 0.3114643394947052,
+   "eaten_swap": 0.28146299719810486,
+   "drop": 0.09632349014282227,
+   "passed": false,
+   "scorable": false,
+   "distinct_heard": 5,
+   "sectors_ge_min": 3,
+   "eaten_blind": null
+  },
+  {
+   "lifespan": 2829,
+   "grad_steps": 1530,
+   "eaten_true": 2.4448134899139404,
+   "eaten_swap": 2.0458757877349854,
+   "drop": 0.16317707300186157,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 8,
+   "sectors_ge_min": 8,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 136,
+    "500": 272,
+    "1000": 544,
+    "2000": 1088
+   }
+  },
+  {
+   "lifespan": 3000,
+   "grad_steps": 1598,
+   "eaten_true": 2.432032823562622,
+   "eaten_swap": 2.5600340366363525,
+   "drop": -0.052631378173828125,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 8,
+   "sectors_ge_min": 8,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 136,
+    "500": 272,
+    "1000": 544,
+    "2000": 1088
+   }
+  },
+  {
+   "lifespan": 3000,
+   "grad_steps": 1598,
+   "eaten_true": 0.18765227496623993,
+   "eaten_swap": 0.24167358875274658,
+   "drop": -0.28787994384765625,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 7,
+   "sectors_ge_min": 6,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 136,
+    "500": 272,
+    "1000": 544,
+    "2000": 1088
+   }
+  },
+  {
+   "lifespan": 3000,
+   "grad_steps": 1598,
+   "eaten_true": 0.4408320486545563,
+   "eaten_swap": 0.41888582706451416,
+   "drop": 0.04978364706039429,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 8,
+   "sectors_ge_min": 7,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 136,
+    "500": 272,
+    "1000": 544,
+    "2000": 1088
+   }
+  },
+  {
+   "lifespan": 3000,
+   "grad_steps": 1598,
+   "eaten_true": 0.28041180968284607,
+   "eaten_swap": 0.32430747151374817,
+   "drop": -0.15654003620147705,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 7,
+   "sectors_ge_min": 7,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 136,
+    "500": 272,
+    "1000": 544,
+    "2000": 1088
+   }
+  },
+  {
+   "lifespan": 3000,
+   "grad_steps": 1598,
+   "eaten_true": 0.5730171799659729,
+   "eaten_swap": 0.4696826636791229,
+   "drop": 0.18033403158187866,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 7,
+   "sectors_ge_min": 6,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 136,
+    "500": 272,
+    "1000": 544,
+    "2000": 1088
+   }
+  },
+  {
+   "lifespan": 3000,
+   "grad_steps": 1598,
+   "eaten_true": 1.586008906364441,
+   "eaten_swap": 1.5857130289077759,
+   "drop": 0.00018650293350219727,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 7,
+   "sectors_ge_min": 5,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 136,
+    "500": 272,
+    "1000": 544,
+    "2000": 1088
+   }
+  },
+  {
+   "lifespan": 3000,
+   "grad_steps": 1598,
+   "eaten_true": 0.5009667873382568,
+   "eaten_swap": 0.49330464005470276,
+   "drop": 0.01529473066329956,
+   "passed": false,
+   "scorable": false,
+   "distinct_heard": 8,
+   "sectors_ge_min": 4,
+   "eaten_blind": null
+  },
+  {
+   "lifespan": 2232,
+   "grad_steps": 1190,
+   "eaten_true": 0.1289655864238739,
+   "eaten_swap": 0.1469390094280243,
+   "drop": -0.1393660306930542,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 8,
+   "sectors_ge_min": 6,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 136,
+    "500": 272,
+    "1000": 544,
+    "2000": 1088
+   }
+  },
+  {
+   "lifespan": 2203,
+   "grad_steps": 1190,
+   "eaten_true": 0.25205591320991516,
+   "eaten_swap": 0.2327333241701126,
+   "drop": 0.07665985822677612,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 8,
+   "sectors_ge_min": 8,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 136,
+    "500": 272,
+    "1000": 544,
+    "2000": 1088
+   }
+  },
+  {
+   "lifespan": 2386,
+   "grad_steps": 1292,
+   "eaten_true": 0.3661760985851288,
+   "eaten_swap": 0.4176138937473297,
+   "drop": -0.1404728889465332,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 8,
+   "sectors_ge_min": 6,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 136,
+    "500": 272,
+    "1000": 544,
+    "2000": 1088
+   }
+  },
+  {
+   "lifespan": 2217,
+   "grad_steps": 1190,
+   "eaten_true": 0.158333420753479,
+   "eaten_swap": 0.18124224245548248,
+   "drop": -0.14468729496002197,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 7,
+   "sectors_ge_min": 6,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 136,
+    "500": 272,
+    "1000": 544,
+    "2000": 1088
+   }
+  },
+  {
+   "lifespan": 2157,
+   "grad_steps": 1156,
+   "eaten_true": 1.5527722041497327e-07,
+   "eaten_swap": 7.763861020748664e-08,
+   "drop": 0.5,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 8,
+   "sectors_ge_min": 6,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 136,
+    "500": 272,
+    "1000": 544,
+    "2000": 1088
+   }
+  },
+  {
+   "lifespan": 2319,
+   "grad_steps": 1258,
+   "eaten_true": 0.4605971574783325,
+   "eaten_swap": 0.4336247444152832,
+   "drop": 0.05855965614318848,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 6,
+   "sectors_ge_min": 5,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 136,
+    "500": 272,
+    "1000": 544,
+    "2000": 1088
+   }
+  },
+  {
+   "lifespan": 2381,
+   "grad_steps": 1292,
+   "eaten_true": 0.5049257278442383,
+   "eaten_swap": 0.5052383542060852,
+   "drop": -0.0006191730499267578,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 7,
+   "sectors_ge_min": 7,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 136,
+    "500": 272,
+    "1000": 544,
+    "2000": 1088
+   }
+  },
+  {
+   "lifespan": 2351,
+   "grad_steps": 1258,
+   "eaten_true": 0.2652929723262787,
+   "eaten_swap": 0.2075781226158142,
+   "drop": 0.2175513505935669,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 7,
+   "sectors_ge_min": 6,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 136,
+    "500": 272,
+    "1000": 544,
+    "2000": 1088
+   }
+  },
+  {
+   "lifespan": 2513,
+   "grad_steps": 1360,
+   "eaten_true": 0.418957382440567,
+   "eaten_swap": 0.4615384042263031,
+   "drop": -0.10163569450378418,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 8,
+   "sectors_ge_min": 6,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 136,
+    "500": 272,
+    "1000": 544,
+    "2000": 1088
+   }
+  },
+  {
+   "lifespan": 2291,
+   "grad_steps": 1224,
+   "eaten_true": 0.2273818701505661,
+   "eaten_swap": 0.23954646289348602,
+   "drop": -0.05349850654602051,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 7,
+   "sectors_ge_min": 5,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 136,
+    "500": 272,
+    "1000": 544,
+    "2000": 1088
+   }
+  },
+  {
+   "lifespan": 2432,
+   "grad_steps": 1292,
+   "eaten_true": 0.050000160932540894,
+   "eaten_swap": 0.04583347961306572,
+   "drop": 0.08333337306976318,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 8,
+   "sectors_ge_min": 8,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 136,
+    "500": 272,
+    "1000": 544,
+    "2000": 1088
+   }
+  },
+  {
+   "lifespan": 2291,
+   "grad_steps": 1224,
+   "eaten_true": 0.5949698090553284,
+   "eaten_swap": 0.7304153442382812,
+   "drop": -0.22765111923217773,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 6,
+   "sectors_ge_min": 5,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 136,
+    "500": 272,
+    "1000": 544,
+    "2000": 1088
+   }
+  },
+  {
+   "lifespan": 2300,
+   "grad_steps": 1224,
+   "eaten_true": 4.238927886035526e-06,
+   "eaten_swap": 4.238924248056719e-06,
+   "drop": 8.344650268554688e-07,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 8,
+   "sectors_ge_min": 5,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 136,
+    "500": 272,
+    "1000": 544,
+    "2000": 1088
+   }
+  },
+  {
+   "lifespan": 2190,
+   "grad_steps": 1190,
+   "eaten_true": 0.6925334930419922,
+   "eaten_swap": 0.6772703528404236,
+   "drop": 0.022039592266082764,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 7,
+   "sectors_ge_min": 7,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 136,
+    "500": 272,
+    "1000": 544,
+    "2000": 1088
+   }
+  },
+  {
+   "lifespan": 3000,
+   "grad_steps": 1598,
+   "eaten_true": 0.17832930386066437,
+   "eaten_swap": 0.09758874028921127,
+   "drop": 0.45276105403900146,
+   "passed": true,
+   "scorable": true,
+   "distinct_heard": 7,
+   "sectors_ge_min": 5,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": true,
+    "500": false,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 136,
+    "500": 272,
+    "1000": 544,
+    "2000": 1088
+   }
+  },
+  {
+   "lifespan": 2312,
+   "grad_steps": 1258,
+   "eaten_true": 0.07545898109674454,
+   "eaten_swap": 0.07583940774202347,
+   "drop": -0.00504148006439209,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 5,
+   "sectors_ge_min": 5,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 136,
+    "500": 272,
+    "1000": 544,
+    "2000": 1088
+   }
+  },
+  {
+   "lifespan": 2699,
+   "grad_steps": 1462,
+   "eaten_true": 0.30958905816078186,
+   "eaten_swap": 0.39024874567985535,
+   "drop": -0.2605379819869995,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 8,
+   "sectors_ge_min": 6,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 136,
+    "500": 272,
+    "1000": 544,
+    "2000": 1088
+   }
+  },
+  {
+   "lifespan": 2429,
+   "grad_steps": 1292,
+   "eaten_true": 0.09185931831598282,
+   "eaten_swap": 0.09271544963121414,
+   "drop": -0.00932002067565918,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 7,
+   "sectors_ge_min": 5,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 136,
+    "500": 272,
+    "1000": 544,
+    "2000": 1088
+   }
+  },
+  {
+   "lifespan": 2180,
+   "grad_steps": 1190,
+   "eaten_true": 0.20627520978450775,
+   "eaten_swap": 0.15225167572498322,
+   "drop": 0.26190030574798584,
+   "passed": false,
+   "scorable": false,
+   "distinct_heard": 6,
+   "sectors_ge_min": 3,
+   "eaten_blind": null
+  },
+  {
+   "lifespan": 2577,
+   "grad_steps": 1394,
+   "eaten_true": 0.5441519618034363,
+   "eaten_swap": 0.6047584414482117,
+   "drop": -0.11137795448303223,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 8,
+   "sectors_ge_min": 8,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": true
+   },
+   "snap_gsteps": {
+    "250": 136,
+    "500": 272,
+    "1000": 544,
+    "2000": 1088
+   }
+  },
+  {
+   "lifespan": 2448,
+   "grad_steps": 1326,
+   "eaten_true": 0.34583353996276855,
+   "eaten_swap": 0.41382113099098206,
+   "drop": -0.19659054279327393,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 6,
+   "sectors_ge_min": 6,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 136,
+    "500": 272,
+    "1000": 544,
+    "2000": 1088
+   }
+  },
+  {
+   "lifespan": 2416,
+   "grad_steps": 1292,
+   "eaten_true": 0.9791616797447205,
+   "eaten_swap": 1.0340460538864136,
+   "drop": -0.056052446365356445,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 7,
+   "sectors_ge_min": 6,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 136,
+    "500": 272,
+    "1000": 544,
+    "2000": 1088
+   }
+  },
+  {
+   "lifespan": 3000,
+   "grad_steps": 1598,
+   "eaten_true": 0.007896474562585354,
+   "eaten_swap": 0.007896429859101772,
+   "drop": 5.662441253662109e-06,
+   "passed": false,
+   "scorable": false,
+   "distinct_heard": 6,
+   "sectors_ge_min": 3,
+   "eaten_blind": null
+  },
+  {
+   "lifespan": 2184,
+   "grad_steps": 1190,
+   "eaten_true": 7.768239385086417e-08,
+   "eaten_swap": 9.189171090717707e-10,
+   "drop": 0.988170862197876,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 8,
+   "sectors_ge_min": 6,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 136,
+    "500": 272,
+    "1000": 544,
+    "2000": 1088
+   }
+  },
+  {
+   "lifespan": 3000,
+   "grad_steps": 1598,
+   "eaten_true": 0.20314793288707733,
+   "eaten_swap": 0.22710834443569183,
+   "drop": -0.11794567108154297,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 8,
+   "sectors_ge_min": 7,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 136,
+    "500": 272,
+    "1000": 544,
+    "2000": 1088
+   }
+  },
+  {
+   "lifespan": 2152,
+   "grad_steps": 1156,
+   "eaten_true": 0.5682401657104492,
+   "eaten_swap": 0.6418664455413818,
+   "drop": -0.1295689344406128,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 8,
+   "sectors_ge_min": 6,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 136,
+    "500": 272,
+    "1000": 544,
+    "2000": 1088
+   }
+  },
+  {
+   "lifespan": 3000,
+   "grad_steps": 1598,
+   "eaten_true": 0.2954869270324707,
+   "eaten_swap": 0.2347383052110672,
+   "drop": 0.20558816194534302,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 8,
+   "sectors_ge_min": 7,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 136,
+    "500": 272,
+    "1000": 544,
+    "2000": 1088
+   }
+  },
+  {
+   "lifespan": 3000,
+   "grad_steps": 1598,
+   "eaten_true": 0.00023158692056313157,
+   "eaten_swap": 0.004761223215609789,
+   "drop": -19.559120178222656,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 7,
+   "sectors_ge_min": 6,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 136,
+    "500": 272,
+    "1000": 544,
+    "2000": 1088
+   }
+  },
+  {
+   "lifespan": 2391,
+   "grad_steps": 1292,
+   "eaten_true": 0.06320828944444656,
+   "eaten_swap": 0.13618993759155273,
+   "drop": -1.1546213626861572,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 8,
+   "sectors_ge_min": 8,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 136,
+    "500": 272,
+    "1000": 544,
+    "2000": 1088
+   }
+  },
+  {
+   "lifespan": 3000,
+   "grad_steps": 1598,
+   "eaten_true": 0.16996490955352783,
+   "eaten_swap": 0.16790050268173218,
+   "drop": 0.012146055698394775,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 8,
+   "sectors_ge_min": 7,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 136,
+    "500": 272,
+    "1000": 544,
+    "2000": 1088
+   }
+  },
+  {
+   "lifespan": 2275,
+   "grad_steps": 1224,
+   "eaten_true": 0.41855379939079285,
+   "eaten_swap": 0.41636088490486145,
+   "drop": 0.0052391886711120605,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 8,
+   "sectors_ge_min": 6,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 136,
+    "500": 272,
+    "1000": 544,
+    "2000": 1088
+   }
+  },
+  {
+   "lifespan": 3000,
+   "grad_steps": 1598,
+   "eaten_true": 0.35586580634117126,
+   "eaten_swap": 0.30778729915618896,
+   "drop": 0.13510286808013916,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 8,
+   "sectors_ge_min": 6,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 136,
+    "500": 272,
+    "1000": 544,
+    "2000": 1088
+   }
+  },
+  {
+   "lifespan": 3000,
+   "grad_steps": 1598,
+   "eaten_true": 0.24723702669143677,
+   "eaten_swap": 0.2743760049343109,
+   "drop": -0.10976898670196533,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 6,
+   "sectors_ge_min": 5,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 136,
+    "500": 272,
+    "1000": 544,
+    "2000": 1088
+   }
+  },
+  {
+   "lifespan": 2486,
+   "grad_steps": 1326,
+   "eaten_true": 0.011651079170405865,
+   "eaten_swap": 0.026407966390252113,
+   "drop": -1.2665684223175049,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 8,
+   "sectors_ge_min": 6,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 136,
+    "500": 272,
+    "1000": 544,
+    "2000": 1088
+   }
+  },
+  {
+   "lifespan": 2296,
+   "grad_steps": 1224,
+   "eaten_true": 0.12417867034673691,
+   "eaten_swap": 0.16092564165592194,
+   "drop": -0.2959202527999878,
+   "passed": false,
+   "scorable": false,
+   "distinct_heard": 5,
+   "sectors_ge_min": 4,
+   "eaten_blind": null
+  },
+  {
+   "lifespan": 2400,
+   "grad_steps": 1292,
+   "eaten_true": 0.3044053912162781,
+   "eaten_swap": 0.2741720378398895,
+   "drop": 0.09931933879852295,
+   "passed": false,
+   "scorable": false,
+   "distinct_heard": 5,
+   "sectors_ge_min": 3,
+   "eaten_blind": null
+  },
+  {
+   "lifespan": 3000,
+   "grad_steps": 1598,
+   "eaten_true": 0.12131870537996292,
+   "eaten_swap": 0.11032682657241821,
+   "drop": 0.09060335159301758,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 8,
+   "sectors_ge_min": 8,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 136,
+    "500": 272,
+    "1000": 544,
+    "2000": 1088
+   }
+  },
+  {
+   "lifespan": 3000,
+   "grad_steps": 1598,
+   "eaten_true": 0.17251558601856232,
+   "eaten_swap": 0.19236916303634644,
+   "drop": -0.1150827407836914,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 8,
+   "sectors_ge_min": 8,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 136,
+    "500": 272,
+    "1000": 544,
+    "2000": 1088
+   }
+  },
+  {
+   "lifespan": 2582,
+   "grad_steps": 1394,
+   "eaten_true": 0.1293611079454422,
+   "eaten_swap": 0.14015114307403564,
+   "drop": -0.08341014385223389,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 7,
+   "sectors_ge_min": 6,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 136,
+    "500": 272,
+    "1000": 544,
+    "2000": 1088
+   }
+  },
+  {
+   "lifespan": 3000,
+   "grad_steps": 1598,
+   "eaten_true": 0.8207647204399109,
+   "eaten_swap": 0.7261114120483398,
+   "drop": 0.11532330513000488,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 8,
+   "sectors_ge_min": 8,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 136,
+    "500": 272,
+    "1000": 544,
+    "2000": 1088
+   }
+  },
+  {
+   "lifespan": 2416,
+   "grad_steps": 1292,
+   "eaten_true": 0.04446205496788025,
+   "eaten_swap": 0.0228887852281332,
+   "drop": 0.4852063059806824,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 8,
+   "sectors_ge_min": 8,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 136,
+    "500": 272,
+    "1000": 544,
+    "2000": 1088
+   }
+  },
+  {
+   "lifespan": 2145,
+   "grad_steps": 1156,
+   "eaten_true": 1.3977313528812374e-07,
+   "eaten_swap": 1.4105927448326838e-07,
+   "drop": -0.009201645851135254,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 8,
+   "sectors_ge_min": 6,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 136,
+    "500": 272,
+    "1000": 544,
+    "2000": 1088
+   }
+  },
+  {
+   "lifespan": 2157,
+   "grad_steps": 1156,
+   "eaten_true": 0.33541032671928406,
+   "eaten_swap": 0.3657585680484772,
+   "drop": -0.09048104286193848,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 8,
+   "sectors_ge_min": 8,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 136,
+    "500": 272,
+    "1000": 544,
+    "2000": 1088
+   }
+  },
+  {
+   "lifespan": 3000,
+   "grad_steps": 1598,
+   "eaten_true": 0.06311776489019394,
+   "eaten_swap": 0.04353112354874611,
+   "drop": 0.3103190064430237,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 8,
+   "sectors_ge_min": 6,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 136,
+    "500": 272,
+    "1000": 544,
+    "2000": 1088
+   }
+  },
+  {
+   "lifespan": 2203,
+   "grad_steps": 1190,
+   "eaten_true": 0.5452225804328918,
+   "eaten_swap": 0.535952627658844,
+   "drop": 0.0170021653175354,
+   "passed": false,
+   "scorable": false,
+   "distinct_heard": 8,
+   "sectors_ge_min": 4,
+   "eaten_blind": null
+  },
+  {
+   "lifespan": 3000,
+   "grad_steps": 1598,
+   "eaten_true": 0.5360467433929443,
+   "eaten_swap": 0.41954436898231506,
+   "drop": 0.21733617782592773,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 7,
+   "sectors_ge_min": 5,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 136,
+    "500": 272,
+    "1000": 544,
+    "2000": 1088
+   }
+  },
+  {
+   "lifespan": 3000,
+   "grad_steps": 1598,
+   "eaten_true": 0.004198101814836264,
+   "eaten_swap": 2.7669475457514636e-06,
+   "drop": 0.9993408918380737,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 8,
+   "sectors_ge_min": 8,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 136,
+    "500": 272,
+    "1000": 544,
+    "2000": 1088
+   }
+  },
+  {
+   "lifespan": 3000,
+   "grad_steps": 1598,
+   "eaten_true": 0.1965808868408203,
+   "eaten_swap": 0.1549428254365921,
+   "drop": 0.21181130409240723,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 8,
+   "sectors_ge_min": 7,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 136,
+    "500": 272,
+    "1000": 544,
+    "2000": 1088
+   }
+  },
+  {
+   "lifespan": 3000,
+   "grad_steps": 1598,
+   "eaten_true": 0.13330718874931335,
+   "eaten_swap": 0.13321124017238617,
+   "drop": 0.0007197856903076172,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 6,
+   "sectors_ge_min": 5,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 136,
+    "500": 272,
+    "1000": 544,
+    "2000": 1088
+   }
+  },
+  {
+   "lifespan": 3000,
+   "grad_steps": 1598,
+   "eaten_true": 0.05239826440811157,
+   "eaten_swap": 0.035731714218854904,
+   "drop": 0.31807446479797363,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 8,
+   "sectors_ge_min": 8,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 136,
+    "500": 272,
+    "1000": 544,
+    "2000": 1088
+   }
+  },
+  {
+   "lifespan": 3000,
+   "grad_steps": 1598,
+   "eaten_true": 0.9434855580329895,
+   "eaten_swap": 0.7666766047477722,
+   "drop": 0.18739980459213257,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 8,
+   "sectors_ge_min": 7,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 136,
+    "500": 272,
+    "1000": 544,
+    "2000": 1088
+   }
+  },
+  {
+   "lifespan": 3000,
+   "grad_steps": 1598,
+   "eaten_true": 0.0017356168245896697,
+   "eaten_swap": 0.0022924274671822786,
+   "drop": -0.3208143711090088,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 7,
+   "sectors_ge_min": 6,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 136,
+    "500": 272,
+    "1000": 544,
+    "2000": 1088
+   }
+  },
+  {
+   "lifespan": 3000,
+   "grad_steps": 1598,
+   "eaten_true": 0.047447752207517624,
+   "eaten_swap": 0.04773695394396782,
+   "drop": -0.006095170974731445,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 8,
+   "sectors_ge_min": 8,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 136,
+    "500": 272,
+    "1000": 544,
+    "2000": 1088
+   }
+  },
+  {
+   "lifespan": 3000,
+   "grad_steps": 1598,
+   "eaten_true": 0.02226952649652958,
+   "eaten_swap": 0.008505468256771564,
+   "drop": 0.6180669665336609,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 8,
+   "sectors_ge_min": 7,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 136,
+    "500": 272,
+    "1000": 544,
+    "2000": 1088
+   }
+  },
+  {
+   "lifespan": 2453,
+   "grad_steps": 1326,
+   "eaten_true": 0.002522824564948678,
+   "eaten_swap": 0.002522676018998027,
+   "drop": 5.882978439331055e-05,
+   "passed": false,
+   "scorable": false,
+   "distinct_heard": 5,
+   "sectors_ge_min": 4,
+   "eaten_blind": null
+  },
+  {
+   "lifespan": 3000,
+   "grad_steps": 1598,
+   "eaten_true": 0.05000004172325134,
+   "eaten_swap": 0.03750019893050194,
+   "drop": 0.24999666213989258,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 8,
+   "sectors_ge_min": 8,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 136,
+    "500": 272,
+    "1000": 544,
+    "2000": 1088
+   }
+  },
+  {
+   "lifespan": 2948,
+   "grad_steps": 1598,
+   "eaten_true": 0.4774523675441742,
+   "eaten_swap": 0.19953227043151855,
+   "drop": 0.5820896625518799,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 8,
+   "sectors_ge_min": 5,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": true,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 136,
+    "500": 272,
+    "1000": 544,
+    "2000": 1088
+   }
+  },
+  {
+   "lifespan": 3000,
+   "grad_steps": 1598,
+   "eaten_true": 0.01250001136213541,
+   "eaten_swap": 7.581344441121018e-10,
+   "drop": 0.9999999403953552,
+   "passed": false,
+   "scorable": false,
+   "distinct_heard": 4,
+   "sectors_ge_min": 4,
+   "eaten_blind": null
+  },
+  {
+   "lifespan": 2841,
+   "grad_steps": 1530,
+   "eaten_true": 0.008333425037562847,
+   "eaten_swap": 0.00833338126540184,
+   "drop": 5.304813385009766e-06,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 8,
+   "sectors_ge_min": 7,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 136,
+    "500": 272,
+    "1000": 544,
+    "2000": 1088
+   }
+  },
+  {
+   "lifespan": 3000,
+   "grad_steps": 1598,
+   "eaten_true": 0.07917430996894836,
+   "eaten_swap": 0.06250035017728806,
+   "drop": 0.21059811115264893,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 8,
+   "sectors_ge_min": 8,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 136,
+    "500": 272,
+    "1000": 544,
+    "2000": 1088
+   }
+  },
+  {
+   "lifespan": 3000,
+   "grad_steps": 1598,
+   "eaten_true": 0.034974172711372375,
+   "eaten_swap": 0.04077669233083725,
+   "drop": -0.16590869426727295,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 8,
+   "sectors_ge_min": 7,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 136,
+    "500": 272,
+    "1000": 544,
+    "2000": 1088
+   }
+  },
+  {
+   "lifespan": 3000,
+   "grad_steps": 1598,
+   "eaten_true": 0.21942289173603058,
+   "eaten_swap": 0.22509212791919708,
+   "drop": -0.025837063789367676,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 8,
+   "sectors_ge_min": 5,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 136,
+    "500": 272,
+    "1000": 544,
+    "2000": 1088
+   }
+  },
+  {
+   "lifespan": 3000,
+   "grad_steps": 1598,
+   "eaten_true": 0.9489688873291016,
+   "eaten_swap": 0.788661777973175,
+   "drop": 0.16892766952514648,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 8,
+   "sectors_ge_min": 8,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 136,
+    "500": 272,
+    "1000": 544,
+    "2000": 1088
+   }
+  },
+  {
+   "lifespan": 3000,
+   "grad_steps": 1598,
+   "eaten_true": 0.38750001788139343,
+   "eaten_swap": 0.38333335518836975,
+   "drop": 0.010752618312835693,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 5,
+   "sectors_ge_min": 5,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 136,
+    "500": 272,
+    "1000": 544,
+    "2000": 1088
+   }
+  },
+  {
+   "lifespan": 2169,
+   "grad_steps": 1156,
+   "eaten_true": 0.5229365229606628,
+   "eaten_swap": 0.5158967971801758,
+   "drop": 0.013461887836456299,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 8,
+   "sectors_ge_min": 7,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 136,
+    "500": 272,
+    "1000": 544,
+    "2000": 1088
+   }
+  },
+  {
+   "lifespan": 2257,
+   "grad_steps": 1224,
+   "eaten_true": 0.20871491730213165,
+   "eaten_swap": 0.23333339393138885,
+   "drop": -0.11795258522033691,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 8,
+   "sectors_ge_min": 6,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 136,
+    "500": 272,
+    "1000": 544,
+    "2000": 1088
+   }
+  },
+  {
+   "lifespan": 2171,
+   "grad_steps": 1156,
+   "eaten_true": 0.4061770737171173,
+   "eaten_swap": 0.3773997128009796,
+   "drop": 0.07084929943084717,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 8,
+   "sectors_ge_min": 6,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 136,
+    "500": 272,
+    "1000": 544,
+    "2000": 1088
+   }
+  },
+  {
+   "lifespan": 2407,
+   "grad_steps": 1292,
+   "eaten_true": 0.14964912831783295,
+   "eaten_swap": 0.1798490285873413,
+   "drop": -0.2018047571182251,
+   "passed": false,
+   "scorable": false,
+   "distinct_heard": 5,
+   "sectors_ge_min": 4,
+   "eaten_blind": null
+  },
+  {
+   "lifespan": 2277,
+   "grad_steps": 1224,
+   "eaten_true": 0.027461839839816093,
+   "eaten_swap": 0.047026127576828,
+   "drop": -0.7124172449111938,
+   "passed": false,
+   "scorable": true,
+   "distinct_heard": 8,
+   "sectors_ge_min": 5,
+   "eaten_blind": null,
+   "snap_pass": {
+    "250": false,
+    "500": false,
+    "1000": false,
+    "2000": false
+   },
+   "snap_gsteps": {
+    "250": 136,
+    "500": 272,
+    "1000": 544,
+    "2000": 1088
+   }
+  }
+ ]
+}
