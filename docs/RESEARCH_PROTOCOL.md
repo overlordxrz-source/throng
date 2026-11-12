@@ -5459,6 +5459,33 @@ more expensive, because it produces publishable-looking nulls.
      is < ~11k/s, size the pilot to what $6 buys and say how many steps that is. Don't port.
   6. The network retry may launch ONLY the throughput probe.
 
+- **RESULT (Nov 12 ~04:20): stage-1 v2 built and checked; CONTAINER THROUGHPUT ~25.9k agent-steps/s -> NO PORT**
+  (comm-toy `8a0d027`).
+  - **Changes per Cam:**
+    - (a) the speaker offset was ALREADY an input: `hear()` returns one-hot token + flag + offset / 9, and the
+      memory's side input is x[100:];
+    - (b) own energy and age now feed the memory directly (x[98:100]);
+    - hungry test start `--test-energy` (the learner's energy at probe start; default 0 = unchanged; stage-1 readouts
+      use 0.3), with the natural start as secondary;
+    - milestone readouts (`--readout-at`) on a fresh frozen-weight world batch: the life test hungry / natural x
+      memory carried / wiped, plus a linear probe on the memory state (sector and move class) vs the memory-wiped
+      state and shuffled-code labels, by tokens heard;
+    - staggered starting ages (0-2,500): juveniles 44% of lives in a smoke run, above >= 25%;
+    - the resolved config is printed at launch; per-head losses and label counts are logged every update.
+  - **Checks:**
+    - default path identical (8/8 lives, identical report);
+    - **stage-1 resume bit-identical** (`tests/test_stage1_ckpt.py`: 40 updates vs killed after 25 and resumed). A
+      mutant that skips restoring the RNG diverges; the first 8-update version of this test had no teeth (no deaths
+      after resume) and was replaced.
+  - **Throughput:** container (4 CPU, W=64, plan `s1tp`, ~$0.01): **median 0.631 s/update = ~25.9k agent-steps/s**
+    at steady state (compile excluded; the summary's 14.3k includes the 4.75 s first-update compile). Laptop ~15.7k.
+    **> 11k, so no port.** $6 at ~$0.24/h buys ~2e9 training agent-steps before readout costs.
+- **REGISTERED (EXPLORE, ~$0.2): `hunger_ctl`**, the scripted controls under the hungry start (`--test-energy 0.3`),
+  which must reproduce their frozen numbers within CI:
+  - `hunger_gate` (the b61afb2 gate config): perfect 91.9% (87.2-94.9), deaf <= 10%;
+  - `hunger_parent_true` (parent arm, leave 1,000, true code): 87.7% (82.2-91.7), deaf 0%.
+  - If either misses, report before going on (Cam).
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under

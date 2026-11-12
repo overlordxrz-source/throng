@@ -13,7 +13,7 @@ from pathlib import Path
 import modal
 
 _REQUIREMENTS = str(Path(__file__).resolve().parents[1] / "requirements.txt")
-PINNED_SHA = "1baefb92beb61006ec580c4675c8f0d7e307d0f2"  # comm-toy: + stage-1 recurrent agent
+PINNED_SHA = "8a0d027a9eec468c47289801f88ef7051017c2d0"  # comm-toy: stage-1 v2 (readouts, hunger start, ckpt)
 REPO_URL = "https://github.com/overlordxrz-source/throng.git"
 VOLUME_MOUNT = "/mnt/throng-runs"
 OUTD = f"{VOLUME_MOUNT}/testbed/w2jobs"
@@ -64,6 +64,10 @@ _OBSL = ["w2/learnability.py", "--navs", _NAVS, *_WORLD, "--beacon-walk", "--you
 _S1 = ["w2/learnability.py", "--navs", _NAVS, *_WORLD, "--beacon-walk", "--young-seek", "--beacon-spread", "6", "--test", "heard25",
        "--score", "last-heard", "--min-sectors", "5", "--seek-age", "500", "--parent", "--agent", "recurrent"]
 PLANS = {
+    # Cam Nov 12: scripted controls under the HUNGRY test start must reproduce their frozen numbers (EXPLORE, ~\$0.2)
+    "hunger_ctl": [("hunger_gate", ["w2/learnability.py", "--navs", _NAVS, *_WORLD, *_APP, "--updates", "150", "--worlds", "16",
+                                    "--no-train", "--sanity", "--test-energy", "0.3"]),
+                   ("hunger_parent_true", [*_OBSL, "--obs-listener", "true", "--parent-leave", "1000", "--test-energy", "0.3"])],
     # Nov 12 price probe (EXPLORE, ~$0.01): stage-1 training throughput on a 4-CPU container
     "s1tp": [("s1tp_w64", [*_S1, "--worlds", "64", "--updates", "12", "--eval-updates", "0"])],
     # Cam Nov 12 plug-in check (EXPLORE, < $1): counting-observer listener vs the true-code control, frozen test, parent arm
