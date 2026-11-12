@@ -5625,6 +5625,66 @@ more expensive, because it produces publishable-looking nulls.
     - If both collapse, the reflex is not the cause.
   - Files: `docs/data/stage1/grad_diag_u6000.json`.
 
+- **RESULT (Nov 12 06:44): the 100M READOUT landed; pilot STOPPED at 06:45 per the foraging rule** (`modal app stop`
+  throng-w2jobs, after the readout, at update ~6104). Pilot cost ~$1.62 in total (billing by app).
+  The readout took 56 min of container time (~$0.45). It is the expensive part; restructure it before any relaunch.
+  - **Sanity stop: not triggered.**
+    - Shuffled-code probe 11.1%, Wilson 95% CI 10.75-11.44% on 31,941 rows. The lower bound is not above 12.5%.
+    - Memory-wiped hungry pass 0% (0 of 181).
+  - **Life test: 0% pass in all four arms** (hungry/natural x memory carried/wiped; 181 eligible of 750 lives; CI
+    0-2.1%).
+    - Food under true and deranged codes is equal (hungry 0.193 vs 0.193). The agent does not act on the code.
+    - That is expected from an agent that has stopped moving.
+  - **Linear probe on the memory, sector accuracy by tokens heard in the life:**
+
+    | tokens heard | 1-5 | 6-15 | 16-40 | 41-100 | 101-300 | 301+ |
+    |---|---|---|---|---|---|---|
+    | memory | 24.4 | 35.6 | 40.9 | 44.7 | 43.2 | 37.2 |
+    | memory wiped | 26.6 | 31.3 | 30.9 | 32.9 | 34.4 | 28.5 |
+    | shuffled code | 12.2 | 10.9 | 10.2 | 11.6 | 11.9 | 10.5 |
+
+    - Move class: memory 69% vs wiped 57%.
+  - **Registered "rises" criterion (ii) is MET as written:** memory rises 18.8 points from the 1-5 bin to the 101-300
+    bin (>= 10), and is above the wiped probe in the 101-300 bin (43.2 vs 34.4).
+  - Criterion (i) (hungry pass by tokens heard) is not met: 0 everywhere.
+  - **Caveat before anyone reads (ii) as code learning:**
+    - Tokens heard grows with age, so a longer history may carry sector information without decoding the code
+      (where food has been, where the speaker stands).
+    - The wiped probe (current input only) is already 27-34%, well above chance.
+    - A discriminating control is needed, e.g. re-draw the life's code mid-life and test whether the memory's sector
+      accuracy drops for the new code. Not run.
+  - Under the registered tree, (ii) points to CONFIRM on held-out code families (needs new credits). The foraging
+    STOP takes precedence. The relaunch question is Cam's.
+  - Files: `docs/data/stage1/s1pilot_100M_readout.json`, `s1pilot_8a0d027.log`.
+- **RESULT (Nov 12 06:43): cross-fostering 48-probe calibration `xfcal48` PASSES** (Modal, comm-toy `131f579`,
+  $0.13 vs the ~$0.1 estimate: +28%, just past the 25% leeway; disclosed).
+  - 173 eligible lives.
+  - Perfect foster-learner: 93.6% foster (CI 89.0-96.4), 0% birth (0-2.2).
+  - Perfect birth-decoder: 0% foster, 91.9% birth (86.9-95.1).
+  - Deaf navigator: 0% and 0%.
+  - Both point estimates clear 90%; the lower CI bounds are just below it. The instrument is calibrated.
+  - Files: `docs/data/crossfoster/xfcal48_131f579.json`.
+- **DIAGNOSIS A/Bs (laptop, 16 worlds x 250 updates = 1.0M agent-steps from the navigator init; forage check on 64
+  fresh worlds).** The laptop runs this harness at ~33k agent-steps/s, the same as the Modal container.
+
+  | arm | adult food vs navigator (CI) | verdict |
+  |---|---|---|
+  | as the pilot (unmasked) | 29% (28-31) | reproduces the collapse in 250 updates |
+  | `--mask-forced` (reflex-chosen steps out of PPO) | 34% (31-36) | **refuted**; reflex steps were only ~0.1% of steps |
+  | `--ppo-min-age 500` (juvenile energy-floor steps out of PPO) | 36% (34-39) | **refuted** |
+  | `--kl-nav 0.1` | 85% (79-90) | partial |
+  | `--kl-nav 1.0` | 99% (95-104) | foraging kept |
+
+  - Predictions scored:
+    - mask-forced fixes it: p 0.45, MISS;
+    - juvenile mask fixes it: p 0.4, MISS;
+    - a KL arm reaches >= 0.9: p 0.5, HIT.
+  - **The mechanism is still open.** Neither code hypothesis survived. The KL penalty works as a constraint, not as an
+    explanation.
+  - Lever code: comm-toy `4a73096` (`--mask-forced`) and `d6d155b` (`--ppo-min-age`, `--kl-nav`), default path identical,
+    resume test passes.
+  - Running: the KL arms at 2,000 updates (8M agent-steps), to see whether the collapse only takes longer.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
