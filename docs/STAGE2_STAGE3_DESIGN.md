@@ -94,3 +94,20 @@ its birth score:
 **For learned lineages (stage 3 proper):** a lineage's code is not a known permutation, so it is measured as that
 lineage's dictionary: its modal call per situation in frozen test episodes. Probes then play back each lineage's
 dictionary through a scripted speaker. Defining "situation" for learned calls depends on what stage 2's MI readout finds.
+
+## Cross-fostering calibration, first run (laptop, Nov 12; comm-toy `131f579`, `learnability.py --crossfoster`)
+
+75 eligible lives, gate config with a random code per life, **16 probes x 600 steps** (laptop limit):
+
+| listener | uses foster code | uses birth code |
+|---|---|---|
+| perfect foster-learner | 70.7% (59.6-79.8) | 0.0% (0-4.9) |
+| perfect birth-decoder | 0.0% (0-4.9) | 69.3% (58.2-78.6) |
+| deaf navigator | 0.0% | 0.0% |
+
+- **The instrument is clean and symmetric:** no listener is ever credited with the wrong code, and the deaf
+  navigator passes nothing.
+- **Not yet calibrated:** the perfect listeners reach ~70%, not 90%. The likely cause is the probe count: the frozen
+  test uses 48 probes, and the same perfect listener scored 83% at 24 probes and 92% at 48, because the paired > 2 SE
+  criterion needs probes.
+- **Next:** the 48-probe calibration (~25 min laptop, so Modal ~/bin/zsh.1), when Cam allows.

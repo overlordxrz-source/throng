@@ -5553,6 +5553,12 @@ more expensive, because it produces publishable-looking nulls.
     foraging than the navigator, which bears on Cam's stage-1 gate condition (foraging within 10% of the navigators).
     To be checked against the readout's lifespans.
 
+- **RESULT (Nov 12 ~06:30), free prep: stage 2 / stage 3 designs drafted** (`docs/STAGE2_STAGE3_DESIGN.md`), and the
+  **cross-fostering instrument built and run on the laptop** (comm-toy `131f579`, `--crossfoster`).
+  - At 16 probes: perfect foster-learner 70.7% foster / 0% birth; perfect birth-decoder 0% / 69.3%; deaf 0% / 0%.
+  - Clean and symmetric, but NOT yet >= 90%. The probe count is the likely cause (the frozen test uses 48). The
+    48-probe calibration needs Modal (~$0.1); asking Cam.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
