@@ -83,6 +83,9 @@ def main():
     ap.add_argument("--lit-from", type=int, default=7500)
     ap.add_argument("--out", required=True)
     ap.add_argument("--log-imit", action="store_true", help="diagnostic (Cam Nov 10, 4b): log each newborn's copy loss and token agreement with the copied elders, before each copy step")
+    ap.add_argument("--copy-unit", default="", help="Nov 12 unit test (Cam work order ii): a newborn copies a FROZEN elder for --copy-steps; modes ce | soft | embed (comma list); exit")
+    ap.add_argument("--copy-steps", type=int, default=500); ap.add_argument("--copy-tau", type=float, default=1.0)
+    ap.add_argument("--copy-elder", default="fire", choices=["fire", "navigator"], help="fire: a frozen elder whose top word is a fixed word per lit fire (a working founder); navigator: an untrained navigator's own tokens")
     ap.add_argument("--copy-diag", default=None, help="diagnostic: load these brains (msgpack), roll out once, and compare each brain's argmax tokens with every other brain's on the same sender inputs; exit")
     ap.add_argument("--copy-diag-ages", type=int, nargs="*", default=[], help="the brains' ages at the saved update (to say who copied whom)")
     ap.add_argument("--ckpt", default=None, help="checkpoint path: resume from it if present (Cam Nov 10)")
@@ -406,6 +409,71 @@ def main():
         res["PASS"] = bool(all(res.values()))
         print(json.dumps(res, indent=1), flush=True); emit(dict(phase="selftest", **res))
         raise SystemExit(0 if res["PASS"] else 1)
+
+    if a.copy_unit:                                   # Nov 12: copy-pathway unit test (newborn b=1 copies frozen elder e=0)
+        TS = rl_jax.TOKEN_SLOTS
+
+        def zfwd(S_, b, ob):
+            p = brains.take(S_, b); _, o = model.apply(p, jnp.zeros((ob.shape[0], H)), ob)
+            return p, o.z_e
+
+        def argtok1(S_, b, ob):
+            p, z = zfwd(S_, b, ob)
+            return jnp.stack([jnp.argmax(t, -1) for t in rl_jax.token_logits(p, z, TAU)], 1)
+
+        def copy_loss(S_, ob, tk, mode):
+            p, z = zfwd(S_, 1, ob)
+            if mode == "embed":                       # pull z_e toward the newborn's OWN codebook entry at the elder's index
+                L = 0.0
+                for i, (lo, hi, ck) in enumerate(TS):
+                    tgt = jax.lax.stop_gradient(p["params"][ck]["embedding"])[tk[:, i]]
+                    L = L + jnp.sum((z[:, lo:hi] - tgt) ** 2, -1).mean()
+                return L
+            tau = TAU if mode == "ce" else a.copy_tau
+            tl = rl_jax.token_logits(p, z, tau)
+            return sum(-jnp.take_along_axis(jax.nn.log_softmax(tl[i], -1), tk[:, i:i + 1], -1)[:, 0].mean() for i in range(3))
+
+        def cgrads(S_, ob, tk, mode):
+            g = jax.grad(copy_loss)(S_, ob, tk, mode)
+            return {"params": {k: (g["params"][k] if k in MSGK else jax.tree_util.tree_map(jnp.zeros_like, g["params"][k])) for k in g["params"]}}
+        cg = jax.jit(cgrads, static_argnums=(3,))
+        sch = brains.pair_schedule(W, B, np.random.default_rng(0)); ids = brains.agent_brain_map(*sch)
+        pools, labs = [], []
+        for k_ in range(4):                           # situations: elder sender inputs from 4 rollouts (3 train, 1 held out)
+            _, R = rollout(S, ids, init_state(jax.random.PRNGKey(50 + k_)), jax.random.PRNGKey(60 + k_))
+            R = jax.tree_util.tree_map(np.asarray, R); T_, N_ = R["obs"].shape[:2]
+            rows = (~np.broadcast_to(is_lis, (T_, N_))).reshape(-1) & (np.broadcast_to(ids, (T_, N_)).reshape(-1) == 0)
+            pools.append(jnp.asarray(R["obs"].reshape(T_ * N_, -1)[rows]))
+            labs.append(np.repeat(R["active"], 2, axis=1).reshape(-1)[rows])      # the lit fire each sender row sees
+        tr = jnp.concatenate(pools[:3]); ho = pools[3]; lab_tr = np.concatenate(labs[:3]); lab_ho = labs[3]
+        S0 = S
+        if a.copy_elder == "fire":                    # the elder's top word per situation: a fixed word per lit fire
+            WORD = np.array([[(7 * f + 3) % V, (13 * f + 5) % V, (29 * f + 11) % V] for f in range(8)])
+            el_tr = jnp.asarray(WORD[lab_tr]); el_ho = WORD[lab_ho]
+        else:
+            el_tr = argtok1(S0, 0, tr); el_ho = np.asarray(argtok1(S0, 0, ho))
+        words = len({tuple(x) for x in el_ho.tolist()})
+        out = dict(elder=a.copy_elder, situations_heldout=int(len(set(lab_ho.tolist()))), steps=a.copy_steps, copy_tau=a.copy_tau, train_rows=int(tr.shape[0]), heldout_rows=int(ho.shape[0]),
+                   elder_distinct_words_heldout=words, modes={})
+        fresh = brains.stack([nav_params(j % len(a.navs)) for j in range(B, 2 * B)])
+        chance_slot = float(np.mean([(np.asarray(argtok1(fresh, j, ho)) == el_ho).mean() for j in range(B)]))
+        chance_word = float(np.mean([(np.asarray(argtok1(fresh, j, ho)) == el_ho).all(1).mean() for j in range(B)]))
+        rr = np.random.default_rng(7)
+        for mode in a.copy_unit.split(","):
+            Sx, OSx = S0, brains.opt_init_per_brain(opt, S0); curve = []
+            for st in range(1, a.copy_steps + 1):
+                bi = rr.integers(0, tr.shape[0], 512)
+                g = cg(Sx, tr[bi], el_tr[bi], mode)
+                Sx, OSx = apply(Sx, OSx, g, st)       # born = 0, so age = st: inside the sensitive period
+                if st in (1, 50, 100, 200, 300, 500, 750, 1000, 1500, a.copy_steps):
+                    nb = np.asarray(argtok1(Sx, 1, ho))
+                    curve.append(dict(step=st, slot_agree=float((nb == el_ho).mean()), word_agree=float((nb == el_ho).all(1).mean())))
+            # the elder must stay frozen: brain 0 untouched
+            frozen = all(bool(jnp.array_equal(x[0], y[0])) for x, y in zip(jax.tree_util.tree_leaves(Sx), jax.tree_util.tree_leaves(S0)))
+            out["modes"][mode] = dict(curve=curve, elder_frozen=frozen, final_slot_agree=curve[-1]["slot_agree"],
+                                      final_word_agree=curve[-1]["word_agree"], passes_50pct_slot=curve[-1]["slot_agree"] >= 0.5)
+        out["chance_slot_fresh_navigators"] = chance_slot; out["chance_word_fresh_navigators"] = chance_word
+        print("COPYUNIT", json.dumps(out), flush=True); raise SystemExit(0)
 
     if a.copy_diag:                                   # 4b: did newborns come to emit their elders' tokens on the same inputs?
         S = jax.tree_util.tree_map(jnp.asarray, flax.serialization.from_bytes(S, open(a.copy_diag, "rb").read()))
