@@ -5559,6 +5559,24 @@ more expensive, because it produces publishable-looking nulls.
   - Clean and symmetric, but NOT yet >= 90%. The probe count is the likely cause (the frozen test uses 48). The
     48-probe calibration needs Modal (~$0.1); asking Cam.
 
+- **Cam, Nov 12 (rulings on the ~06:30 report).**
+  1. **FORAGING RULE at the 100M readout** (on top of the sanity stop). Compare the agent with the navigator on the same
+     lives: KM median lifespan and food per step at matched age, natural energy.
+     - < 50% of the navigator: STOP (save the rest of the $6) and diagnose.
+     - 50-90%: continue and re-check at 300M; still falling at 300M: stop and diagnose.
+     - >= 90%: carry on as registered.
+     - Separate cause from effect: report food/step for ADULTS only, and deaths by age and cause.
+     - **Diagnosis if stopped (laptop):** per-head aux loss vs PPO loss; the norm of the GRU's contribution to the logits
+       vs the trunk's; policy entropy; advantage / value stats. Likely first fix: a KL penalty toward the frozen
+       navigator's policy (propose a coefficient; do not launch).
+  2. **Stage 2 design approved in principle;** it waits for stage 1 and new credits. Build in:
+     - (a) the speak head WIRE-BLIND (it cannot read the incoming wire);
+     - (b) the approved generic PS nudge (founders / parents only) as an arm-level option against the zero-init
+       chicken-and-egg collapse; calibrate the readouts first.
+  3. **Cross-fostering 48-probe calibration on Modal APPROVED** (~$0.1, EXPLORE, item watch). Bar: perfect >= 90%,
+     deaf <= 10%.
+  4. **Budget:** nothing else on this account beyond the pilot and the $0.1 calibration.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
