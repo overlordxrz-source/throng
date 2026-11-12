@@ -116,6 +116,10 @@ first, since it measures every loss term's gradient rather than assuming it.
 
 ## Where everything else lives
 
+**Live handoff (Nov 11 2026): `docs/HANDOFF_2026-11-11.md`.** Read it first. The proposed new direction
+(critique, architecture v2, roadmap v2) is `docs/NORTH_STAR_V2.md`; the record of rulings and results is
+`docs/RESEARCH_PROTOCOL.md`.
+
 `THRONG.md` is the full research log, ops manual, and phase-by-phase history
 — read it before making an architectural decision. `docs/ARCHITECTURE.md` is
 the code-grounded reference for what the network and observation layout

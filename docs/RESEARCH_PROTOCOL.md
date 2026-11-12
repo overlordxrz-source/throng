@@ -5018,6 +5018,14 @@ more expensive, because it produces publishable-looking nulls.
   - Note: the guard and item watch died with the session again at ~20:23; all 13 jobs had finished at 20:13 (no
     unwatched spend). Guard restarted 23:03.
 
+- **Nov 11: handoff and proposal written (no new data).**
+  - Live handoff: `docs/HANDOFF_2026-11-11.md` (status, established facts with tags, toolbox, ranked work order, traps).
+  - Proposal for Cam and M: `docs/NORTH_STAR_V2.md` (what we have been doing wrong; architecture v2; roadmap v2).
+    - Main points: no gradient steps inside a life (learning in memory, slow weights across lives); a recurrent
+      agent; adaptation before language in the ladder; inborn codes allowed, culture shown by cross-fostering; one
+      harness and one probe suite; explore and confirm lanes.
+    - Not adopted. Nothing in it overrides a ruling.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
