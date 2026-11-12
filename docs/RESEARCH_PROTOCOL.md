@@ -5110,8 +5110,10 @@ more expensive, because it produces publishable-looking nulls.
     loss works. "Copy pathway ineffective (temperature 0.08)" is **WITHDRAWN** as the cause.
     - Remaining hypotheses, untested: each gen-2 newborn copied THREE founders whose dictionaries agreed on only
       25-50% of fires (conflicting targets), and the copy step competes with PPO updates.
-    - **Proposed verdict wording, for Cam: "transmission uninformative: newborns copied conflicting founder
-      dictionaries; the copy pathway works on a single functional elder".**
+    - **Proposed verdict wording, for Cam: "transmission uninformative; cause unknown; the copy pathway works on a
+      single functional elder; conflicting founder dictionaries is the leading untested hypothesis".**
+    - **Scope of the unit test:** one seed, 4 situations, 288 training rows reused across 500-1,500 steps, in the
+      toy's channel only.
   - **No copy repair is needed for W2.** Keep the unit test (functional elder, >= 50% per slot by 500 steps; whole
     word reported) as a standing check.
 
