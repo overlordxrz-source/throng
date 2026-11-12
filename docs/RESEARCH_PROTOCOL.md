@@ -5395,6 +5395,16 @@ more expensive, because it produces publishable-looking nulls.
       exists, so the port and its equivalence gate may be unnecessary;
     - the port is NOT started pending Cam's answer.
 
+- **Cam, Nov 12 (ruling on the ~03:35 correction).** **PORT CANCELLED; the recommendation is adopted.**
+  - Build stage 1 in `learnability.py` behind `--agent recurrent`: one shared GRU network, parent arm, the 4 approved
+    drives, a random code per life, training code families only.
+  - The default path must stay identical (8/8 check), and the frozen test path byte-identical to b61afb2, so the
+    equivalence gate falls away with the port.
+  - **10-min laptop pilot: measure TRAINING throughput** (agent-steps/s including updates). Port only if it is
+    < ~11k/s/container at the pilot's settings.
+  - Everything else stands: the obsl1000 pick rule, both reference points in the learner report, the $6 pilot with its
+    registered tree.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
