@@ -5433,6 +5433,32 @@ more expensive, because it produces publishable-looking nulls.
   - **Risk flagged for the pilot:** the navigator-trunk agent eats little in a 600-step test window (homeostatic: it
     eats when hungry), so credited-food reliance may be hard to show even when the memory carries the code.
 
+- **RESULT (Nov 12 ~04:05), EXPLORE: `obsl1000` headroom check -> PRE-REGISTERED PICK: PARENT LEAVES AT 1,000 for
+  stage 1** (`docs/data/obsl/obsl1000_*_f5783c6.json`; ~$0.23).
+  - 877 lives, **187 eligible**.
+  - **Counting observer 70.6% (CI 63.7-76.7)**; strata 5 / 6 / 7-8: 57.8 / 66.7 / 92.9%.
+  - True-code control 87.7% (82.2-91.7); deaf 0%.
+  - Rule: >= 59.2% with >= 150 eligible -> met (+16.4 points over leave-at-500).
+- **Cam, Nov 12 (ruling on the ~04:00 stage-1 build report).**
+  1. Build accepted. Input fixes before the pilot:
+     - (a) the SPEAKER OFFSET (dx, dy) of each heard token;
+     - (b) own age (and energy, if the trunk doesn't already feed it to the GRU).
+  2. **Appetite: test HUNGRY.** Every probe episode starts at a fixed low energy (e.g. 0.3) with drain on, identical
+     for every arm (learner, memory-wiped, scripted perfect, deaf).
+     - Verify the scripted controls reproduce their frozen numbers under the hunger start (report before going on if
+       not).
+     - Natural-energy test as secondary. Scoring byte-identical to b61afb2.
+  3. **Second readout, independent of behaviour:** a linear probe on the frozen GRU hidden state predicting the current
+     token's sector (and move class) on held-out lives, vs tokens heard. The same probe on the memory-wiped control and
+     on shuffled-code lives. "The memory knows the code" and "the agent acts on it" are separate claims; report both.
+  4. **Pre-launch checks:** print the resolved config and the arm diff; lever-did-work for each head (loss nonzero and
+     falling). Stagger births so >= 25% of lives are under 500 at any time (the parent-move head needs juveniles).
+  5. **Pilot:** after the container probe; $6 cap; --ckpt on. Readouts (linear probe + hungry life test, memory vs
+     wiped) at 100M, 300M and 1B agent-steps. Registered tree: reliance or the probe rises with tokens heard ->
+     CONFIRM on held-out families; no rise by ~1B -> key-value memory once; still none -> report. If the container
+     is < ~11k/s, size the pilot to what $6 buys and say how many steps that is. Don't port.
+  6. The network retry may launch ONLY the throughput probe.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
