@@ -5338,6 +5338,29 @@ more expensive, because it produces publishable-looking nulls.
     -> run `obsl1000`; still below -> report.
   - **Prediction:** observer >= 50% with P ~0.45; true-code control >= 90% with P ~0.5.
 
+- **RESULT (Nov 12 ~02:55), EXPLORE lane: plug-in check. THE COUNTING-OBSERVER LISTENER PASSES (54.2% >= 50%)**
+  (Modal, both exited 0, $0.24; `docs/data/obsl/obsl_observer_f5783c6.json`, `obsl_true_f5783c6.json`; parent arm,
+  parent leaves at 500, frozen test 48 x 600).
+  - **Lives:** 791 parent-arm lives, **212 eligible (26.8%)**, scored. Median lifespan 2,028.
+
+    | listener in the frozen test | pass, eligible lives (95% CI) | strata 5 / 6 / 7-8 sectors | deaf control | VoI nav / random |
+    |---|---|---|---|---|
+    | **counting observer** (life's decoded table) | **54.2%** (47.5-60.8) | 42.0 / 38.5 / 77.2% (n 81 / 52 / 79) | 0% | 2.37x / 2.20x |
+    | true code (perfect decoder, same lives) | 87.3% (82.1-91.1) | 76.5 / 90.4 / 96.2% | 0% | 3.08x / 2.95x |
+
+  - **Decision (Cam's registered tree): observer >= 50% of eligible lives -> BUILD the stage-1 agent for the parent arm**
+    (>= 1e5 training lives, throughput check / JAX port first), then the $6 pilot.
+    - Caveat: the observer's CI lower bound (47.5%) is below 50%; the bar is on the point estimate, as before.
+  - **Prediction scoring:** observer >= 50% (P 0.45): HIT. True-code control >= 90% (P 0.5): MISSED (87.3%;
+    parent-arm lives hear fewer sectors, and 5-sector lives pass 76.5%).
+  - **Reading:** the evidence in a parent-arm life IS enough for an agent that uses it near-optimally to rely on the
+    code in the frozen test, without demonstrators in the test. The observer reaches 62% of the perfect decoder's
+    pass rate.
+  - **Throughput note for the next step:** the per-learner learnability harness runs at roughly 2-4k agent-steps/s
+    (all-on, laptop), well short of the ~11k/s/container that 1e8-1e9 agent-steps within $6 needs. Per Cam's ruling:
+    port the frozen test's scoring onto the JAX W2 env and verify it reproduces b61afb2 (perfect >= 90%, deaf
+    <= 10%, within CI) before any pilot.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
