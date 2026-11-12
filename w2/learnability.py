@@ -82,6 +82,7 @@ def main():
     ap.add_argument("--min-heard", type=int, default=25); ap.add_argument("--test-window", type=int, default=300)
     ap.add_argument("--code-per-life", action="store_true", help="Nov 11 (exploratory): each life hears the beacons through its own random sector->token code; the scripted listener decodes with the inverse (stays a perfect decoder)")
     ap.add_argument("--ic-probe", action="store_true", help="Nov 12 stage-1 diagnostic (EXPLORE): with --no-train --code-per-life, record each life's input stream and train a GRU across lives to predict the true sector behind each heard token; accuracy vs tokens heard so far, against a memoryless baseline")
+    ap.add_argument("--parent", action="store_true", help="Cam Nov 12: one scripted parent per newborn (elder l pairs with learner l) stays within 2-3 cells through the juvenile period, then leaves; young-seek targets the parent; no demonstrators in the life test")
     ap.add_argument("--demonstrators", action="store_true", help="scripted elders (perfect followers of the heard code) present even without a copy loss (stage-1 demonstrator arm)")
     ap.add_argument("--io-decoder", action="store_true", help="with --ic-probe collection: run the IDEAL-OBSERVER counting decoder (no training) instead of the GRU probe (Cam Nov 12)")
     ap.add_argument("--ic-steps", type=int, default=400); ap.add_argument("--ic-len", type=int, default=640)
@@ -101,7 +102,7 @@ def main():
     ap.add_argument("--probe-pool", action="store_true", help="diagnostic: every learner trains on teacher data pooled over all training worlds (full sector coverage)")
     ap.add_argument("--probe-train", default="hear", choices=["hear", "all"], help="hear: heard rows + policy head only; all: every layer (diagnostic)")
     a = ap.parse_args()
-    NL = a.n_learners; NE = a.n_elders if (a.copy > 0 or a.demonstrators) else 0; M = NL + NE
+    NL = a.n_learners; NE = NL if a.parent else (a.n_elders if (a.copy > 0 or a.demonstrators) else 0); M = NL + NE
     if a.world == "proto":
         cfg = env.Cfg(L=96, N=NB + M, P=6, patch_sigma=1.0, d0=0.004 if a.long_life else 0.008, reproduce=False, A_max=3000)
     else:
@@ -126,6 +127,8 @@ def main():
         k_ = a.beacon_spread
         bpos = (c[None] + jnp.array([[-k_, -k_], [-k_, k_], [k_, -k_], [k_, k_]])) % cfg.L
         mpos = (c[None] + jax.random.randint(jax.random.fold_in(key, 1), (M, 2), -3, 4)) % cfg.L
+        if a.parent:                                   # each parent starts beside its newborn
+            mpos = mpos.at[NL:].set((mpos[:NL] + jnp.array([1, 0])) % cfg.L)
         return s._replace(pos=jnp.concatenate([bpos, mpos], 0)), c
 
     def hear(s, shift, perm=None):
@@ -170,7 +173,12 @@ def main():
         sc = scripted(s, h, jnp.concatenate([fb_l, jax.random.randint(k2, (NE,), 1, 5)]), None if a.decode_identity else code)
         if a.sanity:
             act_l = sc[:NL]
-        if a.young_seek and a.seek_age and seek_ok:       # scaffolding independent of the juvenile lever (Cam Nov 10)
+        if a.parent and seek_ok:                          # Cam Nov 12: the young stay near THEIR parent while it is present
+            dpar = (s.pos[NB + NL:] - s.pos[NB:NB + NL] + cfg.L // 2) % cfg.L - cfg.L // 2           # (NL, 2)
+            seekp = jnp.where(jnp.abs(dpar[:, 0]) >= jnp.abs(dpar[:, 1]), jnp.where(dpar[:, 0] < 0, 1, 2), jnp.where(dpar[:, 1] > 0, 3, 4))
+            farp = jnp.abs(dpar).max(-1) > cfg.r
+            act_l = jnp.where((s.age[NB:NB + NL] < a.juvenile) & farp, seekp, act_l)
+        elif a.young_seek and a.seek_age and seek_ok:     # scaffolding independent of the juvenile lever (Cam Nov 10)
             db = (s.pos[:NB][None] - s.pos[NB:NB + NL][:, None] + cfg.L // 2) % cfg.L - cfg.L // 2
             dn_ = db[jnp.arange(NL), jnp.argmin(jnp.abs(db).max(-1), 1)]
             seek = jnp.where(jnp.abs(dn_[:, 0]) >= jnp.abs(dn_[:, 1]), jnp.where(dn_[:, 0] < 0, 1, 2), jnp.where(dn_[:, 1] > 0, 3, 4))
@@ -186,9 +194,17 @@ def main():
             else:
                 act_l = jnp.where(young & (h[:NL, 8] < 0.5), 0, act_l)
         lp = jnp.take_along_axis(jax.nn.log_softmax(lg), act_l[:, None], 1)[:, 0]
-        act_m = jnp.concatenate([act_l, sc[NL:]])
+        act_e = sc[NL:]
+        if a.parent:                                       # a parent more than 2 cells from its young steps back toward it
+            dch = (s.pos[NB:NB + NL] - s.pos[NB + NL:] + cfg.L // 2) % cfg.L - cfg.L // 2
+            back = jnp.where(jnp.abs(dch[:, 0]) >= jnp.abs(dch[:, 1]), jnp.where(dch[:, 0] < 0, 1, 2), jnp.where(dch[:, 1] > 0, 3, 4))
+            act_e = jnp.where(jnp.abs(dch).max(-1) > 2, back, act_e)
+        act_m = jnp.concatenate([act_l, act_e])
         act_b = jax.random.randint(jax.random.fold_in(key, 77), (NB,), 1, 5) if a.beacon_walk else jnp.zeros(NB, jnp.int32)
         s2, r, info = env.step(cfg, s, jnp.concatenate([act_b, act_m]), k2)
+        if a.parent:                                       # dropout: after the juvenile period the parent is far away (gone)
+            gone = s2.age[NB:NB + NL] >= a.juvenile
+            s2 = s2._replace(pos=s2.pos.at[NB + NL:].set(jnp.where(gone[:, None], (s2.pos[NB:NB + NL] + cfg.L // 2) % cfg.L, s2.pos[NB + NL:])))
         E = s2.energy.at[:NB].set(1.0).at[NB + NL:].set(1.0)                              # beacons + elders immortal
         if a.juvenile:
             E = E.at[NB:NB + NL].set(jnp.where(young & s2.alive[NB:NB + NL], jnp.maximum(E[NB:NB + NL], cfg.E0), E[NB:NB + NL]))
@@ -428,6 +444,8 @@ def main():
             pos = np.asarray(S.pos).copy(); E = np.asarray(S.energy).copy(); age = np.asarray(S.age).copy(); al = np.asarray(S.alive).copy()
             sl = slice(NB, NB + NL)
             pos[:, sl][dead] = npos[dead]; E[:, sl][dead] = cfg.E0; age[:, sl][dead] = 0; al[:, sl][dead] = True
+            if a.parent:                               # a newborn's parent arrives beside it
+                pos[:, NB + NL:][dead] = (npos[dead] + np.array([1, 0])) % cfg.L
             S = S._replace(pos=jnp.asarray(pos), energy=jnp.asarray(E), age=jnp.asarray(age), alive=jnp.asarray(al))
         if a.ckpt and (it + 1) % a.ckpt_every == 0 and it + 1 < a.updates:
             _ck.save(a.ckpt, dict(it=it, P=P, OS=OS, S=S, key=key, rng=rng, mem_o=mem_o, mem_m=mem_m, mem_e=mem_e,
@@ -890,9 +908,14 @@ def ideal_observer(a, IC, W, NL, NE, T, cfg):
     def sec_of(dx, dy):
         return int(np.mod(np.round(np.arctan2(dy, dx) / (2 * np.pi / 8)), 8))
     MOVE = {1: (-1, 0), 2: (1, 0), 3: (0, 1), 4: (0, -1)}
-    sets = {"oracle_control": "o", "a_visible_food": "a", "b_hindsight_meal": "b", "a+b": "ab"}
+    def _head(sc_):                                       # the move a scripted follower makes for sector sc_
+        dx, dy = np.round(np.cos(sc_ * np.pi / 4) * 3), np.round(np.sin(sc_ * np.pi / 4) * 3)
+        return (1 if dx < 0 else 2) if abs(dx) >= abs(dy) else (3 if dy > 0 else 4)
+    HEAD = np.array([_head(k) for k in range(8)])
+    sets = {"oracle_control": "o", "a_visible_food": "a", "b_hindsight_meal": "b", "a+b": "ab",
+            "A_visible_food_from_beacon": "A", "B_hindsight_meal_from_beacon": "B", "A+B_from_beacon": "AB"}
     if NE:
-        sets.update({"c_demonstrators": "c", "a+b+c": "abc"})
+        sets.update({"c_demonstrators": "c", "a+b+c": "abc", "A+B+c": "ABc"})
     rng = np.random.default_rng(a.seed + 21)
     rec = {k: [] for k in sets}; heard_per_life = []; vis = []
     for w in range(W):
@@ -911,13 +934,20 @@ def ideal_observer(a, IC, W, NL, NE, T, cfg):
                 for i in np.where(hd)[0]:
                     ev.append((i + 1, tok[i], int(tsec[i]), "o"))     # positive control: the true sector, after the fact
                     wv = ob[i, :(2 * r_ + 1) ** 2]
+                    dj = ob[i, 109:111] * R_HEAR                   # the speaker's offset (beacon - listener), an input
                     if wv.max() > 0.2:
-                        b = int(wv.argmax()); ev.append((i, tok[i], sec_of(o_[b // (2 * r_ + 1)], o_[b % (2 * r_ + 1)]), "a"))
+                        b = int(wv.argmax()); fx, fy = o_[b // (2 * r_ + 1)], o_[b % (2 * r_ + 1)]
+                        ev.append((i, tok[i], sec_of(fx, fy), "a"))
+                        if abs(fx - dj[0]) + abs(fy - dj[1]) > 0:
+                            ev.append((i, tok[i], sec_of(fx - dj[0], fy - dj[1]), "A"))
                     nm = meal_t[meal_t > i]
                     if len(nm):
                         j = nm[0]; d = (p[j] - p[i] + L // 2) % L - L // 2
                         if np.abs(d).sum() > 0:
                             ev.append((j, tok[i], sec_of(d[0], d[1]), "b"))
+                        db_ = d - dj
+                        if np.abs(db_).sum() > 0:
+                            ev.append((j, tok[i], sec_of(db_[0], db_[1]), "B"))
                     if NE:
                         pe = pos[w, idx[i], NL:]; dd = (pe - p[i] + L // 2) % L - L // 2
                         near = np.abs(dd).max(1) <= r_; vis.append(bool(near.any()))
@@ -935,16 +965,20 @@ def ideal_observer(a, IC, W, NL, NE, T, cfg):
                             e_i += 1
                         k += 1; v = V[tok[i]]
                         guess = rng.choice(np.flatnonzero(v == v.max()))
-                        rec[name].append((k, guess == tsec[i]))
+                        rec[name].append((k, guess == tsec[i], ob[i, 99] * cfg.A_max, HEAD[guess] == HEAD[tsec[i]]))
     nmed = float(np.median(heard_per_life))
     bins = [(1, 5), (6, 15), (16, 40), (41, 100), (101, 300), (301, 100_000)]
     out = dict(lives=len(heard_per_life), median_tokens_heard_per_life=nmed, demonstrator_in_view_frac=float(np.mean(vis)) if vis else None,
                chance=0.125, sets={})
     for name in sets:
-        R = np.array(rec[name], float); Kk, H = R[:, 0], R[:, 1]
+        R = np.array(rec[name], float); Kk, H, Ag, HE = R[:, 0], R[:, 1], R[:, 2], R[:, 3]
         late = (Kk >= nmed / 2) & (Kk <= nmed)
-        out["sets"][name] = dict(acc_all=float(H.mean()), acc_late_median_life=float(H[late].mean()) if late.any() else None,
-                                 by_tokens_heard={f"{lo}-{hi}": round(float(H[(Kk >= lo) & (Kk <= hi)].mean()), 4) if ((Kk >= lo) & (Kk <= hi)).any() else None for lo, hi in bins})
+        agew = {"age_200-250": (200, 250), "age_450-500": (450, 500), f"after_age_{a.juvenile}": (a.juvenile, 1e9)}
+        out["sets"].setdefault(name, {})["by_age"] = {k_: (round(float(H[(Ag > lo) & (Ag <= hi)].mean()), 4) if ((Ag > lo) & (Ag <= hi)).any() else None) for k_, (lo, hi) in agew.items()}
+        out["sets"][name]["heading_equivalent"] = dict(acc_all=float(HE.mean()), acc_late_median_life=float(HE[late].mean()) if late.any() else None,
+            by_age={k_: (round(float(HE[(Ag > lo) & (Ag <= hi)].mean()), 4) if ((Ag > lo) & (Ag <= hi)).any() else None) for k_, (lo, hi) in agew.items()})
+        out["sets"][name].update(dict(acc_all=float(H.mean()), acc_late_median_life=float(H[late].mean()) if late.any() else None,
+                                 by_tokens_heard={f"{lo}-{hi}": round(float(H[(Kk >= lo) & (Kk <= hi)].mean()), 4) if ((Kk >= lo) & (Kk <= hi)).any() else None for lo, hi in bins}))
     print("IDEALOBS", json.dumps(out), flush=True)
     os.makedirs(os.path.dirname(a.out) or ".", exist_ok=True); json.dump(out, open(a.out, "w"), indent=1)
 
