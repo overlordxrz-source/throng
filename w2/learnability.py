@@ -81,6 +81,9 @@ def main():
     ap.add_argument("--test", default="shift", choices=["shift", "heard25"], help="heard25: swap = a derangement among the sectors that life heard >= --min-heard times")
     ap.add_argument("--min-heard", type=int, default=25); ap.add_argument("--test-window", type=int, default=300)
     ap.add_argument("--code-per-life", action="store_true", help="Nov 11 (exploratory): each life hears the beacons through its own random sector->token code; the scripted listener decodes with the inverse (stays a perfect decoder)")
+    ap.add_argument("--ic-probe", action="store_true", help="Nov 12 stage-1 diagnostic (EXPLORE): with --no-train --code-per-life, record each life's input stream and train a GRU across lives to predict the true sector behind each heard token; accuracy vs tokens heard so far, against a memoryless baseline")
+    ap.add_argument("--demonstrators", action="store_true", help="scripted elders (perfect followers of the heard code) present even without a copy loss (stage-1 demonstrator arm)")
+    ap.add_argument("--ic-steps", type=int, default=400); ap.add_argument("--ic-len", type=int, default=640)
     ap.add_argument("--decode-identity", action="store_true", help="control for --code-per-life: the scripted listener ignores the code (decodes tokens as sectors); must FAIL when codes are on")
     ap.add_argument("--min-sectors", type=int, default=2, help="Cam Nov 10: a life is scorable only if it heard >= this many sectors >= --min-heard times (ruled: 5); pass rates over eligible lives")
     ap.add_argument("--score", default="window", choices=["window", "last-heard"], help="last-heard: in the heard25 test, only food eaten while the last heard TRUE sector is one the life heard >= --min-heard times counts")
@@ -97,7 +100,7 @@ def main():
     ap.add_argument("--probe-pool", action="store_true", help="diagnostic: every learner trains on teacher data pooled over all training worlds (full sector coverage)")
     ap.add_argument("--probe-train", default="hear", choices=["hear", "all"], help="hear: heard rows + policy head only; all: every layer (diagnostic)")
     a = ap.parse_args()
-    NL = a.n_learners; NE = a.n_elders if a.copy > 0 else 0; M = NL + NE
+    NL = a.n_learners; NE = a.n_elders if (a.copy > 0 or a.demonstrators) else 0; M = NL + NE
     if a.world == "proto":
         cfg = env.Cfg(L=96, N=NB + M, P=6, patch_sigma=1.0, d0=0.004 if a.long_life else 0.008, reproduce=False, A_max=3000)
     else:
@@ -308,6 +311,9 @@ def main():
         assert a.test == "heard25", "--code-per-life needs --test heard25"
     snaps = {}; snap_gs = {}; prev_age = np.zeros((W, NL), np.int64)
     lives = []
+    if a.ic_probe:
+        assert a.no_train and a.code_per_life and not a.sanity, "--ic-probe needs --no-train --code-per-life (navigator behaviour)"
+        IC = dict(o=[], act=[], r=[], alive=[], codes=[], lid=[]); life_id = np.zeros((W, NL), np.int64)
     it0 = 0
     if a.ckpt:
         sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "scripts"))
@@ -327,6 +333,9 @@ def main():
         S, (o, act, lp, v, r, dn, take, eo, ea, ne, alive, yc) = (roll_w(P, S, jax.random.split(k, W), jnp.asarray(CODES))
                                                                 if a.code_per_life else roll_w(P, S, jax.random.split(k, W)))
         o, act, lp, v, r, dn, alive = (np.asarray(x) for x in (o, act, lp, v, r, dn, alive))   # (W, T, NL, ...)
+        if a.ic_probe:                                 # (W, T, NL, ...) per update, with the codes and life ids in force
+            IC["o"].append(o.astype(np.float32)); IC["act"].append(np.asarray(act)); IC["r"].append(r.astype(np.float32))
+            IC["alive"].append(alive); IC["codes"].append(CODES[:, :NL].copy()); IC["lid"].append(life_id.copy())
         hm = (o[..., 108] > 0.5) & alive
         cnt += np.einsum("wtl,wtlk->wlk", hm.astype(np.int64), (o[..., 100:108] > 0.5).astype(np.int64))
         adv = np.zeros_like(r); last = 0.0
@@ -405,6 +414,8 @@ def main():
             nav_of[w, l] = rng.integers(0, K)
             if a.code_per_life:
                 CODES[w, l] = crng.permutation(8)       # a new life, a new code
+            if a.ic_probe:
+                life_id[w, l] += 1
         if dead.any():
             fresh = jax.tree_util.tree_map(lambda x: x[nav_of], NAV); dm = jnp.asarray(dead)
             P = jax.tree_util.tree_map(lambda x, y: jnp.where(dm.reshape(dm.shape + (1,) * (x.ndim - 2)), y, x), P, fresh)
@@ -422,6 +433,8 @@ def main():
                                   codes=CODES, crng=crng))
         if a.stop_after and it + 1 == a.stop_after:
             os._exit(3)
+    if a.ic_probe:
+        return incontext_probe(a, IC, W, NL, T)
     if not lives:
         print("no completed lives"); return
     diag = None
@@ -782,6 +795,81 @@ def hearing_probe(a, cfg, net, opt, NAV, nav_of, S, roll_w, ev, hear, W, NL, T, 
                  logit_change_on_sector_flip=float(np.abs(l1 - l2).mean()))
         out["runs"][f"x{fm:g}"] = r; print("PROBE", json.dumps(r), flush=True)
     os.makedirs(os.path.dirname(a.out), exist_ok=True); json.dump(out, open(a.out, "w"), indent=1)
+
+
+def incontext_probe(a, IC, W, NL, T):
+    """Nov 12 (EXPLORE; Cam work order iii, advisor's cheapest decisive test). Each life hears through its own random
+    sector->token code. Can a GRU, trained ACROSS lives with direct supervision, work out a life's code from that
+    life's own input stream? Input per step: the 100-dim view/body obs, the heard token (one-hot + flag + offset),
+    the previous action, the reward. Target: the TRUE sector behind the heard token (on heard steps). Held-out lives
+    are scored by the number of tokens heard so far in the life. Baseline: a memoryless MLP on the same inputs (it can
+    use only what the current step shows)."""
+    o = np.concatenate(IC["o"], 1); act = np.concatenate(IC["act"], 1); r = np.concatenate(IC["r"], 1)
+    alive = np.concatenate(IC["alive"], 1)
+    U = len(IC["codes"]); codes = np.repeat(np.stack(IC["codes"], 1), T, 1)          # (W, U*T, NL, 8)
+    lid = np.repeat(np.stack(IC["lid"], 1), T, 1)                                      # (W, U*T, NL)
+    seqs = []
+    Lm = a.ic_len
+    for w in range(W):
+        for l in range(NL):
+            for li in np.unique(lid[w, :, l]):
+                m = (lid[w, :, l] == li) & alive[w, :, l]
+                idx = np.where(m)[0][:Lm]
+                if len(idx) < 100:
+                    continue
+                ob = o[w, idx, l]; heard = ob[:, 108] > 0.5
+                tok = ob[:, 100:108].argmax(1); inv = np.argsort(codes[w, idx[0], l]); sec = inv[tok]
+                pa = np.concatenate([[0], act[w, idx[:-1], l]]); pr = np.concatenate([[0.0], r[w, idx[:-1], l]])
+                x = np.concatenate([ob[:, :111], np.eye(6)[pa], pr[:, None]], 1).astype(np.float32)
+                X = np.zeros((Lm, x.shape[1]), np.float32); X[:len(idx)] = x
+                Y = np.zeros(Lm, np.int64); Y[:len(idx)] = sec
+                Mk = np.zeros(Lm, np.float32); Mk[:len(idx)] = heard
+                K = np.zeros(Lm, np.int64); K[:len(idx)] = np.cumsum(heard)
+                seqs.append((X, Y, Mk, K))
+    rng = np.random.default_rng(a.seed + 9)
+    order = rng.permutation(len(seqs)); nte = max(len(seqs) // 5, 1)
+    te, trn = [seqs[i] for i in order[:nte]], [seqs[i] for i in order[nte:]]
+    st = lambda S_, j: jnp.asarray(np.stack([x[j] for x in S_]))  # noqa: E731
+    Xtr, Ytr, Mtr = st(trn, 0), st(trn, 1), st(trn, 2); Xte, Yte, Mte, Kte = st(te, 0), st(te, 1), st(te, 2), np.stack([x[3] for x in te])
+
+    class GRUNet(nn.Module):
+        @nn.compact
+        def __call__(self, xs):                                  # xs (L, D)
+            cell = nn.GRUCell(128); h = jnp.zeros((128,))
+            enc = nn.Dense(128); out = nn.Dense(8)
+            def body(h, x):
+                h, _ = cell(h, nn.tanh(enc(x))); return h, out(h)
+            _, lg = nn.scan(lambda m, c, x: body(c, x), variable_broadcast="params", split_rngs={"params": False})(self, h, xs)
+            return lg
+
+    class MLP(nn.Module):
+        @nn.compact
+        def __call__(self, xs):
+            return nn.Dense(8)(nn.tanh(nn.Dense(128)(nn.tanh(nn.Dense(128)(xs)))))
+
+    out = dict(lives_train=len(trn), lives_test=len(te), heard_steps_test=int(np.asarray(Mte).sum()),
+               chance_uniform=0.125, chance_majority=float(np.bincount(np.asarray(Yte)[np.asarray(Mte) > 0], minlength=8).max() / max(np.asarray(Mte).sum(), 1)))
+    for name, M_ in (("gru", GRUNet()), ("memoryless", MLP())):
+        p = M_.init(jax.random.PRNGKey(0), Xtr[0]); opt = optax.adam(1e-3); os_ = opt.init(p)
+        def lossf(p, X, Y, Mk):
+            lg = jax.vmap(lambda x: M_.apply(p, x))(X)
+            ce = -jnp.take_along_axis(jax.nn.log_softmax(lg), Y[..., None], -1)[..., 0]
+            return (ce * Mk).sum() / (Mk.sum() + 1e-8)
+        @jax.jit
+        def upd(p, os_, X, Y, Mk):
+            l, g = jax.value_and_grad(lossf)(p, X, Y, Mk); u, os_ = opt.update(g, os_, p); return optax.apply_updates(p, u), os_, l
+        for s_ in range(a.ic_steps):
+            bi = rng.integers(0, Xtr.shape[0], 32)
+            p, os_, l = upd(p, os_, Xtr[bi], Ytr[bi], Mtr[bi])
+        pred = np.asarray(jax.jit(jax.vmap(lambda x: M_.apply(p, x)))(Xte)).argmax(-1)
+        hit = (pred == np.asarray(Yte)); mk = np.asarray(Mte) > 0
+        bins = [(1, 5), (6, 15), (16, 40), (41, 100), (101, 10_000)]
+        out[name] = dict(final_train_loss=float(l), acc_all=float(hit[mk].mean()),
+                         by_tokens_heard={f"{lo}-{hi}": dict(n=int((mk & (Kte >= lo) & (Kte <= hi)).sum()),
+                                                            acc=float(hit[mk & (Kte >= lo) & (Kte <= hi)].mean()) if (mk & (Kte >= lo) & (Kte <= hi)).any() else None)
+                                          for lo, hi in bins})
+    print("ICPROBE", json.dumps(out), flush=True)
+    os.makedirs(os.path.dirname(a.out) or ".", exist_ok=True); json.dump(out, open(a.out, "w"), indent=1)
 
 
 if __name__ == "__main__":
