@@ -5516,6 +5516,13 @@ more expensive, because it produces publishable-looking nulls.
   - Lever-did-work: every head's loss nonzero and falling between the first and the last 100 updates, with labels
     present (juveniles >= 25%).
 
+- **RESULT (Nov 12 ~04:30), EXPLORE: `hunger_ctl`. THE SCRIPTED CONTROLS REPRODUCE UNDER THE HUNGRY START**
+  (`docs/data/hunger_ctl/`; ~$0.2).
+  - **Gate config:** perfect 94.4% (90.3-96.9) vs frozen 91.9% (87.2-94.9); deaf 0%; 197 eligible; strata 89.1 / 92.9 /
+    98.0%.
+  - **Parent arm, leave 1,000, true code:** 88.2% (82.8-92.1) vs 87.7% (82.2-91.7); deaf 0%; 187 eligible.
+  - CIs overlap: the hungry start does not distort the instrument. **The pilot's pre-launch gate is cleared.**
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
