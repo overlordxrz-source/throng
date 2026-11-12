@@ -5544,6 +5544,15 @@ more expensive, because it produces publishable-looking nulls.
     - (ii) the navigator's pass rate on this life test is 0% (the deaf control in every frozen-test run): STOP if the
       memory-wiped HUNGRY pass rate exceeds the 10% negative-control bar.
 
+- **Pilot note (Nov 12 ~06:05): one preemption, recovered by the checkpoint.**
+  - Modal interrupted the container at ~update 5,220 (KeyboardInterrupt in the log), restarted it at 10:37 UTC, and the
+    run resumed from the update-5,000 checkpoint ("resumed stage 1 at update 5000, 81,920,000 agent-steps"); ~220 updates
+    were lost.
+  - **Watch item before the 1e8 readout:** the training juvenile fraction rose from ~63% to 80-93%, and eaten per step
+    fell from ~0.0025 (update 100) to ~0.0003-0.0007 (updates 5,000-6,100). This suggests shorter lives and worse
+    foraging than the navigator, which bears on Cam's stage-1 gate condition (foraging within 10% of the navigators).
+    To be checked against the readout's lifespans.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
