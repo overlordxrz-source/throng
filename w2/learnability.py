@@ -82,6 +82,9 @@ def main():
     ap.add_argument("--min-heard", type=int, default=25); ap.add_argument("--test-window", type=int, default=300)
     ap.add_argument("--code-per-life", action="store_true", help="Nov 11 (exploratory): each life hears the beacons through its own random sector->token code; the scripted listener decodes with the inverse (stays a perfect decoder)")
     ap.add_argument("--ic-probe", action="store_true", help="Nov 12 stage-1 diagnostic (EXPLORE): with --no-train --code-per-life, record each life's input stream and train a GRU across lives to predict the true sector behind each heard token; accuracy vs tokens heard so far, against a memoryless baseline")
+    ap.add_argument("--obs-listener", default="", choices=["", "observer", "true"], help="Cam Nov 12 plug-in check: lives run with navigator behaviour (+ parent); the frozen life test then runs the scripted listener acting through a per-life token->sector table: observer = the life's counting-decoder argmax (beacon cues + parent), true = the life's real inverse code (control)")
+    ap.add_argument("--parent-leave", type=int, default=0, help="age at which the parent leaves (0 = the juvenile period)")
+    ap.add_argument("--eval-eligible-only", action="store_true", help="run the life test only on lives that heard >= --min-sectors sectors >= --min-heard x (eligibility rate recorded before the filter)")
     ap.add_argument("--parent", action="store_true", help="Cam Nov 12: one scripted parent per newborn (elder l pairs with learner l) stays within 2-3 cells through the juvenile period, then leaves; young-seek targets the parent; no demonstrators in the life test")
     ap.add_argument("--demonstrators", action="store_true", help="scripted elders (perfect followers of the heard code) present even without a copy loss (stage-1 demonstrator arm)")
     ap.add_argument("--io-decoder", action="store_true", help="with --ic-probe collection: run the IDEAL-OBSERVER counting decoder (no training) instead of the GRU probe (Cam Nov 12)")
@@ -143,7 +146,7 @@ def main():
         ok = cheb[jnp.arange(M), j] <= R_HEAR
         return jnp.concatenate([jax.nn.one_hot(sec[j], 8), jnp.ones((M, 1)), dj / R_HEAR], 1) * ok[:, None]
 
-    def scripted(s, h, fallback, code=None):
+    def scripted(s, h, fallback, code=None, dec=None):
         """a listener that eats on food, heads for visible food, else walks the heard sector (decoded through the
         life's code when there is one)"""
         pos = s.pos[NB:]; here = s.food[pos[:, 0], pos[:, 1]]
@@ -152,13 +155,15 @@ def main():
         tw = lambda dx, dy: jnp.where(jnp.abs(dx) >= jnp.abs(dy), jnp.where(dx < 0, 1, 2), jnp.where(dy > 0, 3, 4))  # noqa: E731
         vis = tw(o_[best // (2 * cfg.r + 1)], o_[best % (2 * cfg.r + 1)])
         idx = jnp.argmax(h[:, :8], 1)
-        if code is not None:                           # token -> sector through the inverse of the life's code
+        if dec is not None:                            # token -> sector through a given table (the observer listener)
+            idx = dec[jnp.arange(M), idx]
+        elif code is not None:                         # token -> sector through the inverse of the life's code
             idx = jnp.argsort(code, axis=1)[jnp.arange(M), idx]
         ang = idx * (2 * jnp.pi / 8)
         hd = tw(jnp.round(jnp.cos(ang) * 3), jnp.round(jnp.sin(ang) * 3))
         return jnp.where(here >= 0.2, env.EAT, jnp.where(seen, vis, jnp.where(h[:, 8] > 0.5, hd, fallback)))
 
-    def step_all(P, s, key, shift, young, perm=None, mute=False, seek_ok=True, rand_fb=False, code=None):
+    def step_all(P, s, key, shift, young, perm=None, mute=False, seek_ok=True, rand_fb=False, code=None, dec=None):
         k1, k2 = jax.random.split(key)
         h = hear(s, shift, perm)
         if code is not None:                           # each agent hears the sector through its own code (M, 8)
@@ -170,14 +175,14 @@ def main():
         lg, v, _ = jax.vmap(lambda p, x: net.apply(p, x[None]))(P, o[:NL]); lg, v = lg[:, 0], v[:, 0]
         act_l = jax.random.categorical(k1, lg)
         fb_l = jax.random.randint(jax.random.fold_in(key, 79), (NL,), 1, 5) if rand_fb else act_l
-        sc = scripted(s, h, jnp.concatenate([fb_l, jax.random.randint(k2, (NE,), 1, 5)]), None if a.decode_identity else code)
+        sc = scripted(s, h, jnp.concatenate([fb_l, jax.random.randint(k2, (NE,), 1, 5)]), None if a.decode_identity else code, dec)
         if a.sanity:
             act_l = sc[:NL]
         if a.parent and seek_ok:                          # Cam Nov 12: the young stay near THEIR parent while it is present
             dpar = (s.pos[NB + NL:] - s.pos[NB:NB + NL] + cfg.L // 2) % cfg.L - cfg.L // 2           # (NL, 2)
             seekp = jnp.where(jnp.abs(dpar[:, 0]) >= jnp.abs(dpar[:, 1]), jnp.where(dpar[:, 0] < 0, 1, 2), jnp.where(dpar[:, 1] > 0, 3, 4))
             farp = jnp.abs(dpar).max(-1) > cfg.r
-            act_l = jnp.where((s.age[NB:NB + NL] < a.juvenile) & farp, seekp, act_l)
+            act_l = jnp.where((s.age[NB:NB + NL] < (a.parent_leave or a.juvenile)) & farp, seekp, act_l)
         elif a.young_seek and a.seek_age and seek_ok:     # scaffolding independent of the juvenile lever (Cam Nov 10)
             db = (s.pos[:NB][None] - s.pos[NB:NB + NL][:, None] + cfg.L // 2) % cfg.L - cfg.L // 2
             dn_ = db[jnp.arange(NL), jnp.argmin(jnp.abs(db).max(-1), 1)]
@@ -203,7 +208,7 @@ def main():
         act_b = jax.random.randint(jax.random.fold_in(key, 77), (NB,), 1, 5) if a.beacon_walk else jnp.zeros(NB, jnp.int32)
         s2, r, info = env.step(cfg, s, jnp.concatenate([act_b, act_m]), k2)
         if a.parent:                                       # dropout: after the juvenile period the parent is far away (gone)
-            gone = s2.age[NB:NB + NL] >= a.juvenile
+            gone = s2.age[NB:NB + NL] >= (a.parent_leave or a.juvenile)
             s2 = s2._replace(pos=s2.pos.at[NB + NL:].set(jnp.where(gone[:, None], (s2.pos[NB:NB + NL] + cfg.L // 2) % cfg.L, s2.pos[NB + NL:])))
         E = s2.energy.at[:NB].set(1.0).at[NB + NL:].set(1.0)                              # beacons + elders immortal
         if a.juvenile:
@@ -273,7 +278,7 @@ def main():
             return optax.apply_updates(p, jax.tree_util.tree_map(lambda x: x * f_, u)), os_
         return jax.vmap(jax.vmap(one))(P, OS, f, o, m, eo, ea, em)
 
-    def eval_life(p, centres, key, shift_mode, perm=None, bpos=None, smask=None, mute=False, rand_fb=False, code=None):
+    def eval_life(p, centres, key, shift_mode, perm=None, bpos=None, smask=None, mute=False, rand_fb=False, code=None, dec=None):
         s = env.reset(cfg, key)
         s = s._replace(centres=centres, cap=env.capacity(cfg, centres), food=env.capacity(cfg, centres))
         s, _ = beacons_reset(s, jax.random.fold_in(key, 3))
@@ -288,7 +293,7 @@ def main():
             s, eaten, last = c
             if smask is not None:                     # the TRUE sector heard now (before any swap), for attribution
                 ht = hear(s, 0)[0]; last = jnp.where(ht[8] > 0.5, jnp.argmax(ht[:8]), last)
-            s2, rec = step_all(P1, s, k, sh, jnp.zeros(NL, bool), perm, mute, seek_ok=False, rand_fb=rand_fb, code=code)
+            s2, rec = step_all(P1, s, k, sh, jnp.zeros(NL, bool), perm, mute, seek_ok=False, rand_fb=rand_fb, code=code, dec=dec)
             s2 = s2._replace(alive=s2.alive.at[NB + 1:].set(False))                      # only this learner (no elders)
             credit = 1.0 if smask is None else jnp.where(last >= 0, smask[jnp.maximum(last, 0)], 0.0)
             return (s2, eaten + rec[6][0] * credit, last), None
@@ -297,6 +302,12 @@ def main():
     ev = jax.jit(jax.vmap(jax.vmap(eval_life, in_axes=(None, None, 0, None)), in_axes=(0, 0, 0, None)))
     def make_evp(mute=False, rand_fb=False):   # the heard25 test: per-life, per-episode sector permutation (identity = true message); traced on first call
         life_start = a.test_start == "life"; lh = a.score == "last-heard"
+        if a.code_per_life and EVAL_CODE.get("dec") is not None:   # + a per-life decode table (observer listener)
+            def oned(p, c, k, q, b, m, cd, dc):
+                return eval_life(p, c, k, 0, q, b if life_start else None, m if lh else None, mute, rand_fb, cd, dc)
+            fd = jax.jit(jax.vmap(jax.vmap(oned, in_axes=(None, None, 0, 0, None, None, None, None)), in_axes=(0, 0, 0, 0, 0, 0, 0, 0)))
+            return lambda p, c, k, q, b, m, cd=None: fd(p, c, k, q, b, m, jnp.asarray(EVAL_CODE["all"] if cd is None else cd),
+                                                        jnp.asarray(EVAL_CODE["dec"] if cd is None else EVAL_CODE["dec_sub"]))
         if a.code_per_life:                            # the life's own code (M, 8) rides along per life
             def onec(p, c, k, q, b, m, cd):
                 return eval_life(p, c, k, 0, q, b if life_start else None, m if lh else None, mute, rand_fb, cd)
@@ -323,13 +334,14 @@ def main():
     SNAP = [int(x) for x in a.snap_ages.split(",")] if a.snap_ages else []
     crng = np.random.default_rng(a.seed + 555)        # own stream: the main rng is untouched
     CODES = np.stack([np.stack([crng.permutation(8) for _ in range(M)]) for _ in range(W)]) if a.code_per_life else None
-    EVAL_CODE = {"all": None}
+    EVAL_CODE = {"all": None}; OBS_INFO = {}
     if a.code_per_life:
         assert a.test == "heard25", "--code-per-life needs --test heard25"
     snaps = {}; snap_gs = {}; prev_age = np.zeros((W, NL), np.int64)
     lives = []
     if a.ic_probe:
         assert a.no_train and a.code_per_life and (a.io_decoder or not a.sanity), "--ic-probe needs --no-train --code-per-life (navigator behaviour; --sanity only as the decoder's control)"
+        assert not (a.obs_listener and a.sanity), "--obs-listener: lives run with navigator behaviour (the test then uses the decode table)"
         IC = dict(o=[], act=[], r=[], alive=[], codes=[], lid=[], take=[], ea=[], pos=[]); life_id = np.zeros((W, NL), np.int64)
     it0 = 0
     if a.ckpt:
@@ -427,6 +439,7 @@ def main():
             hc = cnt[w, l][CODES[w, l]] if a.code_per_life else cnt[w, l].copy()     # token counts -> sector space
             lives.append(dict(lifespan=int(ages[w, l]), grad_steps=int(gsteps[w, l]), heard=hc, bpos=np.asarray(S.pos)[w, :NB].copy(),
                               code=CODES[w, l].copy() if a.code_per_life else None,
+                              key=(int(w), int(l), int(life_id[w, l])) if a.ic_probe else None,
                               params=jax.tree_util.tree_map(lambda x: x[w, l], P), centres=np.asarray(S.centres[w]),
                               snaps=snaps.pop((int(w), int(l)), []), snap_gsteps=snap_gs.pop((int(w), int(l)), {})))
             nav_of[w, l] = rng.integers(0, K)
@@ -453,9 +466,15 @@ def main():
                                   codes=CODES, crng=crng))
         if a.stop_after and it + 1 == a.stop_after:
             os._exit(3)
-    if a.ic_probe and a.io_decoder:
+    if a.eval_eligible_only and lives:
+        n_all = len(lives)
+        lives = [x for x in lives if int((x["heard"] >= a.min_heard).sum()) >= a.min_sectors]
+        OBS_INFO.update(lives_before_filter=n_all, eligible_before_filter=len(lives), eligibility_rate_all=len(lives) / n_all)
+        if not lives:
+            print("no eligible lives"); return
+    if a.ic_probe and a.io_decoder and not a.obs_listener:
         return ideal_observer(a, IC, W, NL, NE, T, cfg)
-    if a.ic_probe:
+    if a.ic_probe and not a.obs_listener:
         return incontext_probe(a, IC, W, NL, T)
     if not lives:
         print("no completed lives"); return
@@ -514,6 +533,17 @@ def main():
                 der[i, e, Sset] = q
         if a.code_per_life:                            # learner = agent 0 of M in the life test; the rest are dead
             CL = np.tile(np.arange(8), (len(lives), M, 1)); CL[:, 0] = np.stack([x["code"] for x in lives]); EVAL_CODE["all"] = CL
+        if a.obs_listener:                             # Cam Nov 12 plug-in check: scripted listener through a per-life table
+            DECS = observer_decs(a, IC, W, NL, NE, T, cfg) if a.obs_listener == "observer" else {}
+            DL = np.tile(np.arange(8), (len(lives), M, 1)); nodec = 0
+            for i_, x in enumerate(lives):
+                if a.obs_listener == "true":
+                    DL[i_, 0] = np.argsort(x["code"])
+                elif x["key"] in DECS:
+                    DL[i_, 0] = DECS[x["key"]]
+                else:
+                    nodec += 1; DL[i_, 0] = np.random.default_rng(i_).integers(0, 8, 8)
+            EVAL_CODE["dec"] = DL; a.sanity = True; OBS_INFO.update(mode=a.obs_listener, lives_without_stream=nodec)
         evp = make_evp(); BP = jnp.asarray(np.stack([x["bpos"] for x in lives]))
         SM = jnp.asarray(np.stack([(x["heard"] >= a.min_heard).astype(np.float32) for x in lives]))
         true = np.asarray(evp(Pz, C, keys, jnp.asarray(ident), BP, SM)); swap = np.asarray(evp(Pz, C, keys, jnp.asarray(der), BP, SM))
@@ -565,6 +595,10 @@ def main():
             summ["apparatus"]["scripted_true_over_silence"] = float(summ["eaten_true_mean"] / max(es, 1e-9))
     if a.test == "heard25":
         summ["heard25"] = heard25_report(a, lives, res, scorable, true, swap, der, blind, blind_swap, silent)
+        if OBS_INFO:
+            summ["heard25"]["obs_listener"] = OBS_INFO
+        if a.parent:
+            summ["heard25"]["parent"] = dict(leave_age=a.parent_leave or a.juvenile)
         if evaluate_voi_r is not None:
             el = np.asarray(scorable); tm, sm = evaluate_voi_r[0][el].mean(1), evaluate_voi_r[1][el].mean(1); d = tm - sm
             summ["heard25"]["voi_random_fallback"] = dict(eaten_true=float(tm.mean()), eaten_silence=float(sm.mean()),
@@ -578,6 +612,8 @@ def main():
                     byage[str(k_)] = dict(n=0); continue
                 Pk = jax.tree_util.tree_map(lambda *z: jnp.stack([jnp.asarray(q) for q in z]), *[dict(x["snaps"])[k_] for x in (lives[i] for i in idx)])
                 ii = np.array(idx); cdi = EVAL_CODE["all"][ii] if a.code_per_life else None
+                if EVAL_CODE.get("dec") is not None:
+                    EVAL_CODE["dec_sub"] = EVAL_CODE["dec"][ii]
                 tk = np.asarray(evp(Pk, C[ii], keys[ii], jnp.asarray(ident[ii]), BP[ii], SM[ii], cdi))
                 sk = np.asarray(evp(Pk, C[ii], keys[ii], jnp.asarray(der[ii]), BP[ii], SM[ii], cdi))
                 pk = np.array([_life_pass(tk[j], sk[j]) for j in range(len(idx))])
@@ -981,6 +1017,46 @@ def ideal_observer(a, IC, W, NL, NE, T, cfg):
                                  by_tokens_heard={f"{lo}-{hi}": round(float(H[(Kk >= lo) & (Kk <= hi)].mean()), 4) if ((Kk >= lo) & (Kk <= hi)).any() else None for lo, hi in bins}))
     print("IDEALOBS", json.dumps(out), flush=True)
     os.makedirs(os.path.dirname(a.out) or ".", exist_ok=True); json.dump(out, open(a.out, "w"), indent=1)
+
+
+def observer_decs(a, IC, W, NL, NE, T, cfg, srcs="ABc"):
+    """per-life token -> sector table at the END of each life: the argmax of all counting-decoder evidence from the
+    given sources (A: visible food from the beacon, B: next meal from the beacon, c: demonstrators/parent moves) over
+    the life; tokens with no evidence -> a random sector. Keys = (world, learner, life id)."""
+    o = np.concatenate(IC["o"], 1); alive = np.concatenate(IC["alive"], 1); take = np.concatenate(IC["take"], 1)
+    pos = np.concatenate(IC["pos"], 1); ea = np.concatenate(IC["ea"], 1) if NE else None
+    lid = np.repeat(np.stack(IC["lid"], 1), T, 1)
+    L = cfg.L; r_ = cfg.r; o_ = np.arange(-r_, r_ + 1); rng = np.random.default_rng(a.seed + 31)
+    sec_of = lambda dx, dy: int(np.mod(np.round(np.arctan2(dy, dx) / (2 * np.pi / 8)), 8))  # noqa: E731
+    MOVE = {1: (-1, 0), 2: (1, 0), 3: (0, 1), 4: (0, -1)}
+    out = {}
+    for w in range(W):
+        for l in range(NL):
+            for li in np.unique(lid[w, :, l]):
+                idx = np.where((lid[w, :, l] == li) & alive[w, :, l])[0]
+                if len(idx) == 0:
+                    continue
+                ob = o[w, idx, l]; hd = ob[:, 108] > 0.5; tok = ob[:, 100:108].argmax(1)
+                p = pos[w, idx, l]; meal_t = np.where(take[w, idx, l] > 0)[0]; V = np.zeros((8, 8))
+                for i in np.where(hd)[0]:
+                    wv = ob[i, :(2 * r_ + 1) ** 2]; dj = ob[i, 109:111] * R_HEAR
+                    if "A" in srcs and wv.max() > 0.2:
+                        b = int(wv.argmax()); fx, fy = o_[b // (2 * r_ + 1)], o_[b % (2 * r_ + 1)]
+                        if abs(fx - dj[0]) + abs(fy - dj[1]) > 0:
+                            V[tok[i], sec_of(fx - dj[0], fy - dj[1])] += 1
+                    nm = meal_t[meal_t > i]
+                    if "B" in srcs and len(nm):
+                        d = (p[nm[0]] - p[i] + L // 2) % L - L // 2 - dj
+                        if np.abs(d).sum() > 0:
+                            V[tok[i], sec_of(d[0], d[1])] += 1
+                    if "c" in srcs and NE:
+                        pe = pos[w, idx[i], NL:]; dd = (pe - p[i] + L // 2) % L - L // 2
+                        for e in np.where(np.abs(dd).max(1) <= r_)[0]:
+                            m = int(ea[w, idx[i], e])
+                            if m in MOVE:
+                                V[tok[i], sec_of(*MOVE[m])] += 1
+                out[(int(w), int(l), int(li))] = np.array([rng.choice(np.flatnonzero(V[t] == V[t].max())) for t in range(8)])
+    return out
 
 
 if __name__ == "__main__":
