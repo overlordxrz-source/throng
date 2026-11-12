@@ -5583,6 +5583,48 @@ more expensive, because it produces publishable-looking nulls.
     both.
   - Runs on a SEPARATE app (`throng-w2cal`) so the pilot's app is not redeployed.
 
+- **RESULT (Nov 12 ~06:45): FORAGING CHECK -> STOP.** Laptop, comm-toy `9134001` (`--forage-check`), on the pilot's
+  update-6000 checkpoint (98.3M agent-steps; the 100M readout fires at update 6104).
+  - Method: the agent vs the navigator (the same weights with `side_head` / `side_value` zeroed) on the same 64 fresh
+    worlds and keys, natural energy, 12,800 steps. Every life born in the window counts; lives alive at the end are
+    censored. Adult = age >= 1000 (the parent leaves). 95% CIs bootstrap over worlds.
+  - My application of the rule (not specified by Cam; written into the code before the real checkpoint was run, but
+    not committed first): the decision uses the LOWER of the two ratios.
+  - **Adult food per step: agent 0.00181 vs navigator 0.00937 = 19% (CI 18-21%).** Below 50%: STOP.
+  - KM median lifespan: agent 955 vs navigator 879 (ratio 1.09). This does NOT mean the agent forages better:
+    - In this harness most lives die at nearly the same age, of starvation on the starting energy: navigator 1,734 of
+      2,393 deaths at age 800-899; agent 2,410 of 2,807 at 900-999. Juveniles almost never eat (food/step ~0.0004 at
+      age < 500, both arms).
+    - A longer median there means spending energy more slowly, i.e. moving less.
+    - **Controls:**
+      - Fresh init (agent == navigator): both ratios exactly 1.000 (life for life identical).
+      - Damaged agent (side-head bias +4 on "stay"): KM ratio 1.08, adult food 38% (STOP).
+      - So the lifespan median cannot tell a broken forager from a good one here; adult food per step can.
+  - Deaths: all starvation except old age at A_max = 3000 (agent 80, navigator 249). Fewer agent lives reach adulthood.
+  - Files: `docs/data/stage1/forage_check_u6000.json`, `forage_control_identical.json`, `forage_control_damaged.json`.
+- **DIAGNOSIS (laptop, comm-toy `e8a15a1` `--grad-diag`, one training batch from the update-6000 checkpoint):**
+  - **The agent has almost stopped moving.** Moves are 1.7% of its actions vs 8.4% for the navigator on the same
+    states (both ~47% stay, ~45-51% eat).
+  - The learned side-head term swamps the trunk: logit norm 43.9 vs 7.2. Mean contribution: up -34, right -13, stay
+    +13, eat +13, down +10, left +10. KL(agent || navigator) = 0.39 nats per step.
+  - Entropy 0.62 vs the navigator's 0.78 (max 1.79).
+  - Gradient norm into the shared memory (side_enc + GRU): PPO 0.38; aux (weighted 0.5) meal 0.15, other 0.16,
+    view 0.0002. The aux heads do NOT dominate; PPO is the larger force.
+  - Value: explained variance 0.985; raw advantage sd 0.096 (mean ~0).
+  - **A mechanism found in the code (hypothesis, under test):** `step_all` takes the PPO log-probability of the action
+    AFTER the parent-seek reflex overrides it (`learnability.py` line ~238).
+    - So for juveniles more than r cells from the parent, PPO trains on reflex-chosen moves as if the policy had
+      chosen them.
+    - Juveniles are 80-93% of training samples, and moves cost energy, so the policy can learn "moving is bad"
+      from moves it never chose.
+    - The same line serves the earlier non-recurrent learnability arms with reflexes. That is a watch item for those
+      closed results, not a retraction.
+  - Food per step in training fell from 0.0037 to 0.0013 by update 259, so a short laptop A/B can decide it:
+    16 worlds x 250 updates, `--mask-forced` (reflex steps leave the PPO loss) vs unmasked; then the forage check.
+    - Prediction, written before running: P(masked >= 0.9 of the navigator AND unmasked < 0.5) ~ 0.45.
+    - If both collapse, the reflex is not the cause.
+  - Files: `docs/data/stage1/grad_diag_u6000.json`.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
