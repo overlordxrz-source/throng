@@ -80,6 +80,8 @@ def main():
     ap.add_argument("--no-train", action="store_true", help="apparatus gate: no learning; per-life coverage + life test (+ blind on the same lives)")
     ap.add_argument("--test", default="shift", choices=["shift", "heard25"], help="heard25: swap = a derangement among the sectors that life heard >= --min-heard times")
     ap.add_argument("--min-heard", type=int, default=25); ap.add_argument("--test-window", type=int, default=300)
+    ap.add_argument("--code-per-life", action="store_true", help="Nov 11 (exploratory): each life hears the beacons through its own random sector->token code; the scripted listener decodes with the inverse (stays a perfect decoder)")
+    ap.add_argument("--decode-identity", action="store_true", help="control for --code-per-life: the scripted listener ignores the code (decodes tokens as sectors); must FAIL when codes are on")
     ap.add_argument("--min-sectors", type=int, default=2, help="Cam Nov 10: a life is scorable only if it heard >= this many sectors >= --min-heard times (ruled: 5); pass rates over eligible lives")
     ap.add_argument("--score", default="window", choices=["window", "last-heard"], help="last-heard: in the heard25 test, only food eaten while the last heard TRUE sector is one the life heard >= --min-heard times counts")
     ap.add_argument("--test-start", default="fresh", choices=["fresh", "life"], help="life: each probe episode starts in the life's own world at its end (patch centres + beacon positions), the learner beside a random beacon")
@@ -134,27 +136,34 @@ def main():
         ok = cheb[jnp.arange(M), j] <= R_HEAR
         return jnp.concatenate([jax.nn.one_hot(sec[j], 8), jnp.ones((M, 1)), dj / R_HEAR], 1) * ok[:, None]
 
-    def scripted(s, h, fallback):
-        """a listener that eats on food, heads for visible food, else walks the heard sector"""
+    def scripted(s, h, fallback, code=None):
+        """a listener that eats on food, heads for visible food, else walks the heard sector (decoded through the
+        life's code when there is one)"""
         pos = s.pos[NB:]; here = s.food[pos[:, 0], pos[:, 1]]
         wv = env.window(cfg, s.food, pos, cfg.r).reshape(M, -1); best = jnp.argmax(wv, 1); seen = wv.max(1) > 0.2
         o_ = jnp.arange(-cfg.r, cfg.r + 1)
         tw = lambda dx, dy: jnp.where(jnp.abs(dx) >= jnp.abs(dy), jnp.where(dx < 0, 1, 2), jnp.where(dy > 0, 3, 4))  # noqa: E731
         vis = tw(o_[best // (2 * cfg.r + 1)], o_[best % (2 * cfg.r + 1)])
-        ang = jnp.argmax(h[:, :8], 1) * (2 * jnp.pi / 8)
+        idx = jnp.argmax(h[:, :8], 1)
+        if code is not None:                           # token -> sector through the inverse of the life's code
+            idx = jnp.argsort(code, axis=1)[jnp.arange(M), idx]
+        ang = idx * (2 * jnp.pi / 8)
         hd = tw(jnp.round(jnp.cos(ang) * 3), jnp.round(jnp.sin(ang) * 3))
         return jnp.where(here >= 0.2, env.EAT, jnp.where(seen, vis, jnp.where(h[:, 8] > 0.5, hd, fallback)))
 
-    def step_all(P, s, key, shift, young, perm=None, mute=False, seek_ok=True, rand_fb=False):
+    def step_all(P, s, key, shift, young, perm=None, mute=False, seek_ok=True, rand_fb=False, code=None):
         k1, k2 = jax.random.split(key)
         h = hear(s, shift, perm)
+        if code is not None:                           # each agent hears the sector through its own code (M, 8)
+            tok = code[jnp.arange(M), jnp.argmax(h[:, :8], 1)]
+            h = h.at[:, :8].set(jax.nn.one_hot(tok, 8) * h[:, 8:9])
         if mute:                                  # silence: nobody hears anything (VoI baseline)
             h = jnp.zeros_like(h)
         o = jnp.concatenate([env.observe(cfg, s)[NB:], h], 1)                              # (M, D)
         lg, v, _ = jax.vmap(lambda p, x: net.apply(p, x[None]))(P, o[:NL]); lg, v = lg[:, 0], v[:, 0]
         act_l = jax.random.categorical(k1, lg)
         fb_l = jax.random.randint(jax.random.fold_in(key, 79), (NL,), 1, 5) if rand_fb else act_l
-        sc = scripted(s, h, jnp.concatenate([fb_l, jax.random.randint(k2, (NE,), 1, 5)]))
+        sc = scripted(s, h, jnp.concatenate([fb_l, jax.random.randint(k2, (NE,), 1, 5)]), None if a.decode_identity else code)
         if a.sanity:
             act_l = sc[:NL]
         if a.young_seek and a.seek_age and seek_ok:       # scaffolding independent of the juvenile lever (Cam Nov 10)
@@ -186,13 +195,13 @@ def main():
         return s2, (o[:NL], act_l, lp, v, r[NB:NB + NL] * 20.0, info["dead"][NB:NB + NL], info["take"][NB:NB + NL],
                     o[NL:], act_m[NL:], near_e)
 
-    def roll(P, s, key):
+    def roll(P, s, key, code=None):
         def body(s, k):
             k1, k2 = jax.random.split(k)
             shift = jax.random.randint(k2, (), 0, 8) if a.random_code else 0
             young = s.age[NB:NB + NL] < a.juvenile
             yc = s.age[NB:NB + NL] < a.young
-            s2, rec = step_all(P, s, k1, shift, young)
+            s2, rec = step_all(P, s, k1, shift, young, code=code)
             return s2, rec + (s.alive[NB:NB + NL], yc)
         return jax.lax.scan(body, s, jax.random.split(key, T))
     roll_w = jax.jit(jax.vmap(roll))
@@ -244,7 +253,7 @@ def main():
             return optax.apply_updates(p, jax.tree_util.tree_map(lambda x: x * f_, u)), os_
         return jax.vmap(jax.vmap(one))(P, OS, f, o, m, eo, ea, em)
 
-    def eval_life(p, centres, key, shift_mode, perm=None, bpos=None, smask=None, mute=False, rand_fb=False):
+    def eval_life(p, centres, key, shift_mode, perm=None, bpos=None, smask=None, mute=False, rand_fb=False, code=None):
         s = env.reset(cfg, key)
         s = s._replace(centres=centres, cap=env.capacity(cfg, centres), food=env.capacity(cfg, centres))
         s, _ = beacons_reset(s, jax.random.fold_in(key, 3))
@@ -259,7 +268,7 @@ def main():
             s, eaten, last = c
             if smask is not None:                     # the TRUE sector heard now (before any swap), for attribution
                 ht = hear(s, 0)[0]; last = jnp.where(ht[8] > 0.5, jnp.argmax(ht[:8]), last)
-            s2, rec = step_all(P1, s, k, sh, jnp.zeros(NL, bool), perm, mute, seek_ok=False, rand_fb=rand_fb)
+            s2, rec = step_all(P1, s, k, sh, jnp.zeros(NL, bool), perm, mute, seek_ok=False, rand_fb=rand_fb, code=code)
             s2 = s2._replace(alive=s2.alive.at[NB + 1:].set(False))                      # only this learner (no elders)
             credit = 1.0 if smask is None else jnp.where(last >= 0, smask[jnp.maximum(last, 0)], 0.0)
             return (s2, eaten + rec[6][0] * credit, last), None
@@ -268,10 +277,15 @@ def main():
     ev = jax.jit(jax.vmap(jax.vmap(eval_life, in_axes=(None, None, 0, None)), in_axes=(0, 0, 0, None)))
     def make_evp(mute=False, rand_fb=False):   # the heard25 test: per-life, per-episode sector permutation (identity = true message); traced on first call
         life_start = a.test_start == "life"; lh = a.score == "last-heard"
+        if a.code_per_life:                            # the life's own code (M, 8) rides along per life
+            def onec(p, c, k, q, b, m, cd):
+                return eval_life(p, c, k, 0, q, b if life_start else None, m if lh else None, mute, rand_fb, cd)
+            fc = jax.jit(jax.vmap(jax.vmap(onec, in_axes=(None, None, 0, 0, None, None, None)), in_axes=(0, 0, 0, 0, 0, 0, 0)))
+            return lambda p, c, k, q, b, m, cd=None: fc(p, c, k, q, b, m, jnp.asarray(EVAL_CODE["all"] if cd is None else cd))
         def one(p, c, k, q, b, m):
             return eval_life(p, c, k, 0, q, b if life_start else None, m if lh else None, mute, rand_fb)
         f = jax.jit(jax.vmap(jax.vmap(one, in_axes=(None, None, 0, 0, None, None)), in_axes=(0, 0, 0, 0, 0, 0)))
-        return lambda p, c, k, q, b, m: f(p, c, k, q, b, m)
+        return lambda p, c, k, q, b, m, cd=None: f(p, c, k, q, b, m)
 
     rng = np.random.default_rng(a.seed); key = jax.random.PRNGKey(a.seed)
     states = []
@@ -287,6 +301,11 @@ def main():
     gsteps = np.zeros((W, NL), int)
     cnt = np.zeros((W, NL, 8), np.int64)       # per-life heard-sector counts (coverage)
     SNAP = [int(x) for x in a.snap_ages.split(",")] if a.snap_ages else []
+    crng = np.random.default_rng(a.seed + 555)        # own stream: the main rng is untouched
+    CODES = np.stack([np.stack([crng.permutation(8) for _ in range(M)]) for _ in range(W)]) if a.code_per_life else None
+    EVAL_CODE = {"all": None}
+    if a.code_per_life:
+        assert a.test == "heard25", "--code-per-life needs --test heard25"
     snaps = {}; snap_gs = {}; prev_age = np.zeros((W, NL), np.int64)
     lives = []
     it0 = 0
@@ -300,10 +319,13 @@ def main():
             mem_o, mem_m = Ck["mem_o"], Ck["mem_m"]; mem_e = [(jnp.asarray(e0), jnp.asarray(e1), e2) for e0, e1, e2 in Ck["mem_e"]]
             since_birth, gsteps, cnt, lives, nav_of = Ck["since_birth"], Ck["gsteps"], Ck["cnt"], Ck["lives"], Ck["nav_of"]
             snaps, prev_age, snap_gs = Ck.get("snaps", {}), Ck.get("prev_age", prev_age), Ck.get("snap_gs", {})
+            if a.code_per_life:
+                CODES, crng = Ck["codes"], Ck["crng"]
             it0 = Ck["it"] + 1; print(f"resumed from update {Ck['it'] + 1}", flush=True)
     for it in range(it0, a.updates):
         key, k = jax.random.split(key)
-        S, (o, act, lp, v, r, dn, take, eo, ea, ne, alive, yc) = roll_w(P, S, jax.random.split(k, W))
+        S, (o, act, lp, v, r, dn, take, eo, ea, ne, alive, yc) = (roll_w(P, S, jax.random.split(k, W), jnp.asarray(CODES))
+                                                                if a.code_per_life else roll_w(P, S, jax.random.split(k, W)))
         o, act, lp, v, r, dn, alive = (np.asarray(x) for x in (o, act, lp, v, r, dn, alive))   # (W, T, NL, ...)
         hm = (o[..., 108] > 0.5) & alive
         cnt += np.einsum("wtl,wtlk->wlk", hm.astype(np.int64), (o[..., 100:108] > 0.5).astype(np.int64))
@@ -375,10 +397,14 @@ def main():
                 snap_gs.setdefault((int(w), int(l)), {})[str(k_)] = int(gsteps[w, l])
         prev_age = np.where(dead, 0, ages)
         for w, l in zip(*np.where(dead)):
-            lives.append(dict(lifespan=int(ages[w, l]), grad_steps=int(gsteps[w, l]), heard=cnt[w, l].copy(), bpos=np.asarray(S.pos)[w, :NB].copy(),
+            hc = cnt[w, l][CODES[w, l]] if a.code_per_life else cnt[w, l].copy()     # token counts -> sector space
+            lives.append(dict(lifespan=int(ages[w, l]), grad_steps=int(gsteps[w, l]), heard=hc, bpos=np.asarray(S.pos)[w, :NB].copy(),
+                              code=CODES[w, l].copy() if a.code_per_life else None,
                               params=jax.tree_util.tree_map(lambda x: x[w, l], P), centres=np.asarray(S.centres[w]),
                               snaps=snaps.pop((int(w), int(l)), []), snap_gsteps=snap_gs.pop((int(w), int(l)), {})))
             nav_of[w, l] = rng.integers(0, K)
+            if a.code_per_life:
+                CODES[w, l] = crng.permutation(8)       # a new life, a new code
         if dead.any():
             fresh = jax.tree_util.tree_map(lambda x: x[nav_of], NAV); dm = jnp.asarray(dead)
             P = jax.tree_util.tree_map(lambda x, y: jnp.where(dm.reshape(dm.shape + (1,) * (x.ndim - 2)), y, x), P, fresh)
@@ -392,7 +418,8 @@ def main():
             S = S._replace(pos=jnp.asarray(pos), energy=jnp.asarray(E), age=jnp.asarray(age), alive=jnp.asarray(al))
         if a.ckpt and (it + 1) % a.ckpt_every == 0 and it + 1 < a.updates:
             _ck.save(a.ckpt, dict(it=it, P=P, OS=OS, S=S, key=key, rng=rng, mem_o=mem_o, mem_m=mem_m, mem_e=mem_e,
-                                  since_birth=since_birth, gsteps=gsteps, cnt=cnt, lives=lives, nav_of=nav_of, snaps=snaps, prev_age=prev_age, snap_gs=snap_gs))
+                                  since_birth=since_birth, gsteps=gsteps, cnt=cnt, lives=lives, nav_of=nav_of, snaps=snaps, prev_age=prev_age, snap_gs=snap_gs,
+                                  codes=CODES, crng=crng))
         if a.stop_after and it + 1 == a.stop_after:
             os._exit(3)
     if not lives:
@@ -450,6 +477,8 @@ def main():
                     if np.all(q != Sset):
                         break
                 der[i, e, Sset] = q
+        if a.code_per_life:                            # learner = agent 0 of M in the life test; the rest are dead
+            CL = np.tile(np.arange(8), (len(lives), M, 1)); CL[:, 0] = np.stack([x["code"] for x in lives]); EVAL_CODE["all"] = CL
         evp = make_evp(); BP = jnp.asarray(np.stack([x["bpos"] for x in lives]))
         SM = jnp.asarray(np.stack([(x["heard"] >= a.min_heard).astype(np.float32) for x in lives]))
         true = np.asarray(evp(Pz, C, keys, jnp.asarray(ident), BP, SM)); swap = np.asarray(evp(Pz, C, keys, jnp.asarray(der), BP, SM))
@@ -513,8 +542,9 @@ def main():
                 if not idx:
                     byage[str(k_)] = dict(n=0); continue
                 Pk = jax.tree_util.tree_map(lambda *z: jnp.stack([jnp.asarray(q) for q in z]), *[dict(x["snaps"])[k_] for x in (lives[i] for i in idx)])
-                ii = np.array(idx); tk = np.asarray(evp(Pk, C[ii], keys[ii], jnp.asarray(ident[ii]), BP[ii], SM[ii]))
-                sk = np.asarray(evp(Pk, C[ii], keys[ii], jnp.asarray(der[ii]), BP[ii], SM[ii]))
+                ii = np.array(idx); cdi = EVAL_CODE["all"][ii] if a.code_per_life else None
+                tk = np.asarray(evp(Pk, C[ii], keys[ii], jnp.asarray(ident[ii]), BP[ii], SM[ii], cdi))
+                sk = np.asarray(evp(Pk, C[ii], keys[ii], jnp.asarray(der[ii]), BP[ii], SM[ii], cdi))
                 pk = np.array([_life_pass(tk[j], sk[j]) for j in range(len(idx))])
                 for j, i in enumerate(idx):
                     res[i].setdefault("snap_pass", {})[str(k_)] = bool(pk[j])     # per-life, for paired age trends
