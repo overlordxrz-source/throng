@@ -5259,6 +5259,49 @@ more expensive, because it produces publishable-looking nulls.
   4. W2.1 parent calls stay at stage 2 (learned speakers). Stage 1 keeps scripted speakers as the instrument.
   5. Budget unchanged: all free. The $6 pilot cap stands for the stage-1 agent.
 
+- **RESULT (Nov 12 ~03:00), EXPLORE lane: beacon-relative check + PARENT ARM counting decoder** (comm-toy `7e72ae7`,
+  `learnability.py --parent`, decoder with beacon-relative cues and age windows; `docs/data/ideal_observer/io3_*.json`;
+  laptop, 16 worlds x 80 updates).
+  - **Implementation of the parent arm:**
+    - one scripted parent per newborn (elder l pairs with learner l), starting beside it; it steps back whenever more
+      than 2 cells away;
+    - the young seek THEIR parent when it is more than 3 cells away (while the parent is present);
+    - at the end of the juvenile period (age 500) the parent leaves (moved half a world away);
+    - the life test has no demonstrators (elders are not alive in test episodes);
+    - default path verified identical (8/8 lives).
+  - **Beacon-relative check (listen-only, 274 lives):** cues measured from the beacon's position via the speaker
+    offset.
+    - Visible food: exact 31.3% overall, 47.3% after age 500. Next meal: 23.0%. Both: 27.0% (listener-relative:
+      12.5-15.5%).
+    - **Well below 80%, so the choice is unchanged**, as ruled.
+  - **Parent arm (271 lives; median 286 tokens heard per life; parent in view for 58.5% of tokens heard, vs 4% with
+    roaming demonstrators).** Accuracy at age 200-250 / 450-500 (= at parent dropout) / after dropout:
+
+    | evidence | exact sector (chance 12.5%) | same move as the truth (chance 31.25%) |
+    |---|---|---|
+    | parent's moves (c) | 40.4 / 45.0 / 34.4% | 77.8 / **81.8** / 68.7% |
+    | beacon cues (A+B) + parent (c) | 43.7 / 49.0 / 51.7% | **80.4 / 83.7** / 75.6% |
+    | beacon cues (A+B) alone | 18.7 / 16.9 / 43.1% | 42.9 / 38.0 / 57.3% |
+
+    Over a whole median life, A+B+c reaches 80.8% on the move score and 44.3% exact.
+  - **Measurement change, introduced AFTER seeing the exact-sector numbers (flagged):** the "same move" score counts
+    a decode as correct when it implies the same move as the true sector.
+    - Why: the scripted parent walks diagonal sectors as straight moves (sector 1 like 0, 3 and 5 like 4, 7 like 0),
+      so its moves cannot separate them.
+    - What a listener needs is which way to walk, but its chance level is 31.25%, not 12.5%.
+  - **Decision against Cam's rule (>= 80% within a median life, any cue combination):**
+    - exact sector: **NOT met** (max 51.7%);
+    - same move: **met** at ages 250 and 500 (80.4%, 83.7%) and over the median life (80.8%), but not after dropout
+      (75.6%).
+    - **Which score the rule means is Cam's call.**
+  - **Reading:**
+    - nearness works: putting one parent beside the newborn raises visibility 15x and turns demonstrations into the
+      strongest cue;
+    - the parent's actions carry only 4 directions of the 8-sector code. If the agent must decode exact sectors,
+      the parent cannot teach the diagonals;
+    - median tokens heard per life halve in the parent arm (286 vs 628): following the parent takes the young out of
+      earshot of the beacons more often.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
