@@ -127,6 +127,7 @@ def main():
     ap.add_argument("--forage-check", action="store_true", help="stage 1 (Cam Nov 12): with --ckpt, compare the trained agent with the navigator (side heads zeroed) on the same fresh worlds, natural energy: KM lifespan, food/step by age, deaths by age and cause; then exit")
     ap.add_argument("--forage-worlds", type=int, default=32); ap.add_argument("--forage-updates", type=int, default=120)
     ap.add_argument("--grad-diag", action="store_true", help="stage 1: with --ckpt, build one training batch, report per-loss gradient norms per module, side-head vs trunk logit norms, entropy, actions, value/advantage stats; then exit")
+    ap.add_argument("--mask-forced", action="store_true", help="stage 1: drop steps whose action the parent-seek reflex overrode from the PPO loss (they were not sampled from the policy)")
     ap.add_argument("--forage-control", choices=["none", "damaged"], default="none")
     ap.add_argument("--diag-only", action="store_true", help="with --diag (and e.g. --ckpt of a finished run): run the predictive-head swap check and exit")
     ap.add_argument("--log-levers", action="store_true", help="diagnostic (Cam Nov 10, 4a): per update, each lever's own signal (pred loss, copy CE + rows, replay passes + loss, young-lr factor) to <out>.levers.jsonl")
@@ -469,6 +470,8 @@ def main():
                     hz, _, _, _ = jax.vmap(lambda xx: rnet.apply(rp, jnp.zeros((Hd,)), xx))(x)
                     true_sec = jnp.argmax(hear(s, 0)[:NL, :8], 1)
                     out = out + (h2, hz, true_sec)
+                dpf = (s.pos[NB + NL:] - s.pos[NB:NB + NL] + cfg.L // 2) % cfg.L - cfg.L // 2   # the parent-seek reflex overrode this step's action
+                out = out + ((s.age[NB:NB + NL] < LEAVE) & (jnp.abs(dpf).max(-1) > cfg.r),)
                 return (s2, jnp.where(al[:, None], h2, Hh), rec[1], rec[4]), out
             (s, Hh, pa, pr), R = jax.lax.scan(body, (s, Hh, pa, pr), jax.random.split(key, T))
             return s, Hh, pa, pr, R
@@ -771,12 +774,12 @@ def main():
         while it < a.updates:
             t0 = _time.time(); key_, k = jax.random.split(key_); H0 = Hh
             S_, Hh, PA, PR, R = roll_rw(rp, S_, Hh, PA, PR, jax.random.split(k, W), jnp.asarray(COD), False)
-            x, act, lp, v, r, dn, take, al, ea, pos = (np.asarray(z) for z in R)
+            x, act, lp, v, r, dn, take, al, ea, pos = (np.asarray(z) for z in R[:10]); forced = np.asarray(R[10])
             adv = np.zeros_like(r); last = 0.0
             for t in reversed(range(T)):
                 nv = v[:, t + 1] if t + 1 < T else v[:, t]; nt = 1.0 - dn[:, t]
                 last = r[:, t] + 0.99 * nv * nt - v[:, t] + 0.99 * 0.95 * nt * last; adv[:, t] = last
-            ret = adv + v; m = al.astype(np.float32)
+            ret = adv + v; m = (al & ~forced).astype(np.float32) if a.mask_forced else al.astype(np.float32)   # --mask-forced: reflex-chosen steps leave the PPO loss
             A_ = (adv - (adv * m).sum() / max(m.sum(), 1)) / (adv.std() + 1e-8)
             lp_ = pos[:, :, :NL]; ym = np.full((W, T, NL), 8, np.int64); nxt = np.full((W, NL), -1)
             for t in reversed(range(T)):
@@ -809,7 +812,8 @@ def main():
                             loss_meal=float((parts[:, 1] * wts[:, 0]).sum() / max(wts[:, 0].sum(), 1)),
                             loss_other=float((parts[:, 2] * wts[:, 1]).sum() / max(wts[:, 1].sum(), 1)), loss_view=float(parts[:, 3].mean()),
                             labels_meal=int(wts[:, 0].sum()), labels_other=int(wts[:, 1].sum()),
-                            juvenile_frac=float((agesT < LEAVE).mean()), eaten_per_step=float(take[al].mean()) if al.any() else None, sec=round(dt, 3)))
+                            juvenile_frac=float((agesT < LEAVE).mean()), eaten_per_step=float(take[al].mean()) if al.any() else None,
+                            forced_frac=float(forced[al].mean()) if al.any() else None, sec=round(dt, 3)))
             dead = ~np.asarray(S_.alive)[:, NB:NB + NL]
             for w, l in zip(*np.where(dead)):
                 COD[w, l] = FAM[cr.integers(0, len(FAM))]
