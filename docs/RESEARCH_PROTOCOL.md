@@ -5577,6 +5577,12 @@ more expensive, because it produces publishable-looking nulls.
      deaf <= 10%.
   4. **Budget:** nothing else on this account beyond the pilot and the $0.1 calibration.
 
+- **REGISTERED (EXPLORE, ~$0.1): `xfcal48`**, the cross-fostering calibration at the frozen test's 48 probes x 600 steps.
+  - Gate config with a random code per life; 16 worlds x 100 updates; eligible lives only.
+  - Bar (Cam): perfect foster-learner >= 90% foster and <= 10% birth; perfect birth-decoder the mirror; deaf <= 10% on
+    both.
+  - Runs on a SEPARATE app (`throng-w2cal`) so the pilot's app is not redeployed.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
