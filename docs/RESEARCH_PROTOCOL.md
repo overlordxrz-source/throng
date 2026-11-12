@@ -5209,6 +5209,38 @@ more expensive, because it produces publishable-looking nulls.
      $6 pilot with the registered decision tree.
   6. Container noted (scaled down by itself). Spend $28.45: fine.
 
+- **RESULT (Nov 12 ~02:00), EXPLORE lane: IDEAL-OBSERVER counting decoder. THE WORLD IS EVIDENCE-POOR: no arm comes
+  near 80%** (comm-toy `3933d1e`, `learnability.py --ic-probe --io-decoder`; `docs/data/ideal_observer/`; laptop,
+  16 worlds x 80 updates, the laptop probe's lives).
+  - **Method (no training):** for each token a life hears, votes for sectors from (a) the direction of the best
+    visible food when it is heard, (b) the displacement from where it was heard to the life's next meal (available
+    only after that meal), (c) the next move of any demonstrator within view (Chebyshev <= 3). Online: each heard
+    token is decoded as the argmax of the votes available BEFORE that moment, and scored against the true sector.
+  - **Decoder control:** an oracle source (the true sector, after the fact) reaches **98.7-99.4%**. The bookkeeping
+    is correct.
+  - **Results, accuracy over the second half of a median life (median 490-650 tokens heard); chance 12.5%:**
+
+    | behaviour | (a) visible food | (b) hindsight meal | a+b | (c) demonstrators | a+b+c |
+    |---|---|---|---|---|---|
+    | navigator, listen-only (274 lives) | 13.1% | 14.9% | 15.6% | - | - |
+    | navigator + demonstrators (270 lives) | 13.4% | 15.4% | 15.8% | 17.2% | **18.4%** |
+    | scripted listener, control (184 lives) | 17.5% | 25.2% | 25.7% | - | - |
+
+  - **A demonstrator is in view for only 4.0% of the tokens heard.**
+  - **Even a listener that follows the code perfectly gets weak hindsight evidence** (25%): its next meal is often
+    not at the patch the beacon meant.
+  - **Decision (Cam's registered rule): neither arm reaches 80% within a median life -> the world is evidence-poor;
+    no learner will fix that. Report; Cam chooses** between raising the evidence (demonstrators kept near the newborn,
+    or more of them) and W2.1 parent calls.
+  - **Caveats:**
+    - this is a simple counting observer, not a provably optimal one. It ignores, e.g., the beacon's offset and
+      agents seen in the occupancy view, so it is not a strict upper bound;
+    - accuracy is measured on the beacon's sector, which the listener's own experience reflects only loosely because
+      beacons wander and the listener is up to 9 cells away.
+  - **Reading:** the beacon code describes "the direction from the BEACON to ITS nearest patch". A listener's own
+    experience barely constrains that. A parent calling about food the young can then reach (W2.1), or demonstrators
+    that stay beside the young, would make the evidence immediate.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
