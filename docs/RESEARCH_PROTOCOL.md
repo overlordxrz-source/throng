@@ -5405,6 +5405,34 @@ more expensive, because it produces publishable-looking nulls.
   - Everything else stands: the obsl1000 pick rule, both reference points in the learner report, the $6 pilot with its
     registered tree.
 
+- **BUILT (Nov 12 ~04:00): stage-1 recurrent agent, `learnability.py --agent recurrent`** (comm-toy `1baefb9`; not
+  yet pushed at the time of writing, see below).
+  - **Network (`RecAgent`):**
+    - the navigator trunk (navigator 0's weights, FROZEN);
+    - a GRU memory (128) reading the heard token, the trunk's view features, the previous action and reward;
+    - a zero-initialised head adding to the policy and value, so behaviour starts as the navigator's.
+  - **Drives:**
+    - three as auxiliary heads: the direction of the next meal (hindsight label within the chunk), the parent's next
+      move (masked unless the parent is in view), the next view;
+    - the fourth (stay near the parent) is the existing reflex.
+  - **Training:** one shared weight set; PPO, 2 epochs; backprop through each 64-step chunk from its stored starting
+    memory; memory reset at birth. Per-life codes from training family A (`code_families` parity split). Parent arm.
+  - **Evaluation:** after training, `--eval-updates` with FROZEN weights; only lives BORN in that phase are tested. The
+    life test uses the same probes, derangements (rng 4242), keys (7000+i) and last-heard credit as the frozen
+    heard25 test, with each life's final memory carried into every probe, plus a memory-zeroed control. Pass over
+    eligible lives with Wilson CI and strata.
+  - **Checks:** default path identical (8/8 lives, identical report); a smoke run end to end.
+- **RESULT (Nov 12 ~04:05), laptop pilot: stage-1 TRAINING throughput ~15.7k agent-steps/s** (rollout + 2 PPO/BPTT
+  epochs, steady state, compile excluded; W=16: 0.26 s/update, W=64: 1.05 s/update; `docs/data/stage1/`).
+  - The laptop used ~5-6 cores; the decision is on a 4-CPU container. Plan `s1tp` (a ~$0.01 price probe, W=64)
+    measures it.
+  - **Not yet launched:** the network dropped (GitHub and Modal unreachable), and a background retry pushes, deploys and
+    spawns when the network returns.
+  - Loss notes: the parent-move loss reads 0 once all children are past age 500 (no labels: the parents have left),
+    not leakage. Meal and view losses fall.
+  - **Risk flagged for the pilot:** the navigator-trunk agent eats little in a 600-step test window (homeostatic: it
+    eats when hungry), so credited-food reliance may be hard to show even when the memory carries the code.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
