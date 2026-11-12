@@ -5179,6 +5179,36 @@ more expensive, because it produces publishable-looking nulls.
       drive that turns that into a learning signal;
     - (c) the effect sizes are small, so stage-1 pilots need many lives (thousands) to read.
 
+- **Cam, Nov 12 (rulings on the ~01:20 and ~01:40 reports).**
+  1. **Stage 0: PASS, accepted.**
+  2. **Copying: accepted as working.** Record both readings of "top word": per slot passes at 500 (66%); the whole
+     word reaches 59% only by 1,000 (40% at 500); chance 0.4%.
+     - **(e) verdict ADOPTED: "transmission uninformative; cause unknown; copy pathway works on a single functional
+       elder; conflicting founder dictionaries is the leading untested hypothesis".** The "temperature 0.08"
+       wording is withdrawn. Do not test the hypothesis in the archived toy.
+     - **Design note for stages 2-3:** newborns copy mainly from ONE elder (the parent), which the approved
+       stay-near-parent drive supports.
+  3. **In-context probe read accepted.** Extra caveat: 1,480 training lives is tiny for meta-learning an inference
+     algorithm (RL^2-style results use 1e5+ episodes). The probe mixes "is the evidence in the stream" with "can a GRU
+     learn to use it from 1,480 examples". Separate them first.
+  4. **Next, free (laptop, < 10 min, EXPLORE): an IDEAL-OBSERVER counting decoder, no training.**
+     - Per token in a life, accumulate evidence directions:
+       - (a) food visible in view at hearing time;
+       - (b) direction of the next meal from where the token was heard (hindsight);
+       - (c) demonstrators' movement direction after hearing (demonstrator arm).
+     - Decode each token as the argmax sector; accuracy vs tokens heard, per arm, on the probe's lives. Also report
+       demonstrator visibility (fraction of tokens heard with a demonstrator in view).
+     - **Decision:**
+       - counting decoder >= 80% within a median life in an arm: the evidence is there and the GRU's weakness is
+         meta-training data. Build the stage-1 agent for that arm first, sized for >= 1e5 training lives;
+       - neither arm gets there: the world is evidence-poor; report, and Cam chooses between raising the evidence
+         and moving to W2.1 parent calls.
+  5. **Stage-1 agent after (4).** 1e5+ lives x ~1,000 steps = 1e8-1e9 agent-steps. If the learnability harness can't
+     reach ~11k steps/s/container, port the frozen test's scoring onto the JAX W2 env and verify it reproduces b61afb2
+     (perfect >= 90%, deaf <= 10%, within CI) before any pilot. Do not shrink the run to fit a slow harness. Then the
+     $6 pilot with the registered decision tree.
+  6. Container noted (scaled down by itself). Spend $28.45: fine.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
