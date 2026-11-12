@@ -126,6 +126,7 @@ def main():
     ap.add_argument("--snap-ages", default="", help="comma-separated ages: snapshot each life's weights there; the heard25 test also runs on them (steps to first reliance)")
     ap.add_argument("--forage-check", action="store_true", help="stage 1 (Cam Nov 12): with --ckpt, compare the trained agent with the navigator (side heads zeroed) on the same fresh worlds, natural energy: KM lifespan, food/step by age, deaths by age and cause; then exit")
     ap.add_argument("--forage-worlds", type=int, default=32); ap.add_argument("--forage-updates", type=int, default=120)
+    ap.add_argument("--grad-diag", action="store_true", help="stage 1: with --ckpt, build one training batch, report per-loss gradient norms per module, side-head vs trunk logit norms, entropy, actions, value/advantage stats; then exit")
     ap.add_argument("--forage-control", choices=["none", "damaged"], default="none")
     ap.add_argument("--diag-only", action="store_true", help="with --diag (and e.g. --ckpt of a finished run): run the predictive-head swap check and exit")
     ap.add_argument("--log-levers", action="store_true", help="diagnostic (Cam Nov 10, 4a): per update, each lever's own signal (pred loss, copy CE + rows, replay passes + loss, young-lr factor) to <out>.levers.jsonl")
@@ -700,6 +701,45 @@ def main():
             os.makedirs(os.path.dirname(a.out) or ".", exist_ok=True); json.dump(out, open(a.out, "w"), indent=1, default=float)
             print("FORAGE_CHECK", json.dumps(out, default=float), flush=True)
 
+        def grad_diag(rp, b, adv, ret, v, al, act):
+            """Cam Nov 12 diagnosis: which loss moves the shared memory, how big the learned policy term is next to the
+            navigator's, and what the policy now does"""
+            def part(q, i):
+                _, P_ = jax.vmap(seq_loss, in_axes=(None,) + (0,) * 13)(q, *b); return P_[:, i].mean()
+            groups = {"shared_memory(side_enc+gru)": ("side_enc", "gru"), "side_head": ("side_head",), "side_value": ("side_value",),
+                      "aux_heads": ("aux_meal", "aux_other", "aux_view")}
+            gn = {}
+            for nm, i, wgt in (("ppo", 0, 1.0), ("meal", 1, a.aux), ("other", 2, a.aux), ("view", 3, a.aux)):
+                g = jax.grad(part)(rp, i)["params"]
+                gn[nm] = {gk: float(wgt * np.sqrt(sum(float((leaf ** 2).sum()) for m_ in mods for leaf in jax.tree_util.tree_leaves(g[m_])))) for gk, mods in groups.items()}
+            rpn = {"params": {k_: (jax.tree_util.tree_map(jnp.zeros_like, v_) if k_ in ("side_head", "side_value") else v_) for k_, v_ in rp["params"].items()}}
+            def fw(q, x, h0):
+                def body(h, xx):
+                    h2, lg, vv, _ = rnet.apply(q, h, xx); return h2, (lg, vv)
+                return jax.lax.scan(body, h0, x)[1]
+            (lgA, vA), (lgN, vN) = (jax.jit(jax.vmap(fw, in_axes=(None, 0, 0)))(q, b[0], b[1]) for q in (rp, rpn))
+            m = np.asarray(b[6]) > 0; lgA, lgN, vA = np.asarray(lgA)[m], np.asarray(lgN)[m], np.asarray(vA)[m]
+            side = lgA - lgN
+            def ent(lg):
+                p_ = np.exp(lg - lg.max(-1, keepdims=True)); p_ /= p_.sum(-1, keepdims=True); return p_, float(-(p_ * np.log(p_ + 1e-12)).sum(-1).mean())
+            pA, eA = ent(lgA); pN, eN = ent(lgN)
+            kl = float((pA * (np.log(pA + 1e-12) - np.log(pN + 1e-12))).sum(-1).mean())
+            names = ["stay", "up", "down", "right", "left", "eat"]; alm = np.asarray(al, bool)
+            out = dict(at_update=it, at_agent_steps=steps_train, aux_coef=a.aux,
+                       grad_norm_by_loss_and_module=gn,
+                       logit_norm=dict(trunk_navigator=float(np.linalg.norm(lgN - lgN.mean(-1, keepdims=True), axis=-1).mean()),
+                                       side_head=float(np.linalg.norm(side - side.mean(-1, keepdims=True), axis=-1).mean())),
+                       side_head_mean_contribution={n_: round(float(c_), 4) for n_, c_ in zip(names, (side - side.mean(-1, keepdims=True)).mean(0))},
+                       policy_entropy=dict(agent=eA, navigator=eN, max=float(np.log(6))), kl_agent_to_navigator=kl,
+                       action_prob_mean=dict(agent={n_: round(float(c_), 4) for n_, c_ in zip(names, pA.mean(0))}, navigator={n_: round(float(c_), 4) for n_, c_ in zip(names, pN.mean(0))}),
+                       actions_taken={n_: round(float((np.asarray(act)[alm] == i_).mean()), 4) for i_, n_ in enumerate(names)},
+                       value=dict(mean=float(vA.mean()), sd=float(vA.std()), navigator_value_mean=float(np.asarray(vN)[m].mean())),
+                       returns=dict(mean=float(np.asarray(ret)[alm].mean()), sd=float(np.asarray(ret)[alm].std())),
+                       advantage_raw=dict(mean=float(np.asarray(adv)[alm].mean()), sd=float(np.asarray(adv)[alm].std()), abs_mean=float(np.abs(np.asarray(adv)[alm]).mean())),
+                       explained_variance=float(1 - np.var((np.asarray(ret) - np.asarray(v))[alm]) / (np.var(np.asarray(ret)[alm]) + 1e-12)))
+            os.makedirs(os.path.dirname(a.out) or ".", exist_ok=True); json.dump(out, open(a.out, "w"), indent=1, default=float)
+            print("GRAD_DIAG", json.dumps(out, default=float), flush=True)
+
         # ---- training, with milestone readouts and checkpoints
         S_ = S; Hh = jnp.zeros((W, NL, Hd)); PA = jnp.zeros((W, NL), jnp.int32); PR = jnp.zeros((W, NL))
         COD = np.tile(np.arange(8), (W, M, 1)); COD[:, :NL] = FAM[cr.integers(0, len(FAM), (W, NL))]
@@ -755,6 +795,8 @@ def main():
             tr = lambda z: jnp.asarray(np.swapaxes(np.asarray(z), 1, 2).reshape((W * NL, T) + np.asarray(z).shape[3:]))  # noqa: E731
             b = (tr(x), jnp.asarray(np.asarray(H0).reshape(W * NL, Hd)), tr(act), tr(lp), tr(A_.astype(np.float32)), tr(ret.astype(np.float32)),
                  tr(m), tr(ym), tr(mm.astype(np.float32)), tr(yo), tr(mo.astype(np.float32)), tr(yv.astype(np.float32)), tr(mv.astype(np.float32)))
+            if a.grad_diag:
+                return grad_diag(rp, b, adv, ret, v, al, act)
             for _ in range(a.epochs):
                 rp, ros, parts = upd(rp, ros, *b)
             parts = np.asarray(parts)                     # per-sequence [ppo, meal, other, view, n_meal, n_other]
