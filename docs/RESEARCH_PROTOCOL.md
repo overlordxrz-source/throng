@@ -5026,6 +5026,62 @@ more expensive, because it produces publishable-looking nulls.
       harness and one probe suite; explore and confirm lanes.
     - Not adopted. Nothing in it overrides a ruling.
 
+- **Cam, Nov 11-12: rulings on NORTH_STAR_V2 (4e73d85) and the open ~23:10 items** (supersedes his 09:27Z paste).
+  0. **v2 ADOPTED as the mainline**, with the amendments below. Literature checked by Cam: RL^2 (Duan et al. 2016),
+     "Learning to reinforcement learn" (Wang et al. 2016) and AI-GAs (Clune 2019) say what v2 cites them for;
+     Bhoopchand et al. 2023 (Nature Communications) as described. Read its ablations before designing stage 1.
+  1. **~23:10 items:**
+     - dose reruns CANCELLED (they test in-life gradient learning, which v2 drops); keep the $1.63;
+     - **toy population verdict: "transmission uninformative (copy pathway ineffective, temperature 0.08)"**;
+     - fast learner un-parked and folded into stage 1 as the main line, in the unified harness (not the old FL
+       test);
+     - idea A becomes v2's "next meal" head, trained on the slow weights across lives.
+  2. **Amendments:**
+     - (a) inborn codes only if they arise from training or selection on the world's pressures; claim name stays
+       "inborn signalling" until cross-fostering shows culture;
+     - (b) the stage 1 gate adds foraging within 10% of the navigators, and both VoI forms >= 1.5x in the unified
+       harness;
+     - (c) stage 1 has two arms from the start:
+       - **listen-only:** associative learning from own meals;
+       - **demonstrators:** scripted perfect followers acting on that life's random code, then dropping out, with
+         the "where others will be" head;
+     - (d) the adaptation yardstick is the measurable version of "surpassing"; M's full goal stays the north star;
+       the LLM-agent comparison is M's call, not before stage 2;
+     - (e) two lanes: EXPLORE (free or < $1, no bars, labelled) and CONFIRM (registered). Report effects with
+       intervals, pooled over lives. Required before every launch: the resolved config, the arm diff, and the
+       lever-did-work check;
+     - (f) **W2 is the mainline. The toy and the production network are ARCHIVED:** code frozen, no further spend.
+       Final status: **production network: rung 2 met Nov 9; toy: closed.**
+  3. **Work order:**
+     - (i) stage 0, a random code per life, gate perfect >= 90% and deaf <= 10%;
+     - (ii) copying repair + unit test: a newborn copying a frozen elder reaches >= 50% agreement with the elder's
+       top word per situation within 500 steps, chance reported;
+     - (iii) stage 1 recurrent agent (GRU 128-256), slow weights across lives, no in-life gradient; 10-min laptop
+       pilot, EXPLORE lane: reliance must rise with tokens heard;
+     - (iv) one Modal stage-1 pilot with both arms; price probe first; **cap $6**. Decision tree registered before
+       launch: rise -> CONFIRM on held-out code families (needs new credits); no rise by ~1B agent-steps ->
+       key-value memory once; still none -> listening must be inborn, report.
+  4. Guard: check at every session start and before every spawn. 5. No page needed: M prefers chat.
+- **M APPROVED (card, 06:01Z), relayed by Cam: "Yes, all of it".**
+  - Slow weights pass down lineages, with mutation and selection between lineages. Culture is shown only by the
+    cross-fostering test.
+  - **Four permanent inborn drives:** young stay near voices / parent; "where my next meal was" in hindsight; where
+    others will be; the next view. No longer scaffolding; allowed in both stage-1 arms.
+- **RESULT (Nov 12 ~01:05), EXPLORE lane: STAGE 0 PASSES** (comm-toy `18dfacd`, `learnability.py --code-per-life`;
+  `docs/data/stage0/`).
+  - **Design:** each life hears the beacons through its own random sector -> token permutation (drawn at birth, own
+    RNG stream). The scripted listener decodes with the inverse, so it stays a perfect decoder. Swaps, credit and
+    eligibility stay in sector space; coverage counts are mapped back at death. With the flag off the default path
+    is identical (8/8 lives, identical report), and the resume test passes.
+  - **Smoke** (8 worlds x 100 updates, 24 probes x 600, 59 eligible lives): with and without random codes, EVERY
+    number is identical (scripted 83.1% [71.5, 90.5], deaf 0%, VoI 3.56x / 3.19x).
+    - Expected: the perfect decoder inverts the code, and the deaf agent ignores messages.
+    - So the frozen gate's full-scale result (91.9%, deaf 0%, VoI 3.4x / 3.1x; 197 lives x 48 probes) carries over
+      by construction.
+  - **The code is live (control with teeth):** a scripted listener that ignores the code passes 60.6% with codes off
+    and **6.2% with codes on** (VoI 3.73x -> 1.54x). 4 worlds, 16 probes, ~33 eligible lives each.
+  - Deviation: the smoke pair took 12.7 min on the laptop (over the ~10-min rule); later checks were sized down.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
