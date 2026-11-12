@@ -5032,7 +5032,8 @@ more expensive, because it produces publishable-looking nulls.
      Bhoopchand et al. 2023 (Nature Communications) as described. Read its ablations before designing stage 1.
   1. **~23:10 items:**
      - dose reruns CANCELLED (they test in-life gradient learning, which v2 drops); keep the $1.63;
-     - **toy population verdict: "transmission uninformative (copy pathway ineffective, temperature 0.08)"**;
+     - **toy population verdict: "transmission uninformative (copy pathway ineffective, temperature 0.08)"**
+       [the cause in brackets was WITHDRAWN Nov 12: see the copy-pathway unit test below];
      - fast learner un-parked and folded into stage 1 as the main line, in the unified harness (not the old FL
        test);
      - idea A becomes v2's "next meal" head, trained on the slow weights across lives.
@@ -5081,6 +5082,38 @@ more expensive, because it produces publishable-looking nulls.
   - **The code is live (control with teeth):** a scripted listener that ignores the code passes 60.6% with codes off
     and **6.2% with codes on** (VoI 3.73x -> 1.54x). 4 worlds, 16 probes, ~33 eligible lives each.
   - Deviation: the smoke pair took 12.7 min on the laptop (over the ~10-min rule); later checks were sized down.
+
+- **RESULT (Nov 12 ~01:30), EXPLORE lane: copy-pathway unit test. CORRECTION: the copy pathway WORKS; the toy
+  population's "temperature 0.08" explanation is WITHDRAWN** (comm-toy `a0ea34e`, `pop_toy.py --copy-unit`;
+  `docs/data/copy_unit/`).
+  - **Setup:**
+    - newborn = brain 1 (a fresh navigator); frozen elder = brain 0 (verified untouched after training);
+    - training situations = 288 elder sender rows from 3 rollouts; held out = 96 rows from a 4th;
+    - batch 512, the population's own optimiser and sensitive-period plasticity;
+    - chance = fresh navigators' agreement with the same targets.
+  - **Noise elder (an untrained navigator; 76 distinct words on 96 held-out rows):** 500 steps give 10% / 10% / 3% per
+    slot (ce / soft / embed), chance 1.6%. Nothing to generalise; this is what my Nov 10 check (4b) actually tested.
+  - **Functional elder (a fixed 3-slot word per lit fire, as a working founder has; 4 situations held out):**
+
+    | loss | per-slot agreement, step 500 / 1,000 / 1,500 | whole word, step 500 / 1,000 / 1,500 |
+    |---|---|---|
+    | ce, TAU 0.08 (the population's own loss) | **66%** / 85% / 85% | 40% / **59%** / 58% |
+    | embedding match | 55% / 80% / 87% | 17% / 50% / 65% |
+    | soft temperature (1.0) | 39% / - / - | 12% / - / - |
+
+    Chance: 0.4% per slot, 0% whole word. Every loss is flat for ~200 steps, then rises.
+  - **Cam's bar (>= 50% agreement with the elder's top word within 500 steps):** met per slot by the unchanged ce loss
+    (66%); the whole 3-slot word needs ~800-1,000 steps (59% by 1,000, within the population's 1,000-update
+    sensitive period). One seed; no variance estimate.
+  - **Correction on the record:** check 4b (Nov 10) attributed the failed transmission to TAU 0.08. That check copied
+    a noise elder, which nothing can generalise, so it did not test the pathway. With a functional elder the same
+    loss works. "Copy pathway ineffective (temperature 0.08)" is **WITHDRAWN** as the cause.
+    - Remaining hypotheses, untested: each gen-2 newborn copied THREE founders whose dictionaries agreed on only
+      25-50% of fires (conflicting targets), and the copy step competes with PPO updates.
+    - **Proposed verdict wording, for Cam: "transmission uninformative: newborns copied conflicting founder
+      dictionaries; the copy pathway works on a single functional elder".**
+  - **No copy repair is needed for W2.** Keep the unit test (functional elder, >= 50% per slot by 500 steps; whole
+    word reported) as a standing check.
 
 ## Part 3 — Fossils
 
