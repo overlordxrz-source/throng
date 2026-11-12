@@ -5302,6 +5302,23 @@ more expensive, because it produces publishable-looking nulls.
     - median tokens heard per life halve in the parent arm (286 vs 628): following the parent takes the young out of
       earshot of the beacons more often.
 
+- **Cam, Nov 12 (ruling on the ~03:00 parent-arm report).**
+  1. **Which 80%: Cam meant exact sector.** A score added after the data cannot pass a bar on its own. **Recorded:
+     parent-arm counting decoder, exact sector <= 52% (FAILS); same move 80-84% at ages 250-500 and 76% after
+     dropout (POST HOC, flagged).** Settle it with the registered behavioural test instead.
+  2. **Plug-in check (free, EXPLORE):** a "counting-observer listener" that acts on its CURRENT decoded mapping
+     (argmax of evidence so far, beacon cues + parent) with the same sector -> move rule as the scripted perfect
+     listener, run through the frozen life test (b61afb2) on parent-arm lives.
+     - Confirm whether the scripted perfect listener uses the same sector -> move rule as the parent.
+     - Report eligibility in the parent arm with the sector-count strata.
+  3. **Decision tree:**
+     - observer-listener passes >= 50% of eligible lives: build the stage-1 agent for the parent arm (>= 1e5 training
+       lives, throughput check / JAX port first), then the $6 pilot;
+     - below 50%: rerun the plug-in with the parent leaving at 1,000 instead of 500 (free); if that passes, build with
+       it; if not, report;
+     - fewer than 50 eligible lives in a check: add lives before reading it.
+  4. Budget unchanged: all free; spend ~$28.4.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
