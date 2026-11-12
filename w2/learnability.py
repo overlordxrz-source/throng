@@ -112,6 +112,7 @@ def main():
     ap.add_argument("--test-energy", type=float, default=0.0, help="probe episodes start the learner at this energy (0 = unchanged); stage-1 readouts use 0.3 if unset")
     ap.add_argument("--eval-updates", type=int, default=60, help="recurrent: updates with FROZEN weights after training; lives born then are tested")
     ap.add_argument("--code-family", default="A", choices=["A", "B"], help="per-life codes drawn from this family (A = training)")
+    ap.add_argument("--crossfoster", action="store_true", help="Cam Nov 12 stage-3 instrument calibration (with --code-per-life --no-train): foster-coded vs birth-coded probes for a perfect foster-learner, a perfect birth-decoder and a deaf navigator")
     ap.add_argument("--parent-leave", type=int, default=0, help="age at which the parent leaves (0 = the juvenile period)")
     ap.add_argument("--eval-eligible-only", action="store_true", help="run the life test only on lives that heard >= --min-sectors sectors >= --min-heard x (eligibility rate recorded before the filter)")
     ap.add_argument("--parent", action="store_true", help="Cam Nov 12: one scripted parent per newborn (elder l pairs with learner l) stays within 2-3 cells through the juvenile period, then leaves; young-seek targets the parent; no demonstrators in the life test")
@@ -351,6 +352,50 @@ def main():
             return eval_life(p, c, k, 0, q, b if life_start else None, m if lh else None, mute, rand_fb)
         f = jax.jit(jax.vmap(jax.vmap(one, in_axes=(None, None, 0, 0, None, None)), in_axes=(0, 0, 0, 0, 0, 0)))
         return lambda p, c, k, q, b, m, cd=None: f(p, c, k, q, b, m)
+
+
+    def crossfoster_calibration(lives, scorable, Pz, C, keys, SM):
+        """Stage-3 instrument (Cam Nov 12). Per life: foster code CF (heard all life) and a birth code CB that differs
+        from CF on every well-heard sector. Probes: the same scripted beacons encode with CF (foster probe) or CB (birth
+        probe), same keys, no derangement, last-heard credit. Uses-foster = pass(foster probes vs birth probes); uses-
+        birth = the reverse. Listeners: perfect foster-learner (decodes inv CF), perfect birth-decoder (decodes inv CB),
+        deaf navigator."""
+        n = len(lives); E_ = a.eval_eps; rb = np.random.default_rng(5150)
+        CF = np.stack([x["code"] for x in lives]); CB = CF.copy()
+        for i, x in enumerate(lives):
+            Ss = np.where(x["heard"] >= a.min_heard)[0]
+            while True:
+                q = rb.permutation(8)
+                if np.all(q[Ss] != CF[i, Ss]):
+                    break
+            CB[i] = q
+        def mk(c):
+            A_ = np.tile(np.arange(8), (n, M, 1)); A_[:, 0] = c; return jnp.asarray(A_)
+        CLF, CLB = mk(CF), mk(CB)
+        DF = np.tile(np.arange(8), (n, M, 1)); DF[:, 0] = np.argsort(CF, 1); DB = np.tile(np.arange(8), (n, M, 1)); DB[:, 0] = np.argsort(CB, 1)
+        ident = jnp.asarray(np.tile(np.arange(8), (n, E_, 1)))
+        out = dict(lives=n, eligible=int(np.asarray(scorable).sum()))
+        sv = a.sanity
+        for name, dec, scripted_ in (("perfect_foster_learner", DF, True), ("perfect_birth_decoder", DB, True), ("deaf_navigator", None, False)):
+            a.sanity = scripted_
+            if dec is not None:
+                f = jax.jit(jax.vmap(jax.vmap(lambda p, c, k, q, m, cd, dc: eval_life(p, c, k, 0, q, None, m, False, False, cd, dc),
+                                              in_axes=(None, None, 0, 0, None, None, None)), in_axes=(0, 0, 0, 0, 0, 0, 0)))
+                ef = np.asarray(f(Pz, C, keys, ident, SM, CLF, jnp.asarray(dec))); eb = np.asarray(f(Pz, C, keys, ident, SM, CLB, jnp.asarray(dec)))
+            else:
+                f = jax.jit(jax.vmap(jax.vmap(lambda p, c, k, q, m, cd: eval_life(p, c, k, 0, q, None, m, False, False, cd),
+                                              in_axes=(None, None, 0, 0, None, None)), in_axes=(0, 0, 0, 0, 0, 0)))
+                ef = np.asarray(f(Pz, C, keys, ident, SM, CLF)); eb = np.asarray(f(Pz, C, keys, ident, SM, CLB))
+            el = np.asarray(scorable)
+            fos = np.array([_life_pass(ef[i], eb[i]) for i in range(n)]); bir = np.array([_life_pass(eb[i], ef[i]) for i in range(n)])
+            out[name] = dict(uses_foster=float(fos[el].mean()), uses_foster_ci95=_wilson(int(fos[el].sum()), int(el.sum())),
+                             uses_birth=float(bir[el].mean()), uses_birth_ci95=_wilson(int(bir[el].sum()), int(el.sum())),
+                             eaten_foster_probes=float(ef[el].mean()), eaten_birth_probes=float(eb[el].mean()))
+        a.sanity = sv
+        pf, pb, dn = out["perfect_foster_learner"], out["perfect_birth_decoder"], out["deaf_navigator"]
+        out["calibrated"] = bool(pf["uses_foster"] >= 0.9 and pf["uses_birth"] <= 0.1 and pb["uses_birth"] >= 0.9 and pb["uses_foster"] <= 0.1
+                                 and dn["uses_foster"] <= 0.1 and dn["uses_birth"] <= 0.1)
+        return out
 
     rng = np.random.default_rng(a.seed); key = jax.random.PRNGKey(a.seed)
     states = []
@@ -918,6 +963,8 @@ def main():
         summ["heard25"] = heard25_report(a, lives, res, scorable, true, swap, der, blind, blind_swap, silent)
         if OBS_INFO:
             summ["heard25"]["obs_listener"] = OBS_INFO
+        if a.crossfoster:
+            summ["crossfoster"] = crossfoster_calibration(lives, scorable, Pz, C, keys, SM)
         if a.parent:
             summ["heard25"]["parent"] = dict(leave_age=a.parent_leave or a.juvenile)
         if evaluate_voi_r is not None:
