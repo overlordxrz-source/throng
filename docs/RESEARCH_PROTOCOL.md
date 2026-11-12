@@ -5148,6 +5148,37 @@ more expensive, because it produces publishable-looking nulls.
   - **Prediction:** with ~10x the lives the GRU's edge over memoryless grows to 3-8 points but still does not grow
     with tokens heard (P = 0.6); the demonstrator arm beats listen-only by >= 5 points at 41+ tokens (P = 0.3).
 
+- **RESULT (Nov 12 ~01:35), EXPLORE lane: `icp` in-context probe at scale** (Modal, both exited 0, **$0.15**;
+  `docs/data/icp/icp_listen_f608dd3.json`, `icp_demo_f608dd3.json`).
+  - ~1,480 training / ~370 test lives per arm; ~200k heard test steps. Chance 12.5% uniform, 14-15% majority.
+
+    | arm | GRU | memoryless | GRU - memoryless, by tokens heard 1-5 / 6-15 / 16-40 / 41-100 / 101+ |
+    |---|---|---|---|
+    | listen-only | 21.9% | 20.0% | +0.6 / +1.5 / +1.4 / +1.6 / +2.1 points |
+    | demonstrators | 21.9% | 18.7% | -4.7 / -3.4 / +1.0 / +2.7 / +3.6 points |
+
+  - **Listen-only:** under navigator behaviour a life's stream carries almost no usable evidence of its code. Memory
+    adds ~2 points with direct supervision.
+  - **Demonstrators:** memory's advantage GROWS steadily with tokens heard (-4.7 -> +3.6 points). That is the signature
+    of in-life inference, but small. The early deficit suggests the GRU discounts the current step until it has
+    seen some demonstrations.
+  - **Prediction scoring:**
+    - "the edge grows to 3-8 points but not with tokens heard" (P 0.6): listen-only MISSED (edge ~2, flat);
+      demonstrators MISSED the other way (it grows with tokens);
+    - "demonstrators beat listen-only by >= 5 points at 41+ tokens" (P 0.3): MISSED (GRU +1.6 at 41-100, -0.2 at
+      101+).
+  - **Caveats:**
+    - the GRU still overfits (training loss 1.2-1.5);
+    - demonstrator visibility is unmeasured;
+    - behaviour is the PASSIVE navigator. An agent that acts on what it hears creates its own evidence (follow a
+      token, find food or not), which a passive probe cannot see. So this bounds what passive observation alone
+      offers; it does not bound an active learner.
+  - **Implications for stage 1:**
+    - (a) the demonstrator arm is the more promising one, as Cam's amendment (c) expected;
+    - (b) the listen-only arm will have to rely on its own exploration of tokens; the hindsight next-meal head is the
+      drive that turns that into a learning signal;
+    - (c) the effect sizes are small, so stage-1 pilots need many lives (thousands) to read.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
