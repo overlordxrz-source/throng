@@ -5319,6 +5319,25 @@ more expensive, because it produces publishable-looking nulls.
      - fewer than 50 eligible lives in a check: add lives before reading it.
   4. Budget unchanged: all free; spend ~$28.4.
 
+- **Plug-in check, design (comm-toy `f5783c6`; EXPLORE, < $1). Confirmed in code:** the scripted perfect listener and
+  the parent use the same `scripted()` sector -> move rule (diagonals walked as straight moves). The life test
+  therefore sees only the move class, and this check is the fair arbiter.
+  - **`--obs-listener observer`:**
+    - lives run with navigator behaviour plus the parent (leaves at 500);
+    - at each life's end, the token -> sector table = the argmax of that life's counting-decoder evidence (beacon cues
+      A+B + parent moves c; ties / no evidence -> random);
+    - the frozen life test (heard25, last-heard, >= 5 sectors >= 25x, 48 x 600) then runs the scripted listener
+      acting through that table.
+  - **`--obs-listener true`:** the same lives, the table = the life's real inverse code. This is the perfect-decoder
+    control ON PARENT-ARM LIVES (fewer tokens heard, so it may fall short of the frozen gate's 91.9%).
+  - The deaf control is the navigator on the same lives. `--eval-eligible-only` runs the test only on eligible lives;
+    the eligibility rate is recorded before the filter. A smoke run: ~26% of parent-arm lives eligible.
+  - Plan `obsl`: 32 worlds x 150 updates, both modes; est. ~$0.25; item watch at $1.25. Plan `obsl1000` (parent
+    leaves at 1,000) is held for the "below 50%" branch.
+  - **Decision (Cam's tree):** observer >= 50% of eligible lives -> build the stage-1 agent for the parent arm; below
+    -> run `obsl1000`; still below -> report.
+  - **Prediction:** observer >= 50% with P ~0.45; true-code control >= 90% with P ~0.5.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under

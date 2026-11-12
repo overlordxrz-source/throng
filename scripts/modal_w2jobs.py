@@ -13,7 +13,7 @@ from pathlib import Path
 import modal
 
 _REQUIREMENTS = str(Path(__file__).resolve().parents[1] / "requirements.txt")
-PINNED_SHA = "f608dd3bd280eb001babafdff0fff5f6be3a6a62"  # comm-toy: + code-per-life, copy unit test, in-context probe, demonstrators
+PINNED_SHA = "f5783c62db55b87bfe34656fa6463ba5ee691fbd"  # comm-toy: + parent arm, observer listener, eligible-only eval
 REPO_URL = "https://github.com/overlordxrz-source/throng.git"
 VOLUME_MOUNT = "/mnt/throng-runs"
 OUTD = f"{VOLUME_MOUNT}/testbed/w2jobs"
@@ -58,7 +58,14 @@ _DOSE = [*_ARM[:-2], "--juvenile", "500", "--pred", "1.0", "--copy", "1.0", "--c
 _ICP = ["w2/learnability.py", "--navs", _NAVS, *_WORLD, "--beacon-walk", "--young-seek", "--beacon-spread", "6", "--test", "heard25",
         "--score", "last-heard", "--min-sectors", "5", "--seek-age", "500", "--code-per-life", "--no-train", "--ic-probe",
         "--updates", "150", "--worlds", "64", "--ic-steps", "2000", "--ic-len", "640"]
+_OBSL = ["w2/learnability.py", "--navs", _NAVS, *_WORLD, "--beacon-walk", "--young-seek", "--beacon-spread", "6", "--test", "heard25",
+         "--score", "last-heard", "--min-sectors", "5", "--seek-age", "500", "--code-per-life", "--no-train", "--ic-probe", "--parent",
+         "--eval-eps", "48", "--test-window", "600", "--updates", "150", "--worlds", "32", "--eval-eligible-only"]
 PLANS = {
+    # Cam Nov 12 plug-in check (EXPLORE, < $1): counting-observer listener vs the true-code control, frozen test, parent arm
+    "obsl": [("obsl_observer", [*_OBSL, "--obs-listener", "observer"]), ("obsl_true", [*_OBSL, "--obs-listener", "true"])],
+    "obsl1000": [("obsl1000_observer", [*_OBSL, "--obs-listener", "observer", "--parent-leave", "1000"]),
+                 ("obsl1000_true", [*_OBSL, "--obs-listener", "true", "--parent-leave", "1000"])],
     # Nov 12, EXPLORE lane (< $1, no bars): the stage-1 supervised in-context probe at ~10x the laptop's lives
     "icp": [("icp_listen", [*_ICP]), ("icp_demo", [*_ICP, "--demonstrators"])],
     # Cam Nov 10 ~18:20: dose-response (R32 x5, R128 x3 after the price probe, J2000 x5); item cap $4, stopped at $5
