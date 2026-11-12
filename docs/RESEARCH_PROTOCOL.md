@@ -5361,6 +5361,25 @@ more expensive, because it produces publishable-looking nulls.
     port the frozen test's scoring onto the JAX W2 env and verify it reproduces b61afb2 (perfect >= 90%, deaf
     <= 10%, within CI) before any pilot.
 
+- **Cam, Nov 12 (ruling on the ~02:55 plug-in report).**
+  1. **PASS accepted** (observer 54.2%, CI 47.5-60.8, on the point estimate; true-code 87.3%; deaf 0%).
+     **CI caveat recorded: the observer's lower bound (47.5%) is below the 50% bar.** **The parent arm is the stage-1
+     arm.**
+  2. **Headroom (EXPLORE, ~$0.25, same watch):** the same plug-in with the parent leaving at 1,000 (plan `obsl1000`).
+     **PRE-REGISTERED PICK:** use parent-leave 1,000 for stage 1 iff its observer pass is >= 5 points above 54.2% (>=
+     59.2%) with >= 150 eligible lives; otherwise keep 500. An apparatus choice made before any learner runs.
+  3. **JAX port: approved as the main job.** Equivalence gate before any pilot, within CI on the JAX env:
+     - (a) the original b61afb2 config: perfect 91.9% (87.2-94.9), deaf <= 10%;
+     - (b) the parent arm: perfect 87.3%, observer 54.2%, deaf 0%.
+     - If (a) or (b) misses, find the difference before going on. Do not retune the test.
+  4. **Stage-1 agent (after the port):** parent arm; GRU 128-256; slow weights across lives; no in-life gradient; the
+     4 approved drives; a random code per life; training code families only.
+     - Report the learner's pass against BOTH reference points on the same config: the counting observer and the
+       true-code control.
+     - $6 pilot with the registered tree: reliance rises with tokens heard -> CONFIRM on held-out families (new
+       credits); no rise by ~1B agent-steps -> key-value memory once; still none -> report.
+  5. Spend $28.68 fine; ~$12.3 left under the guard.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
