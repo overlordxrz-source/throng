@@ -13,7 +13,7 @@ from pathlib import Path
 import modal
 
 _REQUIREMENTS = str(Path(__file__).resolve().parents[1] / "requirements.txt")
-PINNED_SHA = "f5783c62db55b87bfe34656fa6463ba5ee691fbd"  # comm-toy: + parent arm, observer listener, eligible-only eval
+PINNED_SHA = "1baefb92beb61006ec580c4675c8f0d7e307d0f2"  # comm-toy: + stage-1 recurrent agent
 REPO_URL = "https://github.com/overlordxrz-source/throng.git"
 VOLUME_MOUNT = "/mnt/throng-runs"
 OUTD = f"{VOLUME_MOUNT}/testbed/w2jobs"
@@ -61,7 +61,11 @@ _ICP = ["w2/learnability.py", "--navs", _NAVS, *_WORLD, "--beacon-walk", "--youn
 _OBSL = ["w2/learnability.py", "--navs", _NAVS, *_WORLD, "--beacon-walk", "--young-seek", "--beacon-spread", "6", "--test", "heard25",
          "--score", "last-heard", "--min-sectors", "5", "--seek-age", "500", "--code-per-life", "--no-train", "--ic-probe", "--parent",
          "--eval-eps", "48", "--test-window", "600", "--updates", "150", "--worlds", "32", "--eval-eligible-only"]
+_S1 = ["w2/learnability.py", "--navs", _NAVS, *_WORLD, "--beacon-walk", "--young-seek", "--beacon-spread", "6", "--test", "heard25",
+       "--score", "last-heard", "--min-sectors", "5", "--seek-age", "500", "--parent", "--agent", "recurrent"]
 PLANS = {
+    # Nov 12 price probe (EXPLORE, ~$0.01): stage-1 training throughput on a 4-CPU container
+    "s1tp": [("s1tp_w64", [*_S1, "--worlds", "64", "--updates", "12", "--eval-updates", "0"])],
     # Cam Nov 12 plug-in check (EXPLORE, < $1): counting-observer listener vs the true-code control, frozen test, parent arm
     "obsl": [("obsl_observer", [*_OBSL, "--obs-listener", "observer"]), ("obsl_true", [*_OBSL, "--obs-listener", "true"])],
     "obsl1000": [("obsl1000_observer", [*_OBSL, "--obs-listener", "observer", "--parent-leave", "1000"]),
