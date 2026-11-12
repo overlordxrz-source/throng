@@ -127,6 +127,8 @@ def main():
     ap.add_argument("--forage-check", action="store_true", help="stage 1 (Cam Nov 12): with --ckpt, compare the trained agent with the navigator (side heads zeroed) on the same fresh worlds, natural energy: KM lifespan, food/step by age, deaths by age and cause; then exit")
     ap.add_argument("--forage-worlds", type=int, default=32); ap.add_argument("--forage-updates", type=int, default=120)
     ap.add_argument("--grad-diag", action="store_true", help="stage 1: with --ckpt, build one training batch, report per-loss gradient norms per module, side-head vs trunk logit norms, entropy, actions, value/advantage stats; then exit")
+    ap.add_argument("--ppo-min-age", type=int, default=0, help="stage 1: steps of lives younger than this leave the PPO loss (diagnosis of the juvenile energy floor)")
+    ap.add_argument("--kl-nav", type=float, default=0.0, help="stage 1: coefficient of a per-step KL(agent || frozen navigator) penalty in the loss")
     ap.add_argument("--mask-forced", action="store_true", help="stage 1: drop steps whose action the parent-seek reflex overrode from the PPO loss (they were not sampled from the policy)")
     ap.add_argument("--forage-control", choices=["none", "damaged"], default="none")
     ap.add_argument("--diag-only", action="store_true", help="with --diag (and e.g. --ckpt of a finished run): run the predictive-head swap check and exit")
@@ -487,6 +489,11 @@ def main():
             ls = jax.nn.log_softmax(lg); lp = jnp.take_along_axis(ls, act[:, None], 1)[:, 0]; ratio = jnp.exp(lp - lp0)
             pg = -jnp.minimum(ratio * adv, jnp.clip(ratio, 0.8, 1.2) * adv)
             Lp = ((pg + 0.5 * (v - ret) ** 2 + 0.01 * (jnp.exp(ls) * ls).sum(-1)) * m).sum() / (m.sum() + 1e-8)
+            if a.kl_nav:                                   # KL to the frozen navigator's policy (the trunk alone), on every live step
+                P_ = rp["params"]; tn = jnp.tanh(x[:, :100] @ P_["Dense_0"]["kernel"] + P_["Dense_0"]["bias"])
+                tn = jnp.tanh(tn @ P_["Dense_1"]["kernel"] + P_["Dense_1"]["bias"]); lsn = jax.nn.log_softmax(tn @ P_["Dense_2"]["kernel"] + P_["Dense_2"]["bias"])
+                mk = m
+                Lp = Lp + a.kl_nav * ((jnp.exp(ls) * (ls - lsn)).sum(-1) * mk).sum() / (mk.sum() + 1e-8)
             Lm = (ce(am, ym) * mm).sum() / (mm.sum() + 1e-8); Lo = (ce(ao, yo) * mo).sum() / (mo.sum() + 1e-8)
             Lv = (((av - yv) ** 2).mean(-1) * mv).sum() / (mv.sum() + 1e-8)
             return Lp + a.aux * (Lm + Lo + Lv), jnp.stack([Lp, Lm, Lo, Lv, mm.sum(), mo.sum()])
@@ -779,7 +786,9 @@ def main():
             for t in reversed(range(T)):
                 nv = v[:, t + 1] if t + 1 < T else v[:, t]; nt = 1.0 - dn[:, t]
                 last = r[:, t] + 0.99 * nv * nt - v[:, t] + 0.99 * 0.95 * nt * last; adv[:, t] = last
-            ret = adv + v; m = (al & ~forced).astype(np.float32) if a.mask_forced else al.astype(np.float32)   # --mask-forced: reflex-chosen steps leave the PPO loss
+            ret = adv + v; m = (al & ~forced).astype(np.float32) if a.mask_forced else al.astype(np.float32)
+            if a.ppo_min_age:
+                m = m * ((np.asarray(R[0])[..., 99] * cfg.A_max) >= a.ppo_min_age - 0.5)   # --mask-forced: reflex-chosen steps leave the PPO loss
             A_ = (adv - (adv * m).sum() / max(m.sum(), 1)) / (adv.std() + 1e-8)
             lp_ = pos[:, :, :NL]; ym = np.full((W, T, NL), 8, np.int64); nxt = np.full((W, NL), -1)
             for t in reversed(range(T)):
