@@ -5523,6 +5523,15 @@ more expensive, because it produces publishable-looking nulls.
   - **Parent arm, leave 1,000, true code:** 88.2% (82.8-92.1) vs 87.7% (82.2-91.7); deaf 0%; 187 eligible.
   - CIs overlap: the hungry start does not distort the instrument. **The pilot's pre-launch gate is cleared.**
 
+- **LAUNCHED (Nov 12 04:31): stage-1 pilot `s1pilot`** (call fc-01M77HHYN7HQ6DTSP8PF1163KS; log
+  `testbed/w2jobs/s1pilot_8a0d027.log`; checkpoint `testbed/w2jobs/s1pilot.ckpt`; results
+  `testbed/w2jobs/s1pilot_8a0d027.json`, rewritten at each readout).
+  - Startup check (updates 90-110): 0.72-0.84 s/update (est. ~13 h for 1e9 + readouts, ~$3.5-4).
+  - Labels present: meal ~750-900, other ~10k per update; juveniles ~63%.
+  - Losses: meal falling 1.01 -> 0.80, view 0.011 -> 0.0097, other ~1.39 (flat so far), PPO small.
+  - Watches: guard (cap $41); item watch (throng-w2jobs, cap $6, stops at $7.5).
+  - Readout ETAs: 1e8 ~06:00, 3e8 ~09:00, 1e9 ~18:30 (Nov 12, EST).
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
