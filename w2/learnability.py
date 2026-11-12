@@ -83,6 +83,7 @@ def main():
     ap.add_argument("--code-per-life", action="store_true", help="Nov 11 (exploratory): each life hears the beacons through its own random sector->token code; the scripted listener decodes with the inverse (stays a perfect decoder)")
     ap.add_argument("--ic-probe", action="store_true", help="Nov 12 stage-1 diagnostic (EXPLORE): with --no-train --code-per-life, record each life's input stream and train a GRU across lives to predict the true sector behind each heard token; accuracy vs tokens heard so far, against a memoryless baseline")
     ap.add_argument("--demonstrators", action="store_true", help="scripted elders (perfect followers of the heard code) present even without a copy loss (stage-1 demonstrator arm)")
+    ap.add_argument("--io-decoder", action="store_true", help="with --ic-probe collection: run the IDEAL-OBSERVER counting decoder (no training) instead of the GRU probe (Cam Nov 12)")
     ap.add_argument("--ic-steps", type=int, default=400); ap.add_argument("--ic-len", type=int, default=640)
     ap.add_argument("--decode-identity", action="store_true", help="control for --code-per-life: the scripted listener ignores the code (decodes tokens as sectors); must FAIL when codes are on")
     ap.add_argument("--min-sectors", type=int, default=2, help="Cam Nov 10: a life is scorable only if it heard >= this many sectors >= --min-heard times (ruled: 5); pass rates over eligible lives")
@@ -205,7 +206,7 @@ def main():
             young = s.age[NB:NB + NL] < a.juvenile
             yc = s.age[NB:NB + NL] < a.young
             s2, rec = step_all(P, s, k1, shift, young, code=code)
-            return s2, rec + (s.alive[NB:NB + NL], yc)
+            return s2, rec + (s.alive[NB:NB + NL], yc, s.pos[NB:])
         return jax.lax.scan(body, s, jax.random.split(key, T))
     roll_w = jax.jit(jax.vmap(roll))
 
@@ -312,8 +313,8 @@ def main():
     snaps = {}; snap_gs = {}; prev_age = np.zeros((W, NL), np.int64)
     lives = []
     if a.ic_probe:
-        assert a.no_train and a.code_per_life and not a.sanity, "--ic-probe needs --no-train --code-per-life (navigator behaviour)"
-        IC = dict(o=[], act=[], r=[], alive=[], codes=[], lid=[]); life_id = np.zeros((W, NL), np.int64)
+        assert a.no_train and a.code_per_life and (a.io_decoder or not a.sanity), "--ic-probe needs --no-train --code-per-life (navigator behaviour; --sanity only as the decoder's control)"
+        IC = dict(o=[], act=[], r=[], alive=[], codes=[], lid=[], take=[], ea=[], pos=[]); life_id = np.zeros((W, NL), np.int64)
     it0 = 0
     if a.ckpt:
         sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "scripts"))
@@ -330,12 +331,13 @@ def main():
             it0 = Ck["it"] + 1; print(f"resumed from update {Ck['it'] + 1}", flush=True)
     for it in range(it0, a.updates):
         key, k = jax.random.split(key)
-        S, (o, act, lp, v, r, dn, take, eo, ea, ne, alive, yc) = (roll_w(P, S, jax.random.split(k, W), jnp.asarray(CODES))
+        S, (o, act, lp, v, r, dn, take, eo, ea, ne, alive, yc, mpos) = (roll_w(P, S, jax.random.split(k, W), jnp.asarray(CODES))
                                                                 if a.code_per_life else roll_w(P, S, jax.random.split(k, W)))
         o, act, lp, v, r, dn, alive = (np.asarray(x) for x in (o, act, lp, v, r, dn, alive))   # (W, T, NL, ...)
         if a.ic_probe:                                 # (W, T, NL, ...) per update, with the codes and life ids in force
             IC["o"].append(o.astype(np.float32)); IC["act"].append(np.asarray(act)); IC["r"].append(r.astype(np.float32))
             IC["alive"].append(alive); IC["codes"].append(CODES[:, :NL].copy()); IC["lid"].append(life_id.copy())
+            IC["take"].append(np.asarray(take)); IC["ea"].append(np.asarray(ea)); IC["pos"].append(np.asarray(mpos))
         hm = (o[..., 108] > 0.5) & alive
         cnt += np.einsum("wtl,wtlk->wlk", hm.astype(np.int64), (o[..., 100:108] > 0.5).astype(np.int64))
         adv = np.zeros_like(r); last = 0.0
@@ -433,6 +435,8 @@ def main():
                                   codes=CODES, crng=crng))
         if a.stop_after and it + 1 == a.stop_after:
             os._exit(3)
+    if a.ic_probe and a.io_decoder:
+        return ideal_observer(a, IC, W, NL, NE, T, cfg)
     if a.ic_probe:
         return incontext_probe(a, IC, W, NL, T)
     if not lives:
@@ -869,6 +873,79 @@ def incontext_probe(a, IC, W, NL, T):
                                                             acc=float(hit[mk & (Kte >= lo) & (Kte <= hi)].mean()) if (mk & (Kte >= lo) & (Kte <= hi)).any() else None)
                                           for lo, hi in bins})
     print("ICPROBE", json.dumps(out), flush=True)
+    os.makedirs(os.path.dirname(a.out) or ".", exist_ok=True); json.dump(out, open(a.out, "w"), indent=1)
+
+
+def ideal_observer(a, IC, W, NL, NE, T, cfg):
+    """Cam Nov 12 (EXPLORE): is the evidence for a life's code in its stream at all, with no learning? For each token a
+    life hears, accumulate votes for sectors from (a) food visible in view when it is heard (direction to the best
+    cell), (b) hindsight: the displacement from where it was heard to the life's next meal (available only once that
+    meal happens), (c) demonstrators within view (Chebyshev <= view radius) and their next move direction. Online:
+    each heard token is decoded as the argmax of the votes available BEFORE that moment (ties and no votes ->
+    random), and scored against the true sector. Accuracy vs tokens heard, per evidence set."""
+    o = np.concatenate(IC["o"], 1); alive = np.concatenate(IC["alive"], 1); take = np.concatenate(IC["take"], 1)
+    pos = np.concatenate(IC["pos"], 1); ea = np.concatenate(IC["ea"], 1) if NE else None
+    codes = np.repeat(np.stack(IC["codes"], 1), T, 1); lid = np.repeat(np.stack(IC["lid"], 1), T, 1)
+    L = cfg.L; r_ = cfg.r; o_ = np.arange(-r_, r_ + 1)
+    def sec_of(dx, dy):
+        return int(np.mod(np.round(np.arctan2(dy, dx) / (2 * np.pi / 8)), 8))
+    MOVE = {1: (-1, 0), 2: (1, 0), 3: (0, 1), 4: (0, -1)}
+    sets = {"oracle_control": "o", "a_visible_food": "a", "b_hindsight_meal": "b", "a+b": "ab"}
+    if NE:
+        sets.update({"c_demonstrators": "c", "a+b+c": "abc"})
+    rng = np.random.default_rng(a.seed + 21)
+    rec = {k: [] for k in sets}; heard_per_life = []; vis = []
+    for w in range(W):
+        for l in range(NL):
+            for li in np.unique(lid[w, :, l]):
+                idx = np.where((lid[w, :, l] == li) & alive[w, :, l])[0]
+                if len(idx) < 100:
+                    continue
+                ob = o[w, idx, l]; hd = ob[:, 108] > 0.5; tok = ob[:, 100:108].argmax(1)
+                inv = np.argsort(codes[w, idx[0], l]); tsec = inv[tok]
+                p = pos[w, idx, l]; eat = take[w, idx, l] > 0
+                heard_per_life.append(int(hd.sum()))
+                # evidence events: (time available, token, sector, source)
+                ev = []
+                meal_t = np.where(eat)[0]
+                for i in np.where(hd)[0]:
+                    ev.append((i + 1, tok[i], int(tsec[i]), "o"))     # positive control: the true sector, after the fact
+                    wv = ob[i, :(2 * r_ + 1) ** 2]
+                    if wv.max() > 0.2:
+                        b = int(wv.argmax()); ev.append((i, tok[i], sec_of(o_[b // (2 * r_ + 1)], o_[b % (2 * r_ + 1)]), "a"))
+                    nm = meal_t[meal_t > i]
+                    if len(nm):
+                        j = nm[0]; d = (p[j] - p[i] + L // 2) % L - L // 2
+                        if np.abs(d).sum() > 0:
+                            ev.append((j, tok[i], sec_of(d[0], d[1]), "b"))
+                    if NE:
+                        pe = pos[w, idx[i], NL:]; dd = (pe - p[i] + L // 2) % L - L // 2
+                        near = np.abs(dd).max(1) <= r_; vis.append(bool(near.any()))
+                        for e in np.where(near)[0]:
+                            m = int(ea[w, idx[i], e])
+                            if m in MOVE:
+                                ev.append((i + 1, tok[i], sec_of(*MOVE[m]), "c"))
+                ev.sort(key=lambda x: x[0])
+                for name, srcs in sets.items():
+                    V = np.zeros((8, 8)); k = 0; e_i = 0
+                    for i in np.where(hd)[0]:
+                        while e_i < len(ev) and ev[e_i][0] < i:      # only evidence available before this moment
+                            if ev[e_i][3] in srcs:
+                                V[ev[e_i][1], ev[e_i][2]] += 1
+                            e_i += 1
+                        k += 1; v = V[tok[i]]
+                        guess = rng.choice(np.flatnonzero(v == v.max()))
+                        rec[name].append((k, guess == tsec[i]))
+    nmed = float(np.median(heard_per_life))
+    bins = [(1, 5), (6, 15), (16, 40), (41, 100), (101, 300), (301, 100_000)]
+    out = dict(lives=len(heard_per_life), median_tokens_heard_per_life=nmed, demonstrator_in_view_frac=float(np.mean(vis)) if vis else None,
+               chance=0.125, sets={})
+    for name in sets:
+        R = np.array(rec[name], float); Kk, H = R[:, 0], R[:, 1]
+        late = (Kk >= nmed / 2) & (Kk <= nmed)
+        out["sets"][name] = dict(acc_all=float(H.mean()), acc_late_median_life=float(H[late].mean()) if late.any() else None,
+                                 by_tokens_heard={f"{lo}-{hi}": round(float(H[(Kk >= lo) & (Kk <= hi)].mean()), 4) if ((Kk >= lo) & (Kk <= hi)).any() else None for lo, hi in bins})
+    print("IDEALOBS", json.dumps(out), flush=True)
     os.makedirs(os.path.dirname(a.out) or ".", exist_ok=True); json.dump(out, open(a.out, "w"), indent=1)
 
 
