@@ -5532,6 +5532,17 @@ more expensive, because it produces publishable-looking nulls.
   - Watches: guard (cap $41); item watch (throng-w2jobs, cap $6, stops at $7.5).
   - Readout ETAs: 1e8 ~06:00, 3e8 ~09:00, 1e9 ~18:30 (Nov 12, EST).
 
+- **Cam, Nov 12 (ack on the 04:31 launch): SANITY STOP added at the 100M readout** (no change to the registered tree).
+  - Stop the run, save the rest of the $6 and report, if either:
+    - the linear probe on shuffled-code lives is above chance;
+    - the memory-wiped life test differs from the navigator's.
+  - Otherwise let it run to 1e9 untouched. Send each readout (probe accuracy vs tokens heard, memory kept vs wiped,
+    hungry life-test pass with CI).
+  - **Operationalised before the readout (Will):**
+    - (i) shuffled-code sector probe: STOP if its 95% Wilson CI (on its held-out rows) excludes 12.5%;
+    - (ii) the navigator's pass rate on this life test is 0% (the deaf control in every frozen-test run): STOP if the
+      memory-wiped HUNGRY pass rate exceeds the 10% negative-control bar.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
