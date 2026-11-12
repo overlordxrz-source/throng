@@ -46,6 +46,13 @@ def run_w2(tag: str, args: list) -> str:
     return f"{tag}: exit {p.returncode}"
 
 
+@app.function(image=image, cpu=4.0, memory=8192, timeout=24 * 60 * 60, retries=0, volumes={VOLUME_MOUNT: volume})
+def run_w2_long(tag: str, args: list) -> str:
+    """the stage-1 pilot: up to 24 h (a timeout is not a preemption, so it would not be restarted); --ckpt makes a
+    preempted run resume where it stopped"""
+    return run_w2.local(tag, args)
+
+
 _NAVS = "w2_out/nav_w13/*.msgpack"
 _WORLD = ["--world", "0.0013,8,0.001"]
 _APP = ["--beacon-walk", "--young-seek", "--beacon-spread", "6", "--test", "heard25", "--score", "last-heard", "--min-sectors", "5",
@@ -63,7 +70,12 @@ _OBSL = ["w2/learnability.py", "--navs", _NAVS, *_WORLD, "--beacon-walk", "--you
          "--eval-eps", "48", "--test-window", "600", "--updates", "150", "--worlds", "32", "--eval-eligible-only"]
 _S1 = ["w2/learnability.py", "--navs", _NAVS, *_WORLD, "--beacon-walk", "--young-seek", "--beacon-spread", "6", "--test", "heard25",
        "--score", "last-heard", "--min-sectors", "5", "--seek-age", "500", "--parent", "--agent", "recurrent"]
+_PILOT = [*_S1, "--parent-leave", "1000", "--code-family", "A", "--rec-hidden", "128", "--worlds", "64", "--updates", "61100",
+          "--readout-at", "1e8,3e8,1e9", "--readout-worlds", "64", "--eval-updates", "60", "--eval-eps", "48", "--test-window", "600",
+          "--test-energy", "0.3", "--ckpt-every", "500"]
 PLANS = {
+    # Cam Nov 12 stage-1 pilot (cap \$6; registered tree); launched only after hunger_ctl passes
+    "s1pilot": [("s1pilot", _PILOT)],
     # Cam Nov 12: scripted controls under the HUNGRY test start must reproduce their frozen numbers (EXPLORE, ~\$0.2)
     "hunger_ctl": [("hunger_gate", ["w2/learnability.py", "--navs", _NAVS, *_WORLD, *_APP, "--updates", "150", "--worlds", "16",
                                     "--no-train", "--sanity", "--test-energy", "0.3"]),

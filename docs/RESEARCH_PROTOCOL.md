@@ -5486,6 +5486,36 @@ more expensive, because it produces publishable-looking nulls.
   - `hunger_parent_true` (parent arm, leave 1,000, true code): 87.7% (82.2-91.7), deaf 0%.
   - If either misses, report before going on (Cam).
 
+- **REGISTERED (before data): STAGE-1 PILOT `s1pilot`** (Modal `throng-w2jobs`, new function `run_w2_long`: 24 h
+  timeout, 4 CPU, 8 GB; comm-toy `8a0d027`). **Launches only after `hunger_ctl` passes.**
+  - **Resolved config:** parent arm, parent leaves at 1,000; random code per life from training family A; RecAgent with
+    hidden 128 (navigator-0 trunk frozen; GRU memory reading heard token + speaker offset, trunk features, previous
+    action and reward, own energy and age; 3 auxiliary drives, aux weight 0.5) + the stay-near-parent reflex; PPO, 2
+    epochs, lr 3e-4; 64 worlds x 64 steps x 4 learners = 16,384 agent-steps per update; **61,100 updates ~ 1.0e9
+    agent-steps**.
+  - **Readouts at 1e8, 3e8, 1e9 agent-steps:** 64 fresh worlds x 60 frozen-weight updates; lives born there:
+    - life test with the frozen scoring (heard25, last-heard, >= 5 sectors >= 25x, 48 x 600), **hungry start 0.3
+      primary**, natural secondary; memory carried vs wiped;
+    - linear probe on the memory state (sector, move class) vs the memory-wiped state and shuffled-code labels, by
+      tokens heard;
+    - checkpoint every 500 updates.
+  - **Reference points for the report (same config):** counting observer 70.6% and true-code control 87.7% (obsl1000,
+    natural start), plus the hungry-start control from `hunger_ctl`.
+  - **Price:** ~10.7 h of training at the measured 0.63 s/update plus 3 readouts: est. **$3-4** at ~$0.24/h. Item cap
+    $6; the item watch stops the app at $7.5.
+  - **Decision tree (Cam, registered):**
+    - reliance OR the linear probe rises with tokens heard -> CONFIRM run on held-out code families (new account
+      credits);
+    - no rise by ~1e9 agent-steps -> key-value memory, once;
+    - still none -> report.
+  - **"Rises" is operationalised before data as** either:
+    - the hungry memory-carried pass rate in lives with > 600 tokens heard exceeding that in lives with <= 300 by a
+      two-proportion z > 2; or
+    - linear-probe sector accuracy (memory) rising across the token bins 1-5 -> 101-300 by >= 10 points AND above the
+      memory-wiped probe in the 101-300 bin.
+  - Lever-did-work: every head's loss nonzero and falling between the first and the last 100 updates, with labels
+    present (juveniles >= 25%).
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
