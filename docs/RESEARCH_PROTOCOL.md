@@ -5539,7 +5539,8 @@ more expensive, because it produces publishable-looking nulls.
   - Otherwise let it run to 1e9 untouched. Send each readout (probe accuracy vs tokens heard, memory kept vs wiped,
     hungry life-test pass with CI).
   - **Operationalised before the readout (Will):**
-    - (i) shuffled-code sector probe: STOP if its 95% Wilson CI (on its held-out rows) excludes 12.5%;
+    - (i) shuffled-code sector probe: STOP if it is ABOVE chance, i.e. the lower bound of its 95% Wilson CI (on its
+      held-out rows) exceeds 12.5% (below-chance values are not leakage);
     - (ii) the navigator's pass rate on this life test is 0% (the deaf control in every frozen-test run): STOP if the
       memory-wiped HUNGRY pass rate exceeds the 10% negative-control bar.
 
