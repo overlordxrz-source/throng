@@ -5241,6 +5241,24 @@ more expensive, because it produces publishable-looking nulls.
     experience barely constrains that. A parent calling about food the young can then reach (W2.1), or demonstrators
     that stay beside the young, would make the evidence immediate.
 
+- **Cam, Nov 12 (ruling on the ~02:00 ideal-observer report).**
+  1. **Result accepted:** evidence-poor branch.
+  2. **One free check first (EXPLORE):** a BEACON-relative observer. Cues (a) and (b) measured from the beacon's
+     position using the speaker offset (a v2 agent input): the direction from the beacon to the food seen, and to the
+     next meal. Reported next to the current numbers. It changes the choice only if it reaches >= 80% on its own in
+     the listen-only arm.
+  3. **CHOICE: option (1), with nearness rather than numbers.**
+     - One "parent" demonstrator per newborn stays beside it (in view, <= 3 cells) through the juvenile period. It
+       hears the same tokens and acts on them. Young-seek targets the parent, not the nearest beacon (the approved
+       stay-near-parent drive).
+     - The parent leaves at the end of the juvenile period (expert dropout, as in Bhoopchand).
+     - The life test runs with NO demonstrators present, so following the parent cannot pass it.
+     - **Re-run the counting decoder in this arm first. Decision:** >= 80% within a median life (any cue combination,
+       reported at ages 250 / 500 and at parent dropout) -> build the stage-1 agent for this arm (>= 1e5 training
+       lives, throughput check / JAX port as ruled). Below 80% -> report; Cam decides.
+  4. W2.1 parent calls stay at stage 2 (learned speakers). Stage 1 keeps scripted speakers as the instrument.
+  5. Budget unchanged: all free. The $6 pilot cap stands for the stage-1 agent.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
