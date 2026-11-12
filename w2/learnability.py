@@ -124,6 +124,9 @@ def main():
     ap.add_argument("--score", default="window", choices=["window", "last-heard"], help="last-heard: in the heard25 test, only food eaten while the last heard TRUE sector is one the life heard >= --min-heard times counts")
     ap.add_argument("--test-start", default="fresh", choices=["fresh", "life"], help="life: each probe episode starts in the life's own world at its end (patch centres + beacon positions), the learner beside a random beacon")
     ap.add_argument("--snap-ages", default="", help="comma-separated ages: snapshot each life's weights there; the heard25 test also runs on them (steps to first reliance)")
+    ap.add_argument("--forage-check", action="store_true", help="stage 1 (Cam Nov 12): with --ckpt, compare the trained agent with the navigator (side heads zeroed) on the same fresh worlds, natural energy: KM lifespan, food/step by age, deaths by age and cause; then exit")
+    ap.add_argument("--forage-worlds", type=int, default=32); ap.add_argument("--forage-updates", type=int, default=120)
+    ap.add_argument("--forage-control", choices=["none", "damaged"], default="none")
     ap.add_argument("--diag-only", action="store_true", help="with --diag (and e.g. --ckpt of a finished run): run the predictive-head swap check and exit")
     ap.add_argument("--log-levers", action="store_true", help="diagnostic (Cam Nov 10, 4a): per update, each lever's own signal (pred loss, copy CE + rows, replay passes + loss, young-lr factor) to <out>.levers.jsonl")
     ap.add_argument("--ckpt", default=None, help="checkpoint path; resume from it if present (Cam Nov 10: --ckpt on for Modal runs)")
@@ -621,6 +624,82 @@ def main():
                                        "rows": int(len(Ysec)), "chance_sector": 0.125}
             return out
 
+        def km(L, C):
+            """Kaplan-Meier median of lifespans L with right-censoring flags C"""
+            L, C = np.asarray(L), np.asarray(C, bool); Sv = 1.0
+            for t_ in np.unique(L[~C]):
+                n_ = (L >= t_).sum(); d_ = ((L == t_) & ~C).sum(); Sv *= 1 - d_ / n_
+                if Sv <= 0.5:
+                    return int(t_)
+            return None
+
+        def forage(rp_, Wf, nup, base):
+            """frozen weights, natural energy, fresh worlds (same seeds for every arm): every life born in the window;
+            lifespan (KM, censored at the end), cause of death, food per step by age"""
+            Sf = fresh_worlds(base, Wf); rf = np.random.default_rng(a.seed + 303); kf = jax.random.PRNGKey(base + 9)
+            Hf = jnp.zeros((Wf, NL, Hd)); PAf = jnp.zeros((Wf, NL), jnp.int32); PRf = jnp.zeros((Wf, NL))
+            CODf = np.tile(np.arange(8), (Wf, M, 1)); CODf[:, :NL] = FAM[rf.integers(0, len(FAM), (Wf, NL))]
+            born = np.asarray(Sf.age)[:, NB:NB + NL] == 0
+            AB = [0, 250, 500, 1000, 1500, 2000, 3000, 10 ** 6]; FS = np.zeros((Wf, len(AB) - 1)); NS = np.zeros((Wf, len(AB) - 1))
+            lives = []                                     # (world, lifespan, censored, cause)
+            for _ in range(nup):
+                kf, k = jax.random.split(kf); age0 = np.asarray(Sf.age)[:, NB:NB + NL]
+                Sf, Hf, PAf, PRf, R = roll_rw(rp_, Sf, Hf, PAf, PRf, jax.random.split(k, Wf), jnp.asarray(CODf), False)
+                take, al = np.asarray(R[6]), np.asarray(R[7])                       # (Wf, T, NL)
+                ageT = age0[:, None, :] + np.arange(T)[None, :, None]
+                bi = np.searchsorted(AB, ageT, side="right") - 1
+                for j in range(len(AB) - 1):
+                    mk = al & (bi == j) & born[:, None, :]
+                    FS[:, j] += (take * mk).sum((1, 2)); NS[:, j] += mk.sum((1, 2))
+                dead = ~np.asarray(Sf.alive)[:, NB:NB + NL]; agd = np.asarray(Sf.age)[:, NB:NB + NL]; Ed = np.asarray(Sf.energy)[:, NB:NB + NL]
+                for w, l in zip(*np.where(dead)):
+                    if born[w, l]:
+                        lives.append((w, int(agd[w, l]), False, "starvation" if Ed[w, l] <= 0 else ("age" if agd[w, l] >= cfg.A_max else "other")))
+                    CODf[w, l] = FAM[rf.integers(0, len(FAM))]; born[w, l] = True
+                if dead.any():
+                    Sf, Hf, PAf, PRf = respawn(Sf, Hf, PAf, PRf, dead, rf)
+            agd = np.asarray(Sf.age)[:, NB:NB + NL]
+            for w, l in zip(*np.where(born)):
+                lives.append((w, int(agd[w, l]), True, "censored"))
+            return lives, FS, NS, AB
+
+        def forage_check(rp):
+            rpn = {"params": {k_: (jax.tree_util.tree_map(jnp.zeros_like, v_) if k_ in ("side_head", "side_value") else v_) for k_, v_ in rp["params"].items()}}
+            Wf, nup, res = a.forage_worlds, a.forage_updates, {}
+            for name, q in (("agent", rp), ("navigator", rpn)):
+                t1 = _time.time(); res[name] = forage(q, Wf, nup, 77_000); print(f"forage {name}: {_time.time() - t1:.0f}s", flush=True)
+            AB = res["agent"][3]; adult = [j for j in range(len(AB) - 1) if AB[j] >= LEAVE]
+            def summ(lives, FS, NS, wsel):
+                Lw = [x for w_ in wsel for x in lives if x[0] == w_]; L_ = [x[1] for x in Lw]; C_ = [x[2] for x in Lw]   # resampled worlds count with multiplicity
+                fs, ns = FS[wsel].sum(0), NS[wsel].sum(0)
+                return dict(km_median=km(L_, C_), adult_food_per_step=float(fs[adult].sum() / max(ns[adult].sum(), 1)), fs=fs, ns=ns, Lw=Lw)
+            allw = np.arange(Wf); out = dict(worlds=Wf, steps=nup * T, adult_from_age=LEAVE, A_max=cfg.A_max, at_update=it, at_agent_steps=steps_train)
+            for name in res:
+                sm = summ(*res[name][:3], allw); Lw = sm["Lw"]
+                deaths = [x for x in Lw if not x[2]]
+                out[name] = dict(lives=len(Lw), deaths=len(deaths), censored=len(Lw) - len(deaths), km_median_lifespan=sm["km_median"],
+                                 adult_food_per_step=sm["adult_food_per_step"],
+                                 food_per_step_by_age={f"{AB[j]}-{AB[j + 1] - 1}": (round(float(sm["fs"][j] / sm["ns"][j]), 6) if sm["ns"][j] else None, int(sm["ns"][j])) for j in range(len(AB) - 1)},
+                                 death_age_hist_100={int(b_): int(c_) for b_, c_ in zip(*np.unique([x[1] // 100 * 100 for x in deaths], return_counts=True))},
+                                 deaths_by_age_and_cause={f"{AB[j]}-{AB[j + 1] - 1}": {c: sum(1 for x in deaths if AB[j] <= x[1] < AB[j + 1] and x[3] == c) for c in ("starvation", "age", "other")} for j in range(len(AB) - 1)})
+            rb = np.random.default_rng(11); rk, rf_ = [], []           # bootstrap over worlds (same worlds in both arms)
+            for _ in range(500):
+                ws = rb.integers(0, Wf, Wf); sa, sn = summ(*res["agent"][:3], ws), summ(*res["navigator"][:3], ws)
+                if sa["km_median"] and sn["km_median"]:
+                    rk.append(sa["km_median"] / sn["km_median"])
+                if sn["adult_food_per_step"] > 0:
+                    rf_.append(sa["adult_food_per_step"] / sn["adult_food_per_step"])
+            ka, kn = out["agent"]["km_median_lifespan"], out["navigator"]["km_median_lifespan"]
+            fa, fn_ = out["agent"]["adult_food_per_step"], out["navigator"]["adult_food_per_step"]
+            out["ratio_km_median"] = dict(point=(ka / kn if ka and kn else None), ci95=[float(np.percentile(rk, 2.5)), float(np.percentile(rk, 97.5))] if rk else None)
+            out["ratio_adult_food_per_step"] = dict(point=(fa / fn_ if fn_ else None), ci95=[float(np.percentile(rf_, 2.5)), float(np.percentile(rf_, 97.5))] if rf_ else None)
+            pts = [r_["point"] for r_ in (out["ratio_km_median"], out["ratio_adult_food_per_step"]) if r_["point"] is not None]
+            worst = min(pts) if pts else None
+            out["rule_registered"] = "lower of the two ratios: <0.5 STOP and diagnose; 0.5-0.9 continue, recheck at 300M; >=0.9 carry on"
+            out["decision"] = None if worst is None else ("STOP" if worst < 0.5 else ("CONTINUE_RECHECK_300M" if worst < 0.9 else "CARRY_ON"))
+            os.makedirs(os.path.dirname(a.out) or ".", exist_ok=True); json.dump(out, open(a.out, "w"), indent=1, default=float)
+            print("FORAGE_CHECK", json.dumps(out, default=float), flush=True)
+
         # ---- training, with milestone readouts and checkpoints
         S_ = S; Hh = jnp.zeros((W, NL, Hd)); PA = jnp.zeros((W, NL), jnp.int32); PR = jnp.zeros((W, NL))
         COD = np.tile(np.arange(8), (W, M, 1)); COD[:, :NL] = FAM[cr.integers(0, len(FAM), (W, NL))]
@@ -637,6 +716,11 @@ def main():
                 COD, cr, key_, it, t_train, steps_train, log, READS = Ck["COD"], Ck["cr"], jnp.asarray(Ck["key"]), Ck["it"], Ck["t"], Ck["steps"], Ck["log"], Ck["reads"]
                 rng_main.bit_generator.state = Ck["rng_state"]; MIL[:] = Ck["mil"]
                 print(f"resumed stage 1 at update {it}, {steps_train:,} agent-steps", flush=True)
+        if a.forage_check:
+            if a.forage_control == "damaged":           # negative control: the side head pushes hard toward action 0
+                rp = {"params": {**rp["params"], "side_head": {"kernel": rp["params"]["side_head"]["kernel"], "bias": rp["params"]["side_head"]["bias"].at[0].add(4.0)}}}
+            print("forage-check on", "ckpt" if a.ckpt else "FRESH INIT (control: agent == navigator)", a.forage_control, flush=True)
+            return forage_check(rp)
         def save_out():
             thr = steps_train / max(t_train, 1e-9)
             out = dict(train_updates_done=it, train_agent_steps=steps_train, train_seconds=round(t_train, 1),
