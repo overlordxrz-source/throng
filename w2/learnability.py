@@ -52,6 +52,28 @@ class NetP(nn.Module):
         return nn.Dense(6, name="Dense_2")(h), nn.Dense(1, name="Dense_3")(h)[..., 0], nn.Dense(100, name="pred")(h)
 
 
+class RecAgent(nn.Module):
+    """Stage 1 (Cam Nov 12): the navigator trunk (frozen; loaded from navigator 0) + a GRU memory that reads the heard
+    token, the trunk's view features, the previous action and reward. A zero-initialised head adds to the policy and the
+    value, so behaviour starts exactly as the navigator's. Three approved drives as auxiliary heads: the direction of
+    the next meal (hindsight label), the parent's next move, the next view."""
+    hd: int = 128
+
+    @nn.compact
+    def __call__(self, h, x):
+        obs, side = x[..., :100], x[..., 100:]
+        t = nn.tanh(nn.Dense(128, name="Dense_0")(obs)); t = nn.tanh(nn.Dense(128, name="Dense_1")(t))
+        lg_nav = nn.Dense(6, name="Dense_2")(t); v_nav = nn.Dense(1, name="Dense_3")(t)[..., 0]
+        z = nn.tanh(nn.Dense(64, name="side_enc")(jnp.concatenate([side, t], -1)))
+        h, y = nn.GRUCell(self.hd, name="gru")(h, z)
+        zi = nn.initializers.zeros
+        lg = lg_nav + nn.Dense(6, name="side_head", kernel_init=zi, bias_init=zi)(y)
+        v = v_nav + nn.Dense(1, name="side_value", kernel_init=zi, bias_init=zi)(y)[..., 0]
+        meal = nn.Dense(9, name="aux_meal")(y); other = nn.Dense(5, name="aux_other")(y)
+        view = nn.Dense(49, name="aux_view")(jnp.concatenate([t, y], -1))
+        return h, lg, v, (meal, other, view)
+
+
 def sector(off):
     ang = jnp.arctan2(off[..., 1].astype(jnp.float32), off[..., 0].astype(jnp.float32))
     return jnp.mod(jnp.round(ang / (2 * jnp.pi / 8)).astype(jnp.int32), 8)
@@ -83,6 +105,11 @@ def main():
     ap.add_argument("--code-per-life", action="store_true", help="Nov 11 (exploratory): each life hears the beacons through its own random sector->token code; the scripted listener decodes with the inverse (stays a perfect decoder)")
     ap.add_argument("--ic-probe", action="store_true", help="Nov 12 stage-1 diagnostic (EXPLORE): with --no-train --code-per-life, record each life's input stream and train a GRU across lives to predict the true sector behind each heard token; accuracy vs tokens heard so far, against a memoryless baseline")
     ap.add_argument("--obs-listener", default="", choices=["", "observer", "true"], help="Cam Nov 12 plug-in check: lives run with navigator behaviour (+ parent); the frozen life test then runs the scripted listener acting through a per-life token->sector table: observer = the life's counting-decoder argmax (beacon cues + parent), true = the life's real inverse code (control)")
+    ap.add_argument("--agent", default="ff", choices=["ff", "recurrent"], help="recurrent: Cam Nov 12 stage 1 (one shared GRU network; slow weights across lives; memory within a life)")
+    ap.add_argument("--rec-hidden", type=int, default=128); ap.add_argument("--rec-lr", type=float, default=3e-4)
+    ap.add_argument("--aux", type=float, default=0.5, help="weight of the three auxiliary drive losses")
+    ap.add_argument("--eval-updates", type=int, default=60, help="recurrent: updates with FROZEN weights after training; lives born then are tested")
+    ap.add_argument("--code-family", default="A", choices=["A", "B"], help="per-life codes drawn from this family (A = training)")
     ap.add_argument("--parent-leave", type=int, default=0, help="age at which the parent leaves (0 = the juvenile period)")
     ap.add_argument("--eval-eligible-only", action="store_true", help="run the life test only on lives that heard >= --min-sectors sectors >= --min-heard x (eligibility rate recorded before the filter)")
     ap.add_argument("--parent", action="store_true", help="Cam Nov 12: one scripted parent per newborn (elder l pairs with learner l) stays within 2-3 cells through the juvenile period, then leaves; young-seek targets the parent; no demonstrators in the life test")
@@ -163,7 +190,7 @@ def main():
         hd = tw(jnp.round(jnp.cos(ang) * 3), jnp.round(jnp.sin(ang) * 3))
         return jnp.where(here >= 0.2, env.EAT, jnp.where(seen, vis, jnp.where(h[:, 8] > 0.5, hd, fallback)))
 
-    def step_all(P, s, key, shift, young, perm=None, mute=False, seek_ok=True, rand_fb=False, code=None, dec=None):
+    def step_all(P, s, key, shift, young, perm=None, mute=False, seek_ok=True, rand_fb=False, code=None, dec=None, lg_override=None):
         k1, k2 = jax.random.split(key)
         h = hear(s, shift, perm)
         if code is not None:                           # each agent hears the sector through its own code (M, 8)
@@ -172,7 +199,10 @@ def main():
         if mute:                                  # silence: nobody hears anything (VoI baseline)
             h = jnp.zeros_like(h)
         o = jnp.concatenate([env.observe(cfg, s)[NB:], h], 1)                              # (M, D)
-        lg, v, _ = jax.vmap(lambda p, x: net.apply(p, x[None]))(P, o[:NL]); lg, v = lg[:, 0], v[:, 0]
+        if lg_override is not None:                    # stage 1: the recurrent agent's logits / values, computed outside
+            lg, v = lg_override
+        else:
+            lg, v, _ = jax.vmap(lambda p, x: net.apply(p, x[None]))(P, o[:NL]); lg, v = lg[:, 0], v[:, 0]
         act_l = jax.random.categorical(k1, lg)
         fb_l = jax.random.randint(jax.random.fold_in(key, 79), (NL,), 1, 5) if rand_fb else act_l
         sc = scripted(s, h, jnp.concatenate([fb_l, jax.random.randint(k2, (NE,), 1, 5)]), None if a.decode_identity else code, dec)
@@ -343,6 +373,185 @@ def main():
         assert a.no_train and a.code_per_life and (a.io_decoder or not a.sanity), "--ic-probe needs --no-train --code-per-life (navigator behaviour; --sanity only as the decoder's control)"
         assert not (a.obs_listener and a.sanity), "--obs-listener: lives run with navigator behaviour (the test then uses the decode table)"
         IC = dict(o=[], act=[], r=[], alive=[], codes=[], lid=[], take=[], ea=[], pos=[]); life_id = np.zeros((W, NL), np.int64)
+
+    def stage1_recurrent():
+        import time as _time
+        from w2.fastlearner import code_families
+        assert a.parent and a.test == "heard25", "stage 1 runs in the parent arm with the heard25 test"
+        FA, FB = code_families(); FAM = FA if a.code_family == "A" else FB
+        Hd = a.rec_hidden; rnet = RecAgent(Hd); Dx = 100 + HD + 6 + 1
+        rp = rnet.init(jax.random.PRNGKey(a.seed), jnp.zeros((Hd,)), jnp.zeros((Dx,)))
+        nav0 = jax.tree_util.tree_map(lambda x: x[0], NAV)["params"]
+        pp = {k: dict(v) for k, v in rp["params"].items()}
+        pp["Dense_0"] = {"kernel": nav0["Dense_0"]["kernel"][:100], "bias": nav0["Dense_0"]["bias"]}
+        for k_ in ("Dense_1", "Dense_2", "Dense_3"):
+            pp[k_] = dict(nav0[k_])
+        rp = {"params": pp}; FROZEN = ("Dense_0", "Dense_1", "Dense_2", "Dense_3")
+        ropt = optax.chain(optax.clip_by_global_norm(1.0), optax.adam(a.rec_lr)); ros = ropt.init(rp)
+        cr = np.random.default_rng(a.seed + 555)
+        COD = np.tile(np.arange(8), (W, M, 1)); COD[:, :NL] = FAM[cr.integers(0, len(FAM), (W, NL))]
+
+        def obs_x(s, code, pa, pr, perm=None):
+            h_ = hear(s, 0, perm)
+            tk = code[jnp.arange(M), jnp.argmax(h_[:, :8], 1)]
+            h_ = h_.at[:, :8].set(jax.nn.one_hot(tk, 8) * h_[:, 8:9])
+            o = jnp.concatenate([env.observe(cfg, s)[NB:], h_], 1)[:NL]
+            return jnp.concatenate([o, jax.nn.one_hot(pa, 6), pr[:, None]], 1)
+
+        def roll_r(rp, s, Hh, pa, pr, key, code):
+            def body(c, k):
+                s, Hh, pa, pr = c
+                x = obs_x(s, code, pa, pr)
+                h2, lg, v, _ = jax.vmap(lambda h, xx: rnet.apply(rp, h, xx))(Hh, x)
+                young = s.age[NB:NB + NL] < a.juvenile
+                s2, rec = step_all(None, s, k, 0, young, code=code, lg_override=(lg, v))
+                al = s.alive[NB:NB + NL]
+                return (s2, jnp.where(al[:, None], h2, Hh), rec[1], rec[4]), (x, rec[1], rec[2], rec[3], rec[4], rec[5], rec[6], al, rec[8], s.pos[NB:])
+            (s, Hh, pa, pr), R = jax.lax.scan(body, (s, Hh, pa, pr), jax.random.split(key, T))
+            return s, Hh, pa, pr, R
+        roll_rw = jax.jit(jax.vmap(roll_r, in_axes=(None, 0, 0, 0, 0, 0, 0)))
+
+        def ce(lg, y):
+            return -jnp.take_along_axis(jax.nn.log_softmax(lg), y[..., None], -1)[..., 0]
+
+        def seq_loss(rp, x, h0, act, lp0, adv, ret, m, ym, mm, yo, mo, yv, mv):
+            def body(h, xx):
+                h2, lg, v, aux = rnet.apply(rp, h, xx); return h2, (lg, v, aux)
+            _, (lg, v, (am, ao, av)) = jax.lax.scan(body, h0, x)
+            ls = jax.nn.log_softmax(lg); lp = jnp.take_along_axis(ls, act[:, None], 1)[:, 0]; ratio = jnp.exp(lp - lp0)
+            pg = -jnp.minimum(ratio * adv, jnp.clip(ratio, 0.8, 1.2) * adv)
+            Lp = ((pg + 0.5 * (v - ret) ** 2 + 0.01 * (jnp.exp(ls) * ls).sum(-1)) * m).sum() / (m.sum() + 1e-8)
+            Lm = (ce(am, ym) * mm).sum() / (mm.sum() + 1e-8); Lo = (ce(ao, yo) * mo).sum() / (mo.sum() + 1e-8)
+            Lv = (((av - yv) ** 2).mean(-1) * mv).sum() / (mv.sum() + 1e-8)
+            return Lp + a.aux * (Lm + Lo + Lv), jnp.stack([Lp, Lm, Lo, Lv])
+
+        @jax.jit
+        def upd(rp, ros, *b):
+            def tot(q):
+                L, parts = jax.vmap(seq_loss, in_axes=(None,) + (0,) * 13)(q, *b); return L.mean(), parts.mean(0)
+            (L, parts), g = jax.value_and_grad(tot, has_aux=True)(rp)
+            g = {"params": {k_: (jax.tree_util.tree_map(jnp.zeros_like, v_) if k_ in FROZEN else v_) for k_, v_ in g["params"].items()}}
+            u, ros = ropt.update(g, ros, rp); return optax.apply_updates(rp, u), ros, parts
+
+        def sec_np(dx, dy):
+            return np.mod(np.round(np.arctan2(dy, dx) / (np.pi / 4)), 8).astype(np.int64)
+
+        S_ = S; Hh = jnp.zeros((W, NL, Hd)); PA = jnp.zeros((W, NL), jnp.int32); PR = jnp.zeros((W, NL))
+        cnt_ = np.zeros((W, NL, 8), np.int64); born_eval = np.zeros((W, NL), bool); lid_ = np.zeros((W, NL), np.int64)
+        lives_r, log, key_ = [], [], jax.random.PRNGKey(a.seed + 7)
+        U_tot = a.updates + a.eval_updates; t_train = 0.0; steps_train = 0
+        for it in range(U_tot):
+            training = it < a.updates; t0 = _time.time()
+            key_, k = jax.random.split(key_); H0 = Hh
+            S_, Hh, PA, PR, R = roll_rw(rp, S_, Hh, PA, PR, jax.random.split(k, W), jnp.asarray(COD))
+            x, act, lp, v, r, dn, take, al, ea, pos = (np.asarray(z) for z in R)          # (W, T, NL, ...) ; ea (W, T, NE); pos (W, T, M, 2)
+            hm = (x[..., 108] > 0.5) & al
+            cnt_ += np.einsum("wtl,wtlk->wlk", hm.astype(np.int64), (x[..., 100:108] > 0.5).astype(np.int64))
+            if training:
+                adv = np.zeros_like(r); last = 0.0
+                for t in reversed(range(T)):
+                    nv = v[:, t + 1] if t + 1 < T else v[:, t]; nt = 1.0 - dn[:, t]
+                    last = r[:, t] + 0.99 * nv * nt - v[:, t] + 0.99 * 0.95 * nt * last; adv[:, t] = last
+                ret = adv + v; m = al.astype(np.float32)
+                A_ = (adv - (adv * m).sum() / max(m.sum(), 1)) / (adv.std() + 1e-8)
+                # hindsight labels (within the chunk): next meal direction, the parent's next move, the next view
+                lp_ = pos[:, :, :NL]; ym = np.full((W, T, NL), 8, np.int64); nxt = np.full((W, NL), -1)
+                for t in reversed(range(T)):
+                    has = nxt >= 0
+                    if has.any():
+                        tgt = np.take_along_axis(lp_, np.maximum(nxt, 0)[:, None, :, None].repeat(2, 3), 1)[:, 0]
+                        d = (tgt - lp_[:, t] + cfg.L // 2) % cfg.L - cfg.L // 2
+                        ym[:, t] = np.where(has & (np.abs(d).sum(-1) > 0), sec_np(d[..., 0], d[..., 1]), 8)
+                    nxt = np.where(take[:, t] > 0, t, nxt)
+                mm = (ym < 8) & al
+                dpar = (pos[:, :, NL:] - lp_ + cfg.L // 2) % cfg.L - cfg.L // 2
+                yo = np.where(np.isin(ea, [1, 2, 3, 4]), ea, 0).astype(np.int64)
+                mo = (np.abs(dpar).max(-1) <= cfg.r) & al
+                yv = np.concatenate([x[:, 1:, :, :49], x[:, -1:, :, :49]], 1); mv = np.concatenate([al[:, 1:] & al[:, :-1], np.zeros_like(al[:, :1])], 1)
+                tr = lambda z: jnp.asarray(np.swapaxes(np.asarray(z), 1, 2).reshape((W * NL, T) + np.asarray(z).shape[3:]))  # noqa: E731
+                b = (tr(x), jnp.asarray(np.asarray(H0).reshape(W * NL, Hd)), tr(act), tr(lp), tr(A_.astype(np.float32)), tr(ret.astype(np.float32)),
+                     tr(m), tr(ym), tr(mm.astype(np.float32)), tr(yo), tr(mo.astype(np.float32)), tr(yv.astype(np.float32)), tr(mv.astype(np.float32)))
+                for _ in range(a.epochs):
+                    rp, ros, parts = upd(rp, ros, *b)
+                parts = np.asarray(parts)
+                jax.block_until_ready(rp); dt = _time.time() - t0; t_train += dt; steps_train += W * T * NL
+                log.append(dict(update=it, loss_ppo=float(parts[0]), loss_meal=float(parts[1]), loss_other=float(parts[2]), loss_view=float(parts[3]),
+                                eaten_per_step=float(take[al].mean()) if al.any() else None, sec=round(dt, 3)))
+            # deaths: record (frozen-weights phase only, lives born then), respawn beside the beacons with a parent, new code
+            dead = ~np.asarray(S_.alive)[:, NB:NB + NL]; ages = np.asarray(S_.age)[:, NB:NB + NL]
+            for w, l in zip(*np.where(dead)):
+                if not training and born_eval[w, l]:
+                    lives_r.append(dict(lifespan=int(ages[w, l]), heard=cnt_[w, l][COD[w, l]], code=COD[w, l].copy(), h=np.asarray(Hh[w, l]),
+                                        bpos=np.asarray(S_.pos)[w, :NB].copy(), centres=np.asarray(S_.centres[w])))
+                COD[w, l] = FAM[cr.integers(0, len(FAM))]; cnt_[w, l] = 0; lid_[w, l] += 1; born_eval[w, l] = not training
+            if dead.any():
+                dm = jnp.asarray(dead)
+                Hh = jnp.where(dm[..., None], 0.0, Hh); PA = jnp.where(dm, 0, PA); PR = jnp.where(dm, 0.0, PR)
+                npos = (np.asarray(S_.pos)[:, :NB].mean(1, keepdims=True).astype(int) + rng.integers(-3, 4, (W, NL, 2))) % cfg.L
+                pos_ = np.asarray(S_.pos).copy(); E = np.asarray(S_.energy).copy(); age = np.asarray(S_.age).copy(); alv = np.asarray(S_.alive).copy()
+                sl = slice(NB, NB + NL)
+                pos_[:, sl][dead] = npos[dead]; E[:, sl][dead] = cfg.E0; age[:, sl][dead] = 0; alv[:, sl][dead] = True
+                pos_[:, NB + NL:][dead] = (npos[dead] + np.array([1, 0])) % cfg.L
+                S_ = S_._replace(pos=jnp.asarray(pos_), energy=jnp.asarray(E), age=jnp.asarray(age), alive=jnp.asarray(alv))
+            if training and (it + 1) % 10 == 0:
+                print(f"stage1 update {it + 1}: {json.dumps(log[-1])}", flush=True)
+        thr = steps_train / max(t_train, 1e-9)
+        out = dict(train_updates=a.updates, eval_updates=a.eval_updates, worlds=W, T=T, hidden=Hd, train_agent_steps=steps_train,
+                   train_seconds=round(t_train, 1), train_throughput_agent_steps_per_s=round(thr, 1), first_log=log[:1], last_log=log[-1:],
+                   lives_tested=len(lives_r))
+        print("STAGE1_THROUGHPUT", json.dumps(dict(train_throughput_agent_steps_per_s=out["train_throughput_agent_steps_per_s"])), flush=True)
+        # ---- the life test (same probes, derangements and keys as the frozen heard25 test), memory carried in
+        if lives_r:
+            def eval_rec(rp, centres, key, perm, smask, code_l, h0):
+                s = env.reset(cfg, key)
+                s = s._replace(centres=centres, cap=env.capacity(cfg, centres), food=env.capacity(cfg, centres))
+                s, _ = beacons_reset(s, jax.random.fold_in(key, 3))
+                s = s._replace(alive=jnp.array([True] * NB + [True] + [False] * (M - 1)))
+                code = jnp.tile(jnp.arange(8), (M, 1)).at[0].set(code_l)
+                def body(c, k):
+                    s, h, pa, pr, eaten, last = c
+                    ht = hear(s, 0)[0]; last = jnp.where(ht[8] > 0.5, jnp.argmax(ht[:8]), last)
+                    x = obs_x(s, code, jnp.zeros(NL, jnp.int32).at[0].set(pa), jnp.zeros(NL).at[0].set(pr), perm)
+                    h2, lg, v, _ = rnet.apply(rp, h, x[0])
+                    LG = jnp.zeros((NL, 6)).at[0].set(lg); V = jnp.zeros(NL).at[0].set(v)
+                    s2, rec = step_all(None, s, k, 0, jnp.zeros(NL, bool), perm, False, seek_ok=False, code=code, lg_override=(LG, V))
+                    s2 = s2._replace(alive=s2.alive.at[NB + 1:].set(False))
+                    credit = jnp.where(last >= 0, smask[jnp.maximum(last, 0)], 0.0)
+                    return (s2, h2, rec[1][0], rec[4][0], eaten + rec[6][0] * credit, last), None
+                (_, _, _, _, eaten, _), _ = jax.lax.scan(body, (s, h0, jnp.int32(0), 0.0, 0.0, jnp.int32(-1)),
+                                                         jax.random.split(jax.random.fold_in(key, 5), a.test_window))
+                return eaten
+            evr = jax.jit(jax.vmap(jax.vmap(eval_rec, in_axes=(None, None, 0, 0, None, None, None)), in_axes=(None, 0, 0, 0, 0, 0, 0)))
+            n = len(lives_r); E_ = a.eval_eps; rq = np.random.default_rng(4242)
+            ident = np.tile(np.arange(8), (n, E_, 1)); der = ident.copy(); el = np.zeros(n, bool)
+            for i, x_ in enumerate(lives_r):
+                Ss = np.where(x_["heard"] >= a.min_heard)[0]; el[i] = len(Ss) >= max(2, a.min_sectors)
+                if len(Ss) < 2:
+                    continue
+                for e in range(E_):
+                    while True:
+                        q = rq.permutation(Ss)
+                        if np.all(q != Ss):
+                            break
+                    der[i, e, Ss] = q
+            keys = jax.vmap(lambda i: jax.random.split(jax.random.PRNGKey(7000 + i), E_))(jnp.arange(n))
+            Cn = jnp.asarray(np.stack([x_["centres"] for x_ in lives_r])); SM = jnp.asarray(np.stack([(x_["heard"] >= a.min_heard).astype(np.float32) for x_ in lives_r]))
+            CL = jnp.asarray(np.stack([x_["code"] for x_ in lives_r])); HL = jnp.asarray(np.stack([x_["h"] for x_ in lives_r]))
+            res_ = {}
+            for name, h0s in (("memory_carried", HL), ("memory_zeroed", jnp.zeros_like(HL))):
+                tru = np.asarray(evr(rp, Cn, keys, jnp.asarray(ident), SM, CL, h0s)); swp = np.asarray(evr(rp, Cn, keys, jnp.asarray(der), SM, CL, h0s))
+                ok = np.array([_life_pass(tru[i], swp[i]) for i in range(n)])
+                gm = np.array([int((x_["heard"] >= a.min_heard).sum()) for x_ in lives_r])
+                res_[name] = dict(eligible=int(el.sum()), pass_frac=float(ok[el].mean()) if el.any() else None, ci95=_wilson(int(ok[el].sum()), int(el.sum())),
+                                  stratified={lab: (int((el & mk).sum()), float(ok[el & mk].mean()) if (el & mk).any() else None)
+                                              for lab, mk in (("5", gm == 5), ("6", gm == 6), ("7-8", gm >= 7))},
+                                  eaten_true=float(tru[el].mean()) if el.any() else None, eaten_swap=float(swp[el].mean()) if el.any() else None)
+            out["test"] = res_; out["eligibility_rate"] = float(el.mean())
+        os.makedirs(os.path.dirname(a.out) or ".", exist_ok=True); json.dump(dict(summary=out, log=log), open(a.out, "w"), indent=1)
+        print("STAGE1", json.dumps(out)[:3000], flush=True)
+
+    if a.agent == "recurrent":
+        return stage1_recurrent()
     it0 = 0
     if a.ckpt:
         sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "scripts"))
