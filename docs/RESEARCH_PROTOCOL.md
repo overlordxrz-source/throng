@@ -5360,6 +5360,8 @@ more expensive, because it produces publishable-looking nulls.
     (all-on, laptop), well short of the ~11k/s/container that 1e8-1e9 agent-steps within $6 needs. Per Cam's ruling:
     port the frozen test's scoring onto the JAX W2 env and verify it reproduces b61afb2 (perfect >= 90%, deaf
     <= 10%, within CI) before any pilot.
+    **[CORRECTED Nov 12 ~03:35, see below: the 2-4k figure was the all-on TRAINING path (per-learner nets + PPO +
+    replay), not the harness's rollout speed.]**
 
 - **Cam, Nov 12 (ruling on the ~02:55 plug-in report).**
   1. **PASS accepted** (observer 54.2%, CI 47.5-60.8, on the point estimate; true-code 87.3%; deaf 0%).
@@ -5379,6 +5381,19 @@ more expensive, because it produces publishable-looking nulls.
      - $6 pilot with the registered tree: reliance rises with tokens heard -> CONFIRM on held-out families (new
        credits); no rise by ~1B agent-steps -> key-value memory once; still none -> report.
   5. Spend $28.68 fine; ~$12.3 left under the guard.
+
+- **CORRECTION + MEASUREMENT (Nov 12 ~03:35), laptop: the learnability harness's ROLLOUT throughput is far above
+  ~11k/s.**
+  - Parent arm, code per life, no training, timed as the difference between 3- and 8-update runs: **W=16: ~9.0k
+    learner-steps/s; W=64: ~53k learner-steps/s** (~106k counting the parents). The W=256 reading was invalid
+    (timing noise gave a negative difference).
+  - My "2-4k agent-steps/s" note above was the all-on TRAINING path (64 separate networks, per-learner PPO, replay 8),
+    not the environment or rollout speed.
+  - **Implication (flagged for Cam):**
+    - the learnability harness IS a JAX W2 env harness (`w2/env.py`), and the frozen test already lives in it;
+    - the stage-1 agent (ONE shared network, GRU) could be built here, with training throughput measured once it
+      exists, so the port and its equivalence gate may be unnecessary;
+    - the port is NOT started pending Cam's answer.
 
 ## Part 3 — Fossils
 
