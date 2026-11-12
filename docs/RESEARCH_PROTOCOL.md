@@ -5117,6 +5117,37 @@ more expensive, because it produces publishable-looking nulls.
   - **No copy repair is needed for W2.** Keep the unit test (functional elder, >= 50% per slot by 500 steps; whole
     word reported) as a standing check.
 
+- **RESULT (Nov 12 ~01:15), EXPLORE lane: stage-1 supervised in-context probe, laptop pilot. WEAK SIGNAL, UNDERPOWERED**
+  (comm-toy `f608dd3`, `learnability.py --ic-probe`; `docs/data/icp/`).
+  - **Question:** with a random code per life, can a GRU trained ACROSS lives (direct supervision; a diagnostic,
+    never a drive) work out a life's code from that life's own stream?
+    - Inputs: view/body obs, the heard token, the previous action, the reward.
+    - Target: the true sector behind each heard token. Navigator behaviour, picked world, spread 6 + walk.
+    - Baseline: a memoryless MLP on the same inputs.
+  - **Prediction (written before running): P = 0.35** that the GRU reaches >= 10 points above chance by 20+ tokens
+    heard.
+  - **Listen-only** (216-220 training / 54 test lives; 28k heard test steps):
+    - GRU 21.2%, memoryless 19.1%; chance 12.5% uniform, 17.1% majority;
+    - by tokens heard (1-5 / 6-15 / 16-40 / 41-100 / 101+): GRU 11.9 / 13.7 / 16.7 / 19.8 / 21.9%; memoryless 7.4 /
+      10.4 / 11.8 / 14.9 / 20.4%;
+    - the GRU's edge is 1.5-5 points and does not grow with tokens heard. **Prediction not met** (+4 points at 16-40
+      tokens).
+  - **With demonstrators** (`--demonstrators`: the scripted elders, perfect followers, without a copy loss): GRU
+    15.3% vs memoryless 13.7%, majority 17.4%. No gain.
+  - **Caveats, why this is not yet a negative:**
+    - only ~216 training lives, and the GRU overfits (training loss ~1.2-1.3 against 15-21% test accuracy);
+    - how often a demonstrator is inside the learner's 7x7 view is NOT measured;
+    - the memoryless baseline already beats uniform chance: the current step partly reveals the sector (the view,
+      and a life's sector changes slowly).
+  - Reading so far: under navigator behaviour the stream carries little usable evidence of a life's code.
+- **REGISTERED (EXPLORE lane, < $1, no bars): plan `icp`** on Modal `throng-w2jobs` (comm-toy `f608dd3`):
+  - the same probe at ~10x the lives: 64 worlds x 150 updates, 2,000 training steps; two jobs, listen-only and
+    demonstrators;
+  - resolved config = `_ICP` in `scripts/modal_w2jobs.py`; arm diff = `--demonstrators` only;
+  - est. ~$0.15-0.2; item watch stops throng-w2jobs at $1.25.
+  - **Prediction:** with ~10x the lives the GRU's edge over memoryless grows to 3-8 points but still does not grow
+    with tokens heard (P = 0.6); the demonstrator arm beats listen-only by >= 5 points at 41+ tokens (P = 0.3).
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
