@@ -14,7 +14,7 @@ from pathlib import Path
 import modal
 
 _REQUIREMENTS = str(Path(__file__).resolve().parents[1] / "requirements.txt")
-PINNED_SHA = "b25c687d8ee8b55cfaf231be0016e1cc6ddc6b2e"  # comm-toy: + weaning screen (--wean-to, --forage-at, --final-return-check)
+PINNED_SHA = "31cc8194f49a9ffbf30a750ee90333317effd4d5"  # comm-toy: ratio-1 fix, NaN guard, oracle arm
 REPO_URL = "https://github.com/overlordxrz-source/throng.git"
 VOLUME_MOUNT = "/mnt/throng-runs"
 OUTD = f"{VOLUME_MOUNT}/testbed/w2jobs"
@@ -75,6 +75,9 @@ _PILOT = [*_S1, "--parent-leave", "1000", "--code-family", "A", "--rec-hidden", 
           "--readout-at", "1e8,3e8,1e9", "--readout-worlds", "64", "--eval-updates", "60", "--eval-eps", "48", "--test-window", "600",
           "--test-energy", "0.3", "--ckpt-every", "500"]
 PLANS = {
+    # Cam Nov 13: ORACLE-INPUT apparatus arm (never inherited): s1kl03r + the decoded heard sector as input; to 1e8; cap $0.8
+    "s1orc": [("s1orc", [*_PILOT, "--kl-nav", "0.3", "--token-influence-every", "100", "--oracle-input", "--updates", "6110",
+                         "--readout-at", "1e8", "--readout-worlds-at", "32", "--forage-stop", "--forage-worlds", "64", "--forage-updates", "200"])],
     # Cam Nov 13: WEANING SCREEN (only if s1kl03 stops at 3e8). EXPLORE, item cap $1. ~25M steps per arm, same seeds.
     "wean25": [(tag, ["w2/learnability.py", "--navs", _NAVS, *_WORLD, "--beacon-walk", "--young-seek", "--beacon-spread", "6",
                       "--test", "heard25", "--score", "last-heard", "--min-sectors", "5", "--seek-age", "500", "--parent", "--agent", "recurrent",

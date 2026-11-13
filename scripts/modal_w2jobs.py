@@ -13,7 +13,7 @@ from pathlib import Path
 import modal
 
 _REQUIREMENTS = str(Path(__file__).resolve().parents[1] / "requirements.txt")
-PINNED_SHA = "a595b3560389ef2bca3d0d5ba683f2abde825d33"  # comm-toy: + stage-1 screen levers, in-run foraging stop
+PINNED_SHA = "31cc8194f49a9ffbf30a750ee90333317effd4d5"  # comm-toy: ratio-1 fix, NaN guard, oracle arm
 REPO_URL = "https://github.com/overlordxrz-source/throng.git"
 VOLUME_MOUNT = "/mnt/throng-runs"
 OUTD = f"{VOLUME_MOUNT}/testbed/w2jobs"
@@ -78,6 +78,9 @@ PLANS = {
     "s1pilot": [("s1pilot", _PILOT)],
     # Cam Nov 12: the ONE allowed relaunch = the registered pilot + the screen's pick (c) KL 0.3 to the navigator;
     # readouts halved at 1e8 / 3e8 (32 worlds), full at 1e9 (64); token influence logged every 100 updates; $6 cap
+    # Cam Nov 13: RELAUNCH of the GRU arm on the fixed code (ratio-1, NaN guard, fixed forage rule); same 3e8 conditional; cap $2.4
+    "s1kl03r": [("s1kl03r", [*_PILOT, "--kl-nav", "0.3", "--token-influence-every", "100", "--readout-worlds-at", "32,32,64",
+                             "--forage-stop", "--forage-worlds", "64", "--forage-updates", "200"])],
     "s1kl03": [("s1kl03", [*_PILOT, "--kl-nav", "0.3", "--token-influence-every", "100", "--readout-worlds-at", "32,32,64",
                            "--forage-stop", "--forage-worlds", "64", "--forage-updates", "200"])],
     # Cam Nov 12: scripted controls under the HUNGRY test start must reproduce their frozen numbers (EXPLORE, ~\$0.2)
