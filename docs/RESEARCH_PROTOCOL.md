@@ -6724,6 +6724,14 @@ more expensive, because it produces publishable-looking nulls.
   - Prediction (PASS 0.15 / CLIMBING 0.25 / FAIL 0.6): FAIL.
   - Files: `docs/data/evo2/`.
 
+- **Cam, Nov 13 (addendum 6, after the v2 50M report; relayed by the operator):** v2 FAIL accepted.
+  - "Item 3(i)" is answered by the numbers already reported (v2-best out-eats the follower over a life, 35.7 vs 22.7;
+    adult per-step premium only ~1.2x), so it is skipped; go straight to "the toy grid (3ii)".
+  - The idle-watch kill was right.
+  - The 50M readout head's 0.23 life-test food is noted as a likely unlucky pick; it does not change the verdict.
+  - **Pending:** the message defining items 3(i) / 3(ii) (the toy grid's design) has not reached Will. It was
+    requested from the operator before any work on the grid.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
