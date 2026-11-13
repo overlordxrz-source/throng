@@ -6525,6 +6525,26 @@ more expensive, because it produces publishable-looking nulls.
     - Watch: `throng-w2jobs` cap $0.5 (E 0.2 + D' 0.3).
   - Files: `docs/data/kls/`.
 
+- **RESULT (Nov 13 08:07): D' LEVER CHECK (evolution on lifetime food): FAIL -> D' does NOT launch** (laptop, comm-toy
+  `1256389`; start head N(0,2), which eats 0.05x the navigator's lifetime food; sigma 0.3, pop 32, elite 8,
+  24 generations, ~25M steps; final evaluation on 128 fresh lives).
+
+  | run | best head / navigator (lifetime food) |
+  |---|---|
+  | selection | **0.477x** (0.668 vs 1.399; bar >= 0.95x) |
+  | random-survivor mutant | 0.000x |
+
+  - Selection works (0.05x -> 0.48x, a ~10x gain; the mutant collapses to 0) but does not recover within the budget.
+    Prediction "recovers" p 0.5: MISS.
+  - **Why it is slow:** lifetime food is a very noisy fitness at 16 lives per member. The navigator alone scores
+    0.0-5.86 across generations' world sets (food is concentrated in a few long lives). Selection is mostly ranking
+    noise.
+    - A fix would be more lives per member (e.g. 16 worlds = 64 lives, ~6 generations in 25M) or fitness averaged
+      over generations.
+    - Not run; Cam's ruling.
+  - Note: D (lifespan fitness) already reached 1.47x the navigator's adult food without targeting food.
+  - Files: `docs/data/evolve/leverF_{sel,mut}.json`.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
