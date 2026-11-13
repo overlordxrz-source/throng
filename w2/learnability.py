@@ -165,7 +165,12 @@ def main():
     ap.add_argument("--evolve-final-worlds", type=int, default=16, help="worlds for the final fresh-world evaluation (x4 lives)")
     ap.add_argument("--evolve-fitness", choices=["lifespan", "food"], default="lifespan", help="D: mean capped lifespan; D': lifetime food eaten")
     ap.add_argument("--start-energy", type=float, default=0.0, help="stage 1 arm E: every learner life starts with this energy (0 = E0)")
+    ap.add_argument("--evolve-params", default="side_head", help="comma list of evolved parameter groups (v2: side_enc,gru,side_head)")
+    ap.add_argument("--evolve-sigma-body", type=float, default=0.02, help="mutation sigma for side_enc / gru (side head uses --evolve-sigma)")
+    ap.add_argument("--evolve-init-from", default="", help="start the population from an --evolve checkpoint's top elite")
     ap.add_argument("--evolve-random-select", action="store_true", help="lever-check mutant: survivors chosen at random")
+    ap.add_argument("--load-evo-head", default="", help="stage 1: load the top elite side head from an --evolve checkpoint")
+    ap.add_argument("--premium-check", action="store_true", help="stage 1 (Cam Nov 13): forage check + readout life test for one policy, then exit")
     ap.add_argument("--forage-control", choices=["none", "damaged"], default="none")
     ap.add_argument("--diag-only", action="store_true", help="with --diag (and e.g. --ckpt of a finished run): run the predictive-head swap check and exit")
     ap.add_argument("--log-levers", action="store_true", help="diagnostic (Cam Nov 10, 4a): per update, each lever's own signal (pred loss, copy CE + rows, replay passes + loss, young-lr factor) to <out>.levers.jsonl")
@@ -711,18 +716,24 @@ def main():
             check's mutant). A navigator reference is scored on the same worlds each generation."""
             P_, E_, sig, cap, Wg = a.evolve_pop, a.evolve_elite, a.evolve_sigma, a.evolve_cap, a.evolve_worlds
             rng_e = np.random.default_rng(a.seed + 909); sh0 = rp["params"]["side_head"]
-            base = jax.tree_util.tree_map(jnp.zeros_like, sh0)
+            GROUPS = a.evolve_params.split(",")            # Cam Nov 13 v2: side_enc + gru + side_head; D/D': side_head only
+            head0 = jax.tree_util.tree_map(jnp.zeros_like, sh0)
             if a.evolve_init_noise > 0:                    # lever check: start from a large random head
-                base = {"kernel": jnp.asarray(rng_e.normal(0, a.evolve_init_noise, sh0["kernel"].shape), jnp.float32), "bias": jnp.zeros_like(sh0["bias"])}
+                head0 = {"kernel": jnp.asarray(rng_e.normal(0, a.evolve_init_noise, sh0["kernel"].shape), jnp.float32), "bias": jnp.zeros_like(sh0["bias"])}
+            if a.evolve_init_from:                         # v2: start from a previous run's top elite (side head)
+                Cf = _ck.load(a.evolve_init_from); head0 = jax.tree_util.tree_map(jnp.asarray, Cf["evo_pop"][0])
+                head0 = head0["side_head"] if "side_head" in head0 else head0
+            base = {g: (head0 if g == "side_head" else rp["params"][g]) for g in GROUPS}
+            SIG = {g: (sig if g == "side_head" else a.evolve_sigma_body) for g in GROUPS}
             def mutate(h):
-                return jax.tree_util.tree_map(lambda w: w + jnp.asarray(rng_e.normal(0, sig, w.shape), jnp.float32), h)
+                return {g: jax.tree_util.tree_map(lambda w: w + jnp.asarray(rng_e.normal(0, SIG[g], w.shape), jnp.float32), h[g]) for g in GROUPS}
             pop = [base] + [mutate(base) for _ in range(P_ - 1)]; gen, steps, glog, MILe, READe = 0, 0, [], [float(x) for x in a.readout_at.split(",")] if a.readout_at else [], []
             if a.ckpt:
                 Ck = _ck.load(a.ckpt)
                 if Ck is not None and "evo_pop" in Ck:
                     pop = [jax.tree_util.tree_map(jnp.asarray, h) for h in Ck["evo_pop"]]; gen, steps, glog, MILe, READe = Ck["gen"], Ck["steps"], Ck["glog"], Ck["mil"], Ck["reads"]
                     rng_e.bit_generator.state = Ck["rng_state"]; print(f"resumed evolution at generation {gen}, {steps:,} agent-steps", flush=True)
-            nav_head = jax.tree_util.tree_map(jnp.zeros_like, sh0)
+            nav_head = {g: (jax.tree_util.tree_map(jnp.zeros_like, sh0) if g == "side_head" else rp["params"][g]) for g in GROUPS}
             def score(heads, seed, Wg=Wg):
                 """mean capped lifespan per head; all heads on the same Wg worlds and keys"""
                 nh = len(heads); Wt = nh * Wg
@@ -730,8 +741,7 @@ def main():
                 re_ = np.random.default_rng(seed); C1 = np.tile(np.arange(8), (Wg, M, 1)); C1[:, :NL] = FAM[re_.integers(0, len(FAM), (Wg, NL))]
                 Ct = jnp.asarray(np.tile(C1, (nh, 1, 1)))
                 RP = jax.tree_util.tree_map(lambda x: jnp.broadcast_to(x, (Wt,) + x.shape), rp)
-                KH = jnp.repeat(jnp.stack([h["kernel"] for h in heads]), Wg, 0); BH = jnp.repeat(jnp.stack([h["bias"] for h in heads]), Wg, 0)
-                RP = {"params": {**RP["params"], "side_head": {"kernel": KH, "bias": BH}}}
+                RP = {"params": {**RP["params"], **{g: jax.tree_util.tree_map(lambda *ls: jnp.repeat(jnp.stack(ls), Wg, 0), *[h[g] for h in heads]) for g in GROUPS}}}
                 Ht = jnp.zeros((Wt, NL, Hd)); PAt = jnp.zeros((Wt, NL), jnp.int32); PRt = jnp.zeros((Wt, NL))
                 life = np.full((Wt, NL), float(cap)); rec = np.zeros((Wt, NL), bool); ke = jax.random.PRNGKey(seed + 1); n_roll = 0
                 food = np.zeros((Wt, NL))
@@ -753,7 +763,7 @@ def main():
                 best = int(np.argmax(fp)); elites = [pop[i] for i in order[:E_]]
                 glog.append(dict(gen=gen, steps=steps, best=float(fp.max()), mean=float(fp.mean()), elite_mean=float(fp[order[:E_]].mean()), navigator=fnav))
                 print(f"evolve gen {gen}: {json.dumps(glog[-1])}", flush=True)
-                rp_best = {"params": {**rp["params"], "side_head": pop[best]}}
+                rp_best = {"params": {**rp["params"], **pop[best]}}
                 while MILe and steps >= MILe[0]:
                     tagm = f"{MILe[0]:.0e}"; MILe.pop(0); t1 = _time.time()
                     rd = readout(rp_best, tagm); fo = forage_check(rp_best, write=False)
@@ -768,6 +778,7 @@ def main():
                     _ck.save(a.ckpt, dict(evo_pop=pop, gen=gen, steps=steps, glog=glog, mil=MILe, reads=READe, rng_state=rng_e.bit_generator.state))
             # final: the best of the last scored generation vs the navigator vs the starting head, on fresh worlds
             fin, _ = score([elites[0], nav_head, base], 999_000, a.evolve_final_worlds)
+            out["evolved_groups"] = GROUPS; out["sigma_by_group"] = SIG; out["init_from"] = a.evolve_init_from
             out["fitness"] = a.evolve_fitness
             out["final_eval_fresh_worlds"] = dict(best=float(fin[0]), navigator=float(fin[1]), start_head=float(fin[2]), best_over_navigator=float(fin[0] / fin[1]))
             json.dump(dict(summary=out), open(a.out, "w"), indent=1, default=float)
@@ -1078,6 +1089,7 @@ def main():
                 out[name] = dict(lives=len(Lw), deaths=len(deaths), censored=len(Lw) - len(deaths), km_median_lifespan=sm["km_median"],
                                  survival_past_1000=km_surv([x[1] for x in Lw], [x[2] for x in Lw], 1000),
                                  survival_past_1300=km_surv([x[1] for x in Lw], [x[2] for x in Lw], 1300),
+                                 survival_past_2048=km_surv([x[1] for x in Lw], [x[2] for x in Lw], 2048),
                                  adult_food_per_step=sm["adult_food_per_step"],
                                  food_per_step_by_age={f"{AB[j]}-{AB[j + 1] - 1}": (round(float(sm["fs"][j] / sm["ns"][j]), 6) if sm["ns"][j] else None, int(sm["ns"][j])) for j in range(len(AB) - 1)},
                                  death_age_hist_100={int(b_): int(c_) for b_, c_ in zip(*np.unique([x[1] // 100 * 100 for x in deaths], return_counts=True))},
@@ -1239,6 +1251,16 @@ def main():
                 print(f"resumed stage 1 at update {it}, {steps_train:,} agent-steps", flush=True)
                 if any(r_.get("forage", {}).get("decision") == "STOP" for r_ in READS) and not (a.forage_check or a.return_check or a.redraw_probe or a.grad_diag):
                     print("FORAGE_STOP already decided in this checkpoint: not training on", flush=True); return
+        if a.load_evo_head:                                # Cam Nov 13: evaluate an evolved side head (the population's first = top elite)
+            Ce = _ck.load(a.load_evo_head); top = jax.tree_util.tree_map(jnp.asarray, Ce["evo_pop"][0])
+            rp = {"params": {**rp["params"], **(top if "side_head" in top else {"side_head": top})}}
+            print("loaded evolved side head from", a.load_evo_head, "generation", Ce["gen"], flush=True)
+        if a.premium_check:                                # Cam Nov 13 item 4: the listening premium over a competent forager
+            fo = forage_check(rp, write=False); rd = readout(rp, "premium")
+            out = dict(policy=("scripted true-code follower" if a.sanity else ("evolved head" if a.load_evo_head else "rp")),
+                       forage=fo, life_test=rd.get("tests"), lives=rd.get("lives"), eligible=rd.get("eligible"))
+            json.dump(out, open(a.out, "w"), indent=1, default=float); print("PREMIUM", json.dumps({k_: v_ for k_, v_ in out.items() if k_ != "forage"}, default=float)[:1500], flush=True)
+            return
         TIB = build_ti_batch(rp) if a.ti_fixed else None
         if a.evolve:
             return evolve_run(rp)
