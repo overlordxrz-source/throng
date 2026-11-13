@@ -141,6 +141,7 @@ def main():
     ap.add_argument("--readout-worlds-at", default="", help="stage 1: readout worlds per milestone, e.g. 32,32,64 (overrides --readout-worlds)")
     ap.add_argument("--forage-stop", action="store_true", help="stage 1 (Cam's foraging rule, in-run): after each milestone readout, forage-check the live weights; STOP at 1st milestone if the lower ratio < 0.5; at the 2nd if < 0.5 or still falling from the 50-90% band")
     ap.add_argument("--reward-variants", default="", help="stage 1 return check: extra rewards scored on the same trajectories, e.g. death:1,alive:0.001,topup")
+    ap.add_argument("--wean-to", type=int, default=0, help="gradual weaning (Cam Nov 12): after the --juvenile top-up the parent supplies w*(d0+d_move) energy per step up to E0, w falling linearly to 0 at this age (set it to --parent-leave); 0 = off")
     ap.add_argument("--forage-control", choices=["none", "damaged"], default="none")
     ap.add_argument("--diag-only", action="store_true", help="with --diag (and e.g. --ckpt of a finished run): run the predictive-head swap check and exit")
     ap.add_argument("--log-levers", action="store_true", help="diagnostic (Cam Nov 10, 4a): per update, each lever's own signal (pred loss, copy CE + rows, replay passes + loss, young-lr factor) to <out>.levers.jsonl")
@@ -264,6 +265,11 @@ def main():
         E = s2.energy.at[:NB].set(1.0).at[NB + NL:].set(1.0)                              # beacons + elders immortal
         if a.juvenile:
             E = E.at[NB:NB + NL].set(jnp.where(young & s2.alive[NB:NB + NL], jnp.maximum(E[NB:NB + NL], cfg.E0), E[NB:NB + NL]))
+        if a.wean_to:                                      # Cam Nov 12: gradual weaning. From the end of the top-up to --wean-to the
+            agw = s2.age[NB:NB + NL]                       # parent supplies w * (d0 + d_move) per step (capped at E0), w 1 -> 0 linearly
+            ww = jnp.clip((a.wean_to - agw) / max(a.wean_to - a.juvenile, 1), 0.0, 1.0)
+            wm = (agw >= a.juvenile) & (agw < a.wean_to) & s2.alive[NB:NB + NL]
+            El = E[NB:NB + NL]; E = E.at[NB:NB + NL].set(jnp.where(wm & (El < cfg.E0), jnp.minimum(El + ww * (cfg.d0 + cfg.d_move), cfg.E0), El))
         al = s2.alive.at[:NB].set(True).at[NB + NL:].set(True)
         s2 = s2._replace(energy=E, alive=al)
         dd = (s.pos[NB + NL:][None] - s.pos[NB:NB + NL][:, None] + cfg.L // 2) % cfg.L - cfg.L // 2
