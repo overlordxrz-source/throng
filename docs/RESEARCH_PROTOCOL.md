@@ -5727,6 +5727,70 @@ more expensive, because it produces publishable-looking nulls.
      - Readouts halved at 100M / 300M, full at 1B. Same foraging stop rule.
      - If nothing passes: no relaunch; report.
 
+- **RESULT (Nov 12 ~08:00): RETURN CHECK (laptop, comm-toy `17bb0c4` `--return-check`; u6000 checkpoint; 64 fresh worlds,
+  12,800 steps; complete lives born in the first 9,800 steps; the actual training reward x20).**
+  - **Reward confirmed as designed.** r = drive(E_prev) - drive(E), drive = (0.8 - E)^2. The energy update includes
+    d_move 0.003 on moves (d0 0.0013). Inclusive fitness off.
+  - **Structural fact:** this reward telescopes. Summed over a life it equals drive(E_birth) - drive(E_death), so
+    every starving life gets the same undiscounted total however long it lived or ate.
+    - Only discounting and old-age deaths separate policies.
+    - The juvenile top-up (age < 500) adds unrecoverable negative reward: energy is refilled free after each paid
+      loss. That is why stand-still lives total -17.2, not -12.
+  - From-birth discounted return, mean (CI over worlds):
+
+    | arm | gamma 0.99 | 0.995 | 0.998 | 0.999 | 1.0 |
+    |---|---|---|---|---|---|
+    | navigator | -0.965 (-0.98,-0.95) | -2.03 | **-5.19** | **-8.37** | **-15.5** |
+    | collapsed u6000 agent | **-0.904** (-0.93,-0.88) | **-1.95** | -5.26 | -8.73 | -16.3 |
+    | stand still | -1.047 | -2.22 | -5.92 | -9.67 | -17.2 |
+    | stand and eat | -1.021 | -2.17 | -5.80 | -9.51 | -17.1 |
+
+  - Return-to-go by age at gamma 0.99:
+
+    | age | navigator | agent | stand and eat |
+    |---|---|---|---|
+    | 0-499 | -1.07 | **-1.04** | -1.14 |
+    | 500-999 | **-1.83** | -1.95 | -2.19 |
+    | 1000-1499 | **-0.44** | -0.79 | -1.03 |
+    | 1500-1999 | **-0.47** | -0.89 | -1.09 |
+    | 2000-2999 | **-0.45** | -0.70 | -1.15 |
+
+  - **Reading: BOTH branches, in different phases.**
+    - Pure freezing never beats the navigator.
+    - The collapsed agent beats it only from birth at gamma <= 0.995. That return is dominated by the topped-up
+      juvenile phase (0.99^500 ~ 0.007), where moving is pure cost and the objective does reward near-freezing.
+    - In adult states the navigator earns clearly more under the training objective, at every gamma. PPO made adult
+      behaviour worse by its own measure.
+    - Masking juvenile steps did not fix it (36%), so the adult failure is primary.
+    - Caveat: by-age return-to-go compares each policy on its own state distribution, not matched states.
+  - **Navigator beats both freezing and the agent from birth at gamma >= 0.998** (lambda 0.95 kept: GAE horizon
+    1/(1 - gamma*lambda) goes from 17 to 19 steps).
+  - PPO mechanics checked against Cam's list:
+    - Rollout-end bootstrap uses v(s_t), not v(s_T). Small bias, identical in the navigator's own training
+      (`w2/learn.py`), which learned to forage.
+    - Deaths cut the bootstrap correctly (nonterminal = 1 - dead).
+    - Advantage std is taken over all steps, dead ones included (the mean is masked). Minor.
+    - Reward scale x20 is the same as the navigator's.
+    - The stage-1-specific difference is the unbounded side head (6x the trunk at u6000).
+- **REGISTERED (Nov 12 ~08:00): KL SCREEN** (laptop, from the navigator init, 16 worlds x 2,000 updates = 8.2M steps;
+  same seeds; forage check at the end on 64 fresh worlds; token influence every 100 updates).
+  - Arms:
+    - (a) `--kl-nav 1.0`;
+    - (b) `--kl-nav 1.0 --kl-silent-only`;
+    - (c) `--kl-nav 0.3`;
+    - (d) the objective fix `--gamma 0.998` (lambda 0.95), no KL;
+    - (e) MY ADDITION under Cam's item-2 checklist: `--side-bound 3` (side-head logits bounded to +-3), no KL.
+  - Pass:
+    - adult food >= 90% of the navigator (point);
+    - AND token influence > 0 and growing, operationalised as mean over updates 1500-1999 > mean over 500-999.
+  - Pick the passing variant with the largest final token influence. Prefer (d) if it passes.
+  - Predictions (P food >= 0.9 / P influence growing):
+    - (a) 0.6 / 0.3;
+    - (b) 0.45 / 0.45;
+    - (c) 0.3 / 0.4;
+    - (d) 0.3 / 0.4;
+    - (e) 0.25 / 0.4.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
