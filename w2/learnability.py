@@ -142,6 +142,8 @@ def main():
     ap.add_argument("--forage-stop", action="store_true", help="stage 1 (Cam's foraging rule, in-run): after each milestone readout, forage-check the live weights; STOP at 1st milestone if the lower ratio < 0.5; at the 2nd if < 0.5 or still falling from the 50-90% band")
     ap.add_argument("--reward-variants", default="", help="stage 1 return check: extra rewards scored on the same trajectories, e.g. death:1,alive:0.001,topup")
     ap.add_argument("--wean-to", type=int, default=0, help="gradual weaning (Cam Nov 12): after the --juvenile top-up the parent supplies w*(d0+d_move) energy per step up to E0, w falling linearly to 0 at this age (set it to --parent-leave); 0 = off")
+    ap.add_argument("--forage-at", default="", help="stage 1: forage checks (agent vs navigator) at these agent-step counts during training, e.g. 5e6,1e7")
+    ap.add_argument("--final-return-check", action="store_true", help="stage 1: after training, the return check by age band on the final weights, into the results JSON")
     ap.add_argument("--forage-control", choices=["none", "damaged"], default="none")
     ap.add_argument("--diag-only", action="store_true", help="with --diag (and e.g. --ckpt of a finished run): run the predictive-head swap check and exit")
     ap.add_argument("--log-levers", action="store_true", help="diagnostic (Cam Nov 10, 4a): per update, each lever's own signal (pred loss, copy CE + rows, replay passes + loss, young-lr factor) to <out>.levers.jsonl")
@@ -662,6 +664,15 @@ def main():
                     return int(t_)
             return None
 
+        def km_surv(L, C, t0):
+            """Kaplan-Meier survival past age t0"""
+            L, C = np.asarray(L), np.asarray(C, bool); Sv = 1.0
+            for t_ in np.unique(L[~C]):
+                if t_ > t0:
+                    break
+                Sv *= 1 - ((L == t_) & ~C).sum() / (L >= t_).sum()
+            return float(Sv)
+
         def forage(rp_, Wf, nup, base, rew=None):
             """frozen weights, natural energy, fresh worlds (same seeds for every arm): every life born in the window;
             lifespan (KM, censored at the end), cause of death, food per step by age"""
@@ -755,7 +766,7 @@ def main():
             os.makedirs(os.path.dirname(a.out) or ".", exist_ok=True); json.dump(out, open(a.out, "w"), indent=1, default=float)
             print("REDRAW_PROBE", json.dumps(out, default=float), flush=True)
 
-        def return_check(rp):
+        def return_check(rp, write=True):
             """Cam Nov 12: is freezing what the training objective asks for? The actual training reward (x20 drive
             reduction, move cost included) along each complete life born in the window, discounted at several gammas"""
             def biased(i):
@@ -820,8 +831,10 @@ def main():
                                                  for lo, hi in ((0, 500), (500, 1000), (1000, 1500), (1500, 2000), (2000, 3000))})
                     res["reward_variants_gamma_0.99"] = VAR
                 out[name] = res; print("return", name, json.dumps(res)[:400], flush=True)
-            os.makedirs(os.path.dirname(a.out) or ".", exist_ok=True); json.dump(out, open(a.out, "w"), indent=1, default=float)
-            print("RETURN_CHECK", json.dumps(out, default=float), flush=True)
+            if write:
+                os.makedirs(os.path.dirname(a.out) or ".", exist_ok=True); json.dump(out, open(a.out, "w"), indent=1, default=float)
+            print("RETURN_CHECK", json.dumps(out, default=float)[:3000], flush=True)
+            return out
 
         def forage_check(rp, write=True):
             rpn = {"params": {k_: (jax.tree_util.tree_map(jnp.zeros_like, v_) if k_ in ("side_head", "side_value") else v_) for k_, v_ in rp["params"].items()}}
@@ -838,6 +851,8 @@ def main():
                 sm = summ(*res[name][:3], allw); Lw = sm["Lw"]
                 deaths = [x for x in Lw if not x[2]]
                 out[name] = dict(lives=len(Lw), deaths=len(deaths), censored=len(Lw) - len(deaths), km_median_lifespan=sm["km_median"],
+                                 survival_past_1000=km_surv([x[1] for x in Lw], [x[2] for x in Lw], 1000),
+                                 survival_past_1300=km_surv([x[1] for x in Lw], [x[2] for x in Lw], 1300),
                                  adult_food_per_step=sm["adult_food_per_step"],
                                  food_per_step_by_age={f"{AB[j]}-{AB[j + 1] - 1}": (round(float(sm["fs"][j] / sm["ns"][j]), 6) if sm["ns"][j] else None, int(sm["ns"][j])) for j in range(len(AB) - 1)},
                                  death_age_hist_100={int(b_): int(c_) for b_, c_ in zip(*np.unique([x[1] // 100 * 100 for x in deaths], return_counts=True))},
@@ -924,6 +939,7 @@ def main():
         S_ = S_._replace(age=jnp.asarray(ag))
         log, READS, key_ = [], [], jax.random.PRNGKey(a.seed + 7)
         MIL = [float(x) for x in a.readout_at.split(",")] if a.readout_at else []
+        FMIL = [float(x) for x in a.forage_at.split(",")] if a.forage_at else []; FORAGES = []
         it, t_train, steps_train = 0, 0.0, 0; rng_main = rng
         if a.ckpt:
             Ck = _ck.load(a.ckpt)
@@ -932,6 +948,8 @@ def main():
                 rp, ros, S_, Hh, PA, PR = tj(Ck["rp"]), tj(Ck["ros"]), tj(Ck["S"]), tj(Ck["Hh"]), tj(Ck["PA"]), tj(Ck["PR"])
                 COD, cr, key_, it, t_train, steps_train, log, READS = Ck["COD"], Ck["cr"], jnp.asarray(Ck["key"]), Ck["it"], Ck["t"], Ck["steps"], Ck["log"], Ck["reads"]
                 rng_main.bit_generator.state = Ck["rng_state"]; MIL[:] = Ck["mil"]
+                if "fmil" in Ck:
+                    FMIL[:] = Ck["fmil"]; FORAGES[:] = Ck["forages"]
                 print(f"resumed stage 1 at update {it}, {steps_train:,} agent-steps", flush=True)
                 if any(r_.get("forage", {}).get("decision") == "STOP" for r_ in READS) and not (a.forage_check or a.return_check or a.redraw_probe or a.grad_diag):
                     print("FORAGE_STOP already decided in this checkpoint: not training on", flush=True); return
@@ -948,7 +966,7 @@ def main():
             thr = steps_train / max(t_train, 1e-9)
             out = dict(train_updates_done=it, train_agent_steps=steps_train, train_seconds=round(t_train, 1),
                        train_throughput_agent_steps_per_s=round(thr, 1), worlds=W, T=T, hidden=Hd, readouts=READS,
-                       lever_check=(dict(first=log[0], last=log[-1]) if log else None))
+                       lever_check=(dict(first=log[0], last=log[-1]) if log else None), forages=FORAGES)
             os.makedirs(os.path.dirname(a.out) or ".", exist_ok=True); json.dump(dict(summary=out, log=log), open(a.out, "w"), indent=1, default=float)
             return out
         while it < a.updates:
@@ -1027,14 +1045,22 @@ def main():
                                                   log=log, reads=READS, rng_state=rng_main.bit_generator.state, mil=[]))
                         print("FORAGE_STOP: the run stops here under the registered foraging rule", flush=True)
                         return
+            while FMIL and steps_train >= FMIL[0]:          # Cam Nov 13: forage checks along training, for the slope
+                FMIL.pop(0); fo = forage_check(rp, write=False)
+                FORAGES.append(dict(at_agent_steps=steps_train, adult_food_ratio=fo["ratio_adult_food_per_step"], km_ratio=fo["ratio_km_median"],
+                                    agent=dict(survival_past_1000=fo["agent"]["survival_past_1000"], survival_past_1300=fo["agent"]["survival_past_1300"],
+                                               adult_food_per_step=fo["agent"]["adult_food_per_step"]))); save_out()
             if a.ckpt and (it % a.ckpt_every == 0):
                 _ck.save(a.ckpt, dict(rp=rp, ros=ros, S=S_, Hh=Hh, PA=PA, PR=PR, COD=COD, cr=cr, key=key_, it=it, t=t_train, steps=steps_train,
-                                      log=log, reads=READS, rng_state=rng_main.bit_generator.state, mil=list(MIL)))
+                                      log=log, reads=READS, rng_state=rng_main.bit_generator.state, mil=list(MIL), fmil=list(FMIL), forages=FORAGES))
             if a.stop_after and it == a.stop_after:
                 os._exit(3)
         if not READS and a.eval_updates:
             READS.append(dict(at_agent_steps=steps_train, **readout(rp, "final")))
         out = save_out()
+        if a.final_return_check:                           # Cam Nov 13: return-to-go by age band on the final weights
+            out["return_check"] = return_check(rp, write=False)
+            json.dump(dict(summary=out, log=log), open(a.out, "w"), indent=1, default=float)
         print("STAGE1_THROUGHPUT", json.dumps(dict(train_throughput_agent_steps_per_s=out["train_throughput_agent_steps_per_s"])), flush=True)
         print("STAGE1", json.dumps(out, default=float)[:3000], flush=True)
 
