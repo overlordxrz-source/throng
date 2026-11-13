@@ -5685,6 +5685,19 @@ more expensive, because it produces publishable-looking nulls.
     resume test passes.
   - Running: the KL arms at 2,000 updates (8M agent-steps), to see whether the collapse only takes longer.
 
+- **RESULT (Nov 12 07:13): KL arms at 2,000 updates (8.2M agent-steps, laptop):**
+  - `--kl-nav 1.0`: adult food 92% of the navigator (CI 87-97). Down from 99% at 250 updates.
+    - KL to the navigator 0.002 nats per step; moves 3.0% vs the navigator's 3.3%.
+  - `--kl-nav 0.1`: 68% (62-74), still falling.
+    - KL 0.029 nats per step; moves 2.6% vs 5.1%.
+  - Predictions:
+    - beta 1.0 holds >= 0.9: p 0.65, HIT (narrowly);
+    - beta 0.1 falls below 0.5: p 0.5, MISS (68%).
+  - **Reading:** beta 1.0 keeps foraging by keeping the policy almost exactly the navigator's. That may also leave too
+    little room for listening to change behaviour. The 0.002 nats per step is averaged over all steps; listening
+    needs deviation only on heard steps.
+  - Files: `docs/data/stage1/ab2000_*`.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
