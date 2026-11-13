@@ -6098,6 +6098,25 @@ more expensive, because it produces publishable-looking nulls.
   - The combined 1000+ band was not added (the edit did not apply; three exact adult bands are reported instead).
   - Files: `docs/data/weaning/return_check_{navigator,follower}_nowean.json`.
 
+- **Cam, Nov 13 ~02:55 (ruling on the follower return check).**
+  1. **Reading:** PPO's per-state advantages DO carry the value of listening at gamma 0.99 (the follower's
+     return-to-go is better at 0-499, 500-999 and 1,500+).
+     - The from-birth parity (-0.05) is the juvenile cost of acting on tokens while topped up. It does not block
+       learning the code: the aux heads train the memory whether or not the agent acts.
+     - No gamma change (0.998 collapsed in the screen; the per-state signal is already there). The three exact adult
+       bands are fine.
+  2. **Conclusion:** the world (2x survival, 3.2x food) and the objective both pay for listening. The leading
+     explanation for the 0% life test is the LEARNER: a GRU inferring a new code within one life under PPO.
+  3. **Key-value memory design note** (only if `s1kl03` stops at 3e8). One page:
+     - what is stored per heard token, and what later evidence is attached;
+     - retrieval keyed on the current token;
+     - how it plugs into the frozen trunk with KL 0.3;
+     - a lever-did-work unit test: on scripted streams with a known code, a supervised probe reads the code from
+       the KV memory at >= 80% within a median life's tokens, before any RL;
+     - throughput and cost.
+     Architecture only; no meanings fed in; no runs (new credits needed).
+  4. If it continues to 1B: send the 1B readout.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
