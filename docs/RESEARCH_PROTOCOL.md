@@ -6615,6 +6615,27 @@ more expensive, because it produces publishable-looking nulls.
   - v2 machinery is ready and smoke-tested (comm-toy `4e6b4bd`+).
   - Files: `docs/data/premium/`.
 
+- **Cam, Nov 13 ~10:40 (rulings).**
+  1. **ARM E counted as FAILED** (option a). Across A-C the 12.5M -> 25M change was <= +0.03, so 25M cannot plausibly
+     reach 1.5x. Not resumed on Modal; the 25M-equivalent readout from the u1500 checkpoint runs on the laptop for the
+     record (does not block v2).
+     - **Finding:** PPO + KL 0.3 does not use a perfect signal even when every life starts hungry, adult and
+       parentless. The juvenile phase is not the explanation; PPO in this harness is.
+  2. **Cap breach recorded** (E ~$0.42 vs $0.20, +110%). **STANDING RULE: one watch per Modal item, at that item's own
+     cap +25%, set before spawn. Shared watches are never allowed.**
+  3. Premium accepted (2.18x). **Stage-2 design note** (recorded in `STAGE2_STAGE3_DESIGN.md`): reproduction must be
+     paid from gathered energy, so food intake, not just time alive, drives fitness.
+  4. **EVOLUTION v2: LAUNCH as built.** EXPLORE, 50M, its own watch, cap $0.6 (stop $0.75).
+     - Readouts: fitness per generation (best, elite mean, population mean); life test, food ratio and forage at 25M
+       and 50M; TI on the fixed batch.
+     - **Decision at 50M:**
+       - PASS (food true/deranged >= 1.5x, forage >= 70% and not falling): oracle CONFIRM to 1e8 with the same setup,
+         cap $0.8, same restated pass rule;
+       - CLIMBING (ratio 1.1-1.5x and rising 25M -> 50M): report; Cam rules on extending;
+       - FAIL (< 1.1x, or flat): no more learner runs on this account; Cam writes the stage-1 rethink for M (unfrozen
+         trunk / end-to-end, a distance curriculum so partial following pays, the fitness design). Next learner work
+         waits for new credits.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under

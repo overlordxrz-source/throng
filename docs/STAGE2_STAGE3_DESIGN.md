@@ -111,3 +111,13 @@ dictionary through a scripted speaker. Defining "situation" for learned calls de
   test uses 48 probes, and the same perfect listener scored 83% at 24 probes and 92% at 48, because the paired > 2 SE
   criterion needs probes.
 - **Next:** the 48-probe calibration (~25 min laptop, so Modal ~/bin/zsh.1), when Cam allows.
+
+## Design note: fitness must be paid in food (Cam, Nov 13)
+
+The listening-premium check (protocol, Nov 13 ~09:40) found that the best evolved stage-1 forager (D-best) outlives
+the scripted true-code follower: 0.82 vs 0.54 survive past 1,300. Yet the follower eats 2.18x as much as an adult. So
+a pure survival-time fitness favours a code-free longevity strategy over listening.
+
+**Rule for stage 2:** when reproduction arrives, it must be paid from gathered energy (an energy threshold to breed,
+or an energy cost per offspring). Then food intake, not just time alive, drives fitness. Re-run the return check by
+age band under the stage-2 reward before deciding on any extra term (the alive bonus stays parked).
