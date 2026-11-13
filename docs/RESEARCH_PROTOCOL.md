@@ -6117,6 +6117,45 @@ more expensive, because it produces publishable-looking nulls.
      Architecture only; no meanings fed in; no runs (new credits needed).
   4. If it continues to 1B: send the 1B readout.
 
+- **RESULT (Nov 13 03:50): `s1kl03` STOPPED at 3e8, BUT THE RUN HAD DIVERGED TO NaN AT UPDATE 9,848 (~161M
+  agent-steps).** Everything after ~161M is void, including the whole 3e8 readout.
+  - The watcher's verdict (STOP) is correct, but for the wrong reason: there is no scientific 3e8 result. The 1e8
+    readout (before the NaN) stands.
+  - **Onset:** losses normal through update 9,847 (ppo 0.068, meal 0.99, eaten 0.0027); all NaN from 9,848, eating
+    0. There is no precursor in the last 12 updates or in token influence.
+  - **Cause (confirmed mechanism; the exact step cannot be replayed because the last good weights are gone):**
+    - After a death the rollout freezes that agent's memory (`jnp.where(alive, h2, Hh)`), but the training scan in
+      `seq_loss` does not. So on dead (masked) steps the recomputed lp can sit near 0 while the stored lp0 is ~-100.
+    - Measured on the pilot u6000 checkpoint: stored lp0 down to -105.7 on live steps and -97.3 on masked steps.
+    - exp(lp - lp0) then overflows float32 (> 88.7). With a negative advantage the PPO term is +inf, and inf x 0
+      mask = NaN, forward and backward.
+    - The bug was latent in pilot 1 too.
+  - **Two failures of my own instruments:**
+    1. The in-run forage stop did NOT catch it. With NaN weights the navigator reference (the same weights with side
+       heads zeroed) also eats nothing, so the food ratio was 0/0 and the rule fell back to the KM ratio of 1.0:
+       CARRY_ON.
+    2. The rolling checkpoint overwrites in place, so the only saved checkpoint (update 18,500) holds NaN weights. It
+       cannot seed a resume. The last good weights are lost.
+  - **Spend:** ~$1.5 on `s1kl03` up to the stop; ~$0.7 of it after the divergence. Metered $31.62.
+  - **Fix (comm-toy `c851f02`; default path identical to `8a0d027`, 0 mismatches over 30 updates; resume tests pass):**
+    1. The PPO log-ratio is clipped to +-20 and masked with `where` (identical whenever values are sane).
+    2. A NaN guard skips any non-finite update and stops after 10 in a row. It has not been exercised yet.
+    3. The forage stop counts "no adult food or NaN ratio" as total collapse.
+       - Checked on the real NaN checkpoint: old rule CARRY_ON (KM 1.0), new rule worst = 0, STOP.
+    4. A checkpoint copy is kept at each milestone readout.
+    - **Poison test with teeth:** masked old log-probs set to -200. Old code: NaN in 26 of 30 updates. Fixed: 0 of 30.
+  - **Open question for Cam:** the registered 3e8 test of GRU + KL 0.3 was never actually run.
+    - Valid evidence ends at 161M (1e8 readout: life test 0%, token influence ~1.3e-4, forage 71%).
+    - Options: (A) rerun `s1kl03` with the fix (~$1.9 to 3e8; ~$4.5 of the $6 item cap remains); (B) treat it as a
+      fail and go to the KV memory (new credits).
+  - Files: `docs/data/s1kl03/s1kl03_final_nan.json`, `s1kl03_a595b35.log`.
+- **DESIGN NOTE (Nov 13 ~04:30): key-value memory** (`docs/KV_MEMORY_DESIGN.md`; Cam's item 3; no runs).
+  - The count before building: the ideal counting observer on the same evidence reaches only 26 -> 56% exact sector
+    (~80% heading-equivalent) by 301+ tokens. So Cam's proposed unit-test bar (>= 80% within a median life's tokens)
+    is unreachable for the exact sector.
+  - Proposed bar instead: the probe on the KV table reaches >= 90% of the counting observer, on both exact and
+    heading, by ~600 tokens; plus a shuffled-code negative control.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
