@@ -140,6 +140,7 @@ def main():
     ap.add_argument("--redraw-probe", type=int, default=0, help="stage 1 (Cam Nov 12): with --ckpt, re-draw each life's code at this age (first rollout boundary after it); linear probe trained on pre-re-draw rows, scored on post rows by tokens heard since the re-draw, vs the wiped baseline; then exit")
     ap.add_argument("--readout-worlds-at", default="", help="stage 1: readout worlds per milestone, e.g. 32,32,64 (overrides --readout-worlds)")
     ap.add_argument("--forage-stop", action="store_true", help="stage 1 (Cam's foraging rule, in-run): after each milestone readout, forage-check the live weights; STOP at 1st milestone if the lower ratio < 0.5; at the 2nd if < 0.5 or still falling from the 50-90% band")
+    ap.add_argument("--reward-variants", default="", help="stage 1 return check: extra rewards scored on the same trajectories, e.g. death:1,alive:0.001,topup")
     ap.add_argument("--forage-control", choices=["none", "damaged"], default="none")
     ap.add_argument("--diag-only", action="store_true", help="with --diag (and e.g. --ckpt of a finished run): run the predictive-head swap check and exit")
     ap.add_argument("--log-levers", action="store_true", help="diagnostic (Cam Nov 10, 4a): per update, each lever's own signal (pred loss, copy CE + rows, replay passes + loss, young-lr factor) to <out>.levers.jsonl")
@@ -672,7 +673,7 @@ def main():
                     rr_ = np.asarray(R[4])
                     for w in range(Wf):
                         for l in range(NL):
-                            rew[w][l][1].extend(rr_[w, al[w, :, l], l].tolist())
+                            rew[w][l][1].extend(rr_[w, al[w, :, l], l].tolist()); rew[w][l][2].extend(np.asarray(R[0])[w, al[w, :, l], l, 98].tolist())
                 ageT = age0[:, None, :] + np.arange(T)[None, :, None]
                 bi = np.searchsorted(AB, ageT, side="right") - 1
                 for j in range(len(AB) - 1):
@@ -683,9 +684,9 @@ def main():
                     if born[w, l]:
                         lives.append((w, int(agd[w, l]), False, "starvation" if Ed[w, l] <= 0 else ("age" if agd[w, l] >= cfg.A_max else "other")))
                         if rew is not None:
-                            rew["done"].append((w, rew[w][l][0], np.array(rew[w][l][1]), lives[-1][3]))
+                            rew["done"].append((w, rew[w][l][0], np.array(rew[w][l][1]), lives[-1][3], np.array(rew[w][l][2])))
                     if rew is not None:
-                        rew[w][l] = ((_ + 1) * T, [])
+                        rew[w][l] = ((_ + 1) * T, [], [])
                     CODf[w, l] = FAM[rf.integers(0, len(FAM))]; born[w, l] = True
                 if dead.any():
                     Sf, Hf, PAf, PRf = respawn(Sf, Hf, PAf, PRf, dead, rf)
@@ -762,7 +763,7 @@ def main():
                                                                    cfg=dict(E_set=cfg.E_set, drive_n=cfg.drive_n, d0=cfg.d0, d_move=cfg.d_move, E0=cfg.E0, eff=cfg.eff, inclusive=cfg.inclusive, A_max=cfg.A_max),
                                                                    juvenile_topup_age=a.juvenile, at_update=it)
             for name, q in arms.items():
-                rew = {w: {l: (0, []) for l in range(NL)} for w in range(Wf)}; rew["done"] = []
+                rew = {w: {l: (0, [], []) for l in range(NL)} for w in range(Wf)}; rew["done"] = []
                 lives, FS, NS, AB = forage(q, Wf, nup, 77_000, rew)
                 done = [d_ for d_ in rew["done"] if d_[1] <= last_birth]
                 res = dict(lives_complete=len(done), mean_lifespan=float(np.mean([len(d_[2]) for d_ in done])) if done else None,
@@ -786,6 +787,32 @@ def main():
                     res[f"gamma_{g}"] = dict(return_from_birth=float(g0a.mean()), ci95=[float(np.percentile(bs, 2.5)), float(np.percentile(bs, 97.5))],
                                              return_to_go_per_step=float(gt.mean()), return_to_go_by_age=byage)
                 res["adult_food_per_step"] = float(FS[:, [j for j in range(len(AB) - 1) if AB[j] >= LEAVE]].sum() / max(NS[:, [j for j in range(len(AB) - 1) if AB[j] >= LEAVE]].sum(), 1))
+                if a.reward_variants:                       # Cam Nov 12: alternative rewards scored on the SAME trajectories
+                    def drv(E):
+                        return np.abs(cfg.E_set - np.clip(E, 0, 1)) ** cfg.drive_n
+                    VAR = {}
+                    for spec in ["current"] + a.reward_variants.split(","):
+                        kind, val = (spec.split(":") + ["0"])[:2]; val = float(val); seqs = []
+                        for d_ in done:
+                            rv = d_[2].copy()
+                            if kind == "death" and d_[3] == "starvation":
+                                rv[-1] -= 20.0 * val                # terminal penalty (drive units, x20 like the reward)
+                            elif kind == "alive":
+                                rv = rv + 20.0 * val                # per-step alive bonus
+                            elif kind == "topup":                   # drive reduction on the energy AFTER the juvenile top-up
+                                E_ = d_[4]; rv = rv.copy(); rv[:-1] = 20.0 * (drv(E_[:-1]) - drv(E_[1:]))
+                            seqs.append(rv)
+                        g = 0.99; ages_ = np.concatenate([np.arange(len(q)) for q in seqs]); gt_ = []
+                        for q in seqs:
+                            acc = np.zeros(len(q)); c = 0.0
+                            for t_ in range(len(q) - 1, -1, -1):
+                                c = q[t_] + g * c; acc[t_] = c
+                            gt_.append(acc)
+                        gt_ = np.concatenate(gt_)
+                        VAR[spec] = dict(return_from_birth=float(np.mean([(q * g ** np.arange(len(q))).sum() for q in seqs])),
+                                         by_age={f"{lo}-{hi - 1}": (round(float(gt_[(ages_ >= lo) & (ages_ < hi)].mean()), 4) if ((ages_ >= lo) & (ages_ < hi)).any() else None)
+                                                 for lo, hi in ((0, 500), (500, 1000), (1000, 1500), (1500, 2000), (2000, 3000))})
+                    res["reward_variants_gamma_0.99"] = VAR
                 out[name] = res; print("return", name, json.dumps(res)[:400], flush=True)
             os.makedirs(os.path.dirname(a.out) or ".", exist_ok=True); json.dump(out, open(a.out, "w"), indent=1, default=float)
             print("RETURN_CHECK", json.dumps(out, default=float), flush=True)
