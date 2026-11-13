@@ -6475,6 +6475,25 @@ more expensive, because it produces publishable-looking nulls.
   - By the registered rule, D launches.
   - Files: `docs/data/evolve/lever_{sel,mut}.json`.
 
+- **Cam, Nov 13 ~07:45 (pre-registration, no round trip).**
+  1. (a)/(b) accepted: no GAE bug. The signal dies in exploration and credit assignment (rare, negatively advantaged
+     juvenile toward-moves; juveniles 71% of the data); the KL is not the main restraint.
+  2. **Cam's error on D, recorded:** lifespan fitness was checked at its endpoints (follower 1,318 > freezer ~962 >
+     navigator 879) but not along the path. From the navigator the nearest climb is freezing, as the lever check
+     shows. D runs to the end as registered; read it as "lifespan selection finds the freeze" unless it shows
+     following.
+  3. **If no A-C arm qualifies, run both** (EXPLORE, oracle input, 25M steps each, same readouts and pick rule):
+     - **D' EVOLUTION ON FOOD:** as D, but fitness = total food eaten over the life. Laptop lever check first
+       (recover the navigator's lifetime food from a noised head; the random-survivor mutant must not). Cap $0.3.
+     - **E HUNGRY-ADULT ORACLE CHECK:** PPO, KL 0.3 (or the best A-C dose if one stands out on the food ratio). Every
+       training life starts in the life test's start state: adult, low energy, no parent, no top-up. Cap $0.2.
+     - **Reading:**
+       - E passes and A-C fail: the juvenile/top-up life course starves the learning signal; fix the life course;
+       - E fails: PPO in this harness can't learn even the simplest version, so evolution (if D' passes) or an
+         unfrozen trunk is the route;
+       - D' passes: evolution on food becomes the slow-weight learner.
+  4. If an A-C arm qualifies: the 07:05 tree stands (pick -> 1e8 oracle confirm); D' and E are dropped.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
