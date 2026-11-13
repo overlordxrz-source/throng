@@ -1251,6 +1251,7 @@ def main():
                 print(f"resumed stage 1 at update {it}, {steps_train:,} agent-steps", flush=True)
                 if any(r_.get("forage", {}).get("decision") == "STOP" for r_ in READS) and not (a.forage_check or a.return_check or a.redraw_probe or a.grad_diag):
                     print("FORAGE_STOP already decided in this checkpoint: not training on", flush=True); return
+        TIB = None                                         # (assigned before any path that can call readout)
         if a.load_evo_head:                                # Cam Nov 13: evaluate an evolved side head (the population's first = top elite)
             Ce = _ck.load(a.load_evo_head); top = jax.tree_util.tree_map(jnp.asarray, Ce["evo_pop"][0])
             rp = {"params": {**rp["params"], **(top if "side_head" in top else {"side_head": top})}}
@@ -1261,7 +1262,8 @@ def main():
                        forage=fo, life_test=rd.get("tests"), lives=rd.get("lives"), eligible=rd.get("eligible"))
             json.dump(out, open(a.out, "w"), indent=1, default=float); print("PREMIUM", json.dumps({k_: v_ for k_, v_ in out.items() if k_ != "forage"}, default=float)[:1500], flush=True)
             return
-        TIB = build_ti_batch(rp) if a.ti_fixed else None
+        if a.ti_fixed:
+            TIB = build_ti_batch(rp)
         if a.evolve:
             return evolve_run(rp)
         if a.return_check:
