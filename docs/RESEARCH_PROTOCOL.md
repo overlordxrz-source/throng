@@ -6007,6 +6007,46 @@ more expensive, because it produces publishable-looking nulls.
   - Throughput 20.2k steps/s. Spend: item watch +$0.47 at 00:37 since its restart (metered $30.68).
   - Files: `docs/data/s1kl03/s1kl03_1e8.json`.
 
+- **Cam, Nov 13 (rulings on the 00:40 readout).**
+  1. The weaning reading is CONFIRMED: the parent's SUPPLY tapers (w x (d0 + d_move), capped at E0, w 1 -> 0 from
+     500 to 1,000).
+  2. The 1e8 readout is accepted; the run continues unchanged. Bars (b) >= 3.8e-4, (c) >= 11.2 points, (a) as
+     written.
+     - Food fell 95% (8M) -> 71% (100M), so 2,000-update screens cannot see the drift. Future screens must run
+       >= 25M steps to measure the slope.
+  3. **If `s1kl03` stops at 3e8 (either rule): the WEANING SCREEN**, specified in advance.
+     - Modal, EXPLORE, item cap $1. ~25M steps per arm, same seeds:
+       - arm 1: KL 0.3 + `--wean-to 1000`;
+       - arm 2: KL 0.3 (the s1kl03 config).
+     - References, no training, under weaning: the navigator and the scripted true-code follower; survival past
+       1,000 and past 1,300.
+     - Readouts: adult food vs the navigator with its slope; token influence; return-to-go by age band.
+     - Decision:
+       - weaning goes into the next learner run if (i) follower survival past 1,300 >= 2x the navigator's AND
+         (ii) arm 1's adult food and token influence >= arm 2's at 25M;
+       - if (i) fails, report (Cam: "the world is too harsh even for a perfect listener").
+       - The next learner run waits for new credits.
+  4. If `s1kl03` continues to 1B: send the 1B readout.
+- **PREP + REFERENCES (Nov 13 ~01:10; laptop, comm-toy `b25c687`; 64 fresh worlds x 12,800 steps; no training).**
+  Run now because they do not depend on the 3e8 outcome and cost nothing.
+
+  | | survival past 1,000 | survival past 1,300 | KM median | adult food per step |
+  |---|---|---|---|---|
+  | navigator, no weaning | 0.280 | 0.258 | 879 | 0.0094 |
+  | true-code follower, no weaning | 0.567 | 0.505 | 1,318 | 0.0301 |
+  | navigator, weaning to 1,000 | 1.000 | 0.406 | 1,282 | 0.0078 |
+  | true-code follower, weaning to 1,000 | 1.000 | 0.643 | 1,977 | 0.0266 |
+
+  - **Condition (i) FAILS under weaning: 0.643 / 0.406 = 1.58x (< 2x).** Without weaning it is 1.96x.
+  - **It does not fail because the world is too harsh for a perfect listener:** 64% of followers live past 1,300.
+    It fails because weaning helps the navigator more (0.26 -> 0.41) than the follower (0.51 -> 0.64). The value
+    of listening shrinks as the world gets kinder.
+  - Since (i) decides the screen on its own, the two training arms (~$0.35) cannot change its verdict.
+    - The screen is staged on the separate app (`modal_w2cal.py` plan `wean25`, not deployed); it launches only on
+      Cam's word.
+    - It would still measure the KL drift slope at 25M and weaning's effect on token influence.
+  - Files: `docs/data/weaning/`.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
