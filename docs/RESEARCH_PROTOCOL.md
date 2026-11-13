@@ -5698,6 +5698,35 @@ more expensive, because it produces publishable-looking nulls.
     needs deviation only on heard steps.
   - Files: `docs/data/stage1/ab2000_*`.
 
+- **Cam, Nov 12 (rulings on the ~07:20 stop report).**
+  1. The STOP is correct, and "lower of the two ratios" is accepted. Food per step is the measure (KM lifespan flatters
+     a frozen agent). `xfcal48` PASS accepted (93.6 / 91.9 / 0); the +28% on $0.13 is fine.
+  2. **First, a free RETURN CHECK (laptop):** on the same lives and keys, the training objective (discounted return
+     under the training gamma, with the actual per-step reward) for the navigator, the collapsed u6000 agent and a
+     scripted stand-still agent.
+     - If freezing scores >= the navigator: the objective rewards freezing. Fix the objective; report the gamma (and
+       matching lambda) at which the navigator beats freezing; confirm the reward is the homeostatic drive reduction
+       as designed, including the move cost.
+     - If the navigator scores higher: PPO is failing to optimise. Check truncation / bootstrap at rollout ends and
+       deaths, advantage normalisation, and the GRU's logit scale (consider bounding it).
+  3. **Then a KL SCREEN (laptop, 2,000 updates each, same seeds):**
+     - (a) beta 1.0 everywhere;
+     - (b) beta 1.0 on silent steps only;
+     - (c) beta 0.3 everywhere;
+     - (d) the objective fix from (2) with no KL, if (2) found one.
+     - Screen metric: adult food >= 90% of the navigator AND token influence > 0 and growing over updates. Token
+       influence = KL between the policy with the true token and with a swapped token, on token steps.
+     - Pick the variant that holds foraging with the largest token influence. Prefer (d) if it holds foraging, since a
+       KL to a fixed navigator caps later learning.
+  4. **Probe control:** the mid-life code re-draw on the 100M checkpoint (laptop). Re-draw at a fixed age; score the
+     probe against the NEW code by tokens heard since the re-draw.
+     - In-context learning is shown only if accuracy drops at the re-draw and climbs back above the wiped baseline.
+     - Until then, criterion (ii) reads "met as written, confounded by age".
+  5. **Relaunch:** one allowed, only if the screen produces a passing variant.
+     - Same registered design plus that fix; $6 cap (~$10.9 under the guard).
+     - Readouts halved at 100M / 300M, full at 1B. Same foraging stop rule.
+     - If nothing passes: no relaunch; report.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
