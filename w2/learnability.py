@@ -149,6 +149,7 @@ def main():
     ap.add_argument("--ratio-check", action="store_true", help="stage 1 (Cam Nov 13): on the first batch, recomputed lp vs stored lp0 on all steps (must be < 1e-4), and the origin of very low live lp0; then exit")
     ap.add_argument("--debug-nan-at", default="", help="test only: 'N,K' poisons the advantages with NaN for updates N..N+K-1 (fires the NaN guard)")
     ap.add_argument("--oracle-input", action="store_true", help="stage 1 APPARATUS ONLY (Cam Nov 13): the decoded sector of the heard message as an extra side input (zero when silent); never inherited")
+    ap.add_argument("--kv-probe", action="store_true", help="with --ic-probe --io-decoder: the KV-memory unit test (fixed-write table + linear probe) on the same streams")
     ap.add_argument("--forage-control", choices=["none", "damaged"], default="none")
     ap.add_argument("--diag-only", action="store_true", help="with --diag (and e.g. --ckpt of a finished run): run the predictive-head swap check and exit")
     ap.add_argument("--log-levers", action="store_true", help="diagnostic (Cam Nov 10, 4a): per update, each lever's own signal (pred loss, copy CE + rows, replay passes + loss, young-lr factor) to <out>.levers.jsonl")
@@ -1798,6 +1799,102 @@ def ideal_observer(a, IC, W, NL, NE, T, cfg):
                                  by_tokens_heard={f"{lo}-{hi}": round(float(H[(Kk >= lo) & (Kk <= hi)].mean()), 4) if ((Kk >= lo) & (Kk <= hi)).any() else None for lo, hi in bins}))
     print("IDEALOBS", json.dumps(out), flush=True)
     os.makedirs(os.path.dirname(a.out) or ".", exist_ok=True); json.dump(out, open(a.out, "w"), indent=1)
+    if a.kv_probe:
+        kv_probe(a, IC, W, NL, NE, T, cfg, out)
+
+
+def kv_probe(a, IC, W, NL, NE, T, cfg, obs_out):
+    """Cam Nov 13 KV unit test (before any RL): the fixed-write key-value table on the SAME streams as the counting
+    observer. Per life, 8 rows (one per token), written only from evidence available BEFORE each heard step, as raw
+    geometry (no 8-sector binning): A = unit vector speaker -> best visible food when heard; B = unit vector speaker
+    -> the life's next meal (written when that meal happens); c = the parent's move (one-hot of 5) while in view.
+    Row = [mean A (2), mean B (2), c frequencies (5), log1p counts A/B/c (3)]. A linear probe (70% of lives train,
+    30% test) reads the true sector from the heard token's row; control: the row of a deranged token."""
+    import optax as _ox
+    o = np.concatenate(IC["o"], 1); alive = np.concatenate(IC["alive"], 1); take = np.concatenate(IC["take"], 1)
+    pos = np.concatenate(IC["pos"], 1); ea = np.concatenate(IC["ea"], 1) if NE else None
+    codes = np.repeat(np.stack(IC["codes"], 1), T, 1); lid = np.repeat(np.stack(IC["lid"], 1), T, 1)
+    L = cfg.L; r_ = cfg.r; o_ = np.arange(-r_, r_ + 1); rng = np.random.default_rng(a.seed + 41)
+    def _head(sc_):
+        dx, dy = np.round(np.cos(sc_ * np.pi / 4) * 3), np.round(np.sin(sc_ * np.pi / 4) * 3)
+        return (1 if dx < 0 else 2) if abs(dx) >= abs(dy) else (3 if dy > 0 else 4)
+    HEAD = np.array([_head(k) for k in range(8)])
+    def unit(v):
+        n = np.hypot(v[0], v[1]); return v / n if n > 0 else None
+    X, XC, Y, K, LIFE = [], [], [], [], []; heard_per_life = []; li_n = 0
+    for w in range(W):
+        for l in range(NL):
+            for li in np.unique(lid[w, :, l]):
+                idx = np.where((lid[w, :, l] == li) & alive[w, :, l])[0]
+                if len(idx) < 100:
+                    continue
+                ob = o[w, idx, l]; hd = ob[:, 108] > 0.5; tok = ob[:, 100:108].argmax(1)
+                tsec = np.argsort(codes[w, idx[0], l])[tok]; p = pos[w, idx, l]; meal_t = np.where(take[w, idx, l] > 0)[0]
+                heard_per_life.append(int(hd.sum())); ev = []
+                for i in np.where(hd)[0]:
+                    dj = ob[i, 109:111] * R_HEAR; wv = ob[i, :(2 * r_ + 1) ** 2]
+                    if wv.max() > 0.2:
+                        b = int(wv.argmax()); u = unit(np.array([o_[b // (2 * r_ + 1)] - dj[0], o_[b % (2 * r_ + 1)] - dj[1]]))
+                        if u is not None:
+                            ev.append((i, tok[i], 0, u))
+                    nm = meal_t[meal_t > i]
+                    if len(nm):
+                        j = nm[0]; d = (p[j] - p[i] + L // 2) % L - L // 2; u = unit(d - dj)
+                        if u is not None:
+                            ev.append((j, tok[i], 1, u))
+                    if NE:
+                        pe = pos[w, idx[i], NL + l]; dd = (pe - p[i] + L // 2) % L - L // 2
+                        if np.abs(dd).max() <= r_:
+                            mv = int(ea[w, idx[i], l]); ev.append((i + 1, tok[i], 2, np.eye(5)[mv if mv < 5 else 0]))
+                ev.sort(key=lambda x: x[0]); Tb = np.zeros((8, 12)); e_i = 0; k = 0
+                der = rng.permutation(8)
+                while np.any(der == np.arange(8)):
+                    der = rng.permutation(8)
+                for i in np.where(hd)[0]:
+                    while e_i < len(ev) and ev[e_i][0] < i:
+                        _, tk, src, vec = ev[e_i]
+                        if src == 0:
+                            Tb[tk, 0:2] += vec; Tb[tk, 9] += 1
+                        elif src == 1:
+                            Tb[tk, 2:4] += vec; Tb[tk, 10] += 1
+                        else:
+                            Tb[tk, 4:9] += vec; Tb[tk, 11] += 1
+                        e_i += 1
+                    def row(t_):
+                        r0 = Tb[t_]; c = r0[9:12]
+                        return np.concatenate([r0[0:2] / max(c[0], 1), r0[2:4] / max(c[1], 1), r0[4:9] / max(c[2], 1), np.log1p(c)])
+                    k += 1; X.append(row(tok[i])); XC.append(row(der[tok[i]])); Y.append(tsec[i]); K.append(k); LIFE.append(li_n)
+                li_n += 1
+    X, XC, Y, K, LIFE = np.array(X), np.array(XC), np.array(Y), np.array(K), np.array(LIFE)
+    nmed = float(np.median(heard_per_life)); ul = np.unique(LIFE); rs = np.random.default_rng(1); rs.shuffle(ul)
+    te = np.isin(LIFE, ul[: max(1, len(ul) * 3 // 10)])
+    bins = [(1, 5), (6, 15), (16, 40), (41, 100), (101, 300), (301, 100_000)]
+    def fit(F):
+        Xtr, Ytr = jnp.asarray(F[~te]), jnp.asarray(Y[~te]); mu, sd = Xtr.mean(0), Xtr.std(0) + 1e-6
+        po = _ox.adam(1e-2); prm = (jnp.zeros((F.shape[1], 8)), jnp.zeros(8)); pst = po.init(prm)
+        @jax.jit
+        def st_(prm, pst):
+            def lf(q):
+                return -jnp.take_along_axis(jax.nn.log_softmax(((Xtr - mu) / sd) @ q[0] + q[1]), Ytr[:, None], 1).mean() + 1e-4 * (q[0] ** 2).sum()
+            g = jax.grad(lf)(prm); u, pst = po.update(g, pst, prm); return _ox.apply_updates(prm, u), pst
+        for _ in range(500):
+            prm, pst = st_(prm, pst)
+        g_ = np.asarray((((jnp.asarray(F[te]) - mu) / sd) @ prm[0] + prm[1]).argmax(-1)); yt, kt = Y[te], K[te]
+        H, HE = g_ == yt, HEAD[g_] == HEAD[yt]; late = (kt >= nmed / 2) & (kt <= nmed)
+        return dict(acc_all=float(H.mean()), acc_late_median_life=float(H[late].mean()), heading_late_median_life=float(HE[late].mean()),
+                    heading_all=float(HE.mean()),
+                    by_tokens_heard={f"{lo}-{hi}": (round(float(H[(kt >= lo) & (kt <= hi)].mean()), 4) if ((kt >= lo) & (kt <= hi)).any() else None) for lo, hi in bins},
+                    heading_by_tokens_heard={f"{lo}-{hi}": (round(float(HE[(kt >= lo) & (kt <= hi)].mean()), 4) if ((kt >= lo) & (kt <= hi)).any() else None) for lo, hi in bins})
+    kv, ctl = fit(X), fit(XC); ob_ = obs_out["sets"].get("A+B+c") or obs_out["sets"].get("A+B_from_beacon")
+    obs_ex, obs_hd = ob_["acc_late_median_life"], ob_["heading_equivalent"]["acc_late_median_life"]
+    out = dict(lives=int(len(ul)), rows=int(len(Y)), median_tokens_heard_per_life=nmed, kv=kv, shuffled_control=kv and ctl,
+               counting_observer=dict(set=("A+B+c" if "A+B+c" in obs_out["sets"] else "A+B_from_beacon"), exact_late=obs_ex, heading_late=obs_hd),
+               bar=dict(rule="KV >= 0.9 x counting observer on exact AND heading (late median life window); control at chance",
+                        kv_over_obs_exact=kv["acc_late_median_life"] / obs_ex if obs_ex else None, kv_over_obs_heading=kv["heading_late_median_life"] / obs_hd if obs_hd else None))
+    out["shuffled_control"] = ctl
+    out["bar"]["pass"] = bool(out["bar"]["kv_over_obs_exact"] and out["bar"]["kv_over_obs_exact"] >= 0.9 and out["bar"]["kv_over_obs_heading"] >= 0.9)
+    print("KV_PROBE", json.dumps(out), flush=True)
+    json.dump(out, open(a.out.replace(".json", "_kv.json"), "w"), indent=1)
 
 
 def observer_decs(a, IC, W, NL, NE, T, cfg, srcs="ABc"):
