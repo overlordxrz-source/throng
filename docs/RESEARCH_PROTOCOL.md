@@ -6299,6 +6299,55 @@ more expensive, because it produces publishable-looking nulls.
     metered +$0.47 over both).
   - The guard (total metered, real time) stays the backstop.
 
+- **RESULT (Nov 13 ~06:45): BOTH 1e8 READOUTS.**
+  - **`s1orc` ORACLE-INPUT ARM: FAIL** under Cam's restated rule.
+    - Run: ended by itself at 05:58 after its 1e8 readout; 341 lives, 87 eligible; 30.4k steps/s; no NaN.
+    - Hungry memory-kept pass **1 of 87 = 1.15% (Wilson 0.2-6.2%)**, below 10%. Wiped 1.15%; natural kept 1.15%;
+      natural wiped 0%.
+    - Food under true vs deranged messages: 0.490 vs 0.443 (+11%; a perfect follower gains ~3x).
+    - **The signal is in the agent but barely moves the policy:**
+      - probe on memory: move class 98.7%, sector 72.6% (wiped 87.2%: the oracle is in the current input);
+      - token influence ~0.7-2.2e-3 nats per heard step, ~10x the GRU arm but tiny next to a follower's;
+      - KL to the navigator ~0.004-0.02 on heard and silent steps alike, so the policy does not deviate more when the
+        signal is present.
+    - Because the oracle is in the input on heard steps, the failure does not need "holding across silences": the
+      policy does not act even when the correct sector is in its current input. My reading: "can't act", not "can't
+      hold". Cam rules (his note 2).
+    - Forage 71.9% (68.6-75.6), RECHECK (moot).
+    - Under Cam's tree (< 10%): fix the policy side first (KL on silent steps only, or a lower beta, screened
+      >= 25M); the KV run waits; the KV replication does not run.
+  - **`s1kl03r` 1e8 (fixed code):**
+    - **Replication:** forage 71.2% (67.3-75.6), inside the original 68-75%: replicates.
+    - Token influence: last 5 logs ~4.2e-5, vs ~1.3e-4 in `s1kl03`: lower by ~3x (token influence is noisy:
+      `s1kl03`'s logs ranged 1.5e-5 to 3.4e-4). Reported, as ruled.
+    - Life test 0% in all four arms (89 eligible).
+    - Probe:
+      - sector memory 24.2 -> 37.7% (1-5 -> 101-300), wiped 27.6% in 101-300: (ii) met as written (+13.6 points),
+        caveat as registered;
+      - move class kept 69.8 / wiped 57.0 (101-300).
+    - No NaN; 19.3k steps/s.
+  - **SANITY STOP TRIGGERED on `s1kl03r`, as operationalised, and applied:** shuffled-code probe 14.13%, row-level
+    Wilson CI 13.61-14.67% (16,514 test rows): the lower bound is above 12.5%.
+    - `throng-w2jobs` was stopped at 06:43 (~update 6,460, ~1.06e8). The 1e8 milestone checkpoint is safe in
+      `~/throng-backup/s1kl03r/`; resumable.
+  - **But the operationalisation is broken (mine):** test rows cluster by life (~165 rows per life, 108 test lives),
+    so a row-level Wilson CI is far too narrow.
+    - Check (laptop, comm-toy `b8d24b3` `--probe-null-check`): regenerated the readout's probe rows exactly (it
+      reproduces 14.13% and the true-sector 34.94%).
+    - **Life-clustered bootstrap CI: 11.9-16.3%, which includes 12.5%.**
+    - **Null over 100 shuffle+split seeds:** mean 12.55%, sd 0.97%, max 15.7%. **The row-Wilson rule fires on 32% of
+      null draws.** The test labels' majority-class rate averages 15.4%.
+    - The observed 14.13% sits at rank p ~ 0.05 against the null: borderline, with no correction across the four
+      readouts so far.
+    - So the trigger is most likely a false positive of the operationalisation, not leakage.
+    - Proposal: replace it with a permutation test against the re-shuffle null (p < 0.01), plus the life-clustered
+      bootstrap.
+  - **CORRECTION ON THE RECORD:** my earlier `s1kl03` 1e8 entry gave the shuffled-probe Wilson CI as 11.5-12.0% using
+    all 54,916 rows. The correct test n is 15,533: 11.3-12.3%. Not triggered either way; the earlier number was
+    wrong.
+  - Spend: metered $32.71. Nothing runs.
+  - Files: `docs/data/s1orc/s1orc_1e8.json`, `docs/data/s1kl03r/s1kl03r_1e8.json`, `probe_null_s1kl03r*.json`.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
