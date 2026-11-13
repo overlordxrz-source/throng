@@ -6662,6 +6662,30 @@ more expensive, because it produces publishable-looking nulls.
   - The readout head at each milestone is that generation's top-scoring member (also a winner's-curse pick). Its
     readout is an independent evaluation.
 
+- **Cam, Nov 13 ~11:00 (standing orders until tomorrow; M near a usage limit).**
+  1. Elite re-scoring confirmed; no change.
+  2. v2 at 25M: log only, no decision.
+  3. **v2 at 50M: Will applies the registered rule:**
+     - PASS: launch the 1e8 oracle CONFIRM (same setup, own watch, cap $0.8, stop $1.0); at 1e8 apply the restated
+       pass rule (hungry memory-kept pass >= 50%, Wilson LB > 10%), then stop.
+     - CLIMBING (1.1-1.5x and rising 25M -> 50M): extend v2 ONCE to 100M (own watch, +$0.6). At 100M: >= 1.5x with
+       forage >= 70% and not falling -> CONFIRM as above; otherwise stop.
+     - FAIL: stop. No more learner runs on this account.
+     - **HARD CEILING: total metered $37.0.** If a step would cross it, don't start it; stop and wait.
+  4. Draft `docs/STAGE1_RETHINK.md` (max 2 pages): what we know; three routes ((a) end-to-end / unfrozen trunk,
+     (b) distance curriculum, (c) evolution with energy-paid reproduction), each with cost, lever check and
+     falsifier; a recommendation and odds.
+  5. Keep the guard alive; update the handoff at each decision point; nothing unattended without its own watch.
+- **REGISTERED before the 25M/50M data (Will's operationalisation of Cam's 50M rule):**
+  `docs/data/evo2/decide_50m.py`.
+  - Ratio = hungry memory-kept food true / deranged at that milestone. Forage = the milestone's adult-food ratio vs
+    the navigator.
+  - PASS: ratio(50M) >= 1.5 AND forage(50M) >= 0.70 AND ratio(50M) >= ratio(25M) ("not falling" is read on the
+    ratio).
+  - CLIMBING: 1.1 <= ratio(50M) < 1.5 AND ratio(50M) > ratio(25M).
+  - FAIL: anything else, including ratio(50M) < 1.1 or not rising.
+  - The 100M check applies the same PASS clause with 50M as the comparison point.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
