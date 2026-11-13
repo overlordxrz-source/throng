@@ -6458,6 +6458,23 @@ more expensive, because it produces publishable-looking nulls.
     random-survivor mutant must stay below 0.95x.
   - Predictions: selection recovers p 0.55; the mutant does not p 0.9.
 
+- **RESULT (Nov 13 07:29): D LEVER CHECK: PASS by the letter, marginal** (laptop, comm-toy `a1a48fd`; 25 generations,
+  ~26M agent-steps each run; final evaluation on 128 fresh lives, capped at 2,048).
+
+  | run | best head | navigator | start head (N(0,5)) | best / navigator |
+  |---|---|---|---|---|
+  | selection (sigma 0.3, pop 32, elite 8) | 961.6 | 1,010.0 | 859.8 | **0.952** (bar >= 0.95) |
+  | mutant: random survivors | 888.2 | 1,010.0 | 859.8 | **0.879** (stays below) |
+
+  - Predictions: selection recovers p 0.55 HIT; the mutant does not p 0.9 HIT.
+  - **Caveats:**
+    - the margin (0.952 vs 0.950) is inside sampling error (~2.7% SE on 128 lives);
+    - 961.6 equals the freezer's lifespan (~962). Selection most likely recovered by moving less, not by navigating.
+  - Per-generation fitness is very noisy: the navigator alone scores 875-1,510 across generations' world sets
+    (16 lives).
+  - By the registered rule, D launches.
+  - Files: `docs/data/evolve/lever_{sel,mut}.json`.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under

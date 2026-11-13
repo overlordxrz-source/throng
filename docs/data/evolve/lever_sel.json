@@ -1,0 +1,223 @@
+{
+ "summary": {
+  "mode": "evolve",
+  "pop": 32,
+  "elite": 8,
+  "sigma": 0.3,
+  "cap": 2048,
+  "worlds_per_member": 4,
+  "init_noise": 5.0,
+  "random_select": false,
+  "generations": 25,
+  "agent_steps": 25986048,
+  "log": [
+   {
+    "gen": 0,
+    "steps": 1081344,
+    "best": 913.4375,
+    "mean": 892.7734375,
+    "elite_mean": 903.796875,
+    "navigator": 1509.9375
+   },
+   {
+    "gen": 1,
+    "steps": 2162688,
+    "best": 929.3125,
+    "mean": 915.8671875,
+    "elite_mean": 924.5390625,
+    "navigator": 1179.5
+   },
+   {
+    "gen": 2,
+    "steps": 3244032,
+    "best": 836.0625,
+    "mean": 815.58203125,
+    "elite_mean": 829.1875,
+    "navigator": 1088.4375
+   },
+   {
+    "gen": 3,
+    "steps": 3953664,
+    "best": 851.8125,
+    "mean": 825.0234375,
+    "elite_mean": 839.2109375,
+    "navigator": 882.875
+   },
+   {
+    "gen": 4,
+    "steps": 4629504,
+    "best": 886.9375,
+    "mean": 860.095703125,
+    "elite_mean": 875.25,
+    "navigator": 874.5625
+   },
+   {
+    "gen": 5,
+    "steps": 5710848,
+    "best": 968.875,
+    "mean": 919.931640625,
+    "elite_mean": 964.25,
+    "navigator": 947.0625
+   },
+   {
+    "gen": 6,
+    "steps": 6792192,
+    "best": 935.9375,
+    "mean": 888.37109375,
+    "elite_mean": 907.6171875,
+    "navigator": 1238.5
+   },
+   {
+    "gen": 7,
+    "steps": 7873536,
+    "best": 1052.3125,
+    "mean": 944.931640625,
+    "elite_mean": 1013.78125,
+    "navigator": 1250.125
+   },
+   {
+    "gen": 8,
+    "steps": 8954880,
+    "best": 916.0625,
+    "mean": 872.533203125,
+    "elite_mean": 891.7890625,
+    "navigator": 994.875
+   },
+   {
+    "gen": 9,
+    "steps": 10036224,
+    "best": 1075.0,
+    "mean": 987.8359375,
+    "elite_mean": 1048.46875,
+    "navigator": 1149.4375
+   },
+   {
+    "gen": 10,
+    "steps": 10847232,
+    "best": 849.875,
+    "mean": 826.705078125,
+    "elite_mean": 839.0703125,
+    "navigator": 918.3125
+   },
+   {
+    "gen": 11,
+    "steps": 11928576,
+    "best": 904.0,
+    "mean": 879.76953125,
+    "elite_mean": 895.0,
+    "navigator": 1136.6875
+   },
+   {
+    "gen": 12,
+    "steps": 13009920,
+    "best": 870.5625,
+    "mean": 832.634765625,
+    "elite_mean": 848.1796875,
+    "navigator": 1390.125
+   },
+   {
+    "gen": 13,
+    "steps": 14091264,
+    "best": 1315.3125,
+    "mean": 1124.787109375,
+    "elite_mean": 1242.7734375,
+    "navigator": 1151.875
+   },
+   {
+    "gen": 14,
+    "steps": 15172608,
+    "best": 1151.3125,
+    "mean": 1019.490234375,
+    "elite_mean": 1116.703125,
+    "navigator": 1230.5
+   },
+   {
+    "gen": 15,
+    "steps": 16253952,
+    "best": 1184.6875,
+    "mean": 1069.7890625,
+    "elite_mean": 1139.1328125,
+    "navigator": 874.625
+   },
+   {
+    "gen": 16,
+    "steps": 17335296,
+    "best": 1093.4375,
+    "mean": 959.302734375,
+    "elite_mean": 1001.1328125,
+    "navigator": 1152.6875
+   },
+   {
+    "gen": 17,
+    "steps": 18416640,
+    "best": 1192.3125,
+    "mean": 1020.462890625,
+    "elite_mean": 1071.2890625,
+    "navigator": 1021.625
+   },
+   {
+    "gen": 18,
+    "steps": 19497984,
+    "best": 1304.3125,
+    "mean": 1078.45703125,
+    "elite_mean": 1149.421875,
+    "navigator": 1288.625
+   },
+   {
+    "gen": 19,
+    "steps": 20579328,
+    "best": 890.25,
+    "mean": 868.552734375,
+    "elite_mean": 885.9453125,
+    "navigator": 1036.5625
+   },
+   {
+    "gen": 20,
+    "steps": 21660672,
+    "best": 1022.375,
+    "mean": 969.0859375,
+    "elite_mean": 1017.6953125,
+    "navigator": 1146.875
+   },
+   {
+    "gen": 21,
+    "steps": 22742016,
+    "best": 1050.0,
+    "mean": 1023.61328125,
+    "elite_mean": 1042.9609375,
+    "navigator": 899.1875
+   },
+   {
+    "gen": 22,
+    "steps": 23823360,
+    "best": 982.0625,
+    "mean": 934.21484375,
+    "elite_mean": 957.28125,
+    "navigator": 1345.3125
+   },
+   {
+    "gen": 23,
+    "steps": 24904704,
+    "best": 1147.1875,
+    "mean": 1066.8125,
+    "elite_mean": 1111.0078125,
+    "navigator": 1164.9375
+   },
+   {
+    "gen": 24,
+    "steps": 25986048,
+    "best": 1093.9375,
+    "mean": 1025.525390625,
+    "elite_mean": 1068.1328125,
+    "navigator": 1008.5625
+   }
+  ],
+  "readouts": [],
+  "final_eval_fresh_worlds": {
+   "best": 961.5703125,
+   "navigator": 1010.0234375,
+   "start_head": 859.8203125,
+   "best_over_navigator": 0.9520277221289729
+  }
+ }
+}
