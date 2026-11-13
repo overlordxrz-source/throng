@@ -163,6 +163,8 @@ def main():
     ap.add_argument("--evolve-worlds", type=int, default=4); ap.add_argument("--evolve-budget", type=float, default=25e6)
     ap.add_argument("--evolve-init-noise", type=float, default=0.0, help="lever check: start the population from a side head with N(0, s) weights")
     ap.add_argument("--evolve-final-worlds", type=int, default=16, help="worlds for the final fresh-world evaluation (x4 lives)")
+    ap.add_argument("--evolve-fitness", choices=["lifespan", "food"], default="lifespan", help="D: mean capped lifespan; D': lifetime food eaten")
+    ap.add_argument("--start-energy", type=float, default=0.0, help="stage 1 arm E: every learner life starts with this energy (0 = E0)")
     ap.add_argument("--evolve-random-select", action="store_true", help="lever-check mutant: survivors chosen at random")
     ap.add_argument("--forage-control", choices=["none", "damaged"], default="none")
     ap.add_argument("--diag-only", action="store_true", help="with --diag (and e.g. --ckpt of a finished run): run the predictive-head swap check and exit")
@@ -565,7 +567,7 @@ def main():
             npos = (np.asarray(S_.pos)[:, :NB].mean(1, keepdims=True).astype(int) + rng_.integers(-3, 4, (S_.pos.shape[0], NL, 2))) % cfg.L
             pos_ = np.asarray(S_.pos).copy(); E = np.asarray(S_.energy).copy(); age = np.asarray(S_.age).copy(); alv = np.asarray(S_.alive).copy()
             sl = slice(NB, NB + NL)
-            pos_[:, sl][dead] = npos[dead]; E[:, sl][dead] = cfg.E0; age[:, sl][dead] = 0; alv[:, sl][dead] = True
+            pos_[:, sl][dead] = npos[dead]; E[:, sl][dead] = (a.start_energy or cfg.E0); age[:, sl][dead] = 0; alv[:, sl][dead] = True
             pos_[:, NB + NL:][dead] = (npos[dead] + np.array([1, 0])) % cfg.L
             return S_._replace(pos=jnp.asarray(pos_), energy=jnp.asarray(E), age=jnp.asarray(age), alive=jnp.asarray(alv)), Hh, PA, PR
 
@@ -732,14 +734,17 @@ def main():
                 RP = {"params": {**RP["params"], "side_head": {"kernel": KH, "bias": BH}}}
                 Ht = jnp.zeros((Wt, NL, Hd)); PAt = jnp.zeros((Wt, NL), jnp.int32); PRt = jnp.zeros((Wt, NL))
                 life = np.full((Wt, NL), float(cap)); rec = np.zeros((Wt, NL), bool); ke = jax.random.PRNGKey(seed + 1); n_roll = 0
+                food = np.zeros((Wt, NL))
                 for _ in range(cap // T):
                     ke, k = jax.random.split(ke); n_roll += 1
                     St, Ht, PAt, PRt, R = roll_rp(RP, St, Ht, PAt, PRt, jnp.tile(jax.random.split(k, Wg), (nh, 1)), Ct, False)
+                    food += (np.asarray(R[6]) * np.asarray(R[7])).sum(1)          # food eaten while alive (lifetime total)
                     dead = ~np.asarray(St.alive)[:, NB:NB + NL] & ~rec; ag = np.asarray(St.age)[:, NB:NB + NL]
                     life[dead] = ag[dead]; rec |= dead
                     if rec.all():
                         break
-                return life.reshape(nh, Wg * NL).mean(1), Wt * NL * n_roll * T
+                fitv = food if a.evolve_fitness == "food" else life       # Cam Nov 13 D': fitness = lifetime food
+                return fitv.reshape(nh, Wg * NL).mean(1), Wt * NL * n_roll * T
             budget = a.evolve_budget
             while steps < budget:
                 fit, used = score(pop + [nav_head], 300_000 + 100 * gen); steps += used
@@ -763,6 +768,7 @@ def main():
                     _ck.save(a.ckpt, dict(evo_pop=pop, gen=gen, steps=steps, glog=glog, mil=MILe, reads=READe, rng_state=rng_e.bit_generator.state))
             # final: the best of the last scored generation vs the navigator vs the starting head, on fresh worlds
             fin, _ = score([elites[0], nav_head, base], 999_000, a.evolve_final_worlds)
+            out["fitness"] = a.evolve_fitness
             out["final_eval_fresh_worlds"] = dict(best=float(fin[0]), navigator=float(fin[1]), start_head=float(fin[2]), best_over_navigator=float(fin[0] / fin[1]))
             json.dump(dict(summary=out), open(a.out, "w"), indent=1, default=float)
             print("EVOLVE_DONE", json.dumps(out["final_eval_fresh_worlds"]), flush=True)
@@ -1214,6 +1220,8 @@ def main():
         S_ = S; Hh = jnp.zeros((W, NL, Hd)); PA = jnp.zeros((W, NL), jnp.int32); PR = jnp.zeros((W, NL))
         COD = np.tile(np.arange(8), (W, M, 1)); COD[:, :NL] = FAM[cr.integers(0, len(FAM), (W, NL))]
         ag = np.asarray(S_.age).copy(); ag[:, NB:NB + NL] = cr.integers(0, 2500, (W, NL))   # staggered ages: juveniles always present
+        if a.start_energy:                                 # Cam Nov 13 arm E: every life starts hungry (the life test's start state)
+            S_ = S_._replace(energy=S_.energy.at[:, NB:NB + NL].set(a.start_energy))
         S_ = S_._replace(age=jnp.asarray(ag))
         log, READS, key_ = [], [], jax.random.PRNGKey(a.seed + 7)
         MIL = [float(x) for x in a.readout_at.split(",")] if a.readout_at else []
