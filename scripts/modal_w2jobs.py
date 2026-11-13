@@ -13,7 +13,7 @@ from pathlib import Path
 import modal
 
 _REQUIREMENTS = str(Path(__file__).resolve().parents[1] / "requirements.txt")
-PINNED_SHA = "1256389b75b8d89b774f3b80a8c13aa44444e881"  # comm-toy: D' (evolution on food) + E (hungry-adult oracle)
+PINNED_SHA = "d262f7087f87368f77a919832c97ed72a29f2a38"  # comm-toy: evolution v2 (groups, food fitness, init-from)
 REPO_URL = "https://github.com/overlordxrz-source/throng.git"
 VOLUME_MOUNT = "/mnt/throng-runs"
 OUTD = f"{VOLUME_MOUNT}/testbed/w2jobs"
@@ -80,6 +80,13 @@ PLANS = {
     # readouts halved at 1e8 / 3e8 (32 worlds), full at 1e9 (64); token influence logged every 100 updates; $6 cap
     # Cam Nov 13: RELAUNCH of the GRU arm on the fixed code (ratio-1, NaN guard, fixed forage rule); same 3e8 conditional; cap $2.4
     # Cam Nov 13 branch 3 (only if no A-C arm qualifies). Same screen readouts; 25M steps each.
+    # Cam Nov 13 ~10:40: EVOLUTION v2. EXPLORE, 50M, own watch cap $0.6. Start from D-best; evolve side_enc + GRU + side
+    # head; fitness = lifetime food (capped 2,048); 8 worlds = 32 lives per member; pop 32, elite 8.
+    "evo2": [("evo2", [*_PILOT, "--oracle-input", "--updates", "1526", "--readout-at", "2.5e7,5e7", "--readout-worlds-at", "32,32",
+                       "--readout-tests", "hungry_kept", "--readout-no-probe", "--ti-fixed", "--forage-worlds", "64", "--forage-updates", "200",
+                       "--evolve", "--evolve-params", "side_enc,gru,side_head", "--evolve-fitness", "food", "--evolve-worlds", "8",
+                       "--evolve-budget", "5e7", "--evolve-sigma", "0.3", "--evolve-sigma-body", "0.02",
+                       "--evolve-init-from", f"{OUTD}/klsD_evolve.ckpt"])],
     "dprime": [("klsDp_evolve_food", [*_PILOT, "--oracle-input", "--updates", "1526", "--readout-at", "1.25e7,2.5e7", "--readout-worlds-at", "32,32",
                                       "--readout-tests", "hungry_kept", "--readout-no-probe", "--ti-fixed", "--forage-worlds", "64", "--forage-updates", "200",
                                       "--evolve", "--evolve-fitness", "food", "--evolve-budget", "25e6", "--evolve-sigma", "0.3"])],
