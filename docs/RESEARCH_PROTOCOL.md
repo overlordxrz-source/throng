@@ -6063,6 +6063,41 @@ more expensive, because it produces publishable-looking nulls.
      key-value memory (needs new credits): a one-page design note for Cam's review (free, no runs). If it continues
      to 1B: send the 1B readout.
 
+- **RESULT (Nov 13 ~02:30): RETURN CHECK, true-code follower vs navigator** (Cam's item 3; EXPLORE; laptop,
+  comm-toy `b25c687`; no weaning; 64 fresh worlds x 12,800 steps; complete lives; training reward x20; the
+  follower = `--sanity`; ~5 min).
+  - Lives: navigator 2,087 complete (mean 1,288 steps, 249 old-age); follower 1,592 (mean 1,737, 444 old-age).
+
+  | gamma | from birth: navigator (CI) | follower (CI) | gap |
+  |---|---|---|---|
+  | 0.99 (training) | -0.965 (-0.982,-0.945) | -1.014 (-1.049,-0.978) | **-0.05** |
+  | 0.995 | -2.03 | -1.87 | +0.16 |
+  | 0.998 | -5.19 | -4.19 | +1.00 |
+  | 0.999 | -8.37 | -6.62 | +1.76 |
+  | 1.0 | -15.47 | -12.89 | +2.57 |
+
+  - Return-to-go by age at gamma 0.99, navigator vs follower:
+
+    | age | navigator | follower |
+    |---|---|---|
+    | 0-499 | -1.07 | **-0.83** |
+    | 500-999 | -1.83 | **-1.08** |
+    | 1000-1499 | **-0.44** | -0.45 |
+    | 1500-1999 | -0.47 | **-0.41** |
+    | 2000-2999 | -0.45 | **-0.30** |
+
+    Per step: -1.13 vs -0.68.
+  - **Reading:** in most states the 0.99 objective does see the value of listening: large in the 500-999 transition
+    band, clear in juveniles and old adults, nil at 1000-1499.
+    - **From birth it does not** (-0.05, CIs about touching). A listener moves on heard tokens during the top-up,
+      when moving is pure cost, and the payoff lands after the top-up ends (~500 steps on, 0.99^500 ~ 0.007).
+    - The from-birth value turns positive at gamma 0.995 and is large by 0.998.
+    - So PPO's per-state advantages carry a real listening signal. The birth-anchored objective hides it behind
+      the horizon.
+  - Caveat: each policy on its own state distribution; later bands are conditional on survival.
+  - The combined 1000+ band was not added (the edit did not apply; three exact adult bands are reported instead).
+  - Files: `docs/data/weaning/return_check_{navigator,follower}_nowean.json`.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
