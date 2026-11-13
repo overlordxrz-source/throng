@@ -6636,6 +6636,18 @@ more expensive, because it produces publishable-looking nulls.
          trunk / end-to-end, a distance curriculum so partial following pays, the fitness design). Next learner work
          waits for new credits.
 
+- **LAUNCHED (Nov 13 10:42): EVOLUTION v2 `evo2`** (`throng-w2jobs`, call fc-01M7AS5VB25MN0D0M4FM5XVAJ5, comm-toy
+  `d262f70`; its OWN watch, cap $0.6, stop $0.75, started before the spawn).
+  - Start: D-best (`klsD_evolve.ckpt` top elite).
+  - Evolved: side_enc + GRU (sigma 0.02) + side head (sigma 0.3).
+  - Fitness: lifetime food over 2,048-capped lives; 8 worlds = 32 lives per member; pop 32, elite 8; 50M agent-steps
+    (~2.16M per generation, ~23 generations).
+  - Readouts at 25M and 50M: hungry memory-kept life test (food ratio, pass), forage vs the navigator, TI + KL on the
+    fixed batch. The fitness per generation is logged.
+  - Generation 0: best 38.2, elite mean 21.3, population mean 11.8, navigator 3.95 (lifetime food).
+  - Decision at 50M as Cam registered (PASS / CLIMBING / FAIL).
+  - Prediction: PASS p 0.15, CLIMBING p 0.25, FAIL p 0.6.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
