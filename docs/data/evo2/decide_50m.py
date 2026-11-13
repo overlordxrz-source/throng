@@ -6,9 +6,9 @@ FAIL: otherwise."""
 import json, sys
 a = sys.argv; f = a[1]; at = float(a[a.index("--at") + 1]) if "--at" in a else 5e7; prev = float(a[a.index("--prev") + 1]) if "--prev" in a else 2.5e7
 R = json.load(open(f))["summary"]["readouts"]
-def pick(x):
-    c = [r for r in R if abs(float(r["tag"]) - x) / x < 1e-6]
-    return c[-1] if c else None
+def pick(x):                       # the readout that fired at this milestone: the first with at_agent_steps >= x
+    c = sorted([r for r in R if r["at_agent_steps"] >= x], key=lambda r: r["at_agent_steps"])
+    return c[0] if c else None
 def ratio(r):
     t = r["tests"]["hungry_memory_carried"]; return t["eaten_true"] / t["eaten_swap"] if t.get("eaten_swap") else None
 def forage(r):
