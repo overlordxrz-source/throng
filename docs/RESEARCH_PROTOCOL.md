@@ -6228,6 +6228,35 @@ more expensive, because it produces publishable-looking nulls.
       criterion.
     - This reading needs Cam's confirmation before the data.
 
+- **RESULT (Nov 13 ~05:00): KV UNIT TEST (before any RL; laptop, comm-toy `fd0b362` `--kv-probe`).** The fixed-write
+  key-value table and the counting observer on the SAME recorded streams.
+  - Streams: navigator behaviour, the stage-1 config (parent arm, parent leaves at 1,000), a random code per life,
+    16 worlds x 80 updates. 239 lives; median 291 tokens heard.
+  - Table rows as in `docs/KV_MEMORY_DESIGN.md`, written only from evidence available BEFORE each heard step. A linear
+    softmax probe on the heard token's row predicts the exact sector (70% of lives train, 30% test). Scored in the
+    observer's own "late median life" window.
+
+  | | exact sector | heading-equivalent |
+  |---|---|---|
+  | counting observer A+B+c (same streams) | 46.8% | 81.4% |
+  | **KV table + probe** | **52.1% (1.11x)** | **71.5% (0.88x)** |
+  | deranged-row control | 15.0% (chance 12.5%) | 23.6% (chance 31.25%) |
+
+  - KV by tokens heard (1-5 / 6-15 / 16-40 / 41-100 / 101-300 / 301+):
+    - exact 20 / 38 / 32 / 38 / 51 / 58;
+    - heading 50 / 69 / 63 / 71 / 72 / 78.
+  - **Bar (>= 0.9x the observer on exact AND heading): FAIL, on heading only (0.88x).**
+    - The probe was trained on the exact sector. The observer's votes use the parent's moves, which carry heading
+      directly.
+    - With ~72 test lives, 0.88 vs 0.90 is likely within sampling error, but the bar stands as registered.
+    - A heading-trained probe is a different readout and is NOT substituted after seeing the data. Cam's call.
+  - Control at chance: yes.
+  - **Plain GRU alongside (different streams and behaviour; `s1kl03` 1e8 readout):**
+    - memory sector probe 38.8% (101-300) / 39.6% (301+), vs KV 50.8 / 58.5;
+    - memory move-class probe 71.2% / 67.0%, vs KV heading 72.2 / 77.9.
+    - So the GRU already holds roughly the KV's heading information but less exact-sector information.
+  - Files: `docs/data/kv/`.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under

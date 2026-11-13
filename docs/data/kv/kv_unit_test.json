@@ -1,0 +1,60 @@
+{
+ "lives": 239,
+ "rows": 93470,
+ "median_tokens_heard_per_life": 291.0,
+ "kv": {
+  "acc_all": 0.5083934405019892,
+  "acc_late_median_life": 0.5205237975321078,
+  "heading_late_median_life": 0.7148073533115085,
+  "heading_all": 0.7361322249894879,
+  "by_tokens_heard": {
+   "1-5": 0.1994,
+   "6-15": 0.3779,
+   "16-40": 0.3205,
+   "41-100": 0.3779,
+   "101-300": 0.5077,
+   "301-100000": 0.5847
+  },
+  "heading_by_tokens_heard": {
+   "1-5": 0.4986,
+   "6-15": 0.686,
+   "16-40": 0.6316,
+   "41-100": 0.7059,
+   "101-300": 0.7216,
+   "301-100000": 0.7788
+  }
+ },
+ "shuffled_control": {
+  "acc_all": 0.131933887505256,
+  "acc_late_median_life": 0.14996222613951146,
+  "heading_late_median_life": 0.23596071518509193,
+  "heading_all": 0.25442313290422747,
+  "by_tokens_heard": {
+   "1-5": 0.1766,
+   "6-15": 0.1599,
+   "16-40": 0.1461,
+   "41-100": 0.0933,
+   "101-300": 0.1404,
+   "301-100000": 0.1315
+  },
+  "heading_by_tokens_heard": {
+   "1-5": 0.1823,
+   "6-15": 0.1773,
+   "16-40": 0.1603,
+   "41-100": 0.1241,
+   "101-300": 0.2152,
+   "301-100000": 0.3416
+  }
+ },
+ "counting_observer": {
+  "set": "A+B+c",
+  "exact_late": 0.4677460263780859,
+  "heading_late": 0.8139584037876226
+ },
+ "bar": {
+  "rule": "KV >= 0.9 x counting observer on exact AND heading (late median life window); control at chance",
+  "kv_over_obs_exact": 1.112834248027071,
+  "kv_over_obs_heading": 0.8781865878959774,
+  "pass": false
+ }
+}
