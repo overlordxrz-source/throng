@@ -58,6 +58,7 @@ class RecAgent(nn.Module):
     value, so behaviour starts exactly as the navigator's. Three approved drives as auxiliary heads: the direction of
     the next meal (hindsight label), the parent's next move, the next view."""
     hd: int = 128
+    bound: float = 0.0          # > 0: the side head's logit contribution is bound * tanh(raw / bound)
 
     @nn.compact
     def __call__(self, h, x):
@@ -67,7 +68,8 @@ class RecAgent(nn.Module):
         z = nn.tanh(nn.Dense(64, name="side_enc")(jnp.concatenate([side, t], -1)))
         h, y = nn.GRUCell(self.hd, name="gru")(h, z)
         zi = nn.initializers.zeros
-        lg = lg_nav + nn.Dense(6, name="side_head", kernel_init=zi, bias_init=zi)(y)
+        sh = nn.Dense(6, name="side_head", kernel_init=zi, bias_init=zi)(y)
+        lg = lg_nav + (self.bound * jnp.tanh(sh / self.bound) if self.bound > 0 else sh)
         v = v_nav + nn.Dense(1, name="side_value", kernel_init=zi, bias_init=zi)(y)[..., 0]
         meal = nn.Dense(9, name="aux_meal")(y); other = nn.Dense(5, name="aux_other")(y)
         view = nn.Dense(49, name="aux_view")(jnp.concatenate([t, y], -1))
@@ -129,7 +131,12 @@ def main():
     ap.add_argument("--grad-diag", action="store_true", help="stage 1: with --ckpt, build one training batch, report per-loss gradient norms per module, side-head vs trunk logit norms, entropy, actions, value/advantage stats; then exit")
     ap.add_argument("--ppo-min-age", type=int, default=0, help="stage 1: steps of lives younger than this leave the PPO loss (diagnosis of the juvenile energy floor)")
     ap.add_argument("--kl-nav", type=float, default=0.0, help="stage 1: coefficient of a per-step KL(agent || frozen navigator) penalty in the loss")
+    ap.add_argument("--kl-silent-only", action="store_true", help="stage 1: apply the --kl-nav penalty only on steps with no token heard")
+    ap.add_argument("--gamma", type=float, default=0.99); ap.add_argument("--lam", type=float, default=0.95)
+    ap.add_argument("--side-bound", type=float, default=0.0, help="stage 1: bound the side head's logit contribution to +-B (B tanh(raw/B)); 0 = unbounded")
+    ap.add_argument("--token-influence-every", type=int, default=0, help="stage 1: every N updates log token influence = KL(policy | true token || policy | swapped token) on heard steps, same memory")
     ap.add_argument("--mask-forced", action="store_true", help="stage 1: drop steps whose action the parent-seek reflex overrode from the PPO loss (they were not sampled from the policy)")
+    ap.add_argument("--return-check", action="store_true", help="stage 1 (Cam Nov 12): with --ckpt, the training objective (discounted return of the actual per-step training reward) for the navigator, the checkpoint agent and scripted stand-still agents on the same fresh worlds; then exit")
     ap.add_argument("--forage-control", choices=["none", "damaged"], default="none")
     ap.add_argument("--diag-only", action="store_true", help="with --diag (and e.g. --ckpt of a finished run): run the predictive-head swap check and exit")
     ap.add_argument("--log-levers", action="store_true", help="diagnostic (Cam Nov 10, 4a): per update, each lever's own signal (pred loss, copy CE + rows, replay passes + loss, young-lr factor) to <out>.levers.jsonl")
@@ -438,7 +445,7 @@ def main():
         assert a.parent and a.test == "heard25", "stage 1 runs in the parent arm with the heard25 test"
         print("RESOLVED_CONFIG", json.dumps(vars(a), default=str), flush=True)
         FA, FB = code_families(); FAM = FA if a.code_family == "A" else FB
-        Hd = a.rec_hidden; rnet = RecAgent(Hd); Dx = 100 + HD + 6 + 1
+        Hd = a.rec_hidden; rnet = RecAgent(Hd, a.side_bound); Dx = 100 + HD + 6 + 1
         rp = rnet.init(jax.random.PRNGKey(a.seed), jnp.zeros((Hd,)), jnp.zeros((Dx,)))
         nav0 = jax.tree_util.tree_map(lambda x: x[0], NAV)["params"]
         pp = {k: dict(v) for k, v in rp["params"].items()}
@@ -492,7 +499,7 @@ def main():
             if a.kl_nav:                                   # KL to the frozen navigator's policy (the trunk alone), on every live step
                 P_ = rp["params"]; tn = jnp.tanh(x[:, :100] @ P_["Dense_0"]["kernel"] + P_["Dense_0"]["bias"])
                 tn = jnp.tanh(tn @ P_["Dense_1"]["kernel"] + P_["Dense_1"]["bias"]); lsn = jax.nn.log_softmax(tn @ P_["Dense_2"]["kernel"] + P_["Dense_2"]["bias"])
-                mk = m
+                mk = m * (x[:, 108] < 0.5) if a.kl_silent_only else m
                 Lp = Lp + a.kl_nav * ((jnp.exp(ls) * (ls - lsn)).sum(-1) * mk).sum() / (mk.sum() + 1e-8)
             Lm = (ce(am, ym) * mm).sum() / (mm.sum() + 1e-8); Lo = (ce(ao, yo) * mo).sum() / (mo.sum() + 1e-8)
             Lv = (((av - yv) ** 2).mean(-1) * mv).sum() / (mv.sum() + 1e-8)
@@ -644,7 +651,7 @@ def main():
                     return int(t_)
             return None
 
-        def forage(rp_, Wf, nup, base):
+        def forage(rp_, Wf, nup, base, rew=None):
             """frozen weights, natural energy, fresh worlds (same seeds for every arm): every life born in the window;
             lifespan (KM, censored at the end), cause of death, food per step by age"""
             Sf = fresh_worlds(base, Wf); rf = np.random.default_rng(a.seed + 303); kf = jax.random.PRNGKey(base + 9)
@@ -657,6 +664,11 @@ def main():
                 kf, k = jax.random.split(kf); age0 = np.asarray(Sf.age)[:, NB:NB + NL]
                 Sf, Hf, PAf, PRf, R = roll_rw(rp_, Sf, Hf, PAf, PRf, jax.random.split(k, Wf), jnp.asarray(CODf), False)
                 take, al = np.asarray(R[6]), np.asarray(R[7])                       # (Wf, T, NL)
+                if rew is not None:                        # rew[w][l] = (birth step, [rewards of the current life])
+                    rr_ = np.asarray(R[4])
+                    for w in range(Wf):
+                        for l in range(NL):
+                            rew[w][l][1].extend(rr_[w, al[w, :, l], l].tolist())
                 ageT = age0[:, None, :] + np.arange(T)[None, :, None]
                 bi = np.searchsorted(AB, ageT, side="right") - 1
                 for j in range(len(AB) - 1):
@@ -666,6 +678,10 @@ def main():
                 for w, l in zip(*np.where(dead)):
                     if born[w, l]:
                         lives.append((w, int(agd[w, l]), False, "starvation" if Ed[w, l] <= 0 else ("age" if agd[w, l] >= cfg.A_max else "other")))
+                        if rew is not None:
+                            rew["done"].append((w, rew[w][l][0], np.array(rew[w][l][1]), lives[-1][3]))
+                    if rew is not None:
+                        rew[w][l] = ((_ + 1) * T, [])
                     CODf[w, l] = FAM[rf.integers(0, len(FAM))]; born[w, l] = True
                 if dead.any():
                     Sf, Hf, PAf, PRf = respawn(Sf, Hf, PAf, PRf, dead, rf)
@@ -673,6 +689,48 @@ def main():
             for w, l in zip(*np.where(born)):
                 lives.append((w, int(agd[w, l]), True, "censored"))
             return lives, FS, NS, AB
+
+        def return_check(rp):
+            """Cam Nov 12: is freezing what the training objective asks for? The actual training reward (x20 drive
+            reduction, move cost included) along each complete life born in the window, discounted at several gammas"""
+            def biased(i):
+                return {"params": {**rpn["params"], "side_head": {"kernel": jnp.zeros_like(rp["params"]["side_head"]["kernel"]),
+                                                                  "bias": jnp.zeros(6).at[i].set(1e3)}}}
+            rpn = {"params": {k_: (jax.tree_util.tree_map(jnp.zeros_like, v_) if k_ in ("side_head", "side_value") else v_) for k_, v_ in rp["params"].items()}}
+            arms = dict(navigator=rpn, agent_ckpt=rp, stand_still=biased(0), stand_and_eat=biased(5))
+            Wf, nup = a.forage_worlds, a.forage_updates; last_birth = nup * T - cfg.A_max     # every life born by then is complete
+            G = [0.99, 0.995, 0.998, 0.999, 0.9995, 1.0]; out = dict(worlds=Wf, steps=nup * T, train_gamma=0.99, train_lambda=0.95, reward_scale=20.0,
+                                                                   reward="drive(E_prev) - drive(E), drive = |E_set - E|^drive_n; energy update includes d_move on moves",
+                                                                   cfg=dict(E_set=cfg.E_set, drive_n=cfg.drive_n, d0=cfg.d0, d_move=cfg.d_move, E0=cfg.E0, eff=cfg.eff, inclusive=cfg.inclusive, A_max=cfg.A_max),
+                                                                   juvenile_topup_age=a.juvenile, at_update=it)
+            for name, q in arms.items():
+                rew = {w: {l: (0, []) for l in range(NL)} for w in range(Wf)}; rew["done"] = []
+                lives, FS, NS, AB = forage(q, Wf, nup, 77_000, rew)
+                done = [d_ for d_ in rew["done"] if d_[1] <= last_birth]
+                res = dict(lives_complete=len(done), mean_lifespan=float(np.mean([len(d_[2]) for d_ in done])) if done else None,
+                           old_age_deaths=sum(1 for d_ in done if d_[3] == "age"),
+                           undiscounted_life_return_mean=float(np.mean([d_[2].sum() for d_ in done])) if done else None)
+                for g in G:
+                    g0 = [float((d_[2] * g ** np.arange(len(d_[2]))).sum()) for d_ in done]
+                    gt = []                                 # return-to-go from every live step of complete lives
+                    for d_ in done:
+                        rv = d_[2]; acc = np.zeros(len(rv)); c = 0.0
+                        for t_ in range(len(rv) - 1, -1, -1):
+                            c = rv[t_] + g * c; acc[t_] = c
+                        gt.append(acc)
+                    ga = np.concatenate([np.arange(len(d_[2])) for d_ in done]) if done else np.zeros(1)
+                    gt = np.concatenate(gt) if gt else np.zeros(1)
+                    byage = {f"{lo}-{hi - 1}": (round(float(gt[(ga >= lo) & (ga < hi)].mean()), 4) if ((ga >= lo) & (ga < hi)).any() else None)
+                             for lo, hi in ((0, 500), (500, 1000), (1000, 1500), (1500, 2000), (2000, 3000))}
+                    bw = {}                                 # bootstrap CI over worlds for the from-birth return
+                    rb = np.random.default_rng(5); ws_ = np.array([d_[0] for d_ in done]); g0a = np.array(g0)
+                    bs = [g0a[np.concatenate([np.where(ws_ == w_)[0] for w_ in rb.integers(0, Wf, Wf)])].mean() for _ in range(300)]
+                    res[f"gamma_{g}"] = dict(return_from_birth=float(g0a.mean()), ci95=[float(np.percentile(bs, 2.5)), float(np.percentile(bs, 97.5))],
+                                             return_to_go_per_step=float(gt.mean()), return_to_go_by_age=byage)
+                res["adult_food_per_step"] = float(FS[:, [j for j in range(len(AB) - 1) if AB[j] >= LEAVE]].sum() / max(NS[:, [j for j in range(len(AB) - 1) if AB[j] >= LEAVE]].sum(), 1))
+                out[name] = res; print("return", name, json.dumps(res)[:400], flush=True)
+            os.makedirs(os.path.dirname(a.out) or ".", exist_ok=True); json.dump(out, open(a.out, "w"), indent=1, default=float)
+            print("RETURN_CHECK", json.dumps(out, default=float), flush=True)
 
         def forage_check(rp):
             rpn = {"params": {k_: (jax.tree_util.tree_map(jnp.zeros_like, v_) if k_ in ("side_head", "side_value") else v_) for k_, v_ in rp["params"].items()}}
@@ -710,6 +768,22 @@ def main():
             out["decision"] = None if worst is None else ("STOP" if worst < 0.5 else ("CONTINUE_RECHECK_300M" if worst < 0.9 else "CARRY_ON"))
             os.makedirs(os.path.dirname(a.out) or ".", exist_ok=True); json.dump(out, open(a.out, "w"), indent=1, default=float)
             print("FORAGE_CHECK", json.dumps(out, default=float), flush=True)
+
+        @jax.jit
+        def _tinf(rp, x, h0, m, key):
+            def fw(x1, h1):
+                def body(h, xx):
+                    h2, lg, _, _ = rnet.apply(rp, h, xx); return h2, (h, lg)
+                return jax.lax.scan(body, h1, x1)[1]
+            hp, lgT = jax.vmap(fw)(x, h0)                               # pre-step memory and the policy with the true token
+            tok = jnp.argmax(x[..., 100:108], -1); sh_ = jax.random.randint(key, tok.shape, 1, 8); tok2 = (tok + sh_) % 8
+            heard = x[..., 108] > 0.5
+            x2 = x.at[..., 100:108].set(jnp.where(heard[..., None], jax.nn.one_hot(tok2, 8), x[..., 100:108]))
+            lgS = jax.vmap(jax.vmap(lambda h, xx: rnet.apply(rp, h, xx)[1]))(hp, x2)
+            lT, lS = jax.nn.log_softmax(lgT), jax.nn.log_softmax(lgS); kl = (jnp.exp(lT) * (lT - lS)).sum(-1)
+            w_ = heard * (m > 0); return (kl * w_).sum() / (w_.sum() + 1e-8), w_.sum()
+        def token_influence(rp, b, key):
+            v_, n_ = _tinf(rp, b[0], b[1], b[6], key); return dict(kl=float(v_), heard_steps=int(n_))
 
         def grad_diag(rp, b, adv, ret, v, al, act):
             """Cam Nov 12 diagnosis: which loss moves the shared memory, how big the learned policy term is next to the
@@ -766,6 +840,8 @@ def main():
                 COD, cr, key_, it, t_train, steps_train, log, READS = Ck["COD"], Ck["cr"], jnp.asarray(Ck["key"]), Ck["it"], Ck["t"], Ck["steps"], Ck["log"], Ck["reads"]
                 rng_main.bit_generator.state = Ck["rng_state"]; MIL[:] = Ck["mil"]
                 print(f"resumed stage 1 at update {it}, {steps_train:,} agent-steps", flush=True)
+        if a.return_check:
+            return return_check(rp)
         if a.forage_check:
             if a.forage_control == "damaged":           # negative control: the side head pushes hard toward action 0
                 rp = {"params": {**rp["params"], "side_head": {"kernel": rp["params"]["side_head"]["kernel"], "bias": rp["params"]["side_head"]["bias"].at[0].add(4.0)}}}
@@ -785,10 +861,10 @@ def main():
             adv = np.zeros_like(r); last = 0.0
             for t in reversed(range(T)):
                 nv = v[:, t + 1] if t + 1 < T else v[:, t]; nt = 1.0 - dn[:, t]
-                last = r[:, t] + 0.99 * nv * nt - v[:, t] + 0.99 * 0.95 * nt * last; adv[:, t] = last
+                last = r[:, t] + a.gamma * nv * nt - v[:, t] + a.gamma * a.lam * nt * last; adv[:, t] = last
             ret = adv + v; m = (al & ~forced).astype(np.float32) if a.mask_forced else al.astype(np.float32)
             if a.ppo_min_age:
-                m = m * ((np.asarray(R[0])[..., 99] * cfg.A_max) >= a.ppo_min_age - 0.5)   # --mask-forced: reflex-chosen steps leave the PPO loss
+                m = m * ((np.asarray(R[0])[..., 99] * cfg.A_max) >= a.ppo_min_age - 0.5)
             A_ = (adv - (adv * m).sum() / max(m.sum(), 1)) / (adv.std() + 1e-8)
             lp_ = pos[:, :, :NL]; ym = np.full((W, T, NL), 8, np.int64); nxt = np.full((W, NL), -1)
             for t in reversed(range(T)):
@@ -809,6 +885,7 @@ def main():
                  tr(m), tr(ym), tr(mm.astype(np.float32)), tr(yo), tr(mo.astype(np.float32)), tr(yv.astype(np.float32)), tr(mv.astype(np.float32)))
             if a.grad_diag:
                 return grad_diag(rp, b, adv, ret, v, al, act)
+            tinf = token_influence(rp, b, jax.random.fold_in(k, 99)) if (a.token_influence_every and it % a.token_influence_every == 0) else None
             for _ in range(a.epochs):
                 rp, ros, parts = upd(rp, ros, *b)
             parts = np.asarray(parts)                     # per-sequence [ppo, meal, other, view, n_meal, n_other]
@@ -822,7 +899,7 @@ def main():
                             loss_other=float((parts[:, 2] * wts[:, 1]).sum() / max(wts[:, 1].sum(), 1)), loss_view=float(parts[:, 3].mean()),
                             labels_meal=int(wts[:, 0].sum()), labels_other=int(wts[:, 1].sum()),
                             juvenile_frac=float((agesT < LEAVE).mean()), eaten_per_step=float(take[al].mean()) if al.any() else None,
-                            forced_frac=float(forced[al].mean()) if al.any() else None, sec=round(dt, 3)))
+                            forced_frac=float(forced[al].mean()) if al.any() else None, token_influence=tinf, sec=round(dt, 3)))
             dead = ~np.asarray(S_.alive)[:, NB:NB + NL]
             for w, l in zip(*np.where(dead)):
                 COD[w, l] = FAM[cr.integers(0, len(FAM))]
