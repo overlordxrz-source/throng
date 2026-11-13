@@ -150,6 +150,8 @@ def main():
     ap.add_argument("--debug-nan-at", default="", help="test only: 'N,K' poisons the advantages with NaN for updates N..N+K-1 (fires the NaN guard)")
     ap.add_argument("--oracle-input", action="store_true", help="stage 1 APPARATUS ONLY (Cam Nov 13): the decoded sector of the heard message as an extra side input (zero when silent); never inherited")
     ap.add_argument("--kv-probe", action="store_true", help="with --ic-probe --io-decoder: the KV-memory unit test (fixed-write table + linear probe) on the same streams")
+    ap.add_argument("--probe-null-n", type=int, default=20)
+    ap.add_argument("--probe-null-check", action="store_true", help="stage 1: with --ckpt, regenerate the first readout's probe rows and test the shuffled-code control against row clustering; then exit")
     ap.add_argument("--forage-control", choices=["none", "damaged"], default="none")
     ap.add_argument("--diag-only", action="store_true", help="with --diag (and e.g. --ckpt of a finished run): run the predictive-head swap check and exit")
     ap.add_argument("--log-levers", action="store_true", help="diagnostic (Cam Nov 10, 4a): per update, each lever's own signal (pred loss, copy CE + rows, replay passes + loss, young-lr factor) to <out>.levers.jsonl")
@@ -603,6 +605,68 @@ def main():
             return dict(acc_all=float(hit.mean()), n_test=int(len(hit)),
                         by_tokens_heard={f"{lo}-{hi}": (round(float(hit[(Kte >= lo) & (Kte <= hi)].mean()), 4) if ((Kte >= lo) & (Kte <= hi)).any() else None) for lo, hi in bins})
 
+        def probe_null_check(rp, Wr, base):
+            """Nov 13: is the shuffled-code probe 'above chance' real, or row clustering? Regenerates a readout's probe rows
+            (same worlds/keys as the readout with this base; no life tests) and reports the registered shuffled number,
+            a null distribution over 20 shuffle+split seeds, a life-clustered bootstrap CI, and the test labels'
+            majority-class rate"""
+            Sr = fresh_worlds(base, Wr); rr = np.random.default_rng(a.seed + 101)
+            Hr = jnp.zeros((Wr, NL, Hd)); PAr = jnp.zeros((Wr, NL), jnp.int32); PRr = jnp.zeros((Wr, NL))
+            CODr = np.tile(np.arange(8), (Wr, M, 1)); CODr[:, :NL] = FAM[rr.integers(0, len(FAM), (Wr, NL))]
+            kh = np.zeros((Wr, NL), np.int64); lidr = np.zeros((Wr, NL), np.int64); cnt_r = np.zeros((Wr, NL, 8), np.int64)
+            PF, key_r = dict(h=[], sec=[], k=[], life=[]), jax.random.PRNGKey(a.seed + 202)
+            for it_ in range(a.eval_updates):
+                key_r, k = jax.random.split(key_r)
+                Sr, Hr, PAr, PRr, R = roll_rw(rp, Sr, Hr, PAr, PRr, jax.random.split(k, Wr), jnp.asarray(CODr), True)
+                x, al = np.asarray(R[0]), np.asarray(R[7]); h2, tsec = np.asarray(R[10]), np.asarray(R[12]); hm = (x[..., 108] > 0.5) & al
+                for t in range(T):
+                    kh += hm[:, t]
+                    if it_ % 3 == 0 and hm[:, t].any():
+                        ww, ll = np.where(hm[:, t]); PF["h"].append(h2[ww, t, ll]); PF["sec"].append(tsec[ww, t, ll]); PF["k"].append(kh[ww, ll])
+                        PF["life"].append(ww * 10_000 + ll * 1000 + lidr[ww, ll])
+                dead = ~np.asarray(Sr.alive)[:, NB:NB + NL]
+                for w, l in zip(*np.where(dead)):
+                    CODr[w, l] = FAM[rr.integers(0, len(FAM))]; kh[w, l] = 0; lidr[w, l] += 1
+                if dead.any():
+                    Sr, Hr, PAr, PRr = respawn(Sr, Hr, PAr, PRr, dead, rr)
+            Fh = np.concatenate(PF["h"]); Ys = np.concatenate(PF["sec"]); LV = np.concatenate(PF["life"]); Kk = np.concatenate(PF["k"])
+            def shuf(seed):
+                Yx = np.empty_like(Ys); rs = np.random.default_rng(seed)
+                for lv in np.unique(LV):
+                    mk = LV == lv; Yx[mk] = rs.permutation(8)[Ys[mk]]
+                return Yx
+            def probe_hits(Y, split_seed):
+                r_ = np.random.default_rng(split_seed); ul = np.unique(LV); r_.shuffle(ul); te = np.isin(LV, ul[: max(1, len(ul) * 3 // 10)])
+                Xtr, Ytr = jnp.asarray(Fh[~te]), jnp.asarray(Y[~te]); mu, sd = Xtr.mean(0), Xtr.std(0) + 1e-6
+                po = optax.adam(1e-2); prm = (jnp.zeros((Fh.shape[1], 8)), jnp.zeros(8)); pst = po.init(prm)
+                @jax.jit
+                def st_(prm, pst):
+                    g = jax.grad(lambda q: ce(((Xtr - mu) / sd) @ q[0] + q[1], Ytr).mean() + 1e-4 * (q[0] ** 2).sum())(prm); u, pst = po.update(g, pst, prm)
+                    return optax.apply_updates(prm, u), pst
+                for _ in range(300):
+                    prm, pst = st_(prm, pst)
+                hit = np.asarray((((jnp.asarray(Fh[te]) - mu) / sd) @ prm[0] + prm[1]).argmax(-1)) == Y[te]
+                maj = np.bincount(Y[te], minlength=8).max() / te.sum()
+                return hit, LV[te], float(maj)
+            hit0, lv0, maj0 = probe_hits(shuf(7), 1)              # the registered configuration (shuffle seed 7, split seed 1)
+            ul0 = np.unique(lv0); rb = np.random.default_rng(3); per = {u: hit0[lv0 == u] for u in ul0}; bs = []
+            for _ in range(1000):                                  # cluster bootstrap: resample test LIVES
+                pick = rb.choice(ul0, len(ul0)); bs.append(np.concatenate([per[u] for u in pick]).mean())
+            null = []
+            for sd_ in range(a.probe_null_n):
+                h_, _, m_ = probe_hits(shuf(100 + sd_), 200 + sd_); null.append((float(h_.mean()), m_))
+            hm_, _, mm_ = probe_hits(Ys, 1)
+            out = dict(rows=int(len(Ys)), test_lives=int(len(ul0)), registered_shuffled=float(hit0.mean()), registered_majority_rate=maj0,
+                       cluster_bootstrap_ci95=[float(np.percentile(bs, 2.5)), float(np.percentile(bs, 97.5))],
+                       null_seeds=dict(mean=float(np.mean([n_[0] for n_ in null])), min=float(min(n_[0] for n_ in null)), max=float(max(n_[0] for n_ in null)),
+                                          frac_lb_rule_would_fire=None, values=[round(n_[0], 4) for n_ in null], majority_rates=[round(n_[1], 4) for n_ in null]),
+                       true_sector_memory=float(hm_.mean()))
+            from math import sqrt
+            def wl(p, n, z=1.96):
+                c = (p + z * z / 2 / n) / (1 + z * z / n); return c - z * sqrt(p * (1 - p) / n + z * z / 4 / n / n) / (1 + z * z / n)
+            nt = int(len(hit0)); out["null_seeds"]["frac_lb_rule_would_fire"] = float(np.mean([wl(n_[0], nt) > 0.125 for n_ in null]))
+            print("PROBE_NULL", json.dumps(out), flush=True); json.dump(out, open(a.out, "w"), indent=1)
+
         def readout(rp, tag):
             """frozen weights on a fresh world batch: lives born here are tested (hungry start primary, natural secondary;
             memory carried vs wiped), and a linear probe reads the memory (vs wiped and shuffled-code controls)"""
@@ -982,6 +1046,8 @@ def main():
                     print("FORAGE_STOP already decided in this checkpoint: not training on", flush=True); return
         if a.return_check:
             return return_check(rp)
+        if a.probe_null_check:
+            return probe_null_check(rp, int(a.readout_worlds_at.split(",")[0]) if a.readout_worlds_at else a.readout_worlds, 91_000)
         if a.redraw_probe:
             return redraw_probe(rp, a.redraw_probe, a.forage_worlds, a.forage_updates)
         if a.forage_check:
