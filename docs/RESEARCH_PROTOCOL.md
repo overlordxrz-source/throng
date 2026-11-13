@@ -6189,6 +6189,45 @@ more expensive, because it produces publishable-looking nulls.
   5. Budget: worst case $37.2, under the $41 guard. Back up milestone checkpoints as they land. `git status -sb`
      before each deploy.
 
+- **RESULT (Nov 13 ~04:30): Cam's three pre-relaunch checks** (laptop, comm-toy `31cc819`).
+  - **(a) RATIO-1: PASS.** The training scan now freezes the memory after a death exactly as the rollout does.
+    - On the first batch before any update: max |lp - lp0| = 7.6e-6 on ALL steps, live and masked (u6000
+      checkpoint); 4.8e-7 at fresh init.
+    - The old scan (mutant `--unsafe-ratio`) gives 1.26 on masked steps, so the test has teeth.
+    - Backstops kept: the log-ratio is set to 0 on masked steps before exp; the +-20 clip; the where-mask.
+  - **(b) lp0 = -105.7 on live steps: reflex-overridden, as allowed.** In the u6000 batch, 11 live steps have
+    lp0 < -30: all 11 reflex-forced, 0 policy-sampled. The lowest policy-sampled lp0 is -9.6. Forced steps are 0.075%
+    of live steps; left as registered.
+  - **(c) NaN guard fired on purpose** (`--debug-nan-at`):
+    - 3 poisoned updates: 3 skips with the weights restored; training continues with finite losses;
+    - 12 poisoned updates: NAN_STOP after 10 consecutive skips.
+  - Poison test still 0 NaN. Resume tests pass (default, KL, oracle).
+  - **Identity vs `8a0d027`: no longer bit-identical. Equal up to float32 rounding:** loss relative difference
+    <= 9e-7 from update 0, with 0 differences in behaviour statistics (eaten, labels, juvenile share) over 30
+    updates. The changed graph alters reduction order; dead steps contribute nothing to any loss.
+- **LAUNCHED (Nov 13 04:33), on the fixed code (comm-toy `31cc819`):**
+  - **`s1kl03r`** (app `throng-w2jobs`, call fc-01M7A425HVMBBHH0BE52WHRZBG): the s1kl03 config. Same registered 3e8
+    conditional (`decide_3e8.py`); fixed forage rule; item cap $2.4.
+    - Replication check at 1e8: forage inside 68-75% and token influence near ~1.3e-4.
+  - **`s1orc`** (app `throng-w2cal`, call fc-01M7A42683WTA5CE3PB60EHYBS): the ORACLE-INPUT apparatus arm. To 1e8
+    (6,110 updates); one 32-world readout plus the forage check; item cap $0.8.
+    - **Deviation (mine):** the oracle input is the decoded sector of the message heard THIS step (zero on silent
+      steps), not of the last heard token. The GRU must carry it across silences. Carrying it in state would touch
+      every rollout / reset / checkpoint path.
+    - The life test's derangement reaches the oracle: it receives the deranged sector, correctly decoded.
+    - Token influence swaps the token and the oracle together. KL to the navigator is logged on heard vs silent
+      steps (both arms).
+  - Per-item spend watches are now keyed on each LIVE APP ID via `modal billing report`
+    (`~/throng-smoke/item_watch_app.sh`), so concurrent items no longer double-count. Stops at 1.25x the cap.
+  - The watcher `~/throng-smoke/watch_run.sh` backs up each milestone checkpoint to `~/throng-backup/<tag>/` and
+    applies the 3e8 conditional for `s1kl03r`.
+  - Cam's oracle decision rule, as registered: pass >= 50% of eligible lives with the Wilson LB above the deranged
+    arm; < 10% means fix the policy side first; in between, Cam rules.
+    - My operationalisation of "LB above deranged": the hungry memory-carried pass rate's Wilson LB > the pass rate
+      of the same test's memory-wiped arm. The paired true-vs-deranged comparison is already inside each life's pass
+      criterion.
+    - This reading needs Cam's confirmation before the data.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under

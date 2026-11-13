@@ -1,0 +1,14 @@
+{
+ "at_update": 0,
+ "max_abs_diff_live": 4.76837158203125e-07,
+ "max_abs_diff_masked": null,
+ "max_abs_diff_all": 4.76837158203125e-07,
+ "pass_ratio1": true,
+ "live_steps": 16384,
+ "live_lp0_below_minus30": 0,
+ "of_which_reflex_forced": 0,
+ "of_which_policy_sampled": 0,
+ "forced_share_of_live": 0.0003662109375,
+ "min_lp0_live_policy_sampled": -7.814484119415283,
+ "min_lp0_live_forced": -9.321749687194824
+}
