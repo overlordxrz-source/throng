@@ -6545,6 +6545,28 @@ more expensive, because it produces publishable-looking nulls.
   - Note: D (lifespan fitness) already reached 1.47x the navigator's adult food without targeting food.
   - Files: `docs/data/evolve/leverF_{sel,mut}.json`.
 
+- **Cam, Nov 13 ~08:20 (screen and D' rulings).**
+  1. Screen: no arm qualifies; accepted. The KL dose is not the lever.
+  2. **D: Cam's prediction was wrong.** From the navigator, lifespan selection found a much better FORAGER in ~6
+     generations. Two consequences:
+     - (a) evolution moves this policy far more than PPO did in 25M steps; it is a serious candidate for the
+       slow-weight learner;
+     - (b) **lifespan fitness SATURATED** (the best heads live to the cap), so a listening mutation earned nothing
+       more. Any further evolution arm needs a non-saturating fitness.
+  3. D': lever FAIL recorded; D' does not launch.
+  4. **FREE NOW: THE LISTENING PREMIUM OVER A COMPETENT FORAGER.**
+     - On the same 128 fresh lives: D's best head, the scripted true-code follower and the navigator. Report adult
+       food per step, survival past 1,300 and to the 2,048 cap, hungry life-test food and pass rate, and the premium
+       (follower / D-best) for each.
+     - Food premium >= 1.5x: the world still pays for listening, so learner work continues.
+     - < 1.5x: a good forager barely needs the code (the world is the bottleneck); Cam rules on a world change.
+  5. **After E lands (pre-registered):**
+     - E passes: the life course starves the learning signal; Cam rules on its design.
+     - E fails AND premium >= 1.5x: **EVOLUTION v2**, one arm (EXPLORE, oracle input, 50M steps, cap $0.6): start
+       from D's best; mutate side_enc + GRU + side head; fitness = lifetime food over censored lives; >= 32 lives per
+       member, pop 32, elite 8; same readouts and pick rule.
+     - E fails AND premium < 1.5x: no run; Cam rules on the world.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
