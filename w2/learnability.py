@@ -157,6 +157,13 @@ def main():
     ap.add_argument("--readout-no-probe", action="store_true", help="stage 1 readout: skip the linear probe (and its sanity rule)")
     ap.add_argument("--sanity-null-n", type=int, default=100, help="stage 1 readout: reshuffle draws for the Cam Nov 13 sanity rule")
     ap.add_argument("--ti-fixed", action="store_true", help="stage 1 readout: token influence + KL heard/silent on a fixed held-out batch")
+    ap.add_argument("--evolve", action="store_true", help="stage 1 screen arm D (Cam Nov 13): side heads set by selection on lifespan; no PPO, no KL")
+    ap.add_argument("--evolve-pop", type=int, default=32); ap.add_argument("--evolve-elite", type=int, default=8)
+    ap.add_argument("--evolve-sigma", type=float, default=0.05); ap.add_argument("--evolve-cap", type=int, default=2048)
+    ap.add_argument("--evolve-worlds", type=int, default=4); ap.add_argument("--evolve-budget", type=float, default=25e6)
+    ap.add_argument("--evolve-init-noise", type=float, default=0.0, help="lever check: start the population from a side head with N(0, s) weights")
+    ap.add_argument("--evolve-final-worlds", type=int, default=16, help="worlds for the final fresh-world evaluation (x4 lives)")
+    ap.add_argument("--evolve-random-select", action="store_true", help="lever-check mutant: survivors chosen at random")
     ap.add_argument("--forage-control", choices=["none", "damaged"], default="none")
     ap.add_argument("--diag-only", action="store_true", help="with --diag (and e.g. --ckpt of a finished run): run the predictive-head swap check and exit")
     ap.add_argument("--log-levers", action="store_true", help="diagnostic (Cam Nov 10, 4a): per update, each lever's own signal (pred loss, copy CE + rows, replay passes + loss, young-lr factor) to <out>.levers.jsonl")
@@ -692,6 +699,74 @@ def main():
             hit = np.asarray((((jnp.asarray(F[te]) - mu) / sd) @ prm[0] + prm[1]).argmax(-1)) == Y[te]
             return hit, LV[te], float(np.bincount(Y[te], minlength=8).max() / te.sum())
 
+        roll_rp = jax.jit(jax.vmap(roll_r, in_axes=(0, 0, 0, 0, 0, 0, 0, None)), static_argnums=(7,))   # per-world weights (evolution)
+
+        def evolve_run(rp):
+            """Cam Nov 13 screen arm D, EVOLUTION: frozen trunk (and frozen random side_enc/GRU), no PPO, no KL. A population
+            of side heads; each member is scored on whole lives (birth to death, censored at --evolve-cap) in the SAME
+            worlds with the SAME keys (common random numbers); fitness = mean age at death. Keep the top --evolve-elite,
+            refill by Gaussian mutation (--evolve-sigma). --evolve-random-select: survivors chosen at random (the lever
+            check's mutant). A navigator reference is scored on the same worlds each generation."""
+            P_, E_, sig, cap, Wg = a.evolve_pop, a.evolve_elite, a.evolve_sigma, a.evolve_cap, a.evolve_worlds
+            rng_e = np.random.default_rng(a.seed + 909); sh0 = rp["params"]["side_head"]
+            base = jax.tree_util.tree_map(jnp.zeros_like, sh0)
+            if a.evolve_init_noise > 0:                    # lever check: start from a large random head
+                base = {"kernel": jnp.asarray(rng_e.normal(0, a.evolve_init_noise, sh0["kernel"].shape), jnp.float32), "bias": jnp.zeros_like(sh0["bias"])}
+            def mutate(h):
+                return jax.tree_util.tree_map(lambda w: w + jnp.asarray(rng_e.normal(0, sig, w.shape), jnp.float32), h)
+            pop = [base] + [mutate(base) for _ in range(P_ - 1)]; gen, steps, glog, MILe, READe = 0, 0, [], [float(x) for x in a.readout_at.split(",")] if a.readout_at else [], []
+            if a.ckpt:
+                Ck = _ck.load(a.ckpt)
+                if Ck is not None and "evo_pop" in Ck:
+                    pop = [jax.tree_util.tree_map(jnp.asarray, h) for h in Ck["evo_pop"]]; gen, steps, glog, MILe, READe = Ck["gen"], Ck["steps"], Ck["glog"], Ck["mil"], Ck["reads"]
+                    rng_e.bit_generator.state = Ck["rng_state"]; print(f"resumed evolution at generation {gen}, {steps:,} agent-steps", flush=True)
+            nav_head = jax.tree_util.tree_map(jnp.zeros_like, sh0)
+            def score(heads, seed, Wg=Wg):
+                """mean capped lifespan per head; all heads on the same Wg worlds and keys"""
+                nh = len(heads); Wt = nh * Wg
+                S1 = fresh_worlds(seed, Wg); St = jax.tree_util.tree_map(lambda x: jnp.tile(x, (nh,) + (1,) * (x.ndim - 1)), S1)
+                re_ = np.random.default_rng(seed); C1 = np.tile(np.arange(8), (Wg, M, 1)); C1[:, :NL] = FAM[re_.integers(0, len(FAM), (Wg, NL))]
+                Ct = jnp.asarray(np.tile(C1, (nh, 1, 1)))
+                RP = jax.tree_util.tree_map(lambda x: jnp.broadcast_to(x, (Wt,) + x.shape), rp)
+                KH = jnp.repeat(jnp.stack([h["kernel"] for h in heads]), Wg, 0); BH = jnp.repeat(jnp.stack([h["bias"] for h in heads]), Wg, 0)
+                RP = {"params": {**RP["params"], "side_head": {"kernel": KH, "bias": BH}}}
+                Ht = jnp.zeros((Wt, NL, Hd)); PAt = jnp.zeros((Wt, NL), jnp.int32); PRt = jnp.zeros((Wt, NL))
+                life = np.full((Wt, NL), float(cap)); rec = np.zeros((Wt, NL), bool); ke = jax.random.PRNGKey(seed + 1); n_roll = 0
+                for _ in range(cap // T):
+                    ke, k = jax.random.split(ke); n_roll += 1
+                    St, Ht, PAt, PRt, R = roll_rp(RP, St, Ht, PAt, PRt, jnp.tile(jax.random.split(k, Wg), (nh, 1)), Ct, False)
+                    dead = ~np.asarray(St.alive)[:, NB:NB + NL] & ~rec; ag = np.asarray(St.age)[:, NB:NB + NL]
+                    life[dead] = ag[dead]; rec |= dead
+                    if rec.all():
+                        break
+                return life.reshape(nh, Wg * NL).mean(1), Wt * NL * n_roll * T
+            budget = a.evolve_budget
+            while steps < budget:
+                fit, used = score(pop + [nav_head], 300_000 + 100 * gen); steps += used
+                fp, fnav = fit[:P_], float(fit[P_])
+                order = np.argsort(-fp) if not a.evolve_random_select else rng_e.permutation(P_)
+                best = int(np.argmax(fp)); elites = [pop[i] for i in order[:E_]]
+                glog.append(dict(gen=gen, steps=steps, best=float(fp.max()), mean=float(fp.mean()), elite_mean=float(fp[order[:E_]].mean()), navigator=fnav))
+                print(f"evolve gen {gen}: {json.dumps(glog[-1])}", flush=True)
+                rp_best = {"params": {**rp["params"], "side_head": pop[best]}}
+                while MILe and steps >= MILe[0]:
+                    tagm = f"{MILe[0]:.0e}"; MILe.pop(0); t1 = _time.time()
+                    rd = readout(rp_best, tagm); fo = forage_check(rp_best, write=False)
+                    rd["forage"] = dict(worst_ratio=min([x_ for x_ in (fo["ratio_km_median"]["point"], fo["ratio_adult_food_per_step"]["point"]) if x_ is not None], default=None), check=fo)
+                    READe.append(dict(at_agent_steps=steps, generation=gen, **rd, readout_seconds=round(_time.time() - t1, 1)))
+                    print("STAGE1_READOUT", json.dumps(READe[-1])[:2500], flush=True)
+                gen += 1; pop = elites + [mutate(elites[rng_e.integers(E_)]) for _ in range(P_ - E_)]
+                out = dict(mode="evolve", pop=P_, elite=E_, sigma=sig, cap=cap, worlds_per_member=Wg, init_noise=a.evolve_init_noise,
+                           random_select=a.evolve_random_select, generations=gen, agent_steps=steps, log=glog, readouts=READe)
+                os.makedirs(os.path.dirname(a.out) or ".", exist_ok=True); json.dump(dict(summary=out), open(a.out, "w"), indent=1, default=float)
+                if a.ckpt:
+                    _ck.save(a.ckpt, dict(evo_pop=pop, gen=gen, steps=steps, glog=glog, mil=MILe, reads=READe, rng_state=rng_e.bit_generator.state))
+            # final: the best of the last scored generation vs the navigator vs the starting head, on fresh worlds
+            fin, _ = score([elites[0], nav_head, base], 999_000, a.evolve_final_worlds)
+            out["final_eval_fresh_worlds"] = dict(best=float(fin[0]), navigator=float(fin[1]), start_head=float(fin[2]), best_over_navigator=float(fin[0] / fin[1]))
+            json.dump(dict(summary=out), open(a.out, "w"), indent=1, default=float)
+            print("EVOLVE_DONE", json.dumps(out["final_eval_fresh_worlds"]), flush=True)
+
         def build_ti_batch(rp):
             """a FIXED held-out batch for token influence: navigator rollouts on fresh worlds (seeded), the last 4 of 24
             updates (mixed ages), memory recomputed from zero at each chunk start"""
@@ -1157,6 +1232,8 @@ def main():
                 if any(r_.get("forage", {}).get("decision") == "STOP" for r_ in READS) and not (a.forage_check or a.return_check or a.redraw_probe or a.grad_diag):
                     print("FORAGE_STOP already decided in this checkpoint: not training on", flush=True); return
         TIB = build_ti_batch(rp) if a.ti_fixed else None
+        if a.evolve:
+            return evolve_run(rp)
         if a.return_check:
             return return_check(rp)
         if a.probe_null_check:
