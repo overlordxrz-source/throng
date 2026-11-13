@@ -6156,6 +6156,39 @@ more expensive, because it produces publishable-looking nulls.
   - Proposed bar instead: the probe on the KV table reaches >= 90% of the counting observer, on both exact and
     heading, by ~600 tokens; plus a shuffled-code negative control.
 
+- **Cam, Nov 13 ~04:25 (rulings on the divergence and the KV note).**
+  1. Diagnosis and fix accepted; the 3e8 readout is VOID; the 1e8 readout stands. Three free laptop checks before any
+     relaunch:
+     - (a) **RATIO-1:** the training scan applies the same death freeze as the rollout. On the first minibatch, before
+       any update, max |lp - lp0| < 1e-4 on ALL steps, live and masked. Keep the +-20 clip and the where-mask as
+       backstops, with the log-ratio set to 0 on masked steps BEFORE exp.
+     - (b) **Explain lp0 = -105.7 on live steps.** If they are reflex-overridden actions, report their share and leave
+       them as registered. If any are policy-sampled, stop and report (a sampling/storage bug).
+     - (c) **Fire the NaN guard on purpose:** it must skip and count, and stop at 10.
+  2. **Decision (A), modified:** relaunch the GRU arm `s1kl03r` on the fixed code under the SAME registered 3e8
+     conditional and the fixed forage rule. Item cap $2.4.
+     - Replication check at 1e8: forage and token influence inside the original 1e8 CIs (forage 68-75%).
+     - If not: report it; it does not stop the run.
+  3. **New apparatus arm, alongside: an ORACLE-INPUT learner** = `s1kl03r` plus the true decoded sector of the last
+     heard token as a side input.
+     - Calibration only: never inherited. It asks whether PPO + the frozen trunk + KL 0.3 can learn to ACT on a
+       correct signal.
+     - Run to 1e8, item cap $0.8.
+     - Readouts: hungry life test (true vs deranged), forage vs the navigator, token influence, KL to the navigator on
+       heard vs silent steps.
+     - Decision:
+       - pass >= 50% of eligible lives with the Wilson LB above deranged: the policy side works, so the KV arm runs;
+       - < 10%: fix the policy side first (KL on silent steps only, or a lower beta, screened >= 25M);
+       - in between: Cam rules.
+  4. **KV note accepted** with the bar "KV probe >= 90% of the counting observer (exact AND heading) by ~600 tokens;
+     shuffled-code control at chance; plain GRU alongside". Cam withdrew his ">= 80% exact" (it contradicted the
+     parent-arm result).
+     - The raw-evidence fixed write is a DIAGNOSTIC arm, not a lineage trait. If it works, the next step is a LEARNED
+       write.
+     - Build and unit-test it on the laptop now. Launch it to 3e8 (item cap $2.4) only if the oracle arm passes.
+  5. Budget: worst case $37.2, under the $41 guard. Back up milestone checkpoints as they land. `git status -sb`
+     before each deploy.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
