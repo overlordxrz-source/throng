@@ -152,6 +152,11 @@ def main():
     ap.add_argument("--kv-probe", action="store_true", help="with --ic-probe --io-decoder: the KV-memory unit test (fixed-write table + linear probe) on the same streams")
     ap.add_argument("--probe-null-n", type=int, default=20)
     ap.add_argument("--probe-null-check", action="store_true", help="stage 1: with --ckpt, regenerate the first readout's probe rows and test the shuffled-code control against row clustering; then exit")
+    ap.add_argument("--signal-diag", action="store_true", help="stage 1 (Cam Nov 13 (a)/(b)): with --ckpt and --oracle-input, where the listening signal dies in PPO; then exit")
+    ap.add_argument("--readout-tests", choices=["all", "hungry_kept"], default="all", help="stage 1 readout: which life tests (the screen uses hungry_kept only)")
+    ap.add_argument("--readout-no-probe", action="store_true", help="stage 1 readout: skip the linear probe (and its sanity rule)")
+    ap.add_argument("--sanity-null-n", type=int, default=100, help="stage 1 readout: reshuffle draws for the Cam Nov 13 sanity rule")
+    ap.add_argument("--ti-fixed", action="store_true", help="stage 1 readout: token influence + KL heard/silent on a fixed held-out batch")
     ap.add_argument("--forage-control", choices=["none", "damaged"], default="none")
     ap.add_argument("--diag-only", action="store_true", help="with --diag (and e.g. --ckpt of a finished run): run the predictive-head swap check and exit")
     ap.add_argument("--log-levers", action="store_true", help="diagnostic (Cam Nov 10, 4a): per update, each lever's own signal (pred loss, copy CE + rows, replay passes + loss, young-lr factor) to <out>.levers.jsonl")
@@ -667,6 +672,45 @@ def main():
             nt = int(len(hit0)); out["null_seeds"]["frac_lb_rule_would_fire"] = float(np.mean([wl(n_[0], nt) > 0.125 for n_ in null]))
             print("PROBE_NULL", json.dumps(out), flush=True); json.dump(out, open(a.out, "w"), indent=1)
 
+        def _shuf(Y, LV, seed):
+            Yx = np.empty_like(Y); rs = np.random.default_rng(seed)
+            for lv in np.unique(LV):
+                mk = LV == lv; Yx[mk] = rs.permutation(8)[Y[mk]]
+            return Yx
+
+        def _probe_hits(F, Y, LV, split_seed):
+            """per-row hits of the readout's linear probe (same split rule), with the test rows' life ids"""
+            r_ = np.random.default_rng(split_seed); ul = np.unique(LV); r_.shuffle(ul); te = np.isin(LV, ul[: max(1, len(ul) * 3 // 10)])
+            Xtr, Ytr = jnp.asarray(F[~te]), jnp.asarray(Y[~te]); mu, sd = Xtr.mean(0), Xtr.std(0) + 1e-6
+            po = optax.adam(1e-2); prm = (jnp.zeros((F.shape[1], 8)), jnp.zeros(8)); pst = po.init(prm)
+            @jax.jit
+            def st_(prm, pst):
+                g = jax.grad(lambda q: ce(((Xtr - mu) / sd) @ q[0] + q[1], Ytr).mean() + 1e-4 * (q[0] ** 2).sum())(prm); u, pst = po.update(g, pst, prm)
+                return optax.apply_updates(prm, u), pst
+            for _ in range(300):
+                prm, pst = st_(prm, pst)
+            hit = np.asarray((((jnp.asarray(F[te]) - mu) / sd) @ prm[0] + prm[1]).argmax(-1)) == Y[te]
+            return hit, LV[te], float(np.bincount(Y[te], minlength=8).max() / te.sum())
+
+        def build_ti_batch(rp):
+            """a FIXED held-out batch for token influence: navigator rollouts on fresh worlds (seeded), the last 4 of 24
+            updates (mixed ages), memory recomputed from zero at each chunk start"""
+            rpn_ = {"params": {k_: (jax.tree_util.tree_map(jnp.zeros_like, v_) if k_ in ("side_head", "side_value") else v_) for k_, v_ in rp["params"].items()}}
+            Wb = 16; Sb = fresh_worlds(97_000, Wb); rb = np.random.default_rng(97); kb = jax.random.PRNGKey(97)
+            Hb = jnp.zeros((Wb, NL, Hd)); PAb = jnp.zeros((Wb, NL), jnp.int32); PRb = jnp.zeros((Wb, NL))
+            CODb = np.tile(np.arange(8), (Wb, M, 1)); CODb[:, :NL] = FAM[rb.integers(0, len(FAM), (Wb, NL))]; xs, ms = [], []
+            for u_ in range(24):
+                kb, k = jax.random.split(kb)
+                Sb, Hb, PAb, PRb, R = roll_rw(rpn_, Sb, Hb, PAb, PRb, jax.random.split(k, Wb), jnp.asarray(CODb), False)
+                if u_ >= 20:
+                    xs.append(np.swapaxes(np.asarray(R[0]), 1, 2).reshape(Wb * NL, T, -1)); ms.append(np.swapaxes(np.asarray(R[7]), 1, 2).reshape(Wb * NL, T))
+                dead = ~np.asarray(Sb.alive)[:, NB:NB + NL]
+                for w, l in zip(*np.where(dead)):
+                    CODb[w, l] = FAM[rb.integers(0, len(FAM))]
+                if dead.any():
+                    Sb, Hb, PAb, PRb = respawn(Sb, Hb, PAb, PRb, dead, rb)
+            X_ = jnp.asarray(np.concatenate(xs)); return (X_, jnp.zeros((X_.shape[0], Hd)), jnp.asarray(np.concatenate(ms).astype(np.float32)))
+
         def readout(rp, tag):
             """frozen weights on a fresh world batch: lives born here are tested (hungry start primary, natural secondary;
             memory carried vs wiped), and a linear probe reads the memory (vs wiped and shuffled-code controls)"""
@@ -678,12 +722,14 @@ def main():
             lives_x, PF, key_r = [], dict(h=[], hz=[], sec=[], k=[], life=[], code=[]), jax.random.PRNGKey(a.seed + 202)
             for it in range(a.eval_updates):
                 key_r, k = jax.random.split(key_r)
-                Sr, Hr, PAr, PRr, R = roll_rw(rp, Sr, Hr, PAr, PRr, jax.random.split(k, Wr), jnp.asarray(CODr), True)
-                x, al = np.asarray(R[0]), np.asarray(R[7]); h2, hz, tsec = np.asarray(R[10]), np.asarray(R[11]), np.asarray(R[12])
+                Sr, Hr, PAr, PRr, R = roll_rw(rp, Sr, Hr, PAr, PRr, jax.random.split(k, Wr), jnp.asarray(CODr), not a.readout_no_probe)
+                x, al = np.asarray(R[0]), np.asarray(R[7])
+                if not a.readout_no_probe:
+                    h2, hz, tsec = np.asarray(R[10]), np.asarray(R[11]), np.asarray(R[12])
                 hm = (x[..., 108] > 0.5) & al
                 for t in range(T):                         # probe rows: heard steps, with the life's running count of tokens heard
                     kh += hm[:, t]
-                    if it % 3 == 0 and hm[:, t].any():      # subsample every 3rd update to bound memory
+                    if not a.readout_no_probe and it % 3 == 0 and hm[:, t].any():      # subsample every 3rd update to bound memory
                         ww, ll = np.where(hm[:, t])
                         PF["h"].append(h2[ww, t, ll]); PF["hz"].append(hz[ww, t, ll]); PF["sec"].append(tsec[ww, t, ll])
                         PF["k"].append(kh[ww, ll]); PF["life"].append(ww * 10_000 + ll * 1000 + lidr[ww, ll])
@@ -716,6 +762,8 @@ def main():
                 tests = {}
                 for start, e0 in (("hungry", a.test_energy or 0.3), ("natural", 0.0)):
                     for name, h0s in (("memory_carried", HL), ("memory_wiped", jnp.zeros_like(HL))):
+                        if a.readout_tests == "hungry_kept" and not (start == "hungry" and name == "memory_carried"):
+                            continue                   # Cam Nov 13 screen: only the hungry memory-kept test (cost)
                         tru = np.asarray(evr(rp, Cn, keys, jnp.asarray(ident), SM, CL, h0s, e0)); swp = np.asarray(evr(rp, Cn, keys, jnp.asarray(der), SM, CL, h0s, e0))
                         ok = np.array([_life_pass(tru[i], swp[i]) for i in range(n)])
                         tests[f"{start}_{name}"] = dict(
@@ -725,7 +773,13 @@ def main():
                                                      for lo, hi in ((0, 300), (301, 600), (601, 1200), (1201, 10 ** 6))},
                             eaten_true=float(tru[el].mean()) if el.any() else None, eaten_swap=float(swp[el].mean()) if el.any() else None)
                 out.update(eligible=int(el.sum()), eligibility_rate=float(el.mean()), tests=tests)
-            if PF["h"]:
+            if TIB is not None:                            # Cam Nov 13: token influence + KL heard/silent on the FIXED held-out batch
+                v_, n_, kh_, ks_ = _tinf(rp, TIB[0], TIB[1], TIB[2], jax.random.PRNGKey(4321))
+                out["ti_fixed"] = dict(kl=float(v_), heard_steps=int(n_), kl_nav_heard=float(kh_), kl_nav_silent=float(ks_))
+            if out.get("tests"):
+                for k_, t_ in out["tests"].items():
+                    t_["food_ratio_true_over_deranged"] = (t_["eaten_true"] / t_["eaten_swap"]) if t_.get("eaten_swap") else None
+            if PF["h"] and not a.readout_no_probe:
                 Fh, Fz = np.concatenate(PF["h"]), np.concatenate(PF["hz"]); Ysec = np.concatenate(PF["sec"]); Kk = np.concatenate(PF["k"]); LV = np.concatenate(PF["life"])
                 Yshuf = np.empty_like(Ysec); rs = np.random.default_rng(7)
                 for lv in np.unique(LV):                   # shuffled-code control: each life's labels through a random permutation
@@ -734,6 +788,15 @@ def main():
                                        "sector_shuffled_code": linear_probe(Fh, Yshuf, LV, Kk, 8, 1),
                                        "move_memory": linear_probe(Fh, HEADM[Ysec], LV, Kk, 4, 1), "move_wiped": linear_probe(Fz, HEADM[Ysec], LV, Kk, 4, 1),
                                        "rows": int(len(Ysec)), "chance_sector": 0.125}
+                # Cam Nov 13 SANITY RULE (replaces the row-level Wilson): permutation test vs the reshuffled null AND a
+                # life-clustered bootstrap CI; it fires only if p < 0.01 AND the cluster LB > 12.5%
+                h0_, lv0_, _ = _probe_hits(Fh, Yshuf, LV, 1); obs_ = float(h0_.mean())
+                nul_ = [float(_probe_hits(Fh, _shuf(Ysec, LV, 100 + q_), LV, 200 + q_)[0].mean()) for q_ in range(a.sanity_null_n)]
+                ul_ = np.unique(lv0_); per_ = {u: h0_[lv0_ == u] for u in ul_}; rb_ = np.random.default_rng(3)
+                bs_ = [np.concatenate([per_[u] for u in rb_.choice(ul_, len(ul_))]).mean() for _ in range(1000)]
+                p_ = (sum(n__ >= obs_ for n__ in nul_) + 1) / (len(nul_) + 1); ci_ = [float(np.percentile(bs_, 2.5)), float(np.percentile(bs_, 97.5))]
+                out["sanity"] = dict(shuffled=obs_, null_mean=float(np.mean(nul_)), null_max=float(np.max(nul_)), n_null=len(nul_), perm_p=p_,
+                                     cluster_ci95=ci_, fires=bool(p_ < 0.01 and ci_[0] > 0.125))
             return out
 
         def km(L, C):
@@ -980,6 +1043,55 @@ def main():
             v_, n_, kh_, ks_ = _tinf(rp, b[0], b[1], b[6], key)
             return dict(kl=float(v_), heard_steps=int(n_), kl_nav_heard=float(kh_), kl_nav_silent=float(ks_))
 
+        def signal_diag(rp, b, adv, v, r, dn, al, act, forced, x, S_end, H_end, PA_end, PR_end, COD_):
+            """Cam Nov 13 (a): where does the listening signal die? On heard, live, non-forced steps: the mean GAE
+            advantage of the move toward the oracle sector vs other actions, by phase; the PG vs KL gradient norm into
+            the side head. (b): juvenile share and advantage stats per age band; and the rollout-end bootstrap
+            approximation (v of the last state seen instead of v(s_T)) measured against the true v(s_T)."""
+            from w2.gae import gae as _gae
+            assert a.oracle_input, "--signal-diag reads the oracle sector from the input"
+            xe = jax.vmap(lambda s_, c_, pa_, pr_: obs_x(s_, c_, pa_, pr_))(S_end, jnp.asarray(COD_), PA_end, PR_end)       # (W, NL, Dx)
+            vT = np.asarray(jax.vmap(jax.vmap(lambda h, xx: rnet.apply(rp, h, xx)[2]))(H_end, xe))                          # (W, NL)
+            adv_true = _gae(r, v, dn, a.gamma, a.lam, v_last=vT)
+            age = x[..., 99] * cfg.A_max; E = x[..., 98]; heard = x[..., 108] > 0.5; base = al & ~forced
+            osec = x[..., -8:].argmax(-1); HEADA = np.array([int(HEADM[k_]) + 1 for k_ in range(8)])      # sector -> move action 1..4
+            toward = HEADA[osec]
+            phases = dict(juvenile=age < LEAVE, hungry_adult=(age >= LEAVE) & (E < cfg.E0), sated_adult=(age >= LEAVE) & (E >= cfg.E0))
+            def grp(A_):
+                out_ = {}
+                for ph, mk in phases.items():
+                    m0 = base & heard & mk; row = {}
+                    for gname, gm in (("toward", act == toward), ("other_moves", (act >= 1) & (act <= 4) & (act != toward)), ("stay", act == 0), ("eat", act == 5)):
+                        mm_ = m0 & gm; row[gname] = dict(n=int(mm_.sum()), mean_adv=float(A_[mm_].mean()) if mm_.any() else None)
+                    t_, o_ = row["toward"]["mean_adv"], row["other_moves"]["mean_adv"]
+                    row["toward_minus_other_moves"] = (t_ - o_) if (t_ is not None and o_ is not None) else None
+                    out_[ph] = row
+                return out_
+            # PG vs KL gradient into the side head (heard live steps / all live steps), at the current weights (ratio = 1)
+            def pieces(q, sel):
+                def one(xx, h0, aa, A_, m_, alv):
+                    lg, _, _ = seq_lp(q, xx, h0, aa, alv); ls = jax.nn.log_softmax(lg); lp_ = jnp.take_along_axis(ls, aa[:, None], 1)[:, 0]
+                    P_ = q["params"]; tn = jnp.tanh(xx[:, :100] @ P_["Dense_0"]["kernel"] + P_["Dense_0"]["bias"])
+                    lsn = jax.nn.log_softmax(jnp.tanh(tn @ P_["Dense_1"]["kernel"] + P_["Dense_1"]["bias"]) @ P_["Dense_2"]["kernel"] + P_["Dense_2"]["bias"])
+                    w_ = m_ * (xx[:, 108] > 0.5) if sel == "heard" else m_
+                    pg = -(lp_ * jax.lax.stop_gradient(A_) * w_).sum(); kl = a.kl_nav * ((jnp.exp(ls) * (ls - lsn)).sum(-1) * w_).sum()
+                    return jnp.stack([pg, kl, w_.sum()])
+                return jax.vmap(one)(b[0], b[1], b[2], b[4], b[6], b[13]).sum(0)
+            gn = {}
+            for sel in ("heard", "all_live"):
+                for i, nm_ in ((0, "pg"), (1, "kl")):
+                    g = jax.grad(lambda q: pieces(q, sel)[i])(rp)["params"]["side_head"]
+                    gn[f"{nm_}_{sel}"] = float(np.sqrt(sum(float((l_ ** 2).sum()) for l_ in jax.tree_util.tree_leaves(g))))
+            bands = dict(age_0_499=age < 500, age_500_999=(age >= 500) & (age < LEAVE), age_1000_plus=age >= LEAVE)
+            out = dict(at_update=it, at_agent_steps=steps_train, kl_coef=a.kl_nav, kl_silent_only=a.kl_silent_only,
+                       advantage_by_phase_heard=grp(adv), advantage_by_phase_heard_true_bootstrap=grp(adv_true),
+                       side_head_grad_norm=gn, pg_over_kl=dict(heard=gn["pg_heard"] / max(gn["kl_heard"], 1e-12), all_live=gn["pg_all_live"] / max(gn["kl_all_live"], 1e-12)),
+                       batch=dict(live_steps=int(al.sum()), juvenile_share=float((age < LEAVE)[al].mean()), heard_share=float(heard[al].mean()), forced_share=float(forced[al].mean()),
+                                  adv_by_age_band={k_: dict(mean=float(adv[al & m_].mean()), sd=float(adv[al & m_].std()), n=int((al & m_).sum())) for k_, m_ in bands.items() if (al & m_).any()}),
+                       bootstrap_approx=dict(mean_abs_adv_diff=float(np.abs(adv - adv_true)[al].mean()), mean_adv_diff=float((adv - adv_true)[al].mean()),
+                                             last_step_mean_diff=float((adv - adv_true)[:, -1][al[:, -1]].mean()), adv_sd=float(adv[al].std())))
+            print("SIGNAL_DIAG", json.dumps(out), flush=True); json.dump(out, open(a.out, "w"), indent=1)
+
         def grad_diag(rp, b, adv, ret, v, al, act):
             """Cam Nov 12 diagnosis: which loss moves the shared memory, how big the learned policy term is next to the
             navigator's, and what the policy now does"""
@@ -1044,6 +1156,7 @@ def main():
                 print(f"resumed stage 1 at update {it}, {steps_train:,} agent-steps", flush=True)
                 if any(r_.get("forage", {}).get("decision") == "STOP" for r_ in READS) and not (a.forage_check or a.return_check or a.redraw_probe or a.grad_diag):
                     print("FORAGE_STOP already decided in this checkpoint: not training on", flush=True); return
+        TIB = build_ti_batch(rp) if a.ti_fixed else None
         if a.return_check:
             return return_check(rp)
         if a.probe_null_check:
@@ -1066,10 +1179,8 @@ def main():
             t0 = _time.time(); key_, k = jax.random.split(key_); H0 = Hh
             S_, Hh, PA, PR, R = roll_rw(rp, S_, Hh, PA, PR, jax.random.split(k, W), jnp.asarray(COD), False)
             x, act, lp, v, r, dn, take, al, ea, pos = (np.asarray(z) for z in R[:10]); forced = np.asarray(R[10])
-            adv = np.zeros_like(r); last = 0.0
-            for t in reversed(range(T)):
-                nv = v[:, t + 1] if t + 1 < T else v[:, t]; nt = 1.0 - dn[:, t]
-                last = r[:, t] + a.gamma * nv * nt - v[:, t] + a.gamma * a.lam * nt * last; adv[:, t] = last
+            from w2.gae import gae as _gae
+            adv = _gae(r, v, dn, a.gamma, a.lam)            # Nov 13: factored out for the GAE/death audit (tests/test_gae.py)
             ret = adv + v; m = (al & ~forced).astype(np.float32) if a.mask_forced else al.astype(np.float32)
             if a.ppo_min_age:
                 m = m * ((np.asarray(R[0])[..., 99] * cfg.A_max) >= a.ppo_min_age - 0.5)
@@ -1105,6 +1216,8 @@ def main():
                 print("RATIO_CHECK", json.dumps(out), flush=True); json.dump(out, open(a.out, "w"), indent=1); return
             if a.grad_diag:
                 return grad_diag(rp, b, adv, ret, v, al, act)
+            if a.signal_diag:
+                return signal_diag(rp, b, adv, v, r, dn, al, act, forced, x, S_, Hh, PA, PR, COD)
             tinf = token_influence(rp, b, jax.random.fold_in(k, 99)) if (a.token_influence_every and it % a.token_influence_every == 0) else None
             if a.debug_nan_at and int(a.debug_nan_at.split(",")[0]) <= it < sum(int(z) for z in a.debug_nan_at.split(",")):   # test only
                 b = b[:4] + (b[4] * jnp.nan,) + b[5:]
