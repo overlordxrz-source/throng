@@ -6567,6 +6567,24 @@ more expensive, because it produces publishable-looking nulls.
        member, pop 32, elite 8; same readouts and pick rule.
      - E fails AND premium < 1.5x: no run; Cam rules on the world.
 
+- **RESULT (Nov 13 ~09:06): ARM E (hungry-adult oracle check): FAIL at 12.5M; STOPPED at update 1,520 of 1,526 for
+  its cost cap, so the 25M readout was not reached.**
+  - 12.5M readout (`throng-w2jobs`, comm-toy `1256389`):
+    - hungry life test 0 of 68 pass (CI 0-5.3%);
+    - food true vs deranged 0.531 vs 0.529 (**1.005x**);
+    - forage 96.7% (CARRY_ON);
+    - token influence 1.5e-4; KL to the navigator 0.002 heard / 0.002 silent.
+  - Even when every life starts in the life test's own state (hungry, no parent, no top-up), PPO + KL 0.3 shows no
+    use of the oracle. Juvenile mechanics are not the whole story.
+  - **CAP BREACH (my error):** E's cap was $0.20 (stop at $0.25). I set the app watch to the combined E + D' cap
+    ($0.50) and did not lower it when D' was dropped.
+    - Billed: ~$0.42 for E's ~1 hour (08:00-09:00 EST $0.415, at ~$0.4/h with the 8 GB long function). I stopped it
+      by hand at 09:06 when I saw it.
+    - Its checkpoints (update 1,500 and the 12.5M milestone) are in `~/throng-backup/klsE/`, so the last 26 updates
+      plus the 25M readout can be resumed for ~$0.07 if Cam wants them.
+  - Metered $34.02.
+  - Files: `docs/data/klsE/`.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
