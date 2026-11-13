@@ -5948,6 +5948,27 @@ more expensive, because it produces publishable-looking nulls.
     on its own states.
   - Files: `docs/data/stage1/reward_variants_u6000.json`.
 
+- **Cam, Nov 12 (rulings on the ~23:30 report).**
+  1. The 3e8 operationalisations are accepted as the registered reading.
+  2. **Reward form: NO CHANGE.** Telescoping is a conceptual weakness, not what broke pilot 1.
+     - Death penalty rejected. Alive bonus 0.0005 parked, not adopted.
+     - In stage 2, reproduction plus inclusive fitness gives survival real value. Re-run the same return check there;
+       if telescoping still bites, the alive bonus goes to M.
+  3. **Juvenile-to-independence is the key finding; TREE AMENDED (before the 3e8 data):**
+     - The harness drops juveniles from a 500-step top-up into near-certain starvation, and the top-up's end (500) is
+       misaligned with the parent leaving (1,000).
+     - **If `s1kl03` fails** (stopped at 3e8, or no rise by 1B), the FIRST next step is a free laptop screen of
+       GRADUAL WEANING, before key-value memory: the top-up tapers linearly from 500 to 1,000 and ends when the parent
+       leaves.
+       - Readouts: navigator survival past independence, adult food, the return check by age band, and token
+         influence at 2,000 updates (KL 0.3 kept).
+       - A world change in the harness, not a new drive: no M approval needed; report it.
+     - Key-value memory stays as the option after that.
+     - **If `s1kl03` passes,** weaning goes into the stage-2 design (W2.1 provisioning parents).
+  4. Relaunch health noted.
+  5. Ops: the guard dying at every session restart is now the most repeated failure in the protocol. It waits on M's
+     secret.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
