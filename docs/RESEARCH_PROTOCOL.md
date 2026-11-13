@@ -5982,6 +5982,31 @@ more expensive, because it produces publishable-looking nulls.
     on its own after independence in this harness. The screen, if it runs, must report survival past ~1,300 as well
     as past 1,000.
 
+- **RESULT (Nov 13 00:37): `s1kl03` 1e8 READOUT** (32 worlds; the readout took 26 min; 357 lives, 96 eligible).
+  - **In-run foraging rule: adult food 71% of the navigator (CI 68-75) -> RECHECK at 3e8.**
+    - KM 895 vs 879.
+    - The run continues. At 3e8 it stops itself if < 50%, or if it is below 71% (still falling).
+    - The KL holds foraging far better than pilot 1 (19%), but it drifts down from the screen's 95% at 8M.
+  - **Sanity stop: not triggered.**
+    - Shuffled-code probe 11.8%, Wilson CI 11.5-12.0% (54,916 rows); the lower bound is not above 12.5%.
+    - Memory-wiped hungry pass 0 of 96.
+  - **Life test: 0% in all four arms** (CI 0-3.9%). Food under true = deranged codes (hungry 0.352 vs 0.352).
+  - **Probe, sector accuracy by tokens heard (1-5 / 6-15 / 16-40 / 41-100 / 101-300 / 301+):**
+    - memory 23.6 / 34.4 / 39.5 / 43.5 / 38.8 / 39.6;
+    - wiped 24.0 / 27.8 / 28.1 / 37.8 / 32.8 / 29.3;
+    - shuffled ~12.
+    - Criterion (ii) met as written (+15.2 points; 38.8 vs 32.8 in 101-300), with the registered caveat:
+      "confounded by age; code-dependent component, no clear re-learning".
+  - **Token influence:** the last 5 logs (5,700-6,100) average ~1.3e-4 nats per heard step, ~3-10x the screen's
+    level at 8M.
+  - Memory-minus-wiped advantage (acc_all): 8.2 points.
+  - **The 3e8 conditional's bars (from the script's definitions):**
+    - (b) token influence >= ~3.8e-4;
+    - (c) advantage >= 11.2 points;
+    - (a) any hungry memory-kept pass with the CI lower bound above wiped.
+  - Throughput 20.2k steps/s. Spend: item watch +$0.47 at 00:37 since its restart (metered $30.68).
+  - Files: `docs/data/s1kl03/s1kl03_1e8.json`.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
