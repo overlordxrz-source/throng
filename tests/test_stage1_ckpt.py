@@ -17,12 +17,13 @@ def run(out, extra):
 
 
 @pytest.mark.skipif(not glob.glob(NAVS), reason="W2 navigators not found")
-def test_stage1_resume_bit_identical(tmp_path):
+@pytest.mark.parametrize("lever", [[], ["--kl-nav", "0.3", "--token-influence-every", "2"]], ids=["default", "kl_relaunch"])
+def test_stage1_resume_bit_identical(tmp_path, lever):
     t = str(tmp_path); ck = os.path.join(t, "s.ckpt")
-    assert run(os.path.join(t, "A.json"), []).returncode == 0
-    r1 = run(os.path.join(t, "B.json"), ["--ckpt", ck, "--ckpt-every", "10", "--stop-after", "25"])
+    assert run(os.path.join(t, "A.json"), lever).returncode == 0
+    r1 = run(os.path.join(t, "B.json"), [*lever, "--ckpt", ck, "--ckpt-every", "10", "--stop-after", "25"])
     assert r1.returncode == 3 and os.path.exists(ck)
-    r2 = run(os.path.join(t, "B.json"), ["--ckpt", ck, "--ckpt-every", "10"])
+    r2 = run(os.path.join(t, "B.json"), [*lever, "--ckpt", ck, "--ckpt-every", "10"])
     assert r2.returncode == 0 and "resumed stage 1 at update 20" in r2.stdout
     k = lambda p: [{x: y for x, y in r.items() if x != "sec"} for r in json.load(open(p))["log"]]  # noqa: E731
     assert k(os.path.join(t, "A.json")) == k(os.path.join(t, "B.json"))

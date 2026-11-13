@@ -139,6 +139,7 @@ def main():
     ap.add_argument("--return-check", action="store_true", help="stage 1 (Cam Nov 12): with --ckpt, the training objective (discounted return of the actual per-step training reward) for the navigator, the checkpoint agent and scripted stand-still agents on the same fresh worlds; then exit")
     ap.add_argument("--redraw-probe", type=int, default=0, help="stage 1 (Cam Nov 12): with --ckpt, re-draw each life's code at this age (first rollout boundary after it); linear probe trained on pre-re-draw rows, scored on post rows by tokens heard since the re-draw, vs the wiped baseline; then exit")
     ap.add_argument("--readout-worlds-at", default="", help="stage 1: readout worlds per milestone, e.g. 32,32,64 (overrides --readout-worlds)")
+    ap.add_argument("--forage-stop", action="store_true", help="stage 1 (Cam's foraging rule, in-run): after each milestone readout, forage-check the live weights; STOP at 1st milestone if the lower ratio < 0.5; at the 2nd if < 0.5 or still falling from the 50-90% band")
     ap.add_argument("--forage-control", choices=["none", "damaged"], default="none")
     ap.add_argument("--diag-only", action="store_true", help="with --diag (and e.g. --ckpt of a finished run): run the predictive-head swap check and exit")
     ap.add_argument("--log-levers", action="store_true", help="diagnostic (Cam Nov 10, 4a): per update, each lever's own signal (pred loss, copy CE + rows, replay passes + loss, young-lr factor) to <out>.levers.jsonl")
@@ -789,7 +790,7 @@ def main():
             os.makedirs(os.path.dirname(a.out) or ".", exist_ok=True); json.dump(out, open(a.out, "w"), indent=1, default=float)
             print("RETURN_CHECK", json.dumps(out, default=float), flush=True)
 
-        def forage_check(rp):
+        def forage_check(rp, write=True):
             rpn = {"params": {k_: (jax.tree_util.tree_map(jnp.zeros_like, v_) if k_ in ("side_head", "side_value") else v_) for k_, v_ in rp["params"].items()}}
             Wf, nup, res = a.forage_worlds, a.forage_updates, {}
             for name, q in (("agent", rp), ("navigator", rpn)):
@@ -823,8 +824,10 @@ def main():
             worst = min(pts) if pts else None
             out["rule_registered"] = "lower of the two ratios: <0.5 STOP and diagnose; 0.5-0.9 continue, recheck at 300M; >=0.9 carry on"
             out["decision"] = None if worst is None else ("STOP" if worst < 0.5 else ("CONTINUE_RECHECK_300M" if worst < 0.9 else "CARRY_ON"))
-            os.makedirs(os.path.dirname(a.out) or ".", exist_ok=True); json.dump(out, open(a.out, "w"), indent=1, default=float)
+            if write:
+                os.makedirs(os.path.dirname(a.out) or ".", exist_ok=True); json.dump(out, open(a.out, "w"), indent=1, default=float)
             print("FORAGE_CHECK", json.dumps(out, default=float), flush=True)
+            return out
 
         @jax.jit
         def _tinf(rp, x, h0, m, key):
@@ -897,6 +900,8 @@ def main():
                 COD, cr, key_, it, t_train, steps_train, log, READS = Ck["COD"], Ck["cr"], jnp.asarray(Ck["key"]), Ck["it"], Ck["t"], Ck["steps"], Ck["log"], Ck["reads"]
                 rng_main.bit_generator.state = Ck["rng_state"]; MIL[:] = Ck["mil"]
                 print(f"resumed stage 1 at update {it}, {steps_train:,} agent-steps", flush=True)
+                if any(r_.get("forage", {}).get("decision") == "STOP" for r_ in READS) and not (a.forage_check or a.return_check or a.redraw_probe or a.grad_diag):
+                    print("FORAGE_STOP already decided in this checkpoint: not training on", flush=True); return
         if a.return_check:
             return return_check(rp)
         if a.redraw_probe:
@@ -971,6 +976,24 @@ def main():
                 tagm = f"{MIL[0]:.0e}"; MIL.pop(0); t1 = _time.time()
                 READS.append(dict(at_agent_steps=steps_train, **readout(rp, tagm), readout_seconds=round(_time.time() - t1, 1))); save_out()
                 print("STAGE1_READOUT", json.dumps(READS[-1])[:2500], flush=True)
+                if a.forage_stop:                          # Cam's foraging rule, enforced in the run (live milestone weights)
+                    rpf = rp
+                    if a.forage_control == "damaged":      # test only
+                        rpf = {"params": {**rp["params"], "side_head": {"kernel": rp["params"]["side_head"]["kernel"], "bias": rp["params"]["side_head"]["bias"].at[0].add(4.0)}}}
+                    fo = forage_check(rpf, write=False)
+                    pts_ = [r_["point"] for r_ in (fo["ratio_km_median"], fo["ratio_adult_food_per_step"]) if r_["point"] is not None]
+                    worst = min(pts_) if pts_ else None; READS[-1]["forage"] = dict(worst_ratio=worst, check=fo)
+                    nmil = len(READS); prev = READS[-2]["forage"]["worst_ratio"] if nmil >= 2 and "forage" in READS[-2] else None
+                    stop = worst is not None and ((nmil == 1 and worst < 0.5) or
+                                                  (nmil == 2 and (worst < 0.5 or (prev is not None and 0.5 <= prev < 0.9 and worst < prev))))
+                    READS[-1]["forage"]["decision"] = "STOP" if stop else ("RECHECK_NEXT" if worst is not None and worst < 0.9 else "CARRY_ON")
+                    save_out(); print("FORAGE_RULE", json.dumps(dict(milestone=nmil, worst_ratio=worst, prev=prev, decision=READS[-1]["forage"]["decision"])), flush=True)
+                    if stop:
+                        if a.ckpt:
+                            _ck.save(a.ckpt, dict(rp=rp, ros=ros, S=S_, Hh=Hh, PA=PA, PR=PR, COD=COD, cr=cr, key=key_, it=it, t=t_train, steps=steps_train,
+                                                  log=log, reads=READS, rng_state=rng_main.bit_generator.state, mil=[]))
+                        print("FORAGE_STOP: the run stops here under the registered foraging rule", flush=True)
+                        return
             if a.ckpt and (it % a.ckpt_every == 0):
                 _ck.save(a.ckpt, dict(rp=rp, ros=ros, S=S_, Hh=Hh, PA=PA, PR=PR, COD=COD, cr=cr, key=key_, it=it, t=t_train, steps=steps_train,
                                       log=log, reads=READS, rng_state=rng_main.bit_generator.state, mil=list(MIL)))
