@@ -138,6 +138,7 @@ def main():
     ap.add_argument("--mask-forced", action="store_true", help="stage 1: drop steps whose action the parent-seek reflex overrode from the PPO loss (they were not sampled from the policy)")
     ap.add_argument("--return-check", action="store_true", help="stage 1 (Cam Nov 12): with --ckpt, the training objective (discounted return of the actual per-step training reward) for the navigator, the checkpoint agent and scripted stand-still agents on the same fresh worlds; then exit")
     ap.add_argument("--redraw-probe", type=int, default=0, help="stage 1 (Cam Nov 12): with --ckpt, re-draw each life's code at this age (first rollout boundary after it); linear probe trained on pre-re-draw rows, scored on post rows by tokens heard since the re-draw, vs the wiped baseline; then exit")
+    ap.add_argument("--readout-worlds-at", default="", help="stage 1: readout worlds per milestone, e.g. 32,32,64 (overrides --readout-worlds)")
     ap.add_argument("--forage-control", choices=["none", "damaged"], default="none")
     ap.add_argument("--diag-only", action="store_true", help="with --diag (and e.g. --ckpt of a finished run): run the predictive-head swap check and exit")
     ap.add_argument("--log-levers", action="store_true", help="diagnostic (Cam Nov 10, 4a): per update, each lever's own signal (pred loss, copy CE + rows, replay passes + loss, young-lr factor) to <out>.levers.jsonl")
@@ -578,7 +579,8 @@ def main():
         def readout(rp, tag):
             """frozen weights on a fresh world batch: lives born here are tested (hungry start primary, natural secondary;
             memory carried vs wiped), and a linear probe reads the memory (vs wiped and shuffled-code controls)"""
-            Wr = a.readout_worlds; Sr = fresh_worlds(91_000 + 1000 * len(READS), Wr); rr = np.random.default_rng(a.seed + 101)
+            Wr = int(a.readout_worlds_at.split(",")[len(READS)]) if a.readout_worlds_at else a.readout_worlds   # Cam Nov 12: halved early readouts
+            Sr = fresh_worlds(91_000 + 1000 * len(READS), Wr); rr = np.random.default_rng(a.seed + 101)
             Hr = jnp.zeros((Wr, NL, Hd)); PAr = jnp.zeros((Wr, NL), jnp.int32); PRr = jnp.zeros((Wr, NL))
             CODr = np.tile(np.arange(8), (Wr, M, 1)); CODr[:, :NL] = FAM[rr.integers(0, len(FAM), (Wr, NL))]
             cnt_r = np.zeros((Wr, NL, 8), np.int64); kh = np.zeros((Wr, NL), np.int64); lidr = np.zeros((Wr, NL), np.int64)
