@@ -6494,6 +6494,37 @@ more expensive, because it produces publishable-looking nulls.
        - D' passes: evolution on food becomes the slow-weight learner.
   4. If an A-C arm qualifies: the 07:05 tree stands (pick -> 1e8 oracle confirm); D' and E are dropped.
 
+- **RESULT (Nov 13 ~08:00): THE ORACLE-INPUT SCREEN `kls`: NO ARM QUALIFIES -> branch 3 (D' and E).** 25M
+  agent-steps each, same seeds, no NaN or tracebacks; ~$0.6 real (metered $32.92 -> $33.52).
+  - Hungry memory-kept life test (food true / deranged), adult forage vs the navigator, and token influence + KL to
+    the navigator on the fixed batch, at 12.5M -> 25M:
+
+  | arm | food ratio | pass | forage | TI | KL heard / silent (25M) |
+  |---|---|---|---|---|---|
+  | A KL 0.3 silent-only | 1.006 -> 1.011 | 0/93, 0/82 | 98% -> 94% | 1.4e-4 -> 1.5e-4 | 0.001 / 0.004 |
+  | B KL 0.1 | 1.015 -> 1.048 | 0/93, 0/71 | 93% -> 75% | 4.7e-4 -> 1.8e-4 | 0.003 / 0.009 |
+  | C KL 0.03 | 1.007 -> 1.016 | 0/91, 0/73 | 80% -> 70% (STOP flag) | 1.8e-3 -> 1.6e-3 | 0.030 / 0.081 |
+  | **D evolution, lifespan** | 1.07 -> **0.98** | 2/60, 2/63 (3%) | **148% -> 147%** | 0.056 -> 0.146 | **3.5 / 3.1 -> 5.4 / 4.2** |
+
+  - **A-C:** the KL dose barely matters. The policy stays near the navigator (KL <= 0.08) and the true message gains
+    1-5% food. Lower beta mainly erodes foraging (C 70%).
+  - **D (evolution on lifespan) did NOT find the freeze. It found a much better forager.**
+    - Best heads live to the 2,048 cap from ~generation 6 (navigator 875-1,510 in the same worlds).
+    - Adult food 1.47x the navigator; hungry life-test food ~2.2 vs ~0.4 for every PPO arm.
+    - But it ignores the code: true vs deranged 2.235 vs 2.278.
+    - The policy moved far from the navigator (KL ~5 nats) and responds to the oracle input (TI 0.15), just not
+      usefully.
+    - So Cam's reading 2 ("lifespan selection finds the freeze") is contradicted: the freeze was the lever check's
+      nearest climb from a NOISED head, not from the navigator.
+  - Predictions (P qualifies): A 0.08, B 0.08, C 0.10, D 0.2. None qualified, consistent with all of them.
+  - **Branch 3 per Cam's pre-registration:**
+    - **E launched 08:04** (`throng-w2jobs`, comm-toy `1256389`, KL 0.3 since no A-C dose stands out):
+      `--juvenile 0 --parent-leave 0 --start-energy 0.3`, so every life starts as the life test does (age 0 input,
+      hungry, no parent, no top-up, no reflex). Note: the forage check's "adult" band then covers all ages.
+    - **D'** waits for its laptop lever check (running).
+    - Watch: `throng-w2jobs` cap $0.5 (E 0.2 + D' 0.3).
+  - Files: `docs/data/kls/`.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
