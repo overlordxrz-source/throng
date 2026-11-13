@@ -6257,6 +6257,39 @@ more expensive, because it produces publishable-looking nulls.
     - So the GRU already holds roughly the KV's heading information but less exact-sector information.
   - Files: `docs/data/kv/`.
 
+- **Cam, Nov 13 ~04:50 (rulings).**
+  1. Pre-relaunch checks accepted. "Equal up to float32 rounding" is the recorded identity.
+  2. The oracle deviation (this-step input, zero when silent) is accepted. If the arm FAILS, the result is ambiguous
+     between "can't act" and "can't hold the signal across silences"; Cam rules then.
+  3. **Oracle pass reading RESTATED** (the wiped arm is not a null for this arm: the oracle bypasses memory on heard
+     steps). For `s1orc`:
+     - PASS = hungry memory-kept pass rate >= 50% of eligible lives (point), with Wilson LB > 10% (the frozen test's
+       deaf ceiling);
+     - the wiped arm is reported descriptively;
+     - < 10% = FAIL; in between, Cam rules.
+     - `s1kl03r` keeps its registered rule (LB above wiped).
+  4. The KV unit test is recorded as FAIL on heading (0.88x). **PRE-REGISTERED, run only if `s1orc` passes (free,
+     laptop):** a replication on FRESH streams (new seeds, >= 2x the lives), with both probes fixed in advance
+     (exact-trained for exact, heading-trained for heading); the same 0.9x-of-observer bar on both. The KV arm
+     launches only if this passes. Heading is the behaviourally relevant readout.
+  5. Free now: the move-class probe on WIPED GRU memory beside the kept numbers.
+  6. Confirm the per-app costs register within ~1 h, else fall back to container-time estimates and say so.
+- **RESULT (Nov 13 04:41): item 5, move-class probe on GRU memory kept vs wiped** (`s1kl03` 1e8 readout, existing
+  data; 15,533 test rows; majority-class chance 37.5%).
+
+  | tokens heard | 1-5 | 6-15 | 16-40 | 41-100 | 101-300 | 301+ |
+  |---|---|---|---|---|---|---|
+  | memory kept | 57.5 | 63.4 | 70.2 | 73.8 | 71.2 | 67.0 |
+  | memory wiped | 50.2 | 53.0 | 59.2 | 63.6 | 59.2 | 52.5 |
+  | gap (points) | 7.3 | 10.4 | 11.0 | 10.2 | 12.0 | 14.5 |
+
+  - **Wiped is well below kept** (10-15 points from 6 tokens on, growing with tokens heard).
+  - By Cam's rule, the GRU memory already holds heading information beyond the current view, roughly what the KV
+    table gives (KV heading 72 / 78% at 101-300 / 301+, on different streams). The agent does not act on it, so
+    acting is the suspected bottleneck. `s1orc` decides.
+  - Caveat as registered: the kept-minus-wiped gap is partly age-confounded (the re-draw control showed only part of
+    it is code-dependent).
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
