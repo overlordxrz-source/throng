@@ -1,0 +1,39 @@
+{
+ "summary": {
+  "mode": "evolve",
+  "pop": 2,
+  "elite": 1,
+  "sigma": 0.05,
+  "cap": 2048,
+  "worlds_per_member": 2,
+  "init_noise": 0.0,
+  "random_select": false,
+  "generations": 1,
+  "agent_steps": 49152,
+  "log": [
+   {
+    "gen": 0,
+    "steps": 49152,
+    "best": 33.399299656227285,
+    "mean": 32.96418955216129,
+    "elite_mean": 33.399299656227285,
+    "navigator": 32.52907944809528
+   }
+  ],
+  "readouts": [],
+  "evolved_groups": [
+   "side_head"
+  ],
+  "sigma_by_group": {
+   "side_head": 0.05
+  },
+  "init_from": "",
+  "fitness": "food",
+  "final_eval_fresh_worlds": {
+   "best": 22.137162333881392,
+   "navigator": 22.66366015630731,
+   "start_head": 22.66366015630731,
+   "best_over_navigator": 0.9767690735391039
+  }
+ }
+}

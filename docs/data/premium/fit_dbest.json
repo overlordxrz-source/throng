@@ -1,0 +1,39 @@
+{
+ "summary": {
+  "mode": "evolve",
+  "pop": 2,
+  "elite": 1,
+  "sigma": 0.05,
+  "cap": 2048,
+  "worlds_per_member": 2,
+  "init_noise": 0.0,
+  "random_select": false,
+  "generations": 1,
+  "agent_steps": 49152,
+  "log": [
+   {
+    "gen": 0,
+    "steps": 49152,
+    "best": 17.812616754251295,
+    "mean": 16.581161820615044,
+    "elite_mean": 17.812616754251295,
+    "navigator": 6.0019951263351965
+   }
+  ],
+  "readouts": [],
+  "evolved_groups": [
+   "side_head"
+  ],
+  "sigma_by_group": {
+   "side_head": 0.05
+  },
+  "init_from": "/Users/overlord/throng-backup/kls/klsD_evolve.ckpt",
+  "fitness": "food",
+  "final_eval_fresh_worlds": {
+   "best": 16.840542336897574,
+   "navigator": 1.3994566970730042,
+   "start_head": 15.680647129057425,
+   "best_over_navigator": 12.033628744726403
+  }
+ }
+}

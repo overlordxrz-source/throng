@@ -6585,6 +6585,36 @@ more expensive, because it produces publishable-looking nulls.
   - Metered $34.02.
   - Files: `docs/data/klsE/`.
 
+- **RESULT (Nov 13 ~09:40): THE LISTENING PREMIUM OVER A COMPETENT FORAGER** (Cam's item 4; laptop, comm-toy
+  `4e6b4bd` + TIB fix `--premium-check`; no training).
+  - The same 32 fresh worlds and keys for each policy (128 starting lives plus respawns, 12,800 steps), plus the
+    hungry memory-kept life test (32 readout worlds).
+  - Policies: the navigator, D's best evolved head (top elite of generation 24), and the scripted true-code follower.
+
+  | | navigator | D-best | follower | **follower / D-best** |
+  |---|---|---|---|---|
+  | adult food per step | 0.0100 | 0.0139 | 0.0302 | **2.18x** |
+  | survival past 1,300 (KM) | 0.24 | **0.82** | 0.54 | 0.66x |
+  | survival past 2,048 (KM) | 0.18 | **0.74** | 0.40 | 0.54x |
+  | KM median lifespan | 878 | 3,000 (A_max) | 1,503 | - |
+  | hungry life-test food (true) | 0.44 | 2.23 | 22.2 | 9.9x |
+  | hungry life-test pass | 0/94 | 2/63 (3.2%) | **62/62 (100%)** | - |
+
+  - **Food premium 2.18x >= 1.5x: the world still pays for listening over good foraging** (Cam's reading).
+  - D-best is a LONGEVITY forager: it eats less per step than the follower but outlives it (most reach A_max). The
+    follower moves more and starves more often.
+  - **Path check on the pre-registered v2 fitness (mine; the same trap as D's):** lifetime food over capped (2,048)
+    lives, 128 fresh lives: follower 22.66 vs D-best 15.68 (**1.45x**), navigator 1.40.
+    - So the v2 fitness does reward following over D-best's strategy, with ~45% headroom at the endpoint. Whether
+      partial following pays along the way is untested.
+- **BRANCH STATUS (pre-registered by Cam):** "E fails AND premium >= 1.5x -> EVOLUTION v2".
+  - The premium holds.
+  - E failed at 12.5M (1.005x) but was stopped before its 25M readout (my cap breach).
+  - **Not launching v2 until Cam confirms** that E's 12.5M result counts as a fail (or orders E's ~$0.07 resume).
+    Spend $34.02 vs his worst case ~$34.3; v2 is $0.6.
+  - v2 machinery is ready and smoke-tested (comm-toy `4e6b4bd`+).
+  - Files: `docs/data/premium/`.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
