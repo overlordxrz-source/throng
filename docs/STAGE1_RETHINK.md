@@ -34,6 +34,11 @@ away. A first step toward it earns nothing until the agent arrives, and moving c
 - Selection sees following only as a small, noisy gain on top of strong code-free foraging. Its path from "ignore"
   to "follow" passes through policies that are no better.
 
+**Update after v2 at 50M (FAIL, 1.069x):** v2's best code-free forager eats MORE over a life than the perfect listener
+(35.7 vs 22.7, the same 128 lives). Against it the adult-food premium is only ~1.2x. So in this world a competent
+forager barely needs the code, which is Cam's "world is the bottleneck" branch. Route (b) addresses exactly this: it
+makes the named food matter more than general foraging skill.
+
 ## Three routes
 
 **(b) Distance curriculum: make partial following pay.** Beacons announce food that is NEAR at first (within ~6-8

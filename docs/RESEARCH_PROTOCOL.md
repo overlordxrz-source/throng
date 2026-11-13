@@ -6699,6 +6699,31 @@ more expensive, because it produces publishable-looking nulls.
       Modal preemption of v2 would have killed it, not resumed it;
     - (2) resumed evolution runs could not take new readout milestones (`--evolve-readout-override`).
 
+- **RESULT (Nov 13 ~11:20): EVOLUTION v2 at 50M -> FAIL (registered rule, `decide_50m.py`). No more learner runs
+  on this account.**
+  - 50M readout (generation 23):
+    - food true vs deranged 0.233 vs 0.218 = **1.069x** (25M: 1.031x): below 1.1;
+    - pass 0/65 (CI 0-5.6%);
+    - forage: adult food 2.54x the navigator; KM lifespan 2.95x;
+    - TI 0.146; KL to the navigator 5.8 / 5.2.
+  - Fitness: elite mean lifetime food ~30-32 from generation 4 on (population mean 15-19). It plateaued.
+  - **Final evaluation, same 128 fresh lives (seed 999,000, 32 worlds), lifetime food over 2,048-capped lives:**
+    - v2 best 35.7; D-best (start) 15.3; navigator 2.3;
+    - the true-code follower scored 22.7 on the same evaluation (premium check).
+  - **Finding: v2's code-free forager out-eats the perfect listener over a life (35.7 vs 22.7).**
+    - On adult food per step the follower still leads, but only ~1.2x (3.0x vs 2.54x the navigator; the two runs'
+      navigator baselines differ in world sets, so this is approximate).
+    - So the listening premium shrinks sharply against the best evolved forager (2.18x vs D-best -> ~1.2x vs v2),
+      and v2's own fitness no longer rewards listening.
+    - This bears directly on Cam's world question: a competent forager barely needs the code in this world.
+  - **Oddity:** the 50M readout head (that generation's top scorer, a winner's-curse pick) ate only 0.23 in the hungry
+    life test, against 5.1 for the 25M head, while foraging 2.54x as an adult. Possibly a slow energy-saver that does
+    badly from a hungry start. It does not change the verdict.
+  - Spend: v2 ~$0.22 (watch estimate) of its $0.6 cap; metered $34.24. Nothing runs. The `evo2x` extension / confirm
+    is NOT launched.
+  - Prediction (PASS 0.15 / CLIMBING 0.25 / FAIL 0.6): FAIL.
+  - Files: `docs/data/evo2/`.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
