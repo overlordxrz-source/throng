@@ -137,6 +137,7 @@ def main():
     ap.add_argument("--token-influence-every", type=int, default=0, help="stage 1: every N updates log token influence = KL(policy | true token || policy | swapped token) on heard steps, same memory")
     ap.add_argument("--mask-forced", action="store_true", help="stage 1: drop steps whose action the parent-seek reflex overrode from the PPO loss (they were not sampled from the policy)")
     ap.add_argument("--return-check", action="store_true", help="stage 1 (Cam Nov 12): with --ckpt, the training objective (discounted return of the actual per-step training reward) for the navigator, the checkpoint agent and scripted stand-still agents on the same fresh worlds; then exit")
+    ap.add_argument("--redraw-probe", type=int, default=0, help="stage 1 (Cam Nov 12): with --ckpt, re-draw each life's code at this age (first rollout boundary after it); linear probe trained on pre-re-draw rows, scored on post rows by tokens heard since the re-draw, vs the wiped baseline; then exit")
     ap.add_argument("--forage-control", choices=["none", "damaged"], default="none")
     ap.add_argument("--diag-only", action="store_true", help="with --diag (and e.g. --ckpt of a finished run): run the predictive-head swap check and exit")
     ap.add_argument("--log-levers", action="store_true", help="diagnostic (Cam Nov 10, 4a): per update, each lever's own signal (pred loss, copy CE + rows, replay passes + loss, young-lr factor) to <out>.levers.jsonl")
@@ -690,6 +691,60 @@ def main():
                 lives.append((w, int(agd[w, l]), True, "censored"))
             return lives, FS, NS, AB
 
+        def redraw_probe(rp, AGE, Wr, nup):
+            Sr = fresh_worlds(93_000, Wr); rr = np.random.default_rng(a.seed + 404); kr = jax.random.PRNGKey(a.seed + 505)
+            Hr = jnp.zeros((Wr, NL, Hd)); PAr = jnp.zeros((Wr, NL), jnp.int32); PRr = jnp.zeros((Wr, NL))
+            CODr = np.tile(np.arange(8), (Wr, M, 1)); CODr[:, :NL] = FAM[rr.integers(0, len(FAM), (Wr, NL))]
+            kb = np.zeros((Wr, NL), np.int64); ka = np.zeros((Wr, NL), np.int64); post = np.zeros((Wr, NL), bool); lid = np.zeros((Wr, NL), np.int64)
+            born = np.asarray(Sr.age)[:, NB:NB + NL] == 0
+            F = dict(h=[], hz=[], sec=[], kb=[], ka=[], post=[], life=[])
+            for _ in range(nup):
+                ages = np.asarray(Sr.age)[:, NB:NB + NL]
+                for w, l in zip(*np.where(born & ~post & (ages >= AGE))):          # re-draw: a new code, different on every sector
+                    while True:
+                        c2 = FAM[rr.integers(0, len(FAM))]
+                        if np.all(c2 != CODr[w, l]):
+                            break
+                    CODr[w, l] = c2; post[w, l] = True; ka[w, l] = 0
+                kr, k = jax.random.split(kr)
+                Sr, Hr, PAr, PRr, R = roll_rw(rp, Sr, Hr, PAr, PRr, jax.random.split(k, Wr), jnp.asarray(CODr), True)
+                x, al = np.asarray(R[0]), np.asarray(R[7]); h2, hz, tsec = np.asarray(R[10]), np.asarray(R[11]), np.asarray(R[12])
+                hm = (x[..., 108] > 0.5) & al & born[:, None, :]
+                for t in range(T):
+                    kb += hm[:, t]; ka += hm[:, t] & post
+                    if hm[:, t].any():
+                        ww, ll = np.where(hm[:, t])
+                        F["h"].append(h2[ww, t, ll]); F["hz"].append(hz[ww, t, ll]); F["sec"].append(tsec[ww, t, ll]); F["kb"].append(kb[ww, ll])
+                        F["ka"].append(ka[ww, ll]); F["post"].append(post[ww, ll]); F["life"].append(ww * 10_000 + ll * 1000 + lid[ww, ll])
+                dead = ~np.asarray(Sr.alive)[:, NB:NB + NL]
+                for w, l in zip(*np.where(dead)):
+                    CODr[w, l] = FAM[rr.integers(0, len(FAM))]; kb[w, l] = 0; ka[w, l] = 0; post[w, l] = False; lid[w, l] += 1; born[w, l] = True
+                if dead.any():
+                    Sr, Hr, PAr, PRr = respawn(Sr, Hr, PAr, PRr, dead, rr)
+            Fh, Fz = np.concatenate(F["h"]), np.concatenate(F["hz"]); Y = np.concatenate(F["sec"]); KB = np.concatenate(F["kb"]); KA = np.concatenate(F["ka"])
+            PO = np.concatenate(F["post"]); LV = np.concatenate(F["life"])
+            r_ = np.random.default_rng(1); ul = np.unique(LV); r_.shuffle(ul); te = np.isin(LV, ul[: max(1, len(ul) * 3 // 10)])
+            bins = [(1, 5), (6, 15), (16, 40), (41, 100), (101, 300), (301, 10 ** 6)]
+            def fit_score(Fx):
+                tr_ = ~te & ~PO; Xtr, Ytr = jnp.asarray(Fx[tr_]), jnp.asarray(Y[tr_]); mu, sd = Xtr.mean(0), Xtr.std(0) + 1e-6
+                po = optax.adam(1e-2); prm = (jnp.zeros((Fx.shape[1], 8)), jnp.zeros(8)); pst = po.init(prm)
+                @jax.jit
+                def st_(prm, pst):
+                    g = jax.grad(lambda q: ce(((Xtr - mu) / sd) @ q[0] + q[1], Ytr).mean() + 1e-4 * (q[0] ** 2).sum())(prm); u, pst = po.update(g, pst, prm)
+                    return optax.apply_updates(prm, u), pst
+                for _ in range(300):
+                    prm, pst = st_(prm, pst)
+                hit = np.asarray((((jnp.asarray(Fx[te]) - mu) / sd) @ prm[0] + prm[1]).argmax(-1)) == Y[te]
+                po_, kb_, ka_ = PO[te], KB[te], KA[te]
+                def bn(mk, kk):
+                    return {f"{lo}-{hi}": ((round(float(hit[mk & (kk >= lo) & (kk <= hi)].mean()), 4), int((mk & (kk >= lo) & (kk <= hi)).sum())) if (mk & (kk >= lo) & (kk <= hi)).any() else None) for lo, hi in bins}
+                return dict(pre_by_tokens_since_birth=bn(~po_, kb_), post_by_tokens_since_redraw=bn(po_, ka_), post_by_tokens_since_birth=bn(po_, kb_),
+                            pre_all=float(hit[~po_].mean()) if (~po_).any() else None, post_all=float(hit[po_].mean()) if po_.any() else None)
+            out = dict(redraw_age=AGE, worlds=Wr, steps=nup * T, rows=int(len(Y)), rows_post=int(PO.sum()), lives=int(len(ul)), at_update=it, at_agent_steps=steps_train,
+                       memory=fit_score(Fh), wiped=fit_score(Fz), chance=0.125)
+            os.makedirs(os.path.dirname(a.out) or ".", exist_ok=True); json.dump(out, open(a.out, "w"), indent=1, default=float)
+            print("REDRAW_PROBE", json.dumps(out, default=float), flush=True)
+
         def return_check(rp):
             """Cam Nov 12: is freezing what the training objective asks for? The actual training reward (x20 drive
             reduction, move cost included) along each complete life born in the window, discounted at several gammas"""
@@ -842,6 +897,8 @@ def main():
                 print(f"resumed stage 1 at update {it}, {steps_train:,} agent-steps", flush=True)
         if a.return_check:
             return return_check(rp)
+        if a.redraw_probe:
+            return redraw_probe(rp, a.redraw_probe, a.forage_worlds, a.forage_updates)
         if a.forage_check:
             if a.forage_control == "damaged":           # negative control: the side head pushes hard toward action 0
                 rp = {"params": {**rp["params"], "side_head": {"kernel": rp["params"]["side_head"]["kernel"], "bias": rp["params"]["side_head"]["bias"].at[0].add(4.0)}}}
