@@ -6380,6 +6380,50 @@ more expensive, because it produces publishable-looking nulls.
      - If none qualifies: report with the (a) diagnostics (PPO itself, not the KL dose); Cam rules on the learner.
   5. Watches: kill each watch when its app ends.
 
+- **RESULT (Nov 13 ~07:40): Cam's pre-screen diagnostics on the `s1orc` 1e8 checkpoint** (laptop, comm-toy
+  `37b5ac3`).
+  - **(b) GAE/DEATH AUDIT: no bug.** GAE is factored into `w2/gae.py` and equals the former inline loop exactly. Tests
+    in `tests/test_gae.py`:
+    - a death then a newborn's data in the same slot: no leak, and the death step's target is terminal (the
+      ignore-death mutant fails);
+    - rollout end on a live agent: bootstrapped (the terminal mutant fails).
+    - The bootstrap at a rollout end uses v of the last state seen, not v(s_T). Measured against the true v(s_T): mean
+      |advantage difference| 0.018 vs an advantage sd of 0.30 (last step -0.016). Small; not the cause; left as is
+      (it is also how the navigator was trained).
+    - Batch composition: 71% juvenile steps; heard steps 22%; forced 0.15%. Advantage sd by age band: 0-499: 0.064
+      (topped-up, nearly flat); 500-999: 0.50; 1000+: 0.26.
+  - **(a) WHERE THE SIGNAL DIES** (heard, live, non-forced steps; one training batch):
+
+    | phase | toward-oracle moves (n, mean advantage) | other moves | stay | eat |
+    |---|---|---|---|---|
+    | juvenile (age < 1000) | 26, **-0.73** | 48, -0.19 | 1530, -0.013 | 1116, -0.030 |
+    | hungry adult (E < 0.6) | **2**, -0.16 | 13, -0.17 | 75, -0.025 | 68, -0.090 |
+    | sated adult | **3**, -0.27 | 5, +0.08 | 339, +0.001 | 330, +0.012 |
+
+    - **The policy almost never moves on heard steps** (moves 2.7% of juvenile heard steps; 2-3 toward-moves per adult
+      phase in a whole batch), so PPO has almost no samples of following.
+    - In juveniles (71% of the data) the toward-oracle move has a NEGATIVE advantage. In the topped-up phase moving is
+      pure cost, and the food is beyond the ~17-step GAE horizon.
+    - **The KL does not out-pull the PG:** the side-head gradient norm is PG 310 vs KL 145 on heard steps (2.1x);
+      953 vs 801 on all live steps.
+    - The true-v(s_T) bootstrap leaves the picture unchanged.
+    - So the signal dies in exploration and credit assignment (no moves sampled; juvenile moves punished), not in the
+      KL. My prediction for the KL screen: some arm qualifies, p ~ 0.15.
+  - Files: `docs/data/s1orc/signal_diag_u6104.json`.
+- **Cam, Nov 13 ~07:15 (two additions).**
+  1. **NEW STANDING RULE, every stage:** before any run that asks agents to LEARN a skill, an oracle arm must show
+     the agent can USE it when handed the answer (same harness, same pass rule). No learner arm launches until its
+     oracle arm passes.
+  2. **SCREEN ARM D, EVOLUTION:** oracle input, frozen trunk, no PPO, no KL.
+     - The side-head weights are set by selection: a population (~32-64) of side heads, each scored on whole lives
+       in shared worlds.
+     - Fitness = lifespan (mean age at death, censored at the rollout cap). Keep the top fraction, mutate, repeat.
+       Report population, sigma, generations.
+     - **Lever check first (laptop):** from a side head initialised to large random noise, selection must recover
+       the navigator's lifespan within the budget; a random-survivor mutant must not.
+     - Same 25M budget, readouts and pick rule as A-C. Screen cap rises to $0.8.
+     - If D wins, evolution becomes stage 1's slow-weight learner; PPO stays only if it adds something on top.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
