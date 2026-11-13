@@ -87,6 +87,13 @@ PLANS = {
                        "--evolve", "--evolve-params", "side_enc,gru,side_head", "--evolve-fitness", "food", "--evolve-worlds", "8",
                        "--evolve-budget", "5e7", "--evolve-sigma", "0.3", "--evolve-sigma-body", "0.02",
                        "--evolve-init-from", f"{OUTD}/klsD_evolve.ckpt"])],
+    # Cam Nov 13 ~11:00: v2's 50M branch. One plan serves both CLIMBING (extend once to 100M) and PASS (1e8 oracle confirm):
+    # resume v2's population (copy evo2.ckpt -> evo2x.ckpt on the volume FIRST) and evolve to 1e8 with one readout there.
+    # Deploy only after evo2 has ended, re-pinned to b44629d. Its own watch; extension +$0.6 / confirm $0.8.
+    "evo2x": [("evo2x", [*_PILOT, "--oracle-input", "--updates", "1526", "--readout-at", "1e8", "--readout-worlds-at", "32,32,32,32",
+                         "--readout-tests", "hungry_kept", "--readout-no-probe", "--ti-fixed", "--forage-worlds", "64", "--forage-updates", "200",
+                         "--evolve", "--evolve-params", "side_enc,gru,side_head", "--evolve-fitness", "food", "--evolve-worlds", "8",
+                         "--evolve-budget", "1e8", "--evolve-sigma", "0.3", "--evolve-sigma-body", "0.02", "--evolve-readout-override"])],
     "dprime": [("klsDp_evolve_food", [*_PILOT, "--oracle-input", "--updates", "1526", "--readout-at", "1.25e7,2.5e7", "--readout-worlds-at", "32,32",
                                       "--readout-tests", "hungry_kept", "--readout-no-probe", "--ti-fixed", "--forage-worlds", "64", "--forage-updates", "200",
                                       "--evolve", "--evolve-fitness", "food", "--evolve-budget", "25e6", "--evolve-sigma", "0.3"])],

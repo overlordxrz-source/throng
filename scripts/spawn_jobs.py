@@ -42,7 +42,7 @@ if __name__ == "__main__":
         jobs = load("modal_w2cal").PLANS[a.plan]; fn = modal.Function.from_name("throng-w2cal", "run_w2_long" if a.plan in ("s1orc", "kls", "klsd") else "run_w2")
     elif a.kind == "w2":
         m = load("modal_w2jobs"); jobs = m.PLANS[a.plan]
-        fn = modal.Function.from_name("throng-w2jobs", "run_w2_long" if a.plan in ("s1pilot", "s1kl03", "s1kl03r", "dprime", "earm", "evo2") else "run_w2")
+        fn = modal.Function.from_name("throng-w2jobs", "run_w2_long" if a.plan in ("s1pilot", "s1kl03", "s1kl03r", "dprime", "earm", "evo2", "evo2x") else "run_w2")
     else:
         m = load("modal_comm_toy"); jobs = m.PLANS[a.plan]; fn = modal.Function.from_name("throng-comm-toy", "run_toy")
     if a.only:
