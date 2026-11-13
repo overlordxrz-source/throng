@@ -5862,6 +5862,21 @@ more expensive, because it produces publishable-looking nulls.
   - Price: 23.8k agent-steps/s with KL (laptop = container) -> ~11.7 h of training. At the pilot's measured
     ~$0.34/h that is ~$4.0, plus readouts ~$0.65: **~$4.6**. Cap $6 (item watch stops at $7.5; guard $41).
 
+- **AMENDMENT to `s1kl03` before launch (Nov 12 ~23:00):**
+  - **The foraging rule is enforced inside the run (`--forage-stop`),** because the session may be unattended
+    overnight (the guard died unattended at 14:44).
+    - After each milestone readout, the forage check runs on the live milestone weights: 64 worlds x 200 updates,
+      lower of the two ratios.
+    - 1e8: STOP if < 0.5.
+    - 3e8: STOP if < 0.5, or if it was in 0.5-0.9 at 1e8 and is lower now.
+    - On a STOP the checkpoint is saved; a resumed STOP checkpoint never trains on.
+    - This uses the exact milestone weights rather than the nearest checkpoint, as Cam's rule intends.
+    - Smoke-tested: a healthy agent carries on; the damaged control stops at milestone 1 (0.39).
+  - **Identity verified:** the relaunch code `a595b35` with no KL reproduces the registered pilot code `8a0d027`
+    exactly (0 mismatches on all log keys over 30 updates). A gamma mutant differs (176 mismatches).
+  - The resume test now also covers the KL relaunch path (both pass).
+  - Pinned comm-toy `a595b35`.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under

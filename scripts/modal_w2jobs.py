@@ -13,7 +13,7 @@ from pathlib import Path
 import modal
 
 _REQUIREMENTS = str(Path(__file__).resolve().parents[1] / "requirements.txt")
-PINNED_SHA = "6e6903e95916030712f14c06bbe4463a534360c4"  # comm-toy: + stage-1 screen levers (--kl-nav, token influence, readout-worlds-at)
+PINNED_SHA = "a595b3560389ef2bca3d0d5ba683f2abde825d33"  # comm-toy: + stage-1 screen levers, in-run foraging stop
 REPO_URL = "https://github.com/overlordxrz-source/throng.git"
 VOLUME_MOUNT = "/mnt/throng-runs"
 OUTD = f"{VOLUME_MOUNT}/testbed/w2jobs"
@@ -78,7 +78,8 @@ PLANS = {
     "s1pilot": [("s1pilot", _PILOT)],
     # Cam Nov 12: the ONE allowed relaunch = the registered pilot + the screen's pick (c) KL 0.3 to the navigator;
     # readouts halved at 1e8 / 3e8 (32 worlds), full at 1e9 (64); token influence logged every 100 updates; $6 cap
-    "s1kl03": [("s1kl03", [*_PILOT, "--kl-nav", "0.3", "--token-influence-every", "100", "--readout-worlds-at", "32,32,64"])],
+    "s1kl03": [("s1kl03", [*_PILOT, "--kl-nav", "0.3", "--token-influence-every", "100", "--readout-worlds-at", "32,32,64",
+                           "--forage-stop", "--forage-worlds", "64", "--forage-updates", "200"])],
     # Cam Nov 12: scripted controls under the HUNGRY test start must reproduce their frozen numbers (EXPLORE, ~\$0.2)
     "hunger_ctl": [("hunger_gate", ["w2/learnability.py", "--navs", _NAVS, *_WORLD, *_APP, "--updates", "150", "--worlds", "16",
                                     "--no-train", "--sanity", "--test-energy", "0.3"]),
