@@ -6648,6 +6648,20 @@ more expensive, because it produces publishable-looking nulls.
   - Decision at 50M as Cam registered (PASS / CLIMBING / FAIL).
   - Prediction: PASS p 0.15, CLIMBING p 0.25, FAIL p 0.6.
 
+- **Cam, Nov 13 ~10:50: winner's-curse check on v2. RESULT: no carry-over; v2 continues.**
+  - In `learnability.py` at `d262f70`, the selection loop:
+    - line 760: `score(pop + [nav_head], 300_000 + 100 * gen)` re-scores the WHOLE population (carried elites and new
+      mutants alike) on fresh worlds every generation;
+    - lines 762-763: ranking uses only that generation's scores;
+    - line 773: the next population is the elites' parameters plus mutants, with no fitness carried.
+    - A once-lucky member must be lucky again on new worlds to stay elite.
+  - The gen-0 best (38.2 vs the follower's 22.7 on this fitness) is the expected max of 32 noisy draws, not a stored
+    score.
+  - The log records best, elite mean and population mean per generation. v2 is judged at 25M / 50M on the life-test
+    food ratio and forage, as registered, not on best fitness.
+  - The readout head at each milestone is that generation's top-scoring member (also a winner's-curse pick). Its
+    readout is an independent evaluation.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
