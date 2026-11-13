@@ -6348,6 +6348,38 @@ more expensive, because it produces publishable-looking nulls.
   - Spend: metered $32.71. Nothing runs.
   - Files: `docs/data/s1orc/s1orc_1e8.json`, `docs/data/s1kl03r/s1kl03r_1e8.json`, `probe_null_s1kl03r*.json`.
 
+- **Cam, Nov 13 ~07:05 (rulings on the two 1e8 readouts).**
+  1. **The oracle FAIL is accepted. Reading: CAN'T ACT.** The stage-1 picture:
+     - the world pays for listening;
+     - the objective sees it per state;
+     - the memory holds the information;
+     - the POLICY doesn't use it, even when handed the answer.
+     The bottleneck is the RL/policy side. KV memory is SHELVED until acting works.
+  2. **`s1kl03r` STAYS STOPPED** (its life-test question is moot under KL 0.3 after the oracle FAIL); keep the 1e8
+     checkpoint.
+     - **SANITY RULE REPLACED for all future readouts:** a permutation test against the reshuffled null (>= 100 draws,
+       p < 0.01) AND a life-clustered bootstrap CI with LB > 12.5%. Both must fire.
+     - Token influence is measured on a fixed held-out batch of heard steps at each readout.
+  3. **Before the screen: two free laptop diagnostics on the `s1orc` 1e8 checkpoint:**
+     - (a) **WHERE THE SIGNAL DIES** (heard steps, split hungry adult / sated adult / juvenile): the mean GAE
+       advantage of the action toward the oracle sector vs other actions; and the PG vs KL gradient norm into the
+       side head.
+     - (b) **GAE/DEATH AUDIT** (unit tests on a hand-built trajectory, each with a mutant that must fail):
+       - a death then a newborn in the same slot within one rollout: no leak across lives, and the dead step's
+         target is terminal;
+       - a rollout end on a live agent: bootstrapped, not terminal;
+       - report the juvenile share of each batch and the advantage mean/sd per age band.
+       If (b) finds a bug: fix, rerun ratio-1 and identity, and run the screen on the fixed code.
+  4. **THEN THE SCREEN** (Modal, EXPLORE, 25M steps per arm, oracle input in every arm, same seeds, cap $0.6 total):
+     - arms: A = KL 0.3 on SILENT steps only; B = KL 0.1 everywhere; C = KL 0.03 everywhere;
+     - readouts at 12.5M and 25M: hungry life-test food true vs deranged (and pass rate); adult forage vs the
+       navigator; KL heard vs silent; TI on the fixed batch.
+     - **PICK:** the highest true/deranged food ratio among arms with ratio >= 1.5x at 25M AND forage >= 70%, not
+       falling between 12.5M and 25M. The pick goes to 1e8 as an oracle CONFIRM (~$0.8, same restated rule) before
+       any memory arm runs.
+     - If none qualifies: report with the (a) diagnostics (PPO itself, not the KL dose); Cam rules on the learner.
+  5. Watches: kill each watch when its app ends.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
