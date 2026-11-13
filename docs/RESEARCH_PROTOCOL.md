@@ -6047,6 +6047,22 @@ more expensive, because it produces publishable-looking nulls.
     - It would still measure the KL drift slope at 25M and weaning's effect on token influence.
   - Files: `docs/data/weaning/`.
 
+- **Cam, Nov 13 ~02:15 (ruling on the weaning references).**
+  1. **Option (1):** skip the two training arms; `wean25` is NOT deployed.
+     - (i) stays as registered and FAILS (1.58x < 2x), so weaning does NOT go into the next learner run. Not restated
+       after seeing the data.
+     - Cam on the record: the bar was a weak proxy (a kinder world lifts both survival rates). Future "does the world
+       reward listening" bars go on the return gap under the training objective, registered before the data.
+  2. **FINDING:** without weaning, a perfect listener already survives past 1,300 ~2x as often (0.505 vs 0.258) and
+     eats 3.2x as much as an adult. The world pays well for understanding the code, so lack of incentive is not the
+     leading explanation for the 0% life test. The "too harsh" branch did not fire (64% of followers pass 1,300 under
+     weaning).
+  3. A free laptop check (EXPLORE): the return check for the true-code follower vs the navigator, no weaning, gamma
+     0.99, by age band. Does PPO's objective see the value of listening, or does it sit beyond the 0.99 horizon?
+  4. If `s1kl03` stops at 3e8: save the checkpoint, send the readout; no weaning screen. Next in the tree is
+     key-value memory (needs new credits): a one-page design note for Cam's review (free, no runs). If it continues
+     to 1B: send the 1B readout.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
