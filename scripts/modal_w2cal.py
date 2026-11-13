@@ -81,8 +81,10 @@ PLANS = {
                    "--readout-tests", "hungry_kept", "--readout-no-probe", "--ti-fixed", "--token-influence-every", "100",
                    "--forage-stop", "--forage-worlds", "64", "--forage-updates", "200", *extra])
             for tag, extra in (("klsA_silent03", ["--kl-nav", "0.3", "--kl-silent-only"]), ("klsB_kl01", ["--kl-nav", "0.1"]),
-                               ("klsC_kl003", ["--kl-nav", "0.03"]),
-                               ("klsD_evolve", ["--evolve", "--evolve-budget", "25e6", "--evolve-sigma", "0.3"]))],
+                               ("klsC_kl003", ["--kl-nav", "0.03"]))],
+    "klsd": [("klsD_evolve", [*_PILOT, "--oracle-input", "--updates", "1526", "--readout-at", "1.25e7,2.5e7", "--readout-worlds-at", "32,32",
+                              "--readout-tests", "hungry_kept", "--readout-no-probe", "--ti-fixed", "--forage-worlds", "64", "--forage-updates", "200",
+                              "--evolve", "--evolve-budget", "25e6", "--evolve-sigma", "0.3"])],
     # Cam Nov 13: ORACLE-INPUT apparatus arm (never inherited): s1kl03r + the decoded heard sector as input; to 1e8; cap $0.8
     "s1orc": [("s1orc", [*_PILOT, "--kl-nav", "0.3", "--token-influence-every", "100", "--oracle-input", "--updates", "6110",
                          "--readout-at", "1e8", "--readout-worlds-at", "32", "--forage-stop", "--forage-worlds", "64", "--forage-updates", "200"])],
