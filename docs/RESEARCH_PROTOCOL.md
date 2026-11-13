@@ -5827,6 +5827,41 @@ more expensive, because it produces publishable-looking nulls.
 - **Ops:** the spend guard had died at 14:44 (heartbeat 7h stale; no Modal activity in the gap; metered $30.07
   unchanged). Restarted at 21:49 with CAP 41.0.
 
+- **RESULT (Nov 12 22:26): KL SCREEN** (laptop; 16 worlds x 2,000 updates = 8.2M steps from the navigator init; same
+  seeds; forage check on 64 fresh worlds; token influence every 100 updates).
+
+  | arm | adult food vs navigator (CI) | token influence, mean over updates 500-999 -> 1500-1999 | trend (Spearman, 19 points) | pass |
+  |---|---|---|---|---|
+  | (a) KL 1.0 | 92.0% (86.7-97.4) | 6.2e-6 -> 1.3e-5 | rho 0.73, p<0.001 | yes |
+  | (b) KL 1.0, silent steps only | 93.8% (88.9-99.2) | 7.5e-6 -> 1.9e-5 | rho 0.79, p<0.001 | yes |
+  | **(c) KL 0.3** | **95.0% (89.4-100.7)** | 9.1e-6 -> **4.0e-5** | **rho 0.91, p<0.001** | **yes: PICK** |
+  | (d) gamma 0.998, no KL | 27.3% | 1.0e-4 -> 1.8e-4 | rho 0.19, p 0.42 | no |
+  | (e) side bound 3, no KL | 28.7% | 7.5e-5 -> 2.3e-4 | rho 0.71 | no |
+
+  - **The pick by Cam's rule is (c), KL 0.3 to the navigator.** The objective fix (d) does not hold foraging, so it
+    cannot be preferred. Bounding the side head (e) does not either.
+  - Token influence is tiny in every arm (~1e-5 nats per heard step). "Growing" is real in (c) but starts from almost
+    nothing. Without KL it is ~10x larger, but foraging collapses.
+  - Non-monotone in beta: beta 0.3 (95%) here vs beta 0.1 at 68% and beta 1.0 at 92%. (c) and (a) are within CI of
+    each other.
+  - Predictions (P food >= 0.9 / P growing):
+    - (a) 0.6 / 0.3: yes / yes;
+    - (b) 0.45 / 0.45: yes / yes;
+    - (c) 0.3 / 0.4: yes / yes (I under-rated it);
+    - (d) 0.3 / 0.4: no / no;
+    - (e) 0.25 / 0.4: no / yes.
+  - Files: `docs/data/stage1/screen_*`.
+- **REGISTERED (Nov 12 ~22:40): THE ONE RELAUNCH `s1kl03`** (Cam's item 5).
+  - Design: the registered pilot design unchanged (`_PILOT`, the same bars, readout instruments, sanity stop, decision
+    tree and "rises" criteria), plus `--kl-nav 0.3`.
+  - Readouts: 32 worlds at 1e8 and 3e8 (halved), 64 at 1e9. Token influence logged every 100 updates.
+  - The same foraging stop rule at 1e8 (laptop forage check on the nearest checkpoint; lower of the two ratios;
+    < 50% stop, 50-90% recheck at 3e8, >= 90% carry on).
+  - Code: comm-toy `6e6903e`. App `throng-w2jobs`, function `run_w2_long` (24 h), checkpoint
+    `testbed/w2jobs/s1kl03.ckpt`.
+  - Price: 23.8k agent-steps/s with KL (laptop = container) -> ~11.7 h of training. At the pilot's measured
+    ~$0.34/h that is ~$4.0, plus readouts ~$0.65: **~$4.6**. Cap $6 (item watch stops at $7.5; guard $41).
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
