@@ -144,6 +144,8 @@ def main():
     ap.add_argument("--wean-to", type=int, default=0, help="gradual weaning (Cam Nov 12): after the --juvenile top-up the parent supplies w*(d0+d_move) energy per step up to E0, w falling linearly to 0 at this age (set it to --parent-leave); 0 = off")
     ap.add_argument("--forage-at", default="", help="stage 1: forage checks (agent vs navigator) at these agent-step counts during training, e.g. 5e6,1e7")
     ap.add_argument("--final-return-check", action="store_true", help="stage 1: after training, the return check by age band on the final weights, into the results JSON")
+    ap.add_argument("--unsafe-ratio", action="store_true", help="test only: the pre-Nov-13 PPO ratio (no log-ratio clip, multiply-mask, no NaN guard)")
+    ap.add_argument("--debug-poison-lp0", action="store_true", help="test only: set the old log-prob of masked steps to -200")
     ap.add_argument("--forage-control", choices=["none", "damaged"], default="none")
     ap.add_argument("--diag-only", action="store_true", help="with --diag (and e.g. --ckpt of a finished run): run the predictive-head swap check and exit")
     ap.add_argument("--log-levers", action="store_true", help="diagnostic (Cam Nov 10, 4a): per update, each lever's own signal (pred loss, copy CE + rows, replay passes + loss, young-lr factor) to <out>.levers.jsonl")
@@ -505,9 +507,13 @@ def main():
             def body(h, xx):
                 h2, lg, v, aux = rnet.apply(rp, h, xx); return h2, (lg, v, aux)
             _, (lg, v, (am, ao, av)) = jax.lax.scan(body, h0, x)
-            ls = jax.nn.log_softmax(lg); lp = jnp.take_along_axis(ls, act[:, None], 1)[:, 0]; ratio = jnp.exp(lp - lp0)
+            ls = jax.nn.log_softmax(lg); lp = jnp.take_along_axis(ls, act[:, None], 1)[:, 0]
+            # Nov 13 NaN fix: after a death the rollout freezes the memory but this scan does not, so on masked steps
+            # lp - lp0 can exceed 88 and exp overflows (inf * 0 mask = NaN, forward and backward). Clip the log-ratio.
+            ratio = jnp.exp(lp - lp0) if a.unsafe_ratio else jnp.exp(jnp.clip(lp - lp0, -20.0, 20.0))
             pg = -jnp.minimum(ratio * adv, jnp.clip(ratio, 0.8, 1.2) * adv)
-            Lp = ((pg + 0.5 * (v - ret) ** 2 + 0.01 * (jnp.exp(ls) * ls).sum(-1)) * m).sum() / (m.sum() + 1e-8)
+            term = pg + 0.5 * (v - ret) ** 2 + 0.01 * (jnp.exp(ls) * ls).sum(-1)
+            Lp = ((term * m) if a.unsafe_ratio else jnp.where(m > 0, term, 0.0)).sum() / (m.sum() + 1e-8)
             if a.kl_nav:                                   # KL to the frozen navigator's policy (the trunk alone), on every live step
                 P_ = rp["params"]; tn = jnp.tanh(x[:, :100] @ P_["Dense_0"]["kernel"] + P_["Dense_0"]["bias"])
                 tn = jnp.tanh(tn @ P_["Dense_1"]["kernel"] + P_["Dense_1"]["bias"]); lsn = jax.nn.log_softmax(tn @ P_["Dense_2"]["kernel"] + P_["Dense_2"]["bias"])
@@ -928,7 +934,11 @@ def main():
                        value=dict(mean=float(vA.mean()), sd=float(vA.std()), navigator_value_mean=float(np.asarray(vN)[m].mean())),
                        returns=dict(mean=float(np.asarray(ret)[alm].mean()), sd=float(np.asarray(ret)[alm].std())),
                        advantage_raw=dict(mean=float(np.asarray(adv)[alm].mean()), sd=float(np.asarray(adv)[alm].std()), abs_mean=float(np.abs(np.asarray(adv)[alm]).mean())),
-                       explained_variance=float(1 - np.var((np.asarray(ret) - np.asarray(v))[alm]) / (np.var(np.asarray(ret)[alm]) + 1e-12)))
+                       explained_variance=float(1 - np.var((np.asarray(ret) - np.asarray(v))[alm]) / (np.var(np.asarray(ret)[alm]) + 1e-12)),
+                       old_logprob=dict(**{f"live_p{q_}": float(np.percentile(np.asarray(b[3])[np.asarray(b[6]) > 0], q_)) for q_ in (0, 0.01, 1)},
+                                        live_min=float(np.asarray(b[3])[np.asarray(b[6]) > 0].min()),
+                                        masked_min=float(np.asarray(b[3])[np.asarray(b[6]) == 0].min()) if (np.asarray(b[6]) == 0).any() else None,
+                                        frac_below_minus30=float((np.asarray(b[3]) < -30).mean()), overflow_threshold=-88.7))
             os.makedirs(os.path.dirname(a.out) or ".", exist_ok=True); json.dump(out, open(a.out, "w"), indent=1, default=float)
             print("GRAD_DIAG", json.dumps(out, default=float), flush=True)
 
@@ -940,7 +950,7 @@ def main():
         log, READS, key_ = [], [], jax.random.PRNGKey(a.seed + 7)
         MIL = [float(x) for x in a.readout_at.split(",")] if a.readout_at else []
         FMIL = [float(x) for x in a.forage_at.split(",")] if a.forage_at else []; FORAGES = []
-        it, t_train, steps_train = 0, 0.0, 0; rng_main = rng
+        it, t_train, steps_train = 0, 0.0, 0; rng_main = rng; nan_run = 0
         if a.ckpt:
             Ck = _ck.load(a.ckpt)
             if Ck is not None:
@@ -1001,9 +1011,18 @@ def main():
             if a.grad_diag:
                 return grad_diag(rp, b, adv, ret, v, al, act)
             tinf = token_influence(rp, b, jax.random.fold_in(k, 99)) if (a.token_influence_every and it % a.token_influence_every == 0) else None
+            if a.debug_poison_lp0:                         # test only: masked steps get an impossible old log-prob
+                b = b[:3] + (jnp.where(b[6] > 0, b[3], -200.0),) + b[4:]
+            prev_ = (rp, ros)
             for _ in range(a.epochs):
                 rp, ros, parts = upd(rp, ros, *b)
             parts = np.asarray(parts)                     # per-sequence [ppo, meal, other, view, n_meal, n_other]
+            if not a.unsafe_ratio and not np.isfinite(parts).all():   # NaN guard: drop this update, stop after 10 in a row
+                rp, ros = prev_; nan_run += 1; print(f"NAN_SKIP update {it} (consecutive {nan_run})", flush=True)
+                if nan_run >= 10:
+                    save_out(); print("NAN_STOP: 10 consecutive non-finite updates", flush=True); return
+            else:
+                nan_run = 0
             wts = parts[:, 4:6]
             jax.block_until_ready(rp); dt = _time.time() - t0
             if it > 0:
@@ -1027,13 +1046,20 @@ def main():
                 tagm = f"{MIL[0]:.0e}"; MIL.pop(0); t1 = _time.time()
                 READS.append(dict(at_agent_steps=steps_train, **readout(rp, tagm), readout_seconds=round(_time.time() - t1, 1))); save_out()
                 print("STAGE1_READOUT", json.dumps(READS[-1])[:2500], flush=True)
+                if a.ckpt:                                 # Nov 13: keep the milestone weights (the rolling checkpoint is overwritten)
+                    _ck.save(f"{a.ckpt}.m{len(READS)}", dict(rp=rp, ros=ros, S=S_, Hh=Hh, PA=PA, PR=PR, COD=COD, cr=cr, key=key_, it=it, t=t_train, steps=steps_train,
+                                                             log=log, reads=READS, rng_state=rng_main.bit_generator.state, mil=list(MIL), fmil=list(FMIL), forages=FORAGES))
                 if a.forage_stop:                          # Cam's foraging rule, enforced in the run (live milestone weights)
                     rpf = rp
                     if a.forage_control == "damaged":      # test only
                         rpf = {"params": {**rp["params"], "side_head": {"kernel": rp["params"]["side_head"]["kernel"], "bias": rp["params"]["side_head"]["bias"].at[0].add(4.0)}}}
                     fo = forage_check(rpf, write=False)
                     pts_ = [r_["point"] for r_ in (fo["ratio_km_median"], fo["ratio_adult_food_per_step"]) if r_["point"] is not None]
-                    worst = min(pts_) if pts_ else None; READS[-1]["forage"] = dict(worst_ratio=worst, check=fo)
+                    worst = min(pts_) if pts_ else None
+                    fp_ = fo["ratio_adult_food_per_step"]["point"]
+                    if fp_ is None or not np.isfinite(fp_) or not fo["agent"]["adult_food_per_step"] > 0:
+                        worst = 0.0                        # Nov 13: a broken agent (no adult food / NaN) counts as total collapse
+                    READS[-1]["forage"] = dict(worst_ratio=worst, check=fo)
                     nmil = len(READS); prev = READS[-2]["forage"]["worst_ratio"] if nmil >= 2 and "forage" in READS[-2] else None
                     stop = worst is not None and ((nmil == 1 and worst < 0.5) or
                                                   (nmil == 2 and (worst < 0.5 or (prev is not None and 0.5 <= prev < 0.9 and worst < prev))))
