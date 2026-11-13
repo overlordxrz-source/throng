@@ -5877,6 +5877,30 @@ more expensive, because it produces publishable-looking nulls.
   - The resume test now also covers the KL relaunch path (both pass).
   - Pinned comm-toy `a595b35`.
 
+- **Cam, Nov 12 (rulings on the ~22:50 relaunch report).**
+  1. The return check is accepted. **The reward TELESCOPES** (summed over a life it is drive(birth) - drive(death);
+     staying alive has value only through discounting). It must be fixed before stage 2; do not touch the running run.
+     - Design item (laptop return check first, same instrument): compare (a) a terminal death penalty, (b) a small
+       per-step alive bonus and (c) the current reward, on navigator vs freeze vs collapsed agents.
+     - Pick the form under which the navigator beats freezing at gamma 0.99 in every age band. Send it to Cam before
+       using it; it is a new pressure, so it goes to M.
+  2. Screen pick (c) KL 0.3 accepted. Token influence ~1e-5 = room to listen, not listening.
+  3. Probe control wording accepted: "met as written; confounded by age; code-dependent component, no clear
+     re-learning".
+  4. **Relaunch cost: option (iii), a conditional at 3e8 (REGISTERED here, before the readout).**
+     - CONTINUE to 1B if ANY holds at 3e8:
+       - (a) hungry life test, memory kept: pass > 0 with the CI lower bound above the memory-wiped arm;
+       - (b) token influence at 3e8 >= 3x its 1e8 value;
+       - (c) the probe's memory-minus-wiped advantage >= 3 points larger at 3e8 than at 1e8.
+     - Otherwise STOP after the 3e8 readout (~$2.5), download the checkpoint off the volume for a later resume, and
+       report.
+     - If nobody is awake, running to 1B is acceptable (inside the leeway). The in-run foraging stop applies either way.
+     - Script: `docs/data/s1kl03/decide_3e8.py`, committed before the data.
+       - My operationalisation of (b): the mean of the last 5 logged values at or before each milestone's update.
+       - (a): Wilson lower bound vs the wiped arm's pass rate.
+       - (c): overall sector accuracy, memory minus wiped.
+  5. Ops: before every deploy, check that `git status -sb` shows nothing "ahead". The guard still waits on M's secret.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
