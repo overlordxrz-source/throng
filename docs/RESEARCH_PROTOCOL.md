@@ -5969,6 +5969,19 @@ more expensive, because it produces publishable-looking nulls.
   5. Ops: the guard dying at every session restart is now the most repeated failure in the protocol. It waits on M's
      secret.
 
+- **PREP (Nov 12 ~23:50): gradual-weaning lever built, not screened** (comm-toy, `--wean-to N`).
+  - My reading of "the top-up tapers linearly", to be confirmed by Cam: after the 500-step top-up, the parent supplies
+    w x (d0 + d_move) energy per step (capped at E0), with w falling linearly from 1 at age 500 to 0 at N = 1,000 (the
+    parent leaves). That is enough to cover a moving juvenile's drain at first, and nothing at independence.
+    - The alternative reading (a floor on energy that tapers from E0 to 0) would put the cliff exactly at 1,000.
+  - Lever check (navigator only, 8 worlds x 3,840 steps; NOT the screen):
+    - no weaning: 62 of 76 navigator deaths before age 1,000, at 800-899;
+    - `--wean-to 1000`: 0 deaths before 1,000, but **the cliff moves rather than vanishing**: 29 of 44 deaths at
+      1,200-1,299 (KM 1,293 vs 883).
+  - So under this reading weaning delays the starvation cliff by ~400 steps. The navigator still rarely finds food
+    on its own after independence in this harness. The screen, if it runs, must report survival past ~1,300 as well
+    as past 1,000.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
