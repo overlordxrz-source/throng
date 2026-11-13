@@ -5791,6 +5791,42 @@ more expensive, because it produces publishable-looking nulls.
     - (d) 0.3 / 0.4;
     - (e) 0.25 / 0.4.
 
+- **RESULT (Nov 12 21:48): PROBE CONTROL, mid-life code re-draw** (laptop, comm-toy `7d92832` `--redraw-probe 450`).
+  - Setup:
+    - Checkpoint u6000 (98.3M steps; the exact 100M weights were not checkpointed before the stop).
+    - 64 fresh worlds x 6,400 steps, 1,261 lives, 390k probe rows.
+    - Each life's code is re-drawn at the first rollout boundary after age 450, to a code that differs on every sector.
+    - The probe is trained on pre-re-draw rows of 70% of lives and scored on the other 30%.
+    - **Added negative control (mine): the same run at fresh init**, i.e. an untrained memory.
+  - Sector accuracy (%):
+
+    | | pre, 101-300 tokens since birth | post, by tokens since the re-draw: 1-5 / 6-15 / 16-40 / 41-100 / 101-300 |
+    |---|---|---|
+    | u6000 memory | 47.6 | 30.3 / 33.0 / 34.8 / 35.7 / 33.8 |
+    | u6000 wiped | 36.3 | 26.1 / 25.1 / 24.5 / 22.9 / 16.3 |
+    | fresh-init memory | 34.5 | 22.0 / 26.8 / 26.4 / 25.0 / 24.6 |
+    | fresh-init wiped | 32.6 | 20.1 / 21.6 / 19.7 / 18.3 / 15.2 |
+
+  - **Cam's literal test (drop at the re-draw, then climb back above wiped) is passed, and it is also passed by the
+    fresh-init control.** Post rows are older lives in other states, so the accuracy drop and the falling wiped
+    baseline are partly distribution shift. As worded, the test has no teeth here.
+  - **Against the control:**
+    - The memory's advantage over wiped falls at the re-draw from 11.3 points (pre, 101-300) to 4.2 (post, 1-5).
+      The control's stays 1.9 -> 1.9.
+    - So part of the trained memory's extra sector information depends on the life's code. That is evidence it reads
+      tokens through a code-specific mapping.
+    - Recovery is weak. Memory rises 5.4 points over the first 100 tokens after the re-draw (control +3.0) and never
+      approaches the pre level (47.6).
+  - **Reading:** code-dependent information in memory: suggestive, yes. In-context re-learning of a new code: not
+    shown beyond the control.
+  - Criterion (ii) now reads: "met as written; confounded by age; the re-draw shows a code-dependent component but no
+    clear re-learning".
+  - Prediction (drop >= 5 points AND recovery above wiped, p 0.3): HIT on the letter, but the control also hits.
+    Scored as uninformative.
+  - Files: `docs/data/stage1/redraw_probe_u6000.json`, `redraw_probe_freshinit_control.json`.
+- **Ops:** the spend guard had died at 14:44 (heartbeat 7h stale; no Modal activity in the gap; metered $30.07
+  unchanged). Restarted at 21:49 with CAP 41.0.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
