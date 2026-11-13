@@ -168,6 +168,7 @@ def main():
     ap.add_argument("--evolve-params", default="side_head", help="comma list of evolved parameter groups (v2: side_enc,gru,side_head)")
     ap.add_argument("--evolve-sigma-body", type=float, default=0.02, help="mutation sigma for side_enc / gru (side head uses --evolve-sigma)")
     ap.add_argument("--evolve-init-from", default="", help="start the population from an --evolve checkpoint's top elite")
+    ap.add_argument("--evolve-readout-override", action="store_true", help="on resume, take readout milestones from --readout-at (those not yet reached) instead of the checkpoint")
     ap.add_argument("--evolve-random-select", action="store_true", help="lever-check mutant: survivors chosen at random")
     ap.add_argument("--load-evo-head", default="", help="stage 1: load the top elite side head from an --evolve checkpoint")
     ap.add_argument("--premium-check", action="store_true", help="stage 1 (Cam Nov 13): forage check + readout life test for one policy, then exit")
@@ -733,6 +734,8 @@ def main():
                 if Ck is not None and "evo_pop" in Ck:
                     pop = [jax.tree_util.tree_map(jnp.asarray, h) for h in Ck["evo_pop"]]; gen, steps, glog, MILe, READe = Ck["gen"], Ck["steps"], Ck["glog"], Ck["mil"], Ck["reads"]
                     rng_e.bit_generator.state = Ck["rng_state"]; print(f"resumed evolution at generation {gen}, {steps:,} agent-steps", flush=True)
+                    if a.evolve_readout_override:      # Cam Nov 13: an extension / confirm takes its milestones from the command line
+                        MILe = [float(x) for x in a.readout_at.split(",") if float(x) > steps] if a.readout_at else []
             nav_head = {g: (jax.tree_util.tree_map(jnp.zeros_like, sh0) if g == "side_head" else rp["params"][g]) for g in GROUPS}
             def score(heads, seed, Wg=Wg):
                 """mean capped lifespan per head; all heads on the same Wg worlds and keys"""
@@ -1241,7 +1244,7 @@ def main():
         it, t_train, steps_train = 0, 0.0, 0; rng_main = rng; nan_run = 0
         if a.ckpt:
             Ck = _ck.load(a.ckpt)
-            if Ck is not None:
+            if Ck is not None and "rp" in Ck:          # (an --evolve checkpoint has no "rp": evolve_run loads its own)
                 tj = lambda t_: jax.tree_util.tree_map(jnp.asarray, t_)  # noqa: E731
                 rp, ros, S_, Hh, PA, PR = tj(Ck["rp"]), tj(Ck["ros"]), tj(Ck["S"]), tj(Ck["Hh"]), tj(Ck["PA"]), tj(Ck["PR"])
                 COD, cr, key_, it, t_train, steps_train, log, READS = Ck["COD"], Ck["cr"], jnp.asarray(Ck["key"]), Ck["it"], Ck["t"], Ck["steps"], Ck["log"], Ck["reads"]
