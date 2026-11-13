@@ -6290,6 +6290,15 @@ more expensive, because it produces publishable-looking nulls.
   - Caveat as registered: the kept-minus-wiped gap is partly age-confounded (the re-draw control showed only part of
     it is code-dependent).
 
+- **Ops (Nov 13 05:30), Cam's item 6: the per-app watches read $0.00 for the first hour.**
+  - `modal billing report` only reports COMPLETE intervals, and the watch used daily resolution, so today's spend
+    never showed.
+  - Fixed: hourly resolution (billed full hours) plus a container-time estimate at $0.35/h for the unbilled part. The
+    measured rate is ~$0.26/h per run (04:33-05:00: $0.118 and $0.112).
+  - Restarted at 05:30 counting from the 04:33 launch: `s1kl03r` ~$0.30, `s1orc` ~$0.29 so far (conservative; total
+    metered +$0.47 over both).
+  - The guard (total metered, real time) stays the backstop.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
