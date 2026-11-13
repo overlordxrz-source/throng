@@ -5901,6 +5901,53 @@ more expensive, because it produces publishable-looking nulls.
        - (c): overall sector accuracy, memory minus wiped.
   5. Ops: before every deploy, check that `git status -sb` shows nothing "ahead". The guard still waits on M's secret.
 
+- **Ops (Nov 12 ~23:10):** the guard and the item watch died at ~22:56 (the session restarted). Restarted at 23:11.
+  - The item watch was restarted with the remaining item cap $5.86 (6 - the $0.14 already spent), so it stops
+    `s1kl03` at $7.47 total (slightly stricter than $7.5).
+  - The registered 3e8 conditional is applied by a detached watcher, `~/throng-smoke/s1kl03_watch.sh` (log
+    `s1kl03_watch.log`):
+    - on STOP it waits for the next checkpoint (which holds the 3e8 readout), stops the app and downloads the
+      checkpoint to `~/throng-backup/s1kl03/`;
+    - on CONTINUE it leaves the run going.
+  - comm-toy now tracks `origin/comm-toy`, so `git status -sb` shows "ahead" (the cause of the silent push failures).
+- **RESULT (Nov 12 ~23:30): REWARD-FORM RETURN CHECK** (Cam's design item; laptop, comm-toy `69b856e`
+  `--reward-variants`; the same u6000 trajectories as the return check, gamma 0.99).
+  - Forms: (c) current; (a) terminal penalty on starvation deaths of 1 / 5 / 20 drive units; (b) alive bonus of
+    0.0005 / 0.002 / 0.005 drive units per step; plus (d), MINE, drive reduction computed on the energy AFTER the
+    juvenile top-up. All x20 like the reward.
+
+  | form | navigator beats freezing in every age band where freezing has lives | navigator beats the collapsed agent at age 0-499 | from birth: navigator / agent / freeze |
+  |---|---|---|---|
+  | (c) current | yes | no (-1.067 vs -1.043) | -0.965 / -0.904 / -1.047 |
+  | (a) death 1 | yes | no | -0.967 / -0.906 / -1.049 |
+  | (a) death 5 | **no** (0-499: -1.405 vs freeze -1.357) | no | -0.976 / -0.910 / -1.054 |
+  | (a) death 20 | **no** (-2.42 vs -1.93) | no | -1.010 / -0.928 / -1.073 |
+  | (b) alive 0.0005 | yes | no (-0.070 vs -0.045) | 0.035 / 0.096 / -0.048 |
+  | (b) alive 0.002 | yes | no | 3.035 / 3.095 / 2.952 |
+  | (b) alive 0.005 | yes | no | 9.034 / 9.095 / 8.952 |
+  | (d) top-up credited | yes | no, near tie (-0.293 vs -0.289) | 0.027 / 0.054 / -0.011 |
+
+  - **Why a death penalty backfires:** in this harness the navigator itself starves early.
+    - 65% of navigator lives die at age 800-899: after the top-up ends at 500 it moves, burns energy faster, and
+      rarely finds food in time. A freezer lives to ~962.
+    - Any strong value on survival therefore makes freezing look better for young agents.
+    - **The juvenile-to-independence transition is the real bottleneck, not the reward's form.** Juveniles barely
+      eat (~0.0004 food per step).
+  - **No form tested makes the navigator beat the collapsed agent in the juvenile band, or from birth, at gamma
+    0.99.** That preference comes from the 100-step horizon and the juvenile ecology, not from telescoping.
+  - **Candidate to send to Cam: (b) alive bonus 0.0005 drive units per step (0.01 at x20).** It removes the
+    telescoping (an undiscounted life is then worth more the longer it lasts), meets Cam's criterion in every band,
+    and is the smallest change. It is about the same size as the basal drain's drive cost (~0.0005 per step at
+    E 0.6).
+  - It is NOT sufficient alone: the KL patch (or a longer horizon) stays needed. The deeper fix is the juvenile
+    ecology: the stage-2 W2.1 parents provisioning their young address exactly this transition.
+  - Predictions:
+    - (a) and (b) won't flip the juvenile band: p 0.7, HIT;
+    - (d) flips it: p 0.6, MISS (near tie).
+  - Caveat: by-age return-to-go is conditional on survival to that age (survivor bias), and each policy is scored
+    on its own states.
+  - Files: `docs/data/stage1/reward_variants_u6000.json`.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
