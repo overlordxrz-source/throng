@@ -6686,6 +6686,19 @@ more expensive, because it produces publishable-looking nulls.
   - FAIL: anything else, including ratio(50M) < 1.1 or not rising.
   - The 100M check applies the same PASS clause with 50M as the comparison point.
 
+- **LOG (Nov 13 ~11:12): v2 at 25M (generation 11; no decision, per Cam).**
+  - Hungry life test: 2/45 pass (4.4%, CI 1.2-14.8%); food true 5.11 vs deranged 4.96 = **1.03x**.
+  - Forage: adult food **3.05x** the navigator; KM lifespan 1.73x.
+  - TI 0.146; KL to the navigator 5.8 heard / 5.0 silent.
+  - Elite mean lifetime food ~31-35 since generation 5 (population mean 16-19).
+  - Reading: v2 is an even stronger forager than D (life-test food 5.1 vs D-best 2.2; follower 22.2), still not
+    using the code.
+  - Two defects found while preparing the 50M branch; both fixed in comm-toy `b44629d` (the running v2 cannot be
+    patched):
+    - (1) any `--evolve` run that resumes from its own checkpoint crashed (the generic loader read `Ck["rp"]`). So a
+      Modal preemption of v2 would have killed it, not resumed it;
+    - (2) resumed evolution runs could not take new readout milestones (`--evolve-readout-override`).
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
