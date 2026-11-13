@@ -6424,6 +6424,40 @@ more expensive, because it produces publishable-looking nulls.
      - Same 25M budget, readouts and pick rule as A-C. Screen cap rises to $0.8.
      - If D wins, evolution becomes stage 1's slow-weight learner; PPO stays only if it adds something on top.
 
+- **REGISTERED (Nov 13 ~08:00): THE ORACLE-INPUT SCREEN `kls`** (Modal app `throng-w2cal`, comm-toy `a1a48fd`;
+  EXPLORE; cap $0.8 total; one per-app watch).
+  - Every arm: `s1orc`'s config (oracle input, frozen trunk, the stage-1 GRU agent), 25M agent-steps, the same seeds.
+    - A: KL 0.3 on SILENT steps only;
+    - B: KL 0.1 everywhere;
+    - C: KL 0.03 everywhere;
+    - D: EVOLUTION (no PPO, no KL).
+  - **Arm D:** population 32, elite 8, Gaussian mutation sigma 0.3 on the side head (the trunk, side_enc and GRU stay
+    at their fixed initial weights).
+    - Each member is scored on 4 worlds x 4 learners from birth to death, capped at 2,048 steps, in shared worlds
+      with common random numbers. Fitness = mean capped lifespan. ~1.08M agent-steps per generation, ~23
+      generations in 25M.
+    - It starts from the navigator (side head zero). A navigator reference is scored every generation.
+  - Readouts at 12.5M and 25M:
+    - hungry memory-kept life test (food true vs deranged, pass rate);
+    - adult forage vs the navigator;
+    - KL to the navigator on heard vs silent steps, and token influence, on a fixed held-out batch.
+    - (No probe, so no sanity rule.)
+  - **PICK (Cam):** the highest true/deranged food ratio among arms with ratio >= 1.5x at 25M AND forage >= 70%, not
+    falling between 12.5M and 25M. The pick goes to a 1e8 oracle CONFIRM (~$0.8, the restated pass rule). If none
+    qualifies: report with the (a) diagnostics.
+  - Predictions (P qualifies): A 0.08, B 0.08, C 0.10, D 0.2.
+  - **A design caution on D (mine), from the lever-check calibration:** in this harness lifespan rewards moving less
+    (freezer ~962 vs navigator ~879, KM). Over 128 fresh lives, a random head with N(0, 0.5) weights lives 1,061 vs
+    the navigator's 1,010 (capped means).
+    - So selection can climb by freezing as well as by following. Only following reaches ~1,300+.
+    - Lifespan is a weak fitness signal near the navigator: the whole range from damaged (noise 5: 860) to navigator
+      is ~150 steps, with ~300 sd per life.
+- **REGISTERED (Nov 13 ~07:55): D LEVER CHECK** (laptop):
+  - start from a side head with N(0, 5) weights (lifespan 0.85x the navigator on 128 fresh lives);
+  - selection (sigma 0.3, pop 32, elite 8, 25M) must reach >= 0.95x the navigator on 128 fresh lives, and the
+    random-survivor mutant must stay below 0.95x.
+  - Predictions: selection recovers p 0.55; the mutant does not p 0.9.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
