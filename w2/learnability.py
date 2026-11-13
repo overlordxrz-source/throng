@@ -146,6 +146,9 @@ def main():
     ap.add_argument("--final-return-check", action="store_true", help="stage 1: after training, the return check by age band on the final weights, into the results JSON")
     ap.add_argument("--unsafe-ratio", action="store_true", help="test only: the pre-Nov-13 PPO ratio (no log-ratio clip, multiply-mask, no NaN guard)")
     ap.add_argument("--debug-poison-lp0", action="store_true", help="test only: set the old log-prob of masked steps to -200")
+    ap.add_argument("--ratio-check", action="store_true", help="stage 1 (Cam Nov 13): on the first batch, recomputed lp vs stored lp0 on all steps (must be < 1e-4), and the origin of very low live lp0; then exit")
+    ap.add_argument("--debug-nan-at", default="", help="test only: 'N,K' poisons the advantages with NaN for updates N..N+K-1 (fires the NaN guard)")
+    ap.add_argument("--oracle-input", action="store_true", help="stage 1 APPARATUS ONLY (Cam Nov 13): the decoded sector of the heard message as an extra side input (zero when silent); never inherited")
     ap.add_argument("--forage-control", choices=["none", "damaged"], default="none")
     ap.add_argument("--diag-only", action="store_true", help="with --diag (and e.g. --ckpt of a finished run): run the predictive-head swap check and exit")
     ap.add_argument("--log-levers", action="store_true", help="diagnostic (Cam Nov 10, 4a): per update, each lever's own signal (pred loss, copy CE + rows, replay passes + loss, young-lr factor) to <out>.levers.jsonl")
@@ -459,7 +462,7 @@ def main():
         assert a.parent and a.test == "heard25", "stage 1 runs in the parent arm with the heard25 test"
         print("RESOLVED_CONFIG", json.dumps(vars(a), default=str), flush=True)
         FA, FB = code_families(); FAM = FA if a.code_family == "A" else FB
-        Hd = a.rec_hidden; rnet = RecAgent(Hd, a.side_bound); Dx = 100 + HD + 6 + 1
+        Hd = a.rec_hidden; rnet = RecAgent(Hd, a.side_bound); Dx = 100 + HD + 6 + 1 + (8 if a.oracle_input else 0)
         rp = rnet.init(jax.random.PRNGKey(a.seed), jnp.zeros((Hd,)), jnp.zeros((Dx,)))
         nav0 = jax.tree_util.tree_map(lambda x: x[0], NAV)["params"]
         pp = {k: dict(v) for k, v in rp["params"].items()}
@@ -475,10 +478,12 @@ def main():
 
         def obs_x(s, code, pa, pr, perm=None):
             h_ = hear(s, 0, perm)
+            orc = h_[:NL, :8]                              # the sector the speaker says, decoded (one-hot x heard; zero when silent)
             tk = code[jnp.arange(M), jnp.argmax(h_[:, :8], 1)]
             h_ = h_.at[:, :8].set(jax.nn.one_hot(tk, 8) * h_[:, 8:9])
             o = jnp.concatenate([env.observe(cfg, s)[NB:], h_], 1)[:NL]
-            return jnp.concatenate([o, jax.nn.one_hot(pa, 6), pr[:, None]], 1)
+            xo = jnp.concatenate([o, jax.nn.one_hot(pa, 6), pr[:, None]], 1)
+            return jnp.concatenate([xo, orc], 1) if a.oracle_input else xo   # Cam Nov 13: ORACLE-INPUT apparatus arm only
 
         def roll_r(rp, s, Hh, pa, pr, key, code, probe):
             def body(c, k):
@@ -503,14 +508,19 @@ def main():
         def ce(lg, y):
             return -jnp.take_along_axis(jax.nn.log_softmax(lg), y[..., None], -1)[..., 0]
 
-        def seq_loss(rp, x, h0, act, lp0, adv, ret, m, ym, mm, yo, mo, yv, mv):
-            def body(h, xx):
-                h2, lg, v, aux = rnet.apply(rp, h, xx); return h2, (lg, v, aux)
-            _, (lg, v, (am, ao, av)) = jax.lax.scan(body, h0, x)
+        def seq_lp(rp, x, h0, act, alv):
+            """Cam Nov 13 ratio-1: the training scan freezes the memory after a death exactly as the rollout does"""
+            def body(h, xa):
+                xx, al_ = xa; h2, lg, v, aux = rnet.apply(rp, h, xx)
+                return (jnp.where(al_ > 0, h2, h) if not a.unsafe_ratio else h2), (lg, v, aux)
+            return jax.lax.scan(body, h0, (x, alv))[1]
+
+        def seq_loss(rp, x, h0, act, lp0, adv, ret, m, ym, mm, yo, mo, yv, mv, alv):
+            lg, v, (am, ao, av) = seq_lp(rp, x, h0, act, alv)
             ls = jax.nn.log_softmax(lg); lp = jnp.take_along_axis(ls, act[:, None], 1)[:, 0]
             # Nov 13 NaN fix: after a death the rollout freezes the memory but this scan does not, so on masked steps
             # lp - lp0 can exceed 88 and exp overflows (inf * 0 mask = NaN, forward and backward). Clip the log-ratio.
-            ratio = jnp.exp(lp - lp0) if a.unsafe_ratio else jnp.exp(jnp.clip(lp - lp0, -20.0, 20.0))
+            ratio = jnp.exp(lp - lp0) if a.unsafe_ratio else jnp.exp(jnp.where(m > 0, jnp.clip(lp - lp0, -20.0, 20.0), 0.0))
             pg = -jnp.minimum(ratio * adv, jnp.clip(ratio, 0.8, 1.2) * adv)
             term = pg + 0.5 * (v - ret) ** 2 + 0.01 * (jnp.exp(ls) * ls).sum(-1)
             Lp = ((term * m) if a.unsafe_ratio else jnp.where(m > 0, term, 0.0)).sum() / (m.sum() + 1e-8)
@@ -526,7 +536,7 @@ def main():
         @jax.jit
         def upd(rp, ros, *b):
             def tot(q):
-                L, parts = jax.vmap(seq_loss, in_axes=(None,) + (0,) * 13)(q, *b); return L.mean(), parts
+                L, parts = jax.vmap(seq_loss, in_axes=(None,) + (0,) * 14)(q, *b); return L.mean(), parts
             (L, parts), g = jax.value_and_grad(tot, has_aux=True)(rp)
             g = {"params": {k_: (jax.tree_util.tree_map(jnp.zeros_like, v_) if k_ in FROZEN else v_) for k_, v_ in g["params"].items()}}
             u, ros = ropt.update(g, ros, rp); return optax.apply_updates(rp, u), ros, parts
@@ -893,17 +903,23 @@ def main():
             tok = jnp.argmax(x[..., 100:108], -1); sh_ = jax.random.randint(key, tok.shape, 1, 8); tok2 = (tok + sh_) % 8
             heard = x[..., 108] > 0.5
             x2 = x.at[..., 100:108].set(jnp.where(heard[..., None], jax.nn.one_hot(tok2, 8), x[..., 100:108]))
+            if a.oracle_input:                             # the oracle arm: the decoded sector is swapped too (a different message)
+                osec = jnp.argmax(x[..., -8:], -1); x2 = x2.at[..., -8:].set(jnp.where(heard[..., None], jax.nn.one_hot((osec + sh_) % 8, 8), x[..., -8:]))
             lgS = jax.vmap(jax.vmap(lambda h, xx: rnet.apply(rp, h, xx)[1]))(hp, x2)
             lT, lS = jax.nn.log_softmax(lgT), jax.nn.log_softmax(lgS); kl = (jnp.exp(lT) * (lT - lS)).sum(-1)
-            w_ = heard * (m > 0); return (kl * w_).sum() / (w_.sum() + 1e-8), w_.sum()
+            P_ = rp["params"]; tn = jnp.tanh(x[..., :100] @ P_["Dense_0"]["kernel"] + P_["Dense_0"]["bias"])   # the navigator's policy
+            lN = jax.nn.log_softmax(jnp.tanh(tn @ P_["Dense_1"]["kernel"] + P_["Dense_1"]["bias"]) @ P_["Dense_2"]["kernel"] + P_["Dense_2"]["bias"])
+            kn = (jnp.exp(lT) * (lT - lN)).sum(-1); lv = m > 0; wh = heard * lv; ws = (~heard) * lv
+            return ((kl * wh).sum() / (wh.sum() + 1e-8), wh.sum(), (kn * wh).sum() / (wh.sum() + 1e-8), (kn * ws).sum() / (ws.sum() + 1e-8))
         def token_influence(rp, b, key):
-            v_, n_ = _tinf(rp, b[0], b[1], b[6], key); return dict(kl=float(v_), heard_steps=int(n_))
+            v_, n_, kh_, ks_ = _tinf(rp, b[0], b[1], b[6], key)
+            return dict(kl=float(v_), heard_steps=int(n_), kl_nav_heard=float(kh_), kl_nav_silent=float(ks_))
 
         def grad_diag(rp, b, adv, ret, v, al, act):
             """Cam Nov 12 diagnosis: which loss moves the shared memory, how big the learned policy term is next to the
             navigator's, and what the policy now does"""
             def part(q, i):
-                _, P_ = jax.vmap(seq_loss, in_axes=(None,) + (0,) * 13)(q, *b); return P_[:, i].mean()
+                _, P_ = jax.vmap(seq_loss, in_axes=(None,) + (0,) * 14)(q, *b); return P_[:, i].mean()
             groups = {"shared_memory(side_enc+gru)": ("side_enc", "gru"), "side_head": ("side_head",), "side_value": ("side_value",),
                       "aux_heads": ("aux_meal", "aux_other", "aux_view")}
             gn = {}
@@ -1007,10 +1023,24 @@ def main():
             yv = np.concatenate([x[:, 1:, :, :49], x[:, -1:, :, :49]], 1); mv = np.concatenate([al[:, 1:] & al[:, :-1], np.zeros_like(al[:, :1])], 1)
             tr = lambda z: jnp.asarray(np.swapaxes(np.asarray(z), 1, 2).reshape((W * NL, T) + np.asarray(z).shape[3:]))  # noqa: E731
             b = (tr(x), jnp.asarray(np.asarray(H0).reshape(W * NL, Hd)), tr(act), tr(lp), tr(A_.astype(np.float32)), tr(ret.astype(np.float32)),
-                 tr(m), tr(ym), tr(mm.astype(np.float32)), tr(yo), tr(mo.astype(np.float32)), tr(yv.astype(np.float32)), tr(mv.astype(np.float32)))
+                 tr(m), tr(ym), tr(mm.astype(np.float32)), tr(yo), tr(mo.astype(np.float32)), tr(yv.astype(np.float32)), tr(mv.astype(np.float32)),
+                 tr(al.astype(np.float32)))
+            if a.ratio_check:                              # Cam Nov 13 (a) ratio-1 and (b) where do lp0 ~ -100 live steps come from
+                lgR = jax.jit(jax.vmap(lambda xx, hh, aa, vv: seq_lp(rp, xx, hh, aa, vv)[0]))(b[0], b[1], b[2], b[13])
+                lpR = np.asarray(jnp.take_along_axis(jax.nn.log_softmax(lgR), b[2][..., None], -1)[..., 0]); lp0_ = np.asarray(b[3])
+                liv = np.asarray(b[13]) > 0; dif = np.abs(lpR - lp0_); frc = np.asarray(tr(forced)).astype(bool)
+                low = liv & (lp0_ < -30)
+                out = dict(at_update=it, max_abs_diff_live=float(dif[liv].max()), max_abs_diff_masked=float(dif[~liv].max()) if (~liv).any() else None,
+                           max_abs_diff_all=float(dif.max()), pass_ratio1=bool(dif.max() < 1e-4),
+                           live_steps=int(liv.sum()), live_lp0_below_minus30=int(low.sum()), of_which_reflex_forced=int((low & frc).sum()),
+                           of_which_policy_sampled=int((low & ~frc).sum()), forced_share_of_live=float((liv & frc).sum() / max(liv.sum(), 1)),
+                           min_lp0_live_policy_sampled=float(lp0_[liv & ~frc].min()), min_lp0_live_forced=float(lp0_[liv & frc].min()) if (liv & frc).any() else None)
+                print("RATIO_CHECK", json.dumps(out), flush=True); json.dump(out, open(a.out, "w"), indent=1); return
             if a.grad_diag:
                 return grad_diag(rp, b, adv, ret, v, al, act)
             tinf = token_influence(rp, b, jax.random.fold_in(k, 99)) if (a.token_influence_every and it % a.token_influence_every == 0) else None
+            if a.debug_nan_at and int(a.debug_nan_at.split(",")[0]) <= it < sum(int(z) for z in a.debug_nan_at.split(",")):   # test only
+                b = b[:4] + (b[4] * jnp.nan,) + b[5:]
             if a.debug_poison_lp0:                         # test only: masked steps get an impossible old log-prob
                 b = b[:3] + (jnp.where(b[6] > 0, b[3], -200.0),) + b[4:]
             prev_ = (rp, ros)

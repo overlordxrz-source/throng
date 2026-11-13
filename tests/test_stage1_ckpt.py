@@ -17,7 +17,7 @@ def run(out, extra):
 
 
 @pytest.mark.skipif(not glob.glob(NAVS), reason="W2 navigators not found")
-@pytest.mark.parametrize("lever", [[], ["--kl-nav", "0.3", "--token-influence-every", "2"]], ids=["default", "kl_relaunch"])
+@pytest.mark.parametrize("lever", [[], ["--kl-nav", "0.3", "--token-influence-every", "2"], ["--kl-nav", "0.3", "--oracle-input", "--token-influence-every", "2"]], ids=["default", "kl_relaunch", "oracle_arm"])
 def test_stage1_resume_bit_identical(tmp_path, lever):
     t = str(tmp_path); ck = os.path.join(t, "s.ckpt")
     assert run(os.path.join(t, "A.json"), lever).returncode == 0
