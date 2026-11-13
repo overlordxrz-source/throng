@@ -13,7 +13,7 @@ from pathlib import Path
 import modal
 
 _REQUIREMENTS = str(Path(__file__).resolve().parents[1] / "requirements.txt")
-PINNED_SHA = "31cc8194f49a9ffbf30a750ee90333317effd4d5"  # comm-toy: ratio-1 fix, NaN guard, oracle arm
+PINNED_SHA = "1256389b75b8d89b774f3b80a8c13aa44444e881"  # comm-toy: D' (evolution on food) + E (hungry-adult oracle)
 REPO_URL = "https://github.com/overlordxrz-source/throng.git"
 VOLUME_MOUNT = "/mnt/throng-runs"
 OUTD = f"{VOLUME_MOUNT}/testbed/w2jobs"
@@ -79,6 +79,14 @@ PLANS = {
     # Cam Nov 12: the ONE allowed relaunch = the registered pilot + the screen's pick (c) KL 0.3 to the navigator;
     # readouts halved at 1e8 / 3e8 (32 worlds), full at 1e9 (64); token influence logged every 100 updates; $6 cap
     # Cam Nov 13: RELAUNCH of the GRU arm on the fixed code (ratio-1, NaN guard, fixed forage rule); same 3e8 conditional; cap $2.4
+    # Cam Nov 13 branch 3 (only if no A-C arm qualifies). Same screen readouts; 25M steps each.
+    "dprime": [("klsDp_evolve_food", [*_PILOT, "--oracle-input", "--updates", "1526", "--readout-at", "1.25e7,2.5e7", "--readout-worlds-at", "32,32",
+                                      "--readout-tests", "hungry_kept", "--readout-no-probe", "--ti-fixed", "--forage-worlds", "64", "--forage-updates", "200",
+                                      "--evolve", "--evolve-fitness", "food", "--evolve-budget", "25e6", "--evolve-sigma", "0.3"])],
+    "earm": [("klsE_hungry_adult", [*_PILOT, "--oracle-input", "--updates", "1526", "--readout-at", "1.25e7,2.5e7", "--readout-worlds-at", "32,32",
+                                    "--readout-tests", "hungry_kept", "--readout-no-probe", "--ti-fixed", "--token-influence-every", "100",
+                                    "--forage-stop", "--forage-worlds", "64", "--forage-updates", "200",
+                                    "--juvenile", "0", "--parent-leave", "0", "--start-energy", "0.3", "--kl-nav", "0.3"])],
     "s1kl03r": [("s1kl03r", [*_PILOT, "--kl-nav", "0.3", "--token-influence-every", "100", "--readout-worlds-at", "32,32,64",
                              "--forage-stop", "--forage-worlds", "64", "--forage-updates", "200"])],
     "s1kl03": [("s1kl03", [*_PILOT, "--kl-nav", "0.3", "--token-influence-every", "100", "--readout-worlds-at", "32,32,64",
