@@ -7595,6 +7595,19 @@ more expensive, because it produces publishable-looking nulls.
   wiped 0.007-0.083; head later 0.97-0.99). Seed 12 running. Screen 2 has >= 4 passes vs screen 1's 3, so by
   Cam's rule **the learner recipe is screen 2** (shared token embedding).
 
+- **RESULT (Nov 15 ~07:00): W2 LEARNER CHECK A2 (demonstrator): PASS.** `docs/data/learner_w2/A2/`.
+  - Setup: the scripted copy-the-parent agent with the demonstrator on first hearings, on the necessity keys
+    (gated, 0.1, 32 worlds x 3000 steps).
+  - It reaches the item on **100%** of demonstrated bouts: mixed d 1-12 (2380 bouts), fixed d = 12 (2436), d 1-22
+    (2335).
+  - Negative control: an untrained agent with the parent present reaches 0.2% (3727 bouts).
+  - So the parent always shows the way, and following it is enough.
+- **PREDICTION (before A1):**
+  - Setup: the scripted true-code follower drives, and only the head's loss trains (the screen-2 recipe agent:
+    `--shared-tok`, weight 0.5); 4M steps; then the evaluation on the necessity keys with the follower driving.
+  - Prediction: head accuracy on 2nd+ hearings >= 90% (p 0.6). The 1st hearing and the shuffled-code mode stay
+    near 1/8 (p 0.9).
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
