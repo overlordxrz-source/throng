@@ -8128,6 +8128,17 @@ more expensive, because it produces publishable-looking nulls.
 - **LAUNCH (Nov 15 13:44): W2 LEARNER SEED 1** (final recipe; the queue started after the twin's evaluation had
   landed at 13:38). Seeds 2-3 follow by the 2-of-3 rule.
 
+- **CAM (Nov 15 ~14:25):** twin, checks and predictions accepted.
+  - Readout without a second round: a checkpoint every 1e7 steps per seed. Per seed: the bar; the frontier curve;
+    head on 2nd+ hearings vs cumulative hearings at d = 3 and 12; the pilot-style table at d = 4 / 6 / 8 / 12.
+  - If the 2-of-3 fails, the same table for the oracle redo.
+  - **Implemented:**
+    - `learner3/snap.py` copies each seed's checkpoint at every 1e7 mark (file name = exact steps).
+    - **Disclosed:** seed 1 had already passed 1e7 when the watcher started, so its 1e7 mark is MISSED. Its first
+      kept snapshot is at 24.4M (labelled the 2e7 mark).
+    - The readout tool is `w2/learner_w2_diag2.py`, a copy of the final learner with the pilot splits plus
+      hungry-bout variants.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
