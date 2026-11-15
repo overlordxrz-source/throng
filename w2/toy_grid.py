@@ -129,6 +129,7 @@ def main():
     ap.add_argument("--eval-modes", default="0,3,4", help="0 true, 1 always-wrong sector, 2 silence, 3 within-life shuffled code (T3), 4 memory wiped each episode")
     ap.add_argument("--life-credit", action="store_true", help="T3 DIAGNOSTIC (Will): RL^2-style credit - GAE terminal only at life end (episode ends are not terminal), so success in later episodes credits what the memory stored earlier")
     ap.add_argument("--hindsight", type=float, default=0.0, help="Cam T3 round 2: weight of the hindsight next-meal head loss (0 = no head)")
+    ap.add_argument("--save-params-at", default="", help="DIAGNOSIS: also save weights at these step counts (and when the frontier first reaches 5)")
     ap.add_argument("--hind-at-start", action="store_true", help="train the hindsight head ONLY at each episode's first step (on hearing, before moving): mid-episode self-motion gives the sector away")
     ap.add_argument("--head-control", action="store_true", help="POSITIVE CONTROL for the head: the scripted ray-walker (true sector) acts; only the hindsight head is trained (supervised)")
     ap.add_argument("--demonstrator", action="store_true", help="Cam T3 round 2 arm B: a visible scripted parent walks to the food on the FIRST hearing of each token in a life")
@@ -254,7 +255,7 @@ def main():
             tok_now = code[jnp.arange(B), osec]
             base, hear, _ = obs(st["pos"], st["fpos"], st["alive_f"], st["E"], st["t"], osec, code, m, (st["dem_pos"], st["dem_on"]))
             x = build_x(base, hear, osec, st["pa"], st["pr"], m)
-            hl = jnp.zeros((B, 8))
+            hl = jnp.zeros((B, 8)); ent = jnp.zeros(B)
             if net is None and a.learner == "ideal":
                 act, h2 = ideal_act(st, h, code, osec, base); lp = jnp.zeros(B); v = jnp.zeros(B)
             elif net is None:
@@ -265,6 +266,7 @@ def main():
                     act = scripted_act(st["pos"], st["fpos"], osec, base)
                 lp = jnp.take_along_axis(jax.nn.log_softmax(lg), act[:, None], 1)[:, 0]
                 hl = hl_ if hl_ is not None else hl
+                lsm = jax.nn.log_softmax(lg); ent = -(jnp.exp(lsm) * lsm).sum(-1)
             st2, r, done, ate = env_step(st, act)
             if a.demonstrator:                                       # the demonstrator steps toward the food (stops on it)
                 dd_ = torus(st["fpos"] - st["dem_pos"])
@@ -302,7 +304,7 @@ def main():
             reset = (newlife if a.tier == "T3" else done).astype(jnp.float32)      # when the rollout wiped the memory
             first_now = ~jnp.take_along_axis(st["seen"], tok_now[:, None], 1)[:, 0]
             return (st3, h3, code2, ep3), (x, act, lp, v, r, done.astype(jnp.float32), ate, h, reset, ep_in_life,
-                                           st["sec"], hl, first_now, (st["t"] == 0))
+                                           st["sec"], hl, first_now, (st["t"] == 0), ent)
         return jax.lax.scan(body, carry, jax.random.split(key, T))
     roll = jax.jit(rollout, static_argnums=(3, 5))
 
@@ -422,7 +424,8 @@ def main():
             rng.bit_generator.state = Ck["rng"]; print(f"resumed at {steps:,} steps, d {d_cur}", flush=True)
         else:
             out["eval_init"] = ({m_: evaluate(p, i, 777) for i, m_ in enumerate(("true", "shuffled", "silence"))} if a.tier != "T3" else None)
-        t_start = time.time()
+        t_start = time.time(); SAVE_AT = [float(z) for z in a.save_params_at.split(",")] if a.save_params_at else []
+        ep_first = np.zeros(B, bool); fm = [0, 0]; saved_d5 = any(c_.get("d", 0) >= 5 for c_ in out["curve"])
         while steps < a.steps:
             if a.ckpt and it % a.ckpt_every == 0 and it > 0:
                 _ck.save(a.ckpt, dict(p=p, ost=ost, c=c, key=key, steps=steps, it=it, d_cur=d_cur, recent=recent, curve=out["curve"],
@@ -457,13 +460,28 @@ def main():
                 for mb in np.array_split(perm, a.minibatches):
                     p, ost = upd(p, ost, {k_: v_[mb] for k_, v_ in bt.items()})
             steps += B * T; it += 1
+            if a.save_params_at:                                      # DIAGNOSIS: first-hearing meal rate; milestone weight saves
+                fn_r, t0_r = np.asarray(R_[12]), np.asarray(R_[13])
+                for t_ in range(T):
+                    ep_first = np.where(t0_r[t_], fn_r[t_], ep_first)
+                    dd_ = dn[t_] > 0; fm[0] += int((ep_first & dd_ & ate[t_]).sum()); fm[1] += int((ep_first & dd_).sum())
+                while SAVE_AT and steps >= SAVE_AT[0]:
+                    open(f"{a.save_params}.at{SAVE_AT[0]:.0e}", "wb").write(flax.serialization.to_bytes(p)); SAVE_AT.pop(0)
+                if not saved_d5 and d_cur >= 5:
+                    open(f"{a.save_params}.d5", "wb").write(flax.serialization.to_bytes(p)); saved_d5 = True; out["d5_at_steps"] = steps
             if a.curriculum:                                                        # episodes that ended this rollout, at the current d
                 recent.extend((ate[dn > 0]).astype(int).tolist()); recent = recent[-500:]
                 if len(recent) >= 500 and np.mean(recent) >= 0.8 and d_cur < a.d_max:
                     d_cur += 1; recent = []
             if it % a.curve_every == 0:
                 actf = np.bincount(act.reshape(-1), minlength=6) / act.size; at = np.swapaxes(act, 0, 1)
-                out["curve"].append(dict(steps=steps, d=d_cur, reach_train=float(ate.sum() / max(dn.sum(), 1)), sec=round(time.time() - t0, 1),
+                diag = {}
+                if a.save_params_at:
+                    hl_r, sc_r, fn_r, t0_r, en_r = np.asarray(R_[11]), np.asarray(R_[10]), np.asarray(R_[12]), np.asarray(R_[13]), np.asarray(R_[14])
+                    okh = hl_r.argmax(-1) == sc_r; lat = t0_r & ~fn_r; fst = t0_r & fn_r
+                    diag = dict(head_acc_later=float(okh[lat].mean()) if lat.any() else None, head_acc_first=float(okh[fst].mean()) if fst.any() else None,
+                                entropy=float(en_r.mean()), first_hearing_meal_rate=(fm[0] / fm[1]) if fm[1] else None); fm = [0, 0]
+                out["curve"].append(dict(steps=steps, d=d_cur, reach_train=float(ate.sum() / max(dn.sum(), 1)), sec=round(time.time() - t0, 1), **diag,
                                          act_freq=[round(float(q), 3) for q in actf], adv_by_act=[round(float(adv[at == k].mean()), 3) if (at == k).any() else None for k in range(6)],
                                          ret_mean=round(float(ret.mean()), 3), r_eat=round(float(r[ate].mean()), 3) if ate.any() else None))
         out["train_seconds"] = round(time.time() - t0, 1)
