@@ -14,7 +14,7 @@ from pathlib import Path
 import modal
 
 _REQUIREMENTS = str(Path(__file__).resolve().parents[1] / "requirements.txt")
-PINNED_SHA = "29a8ecb26834d039e1bca4d9aa124ec6abe24f4e"  # comm-toy: deaf twin (frontier-schedule replay)
+PINNED_SHA = "120ccc8711ec8f31b113c9905becbd0716d19e72"  # comm-toy: W2 learner (learner_w2.py, ep_agent.py)
 REPO_URL = "https://github.com/overlordxrz-source/throng.git"
 VOLUME_MOUNT = "/mnt/throng-runs"
 OUTD = f"{VOLUME_MOUNT}/testbed/w2jobs"
@@ -103,6 +103,9 @@ PLANS = {
     # Cam Nov 15 ~05:50: the DEAF TWIN = oracle #2's recipe, oracle input zeroed in training, oracle #2's frontier replayed. cap $0.4, watch $0.50.
     "twin_w2": [("twin_w2", ["w2/port_w2.py", "--hunger-gate", "--item-size", "0.1", "--W", "32", "--steps", "3e7",
                              "--frontier-schedule", f"{OUTD}/oracle2_w2_3687a6a", "--save-params", f"{OUTD}/twin_w2.params"])],
+    # Cam Nov 15 ~08:15: the 2-minute Modal price probe of the W2 learner at 64 slots (~$0.02), its own app (W2_APP=throng-w2learn-probe).
+    "learnprobe": [("learnprobe", ["w2/learner_w2.py", "--learner", "ep", "--shared-tok", "--hindsight", "0.5", "--demonstrator", "--hunger-gate",
+                                   "--item-size", "0.1", "--W", "32", "--slots", "64", "--steps", "2e6", "--curve-every", "5", "--max-seconds", "120"])],
     "dprime": [("klsDp_evolve_food", [*_PILOT, "--oracle-input", "--updates", "1526", "--readout-at", "1.25e7,2.5e7", "--readout-worlds-at", "32,32",
                                       "--readout-tests", "hungry_kept", "--readout-no-probe", "--ti-fixed", "--forage-worlds", "64", "--forage-updates", "200",
                                       "--evolve", "--evolve-fitness", "food", "--evolve-budget", "25e6", "--evolve-sigma", "0.3"])],

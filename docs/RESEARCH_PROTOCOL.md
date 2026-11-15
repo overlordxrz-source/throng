@@ -7654,6 +7654,25 @@ more expensive, because it produces publishable-looking nulls.
     learner seeds at $0.8 would cross it. Cam's budget lines count against the $41 guard. **Which applies needs M's
     word before any learner spend.**
 
+- **CAM RULINGS (Nov 15 ~08:15): LEARNER GO, conditional.**
+  - Records: twin PASS, so necessity is settled for this world. Screen 2 is the recipe. (b) FAIL. A1-A3 PASS.
+  - **Slots: 64 APPROVED,** after a free check of the MAX records per life in oracle #2's eval lives:
+    - overwrite the oldest record first (the ring already does) and report the overwritten fraction;
+    - the check BLOCKS the launch only if > 5% of lives overflow.
+  - **Budget: the $37.0 hard ceiling is RETIRED** (it was Cam's, for the Nov 13 window). The limit is the guard at
+    $41 (M, Nov 9).
+  - **Learner: APPROVED.** First a 2-minute Modal probe at 64 slots. 5e7 steps per seed if the probe projects
+    <= $0.9 per seed; the cap is the projection, with its own watch at cap x 1.25. Three seeds, one app each, in
+    parallel. Bar, PASS rule and early stop as registered. Predictions before launch.
+- **RESULT (Nov 15 ~08:25): SLOT CHECK: BLOCKS the 64-slot launch by Cam's rule.**
+  - Records per life (one per closed bout) in oracle #2's eval lives (necessity keys, 32 worlds x 4 agents x 3000
+    steps):
+    - mixed d 1-12: max **90**; lives over 64: **17 / 128 = 13.3%**; records overwritten 1.7%;
+    - fixed d = 12: max **99**; lives over 64: **7 / 131 = 5.3%**; records overwritten 2.9%.
+  - The mean is ~36 per life (as reported), but the tail is long: agents that are often hungry hear often.
+  - 128 slots hold every life seen (max 99).
+  - Running the approved 2-minute Modal probe anyway (~$0.02): its price decides the alternatives (96 or 128 slots).
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
