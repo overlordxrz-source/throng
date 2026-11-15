@@ -13,7 +13,7 @@ from pathlib import Path
 import modal
 
 _REQUIREMENTS = str(Path(__file__).resolve().parents[1] / "requirements.txt")
-PINNED_SHA = "3687a6af5339a6d9c10dfe07338871a05efd7bcd"  # comm-toy: hunger-gated named-item world (oracle #2)
+PINNED_SHA = "29a8ecb26834d039e1bca4d9aa124ec6abe24f4e"  # comm-toy: deaf twin (frontier-schedule replay)
 REPO_URL = "https://github.com/overlordxrz-source/throng.git"
 VOLUME_MOUNT = "/mnt/throng-runs"
 OUTD = f"{VOLUME_MOUNT}/testbed/w2jobs"
@@ -99,6 +99,9 @@ PLANS = {
     # Cam Nov 15 ~03:55: ORACLE #2 in the hunger-gated world (item size 0.1 from the sweep), approved once (i)-(iii) pass. cap $0.8, own watch $1.00.
     "oracle2_w2": [("oracle2_w2", ["w2/port_w2.py", "--oracle", "--hunger-gate", "--item-size", "0.1", "--W", "32", "--steps", "3e7",
                                    "--save-params", f"{OUTD}/oracle2_w2.params"])],
+    # Cam Nov 15 ~05:50: the DEAF TWIN = oracle #2's recipe, oracle input zeroed in training, oracle #2's frontier replayed. cap $0.4, watch $0.50.
+    "twin_w2": [("twin_w2", ["w2/port_w2.py", "--hunger-gate", "--item-size", "0.1", "--W", "32", "--steps", "3e7",
+                             "--frontier-schedule", f"{OUTD}/oracle2_w2_3687a6a", "--save-params", f"{OUTD}/twin_w2.params"])],
     "dprime": [("klsDp_evolve_food", [*_PILOT, "--oracle-input", "--updates", "1526", "--readout-at", "1.25e7,2.5e7", "--readout-worlds-at", "32,32",
                                       "--readout-tests", "hungry_kept", "--readout-no-probe", "--ti-fixed", "--forage-worlds", "64", "--forage-updates", "200",
                                       "--evolve", "--evolve-fitness", "food", "--evolve-budget", "25e6", "--evolve-sigma", "0.3"])],

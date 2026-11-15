@@ -7503,6 +7503,21 @@ more expensive, because it produces publishable-looking nulls.
     - EARLY STOP: frontier not past 5 by half the steps -> stopped, counted as FAIL.
     - PRE-APPROVED once the twin PASSES, A1-A4 pass, and the recipe is picked after screen 2.
 
+- **REGISTERED (Nov 15 ~06:05, before launch): DEAF TWIN** (`twin_w2`, comm-toy 29a8ecb).
+  - Design: oracle #2's exact command without `--oracle` (the oracle slot is zero in training and in evaluation) and
+    the same init seed.
+  - Frontier: replayed from oracle #2's logged curve via `--frontier-schedule`. It uses the latest logged value at
+    or before each step, so it lags oracle #2's by <= 20 iterations (164k steps). The lag gives the twin closer items,
+    so the deviation favours the twin.
+  - Tests: the schedule replay matches the log with that lag. The twin evaluation reproduces oracle #2's registered
+    numbers exactly.
+  - **Bar** (necessity lives / keys: gated, 0.1, mixed d 1-12, 32 worlds x 3000, seed 0): oracle #2 mean lifespan
+    >= 1.5x the twin's, AND the 2.5% bootstrap LB >= 1.2x. Worlds are resampled; their lives are paired by key.
+  - Also reported: paid per life / per step and reach by distance 1..22 (a separate eval with d-max 22).
+  - **Caveat:** oracle #2 lives the whole 3000-step horizon, so the ratio is capped at 3000 / twin life. The twin
+    passes for Cam's purpose only if it lives <= 2000 steps on average.
+  - Predictions: the twin's mean life ~1200-2000 (the deafened oracle #2 net: 1013); **bar PASS p 0.55.**
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
