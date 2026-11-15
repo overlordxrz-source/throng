@@ -8020,6 +8020,25 @@ more expensive, because it produces publishable-looking nulls.
   - So the range decay is a real skill gap, aggravated by a gate that advanced the curriculum before mastery.
   - Reported for Cam's ruling; nothing run.
 
+- **CAM RULINGS (Nov 15 ~12:20):**
+  - The gate defect is accepted. Every W2 frontier so far was inflated (oracles #1-2, the twin's replayed schedule,
+    the pilot). The toy results stand (their bars were evaluations).
+  - **NEW GATE, registered for every W2 run from here:**
+    - score = HUNGRY-BOUT REACH (E < H until eaten or T_max; sated bouts count neither way);
+    - advance only when TWO CONSECUTIVE NON-OVERLAPPING windows of 2,000 closed hungry bouts each score >= 0.80.
+  - **STANDING RULE, upgraded:** every gate is validated with a POSITIVE control (the follower reaches the cap) AND
+    a NEGATIVE control (a follower that gives up at random on 30% of bouts, ~0.70 true reach, must never advance).
+  - **ORACLE REDO** (laptop): oracle #2's recipe + the new gate; 3e7 steps; predictions first.
+    - The learner's bar distance D = the highest frontier the oracle masters, capped at 12.
+    - D < 6 -> stop and report.
+    - More than ~1.5e7 steps to reach D -> tell Cam before the learner.
+  - **TWIN REDO** (laptop): oracle input zeroed, frontier replayed from the new oracle.
+  - **LEARNER:** learner_w2_kv.py --head-own-meal + the waiting parent + the new gate; 5e7 steps.
+    - Before it: A2 with the waiting parent, an A5 re-audit, predictions.
+    - Bar at d = D hidden on 2nd-half hungry-bout reach (>= 0.9x the new oracle's at D, >= shuffled + 30, >= 2x
+      shuffled); life >= 1.3x the new twin's, LB > 1.0x.
+    - Early stop: frontier not past D/2 by 2.5e7. Seeds 1-3 sequential 2-of-3.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
