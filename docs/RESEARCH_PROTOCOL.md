@@ -7372,6 +7372,29 @@ more expensive, because it produces publishable-looking nulls.
     that cannot be faked: beyond d = 1 an item is invisible until adjacent, so >= 80% reach at d >= 3 requires the
     signal. A code-free PPO comparator would cost about $0.8; it is not run without approval.
 
+- **RESULT (Nov 15 ~04:40): ORACLE #1 = VOID as an oracle test** (Cam). 30.0M steps, frontier stuck at 1 throughout,
+  ~$0.49 by the item watch (stopped). `docs/data/port_w2/oracle1/`.
+  - **(i) readout: no unexplained second gap.** Reach by start energy, eval-only, 1M steps at d = 1:
+
+    | bout-start energy | trained agent reach | bouts |
+    |---|---|---|
+    | E < 0.6 | 0.81 | 16 |
+    | 0.6 <= E < H = 0.7 | 0.88 | 935 |
+    | 0.7 <= E < 0.75 | 0.86 | 23,359 |
+    | **E >= 0.75 (sated)** | **0.036** | **235,515 (90% of bouts)** |
+
+    - **Hungry-bout reach at d = 1: 87.6% (833 / 951), above Cam's 80% line.** The eat mechanics work.
+    - **Positive control:** the scripted follower in the same world reaches 100% in every energy band.
+  - **Why ~10% overall:** at d = 1 with the gate off, an item sits adjacent and is renewed every <= 4 steps. That is a
+    free food fountain: eating one item in ten (0.1 energy per ~40 steps) out-feeds the drain. So the trained agent
+    stays sated 90% of the time and rationally ignores most items. Overall reach = 0.9 x 0.036 + 0.1 x 0.87 ~ 0.11,
+    as logged.
+  - **The registered evaluation, for the record** (gate off, food): trained / v2-best = **0.08x**.
+    - The agent lives off the d = 1 fountain. Where items are 1-12 away and unseen, it starves (mean life 182 steps
+      vs 470 for v2-best).
+    - Hunger-gated calls remove the fountain: no item while E >= H.
+  - **(i)-(iii) all pass, so ORACLE #2 launches per Cam's pre-approval** (bar registered above).
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under

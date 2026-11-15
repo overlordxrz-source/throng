@@ -1,0 +1,86 @@
+{
+ "cfg": {
+  "navs": "w2_out/nav_w13/*.msgpack",
+  "world": "0.0013,8,0.001",
+  "W": 32,
+  "N": 4,
+  "T": 64,
+  "steps": 1000000.0,
+  "oracle": true,
+  "seed": 0,
+  "epochs": 4,
+  "minibatches": 8,
+  "lr": 0.0003,
+  "d_max": 24,
+  "curve_every": 50,
+  "ckpt": "",
+  "max_seconds": 0,
+  "save_params": "",
+  "item_size": 0.1,
+  "hunger_gate": false,
+  "policy": "learner",
+  "v2": "/Users/overlord/throng-backup/evo2/evo2.ckpt",
+  "init_params": "/Users/overlord/throng-backup/oracle_w2/oracle_w2.params",
+  "eval_only": true,
+  "frontier0": 1.0,
+  "out": "/private/tmp/claude-501/-Users-overlord-CascadeProjects-throng/aad77c1d-d7ac-437e-bef4-aa525802ccc0/scratchpad/port/o1read/trained_d1.json"
+ },
+ "steps": 1007616,
+ "frontier": 1.0,
+ "curve": [
+  {
+   "steps": 409600,
+   "frontier": 1.0,
+   "item_reach": 0.11184521000471921,
+   "food_per_step": 0.0028941365890204906,
+   "paid_per_step": 0.0017907992005348206,
+   "frac_in_bout": 1.0,
+   "sec": 10.7
+  },
+  {
+   "steps": 819200,
+   "frontier": 1.0,
+   "item_reach": 0.10863377609108159,
+   "food_per_step": 0.002798992907628417,
+   "paid_per_step": 0.0017284457571804523,
+   "frac_in_bout": 1.0,
+   "sec": 16.6
+  }
+ ],
+ "reach_by_start_energy": {
+  "E<0.6 d=1": {
+   "reach": 0.8125,
+   "bouts": 16
+  },
+  "E<0.6 all": {
+   "reach": 0.8125,
+   "bouts": 16
+  },
+  "0.6<=E<H d=1": {
+   "reach": 0.8770053386688232,
+   "bouts": 935
+  },
+  "0.6<=E<H all": {
+   "reach": 0.8770053386688232,
+   "bouts": 935
+  },
+  "H<=E<0.75 d=1": {
+   "reach": 0.8611670136451721,
+   "bouts": 23359
+  },
+  "H<=E<0.75 all": {
+   "reach": 0.8611670136451721,
+   "bouts": 23359
+  },
+  "E>=0.75 d=1": {
+   "reach": 0.03601044416427612,
+   "bouts": 235515
+  },
+  "E>=0.75 all": {
+   "reach": 0.03601044416427612,
+   "bouts": 235515
+  }
+ },
+ "train_seconds": 19.4,
+ "throughput": 51842.9507726686
+}
