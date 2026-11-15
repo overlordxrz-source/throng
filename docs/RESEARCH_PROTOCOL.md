@@ -7530,6 +7530,40 @@ more expensive, because it produces publishable-looking nulls.
     - seeds 2 and 5 (stalled) are token-blind, < 2x chance (p 0.6);
     - therefore the SWAP to a shared token embedding (p 0.5).
 
+- **RESULT (Nov 15 06:10): ABLATION (b) GRU + head + demonstrator: FAIL. The episodic memory is needed.**
+  - Seed 0, 20M: frontier stalled at 4. At d = 12 the second half is true 0.015, shuffled 0.013, wiped 0.016; the
+    head on later hearings 0.12 (chance). My prediction: FAIL, p 0.75.
+  - `docs/data/toy_grid/T3_round2/ablations/b_gru/`.
+- **RESULT (Nov 15 ~06:15): ATTENTION CHECK.**
+  - Setup: final weights; eval mode 0 at d = 5, 3000 episodes; hearing steps of 2nd+ hearings with >= 2 records.
+    Script and evals in `docs/data/toy_grid/T3_round2/attention_check/`.
+
+    | seed | outcome | same-token mass / chance | most-recent mass / chance | control: a random OTHER token |
+    |---|---|---|---|---|
+    | 0 | took off | 1.000 / 0.205 = **4.88x** | 0.143 / 0.140 = 1.02x | 0.44x |
+    | 1 | took off | 1.000 / 0.200 = **5.00x** | 0.137 / 0.135 = 1.02x | 0.45x |
+    | 2 | stalled | 0.003 / 0.216 = **0.01x** | 0.134 / 0.148 = 0.91x | 1.17x |
+    | 5 | stalled | 0.004 / 0.214 = **0.02x** | 0.147 / 0.149 = 0.98x | 1.16x |
+
+  - **The take-off seeds attend only to same-token records.**
+  - **The stalled seeds AVOID them:** the opposite of token-matching, not just blind. The query-key mapping
+    settled with the wrong sign, a local optimum where the read pulls the other tokens' records (useless or
+    misleading).
+  - No seed shows a recency bias.
+  - Below Cam's 2x line, so **SWAP mitigation 2 for the SHARED TOKEN EMBEDDING.**
+  - Predictions scored: take-off seeds >= 3x (p 0.75) HIT; stalled seeds < 2x (p 0.6) HIT; swap (p 0.5) HIT.
+    Honest note: I predicted "blind", but the stalled seeds are anti-matched.
+- **REGISTERED (Nov 15 ~06:15, before launch): SCREEN 2 = SHARED TOKEN EMBEDDING.**
+  - Flag `--shared-tok`, comm-toy dfddd34. The query is [E(heard token), Wq z] and the keys are
+    [E(record token), Wk record], with one shared E (8 -> 16, no bias).
+  - Tests:
+    - flag off reproduces the original curve (18/18 points);
+    - at init the same-token attention is 1.21-1.25x chance over 5 init seeds vs 1.00x without. A weak prior, but
+      it cannot settle anti-matched without the learned half overriding it.
+  - Design: L2e + head 0.5 at the hearing + the demonstrator on the 1st hearing + mixed curriculum + harness cost,
+    `--shared-tok`; seeds 8-12; 20M; no early stops; the T3 bar at d = 12; take-off reported separately.
+  - Predictions: take-offs 5/5 p 0.35, >= 4/5 p 0.7; bar passes 5/5 p 0.2, 4/5 p 0.35, <= 3/5 p 0.45.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
