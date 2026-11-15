@@ -100,7 +100,7 @@ def main():
         tok = code[jnp.arange(N), item["sec"]]; oh = jax.nn.one_hot(tok, 8).astype(jnp.int32) * opened[:, None]
         dem_on = opened & a.demonstrator & (jnp.zeros(N, jnp.int32) < K)
         return dict(s=s, item=item, h=jnp.zeros((N, Hd)), pa=jnp.zeros(N, jnp.int32), pr=jnp.zeros(N), code=code,
-                    dem_pos=s.pos, dem_on=dem_on, hcnt=oh, gen=jnp.zeros(N, bool), lost=jnp.zeros(N, bool), hok=jnp.zeros(N, bool))
+                    dem_pos=s.pos, dem_on=dem_on, hcnt=oh, gen=jnp.zeros(N, bool), lost=jnp.zeros(N, bool), hok=jnp.zeros(N, bool), sat=jnp.zeros(N, bool))
 
     def step(pp_, c, k, dfront, mode):
         s, item, h, pa, pr, code = c["s"], c["item"], c["h"], c["pa"], c["pr"], c["code"]
@@ -150,15 +150,17 @@ def main():
         dem_mv, _ = NI.step_toward(c["dem_pos"], item["pos"], L)
         dem_pos = jnp.where(opened[:, None], s3.pos, jnp.where(c["dem_on"][:, None], dem_mv, c["dem_pos"]))
         gen_now = c["gen"] | (item["act"] & (info["take"] > 0))               # generic (world) food eaten during this bout
+        sat_now = c["sat"] | (item["act"] & (s.energy >= H))                 # DIAG: energy reached H during this bout (before this step's item energy)
         doff = NI.torus(c["dem_pos"] - s.pos, L); inview = jnp.abs(doff).max(-1) <= NI.R
         lost_now = c["lost"] | (c["dem_on"] & item["act"] & ~inview)          # DIAG: the parent left the 7x7 view during this bout
         hok_now = jnp.where(hear_now, hl.argmax(-1) == item["sec"], c["hok"])  # DIAG: the head's top sector at the hearing was right
         gen2 = jnp.where(opened | closed, False, gen_now)
         c2 = dict(s=s3, item=item2, h=h3, pa=act, pr=r, code=code2, dem_pos=dem_pos, dem_on=dem_on, hcnt=hcnt, gen=gen2,
-                  lost=jnp.where(opened | closed, False, lost_now), hok=jnp.where(opened | closed, False, hok_now))
+                  lost=jnp.where(opened | closed, False, lost_now), hok=jnp.where(opened | closed, False, hok_now),
+                  sat=jnp.where(opened | closed, False, sat_now))
         info_ = dict(x=x, act=act, lp=lp, v=v, r=r, dead=dead.astype(jnp.float32), h=h, ate=on_item & ~dead, closed=closed & ~dead, gain=gain, pd=pd,
                      es=item["es"], d=item["d"], inb=item["act"], dem=c["dem_on"] & item["act"], hear=hear_now, first=first_hear, sec=item["sec"], hl=hl, age=age_close, alive=s.alive,
-                     wflag=wflag, wslot=wslot, wrec=wrec, cl_item=closed & on_item, cl_death=closed & dead, cl_tmax=closed & ~on_item & ~dead, gen=gen_now, lost=lost_now, hok=hok_now)
+                     wflag=wflag, wslot=wslot, wrec=wrec, cl_item=closed & on_item, cl_death=closed & dead, cl_tmax=closed & ~on_item & ~dead, gen=gen_now, lost=lost_now, hok=hok_now, sat=sat_now, Eend=s.energy)
         return c2, info_
 
     def rollout_world(pp_, c, key, dfront):
@@ -239,6 +241,9 @@ def main():
                     for dn_, dm_ in (("all", jnp.ones(N, bool)), ("dem", f["dem"])):
                         A = dict(A, **{f"c_{nm_}_{dn_}": A[f"c_{nm_}_{dn_}"] + (m_ & dm_).sum(), f"g_{nm_}_{dn_}": A[f"g_{nm_}_{dn_}"] + (m_ & dm_ & f["gen"]).sum()})
                 endb = f["cl_item"] | f["cl_tmax"] | f["cl_death"]; late = ~f["dem"]
+                A = dict(A, tm_n=A["tm_n"] + f["cl_tmax"].sum(), tm_sat=A["tm_sat"] + (f["cl_tmax"] & f["sat"]).sum(), tm_E=A["tm_E"] + (f["Eend"] * f["cl_tmax"]).sum(),
+                         hb_n=A["hb_n"] + (endb & ~f["sat"] & ~f["cl_death"]).sum(), hb_i=A["hb_i"] + (f["cl_item"] & ~f["sat"]).sum(),
+                         it_sat=A["it_sat"] + (f["cl_item"] & f["sat"]).sum())
                 for nm_, m_ in (("dem_kept", f["dem"] & ~f["lost"]), ("dem_lost", f["dem"] & f["lost"]), ("late_hok", late & f["hok"]), ("late_hbad", late & ~f["hok"])):
                     A = dict(A, **{f"n_{nm_}": A[f"n_{nm_}"] + (endb & m_).sum(), f"i_{nm_}": A[f"i_{nm_}"] + (f["cl_item"] & m_).sum(),
                                    f"t_{nm_}": A[f"t_{nm_}"] + (f["cl_tmax"] & m_).sum(), f"d_{nm_}": A[f"d_{nm_}"] + (f["cl_death"] & m_).sum()})
@@ -248,7 +253,7 @@ def main():
                          cnt=jnp.where(end, 0.0, cnt))
                 return (c2, A), None
             z = jnp.float32(0.0)
-            A0 = dict(**{f"{p_}_{n_}": z for p_ in ("n", "i", "t", "d") for n_ in ("dem_kept", "dem_lost", "late_hok", "late_hbad")}, **{f"{p_}_{n_}_{d_}": z for p_ in ("c", "g") for n_ in ("item", "tmax", "death") for d_ in ("all", "dem")}, alive=z, deaths=z, oldage=z, ateD=z, closedD=z, cnt=jnp.zeros(N), mx=z, ovf=z, over=z, recs=z, paid=z, ate=z, closed=z, ate2=z, closed2=z, h1=z, n1=z, hL=z, nL=z, cd=jnp.zeros(25), ad=jnp.zeros(25))
+            A0 = dict(tm_n=z, tm_sat=z, tm_E=z, hb_n=z, hb_i=z, it_sat=z, **{f"{p_}_{n_}": z for p_ in ("n", "i", "t", "d") for n_ in ("dem_kept", "dem_lost", "late_hok", "late_hbad")}, **{f"{p_}_{n_}_{d_}": z for p_ in ("c", "g") for n_ in ("item", "tmax", "death") for d_ in ("all", "dem")}, alive=z, deaths=z, oldage=z, ateD=z, closedD=z, cnt=jnp.zeros(N), mx=z, ovf=z, over=z, recs=z, paid=z, ate=z, closed=z, ate2=z, closed2=z, h1=z, n1=z, hL=z, nL=z, cd=jnp.zeros(25), ad=jnp.zeros(25))
             (cF, A), _ = jax.lax.scan(body, (c, A0), jax.random.split(jax.random.fold_in(key, 2), a.eval_steps))
             cnt = A["cnt"]                                                   # lives still open at the end of the horizon
             A = dict(A, ovf=A["ovf"] + (cnt > a.slots).sum(), over=A["over"] + jnp.maximum(cnt - a.slots, 0.0).sum(), recs=A["recs"] + cnt.sum())
@@ -262,6 +267,8 @@ def main():
             res = dict(mean_life_steps=float(tot["alive"] / lives), lives=float(lives), deaths=float(tot["deaths"]), paid_per_life=float(tot["paid"] / lives),
                        paid_per_step=float(tot["paid"] / tot["alive"]), item_reach=float(tot["ate"] / max(tot["closed"], 1)),
                        reach_2nd_half=float(tot["ate2"] / max(tot["closed2"], 1)),
+                       satiation=dict(tmax_bouts=float(tot["tm_n"]), tmax_frac_reached_H=float(tot["tm_sat"] / max(tot["tm_n"], 1)), tmax_mean_E_at_timeout=float(tot["tm_E"] / max(tot["tm_n"], 1)),
+                                      item_bouts_reached_H_first=float(tot["it_sat"]), hungry_bouts=float(tot["hb_n"]), hungry_bout_reach=float(tot["hb_i"] / max(tot["hb_n"], 1))),
                        diag={n_: [float(tot[f"{p_}_{n_}"]) for p_ in ("n", "i", "t", "d")] for n_ in ("dem_kept", "dem_lost", "late_hok", "late_hbad")},
                        closures={f"{n_}_{d_}": [float(tot[f"c_{n_}_{d_}"]), float(tot[f"g_{n_}_{d_}"])] for n_ in ("item", "tmax", "death") for d_ in ("all", "dem")},
                        max_records_per_life=float(max(q["mx"] for q in per)), lives_overflowing=float(tot["ovf"]),
