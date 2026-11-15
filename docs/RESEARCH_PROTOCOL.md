@@ -7133,6 +7133,30 @@ more expensive, because it produces publishable-looking nulls.
 - **Ops (Nov 15 ~01:55):** at the operator's request (CPU / RAM load) seed 2 was paused (checkpointed) and queued
   behind seed 1. Laptop jobs now run one at a time.
 
+- **RESULT (Nov 15 02:22): T3 CONFIRMATION (registered: 20M, seeds 0 / 1 / 2, the bar at d = 12 hidden): 2/3 ->
+  NOT CONFIRMED.**
+
+| run | max d | eval d | true 1st->2nd | shuffled 2nd | wiped 2nd | head acc 1st / 2nd+ hearing | bar |
+|---|---|---|---|---|---|---|---|
+| L2e_B_s0 | 24 | 12 | 97->100 | 3 | 1 | 16 / 98 | PASS |
+| L2e_B_s0 | 24 | 24 | 81->92 | 3 | 1 | 13 / 86 |  |
+| L2e_B_s1 | 24 | 12 | 92->100 | 4 | 3 | 15 / 94 | PASS |
+| L2e_B_s1 | 24 | 24 | 69->89 | 2 | 2 | 13 / 78 |  |
+| L2e_B_s2 | 5 | 5 | 31->14 | 7 | 27 | 17 / 31 |  |
+| L2e_B_s2 | 5 | 12 | 5->2 | 1 | 1 | 15 / 13 | - |
+
+  - Seeds 0 and 1 PASS (2nd half 100%; shuffled 3-4%; head 1st -> 2nd+ hearing 16 -> 98, 15 -> 94; the curriculum
+    reaches d = 24).
+  - **Seed 2 FAILS:** its curriculum stalled at d = 5. At d = 12: 5% -> 2%.
+    - At d = 5 the head shows a weak signature (17% -> 31%), but the policy does not use it: second half 14%, below
+      the wiped-memory control's 27%.
+  - Per the registered rule: reported, not rerun.
+  - Reading: the recipe CAN learn a per-life code, but is not robust. It either takes off (reaching the cap) or
+    stalls early.
+  - (Seed 2 was paused / resumed from its checkpoint at the operator's request for CPU load. Resume is exact
+    (tested), so this is not a confound.)
+  - The ablations (a)-(c) are running one at a time.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
