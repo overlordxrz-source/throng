@@ -85,11 +85,29 @@ class TfNet(nn.Module):
         return jnp.stack([B0, B1]).reshape(-1), nn.Dense(6, name="pi")(z), nn.Dense(1, name="v")(z)[0], None
 
 
+class EpMem(nn.Module):
+    """Cam 3(d): EPISODE-LEVEL memory. 64 slots, one record per past episode in the life (token heard, displacement from
+    the start at the episode's end, ate flag) written by the environment loop at each episode end; the policy reads them
+    with learned key / value projections queried by the current input (masked to filled slots). The read is learned; the
+    record is raw (no long backprop needed)."""
+    S: int = 64; R: int = 11
+    @nn.compact
+    def __call__(self, h, x):
+        mem = h[: self.S * self.R].reshape(self.S, self.R); filled = mem[:, -2:].sum(-1) != 0  # any record written (offset or ate)
+        filled = filled | (mem[:, :8].sum(-1) > 0)
+        z = nn.tanh(nn.Dense(64, name="f1")(x))
+        q = nn.Dense(32, name="q")(z); k = nn.Dense(32, name="k")(mem); v = nn.Dense(32, name="v")(mem)
+        att = jnp.where(filled, k @ q / jnp.sqrt(32.0), -1e9); w = jax.nn.softmax(att) * filled.any()
+        rd = w @ v
+        y = nn.tanh(nn.Dense(64, name="f2")(jnp.concatenate([z, rd])))
+        return h, nn.Dense(6, name="pi")(y), nn.Dense(1, name="vf")(y)[0], None
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--d", type=int, default=12); ap.add_argument("--hidden", action="store_true")
     ap.add_argument("--lam", type=float, default=0.95); ap.add_argument("--gamma", type=float, default=0.99)
-    ap.add_argument("--tier", choices=["T1", "T2", "T3"], default="T1"); ap.add_argument("--learner", choices=["L1", "L1u", "L2", "L2t", "L3", "scripted", "ideal"], default="L1")
+    ap.add_argument("--tier", choices=["T1", "T2", "T3"], default="T1"); ap.add_argument("--learner", choices=["L1", "L1u", "L2", "L2t", "L2e", "L3", "scripted", "ideal"], default="L1")
     ap.add_argument("--kl", type=float, default=0.3); ap.add_argument("--steps", type=float, default=1e6)
     ap.add_argument("--B", type=int, default=256); ap.add_argument("--T", type=int, default=32); ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--episodes-per-life", type=int, default=8, help="T3: episodes sharing one random code (memory carried within a life)")
@@ -103,6 +121,7 @@ def main():
     ap.add_argument("--save-params", default="", help="save the final weights (flax bytes)"); ap.add_argument("--skip-final-eval", action="store_true")
     ap.add_argument("--eval-params", default="", help="EVAL ONLY: load these weights and evaluate --eval-modes at --test-d")
     ap.add_argument("--eval-modes", default="0,3,4", help="0 true, 1 always-wrong sector, 2 silence, 3 within-life shuffled code (T3), 4 memory wiped each episode")
+    ap.add_argument("--life-credit", action="store_true", help="T3 DIAGNOSTIC (Will): RL^2-style credit - GAE terminal only at life end (episode ends are not terminal), so success in later episodes credits what the memory stored earlier")
     ap.add_argument("--ckpt", default="", help="checkpoint path: resume if present; save every --ckpt-every updates")
     ap.add_argument("--ckpt-every", type=int, default=20); ap.add_argument("--max-seconds", type=float, default=0, help="stop (exit 3) after this long; rerun to resume")
     ap.add_argument("--move-cost", type=float, default=DMOVE, help="audit only: the per-move energy cost (harness 0.003)")
@@ -121,6 +140,9 @@ def main():
         for k in ("Dense_0", "Dense_1", "Dense_2", "Dense_3"):
             pp[k] = dict(nav[k])
         p = {"params": pp}; FROZEN = () if a.learner == "L1u" else ("Dense_0", "Dense_1", "Dense_2", "Dense_3")   # L1u: trunk unfrozen
+    elif a.learner == "L2e":                      # Cam 3(d): episode-level memory (T3)
+        net = EpMem(); Hd = net.S * net.R + 1          # slots + write pointer
+        p = net.init(jax.random.PRNGKey(a.seed), jnp.zeros((Hd,)), jnp.zeros((Dx,))); FROZEN = ()
     elif a.learner == "L2t":                      # addendum 6: transformer memory (T3 only)
         net = TfNet(); Hd = 2 * net.W * (net.dm + 1)
         p = net.init(jax.random.PRNGKey(a.seed), jnp.zeros((Hd,)), jnp.zeros((Dx,))); FROZEN = ()
@@ -226,6 +248,11 @@ def main():
                 h2, lg, v, _ = policy(pp_, h, x); act = jax.random.categorical(k1, lg)
                 lp = jnp.take_along_axis(jax.nn.log_softmax(lg), act[:, None], 1)[:, 0]
             st2, r, done, ate = env_step(st, act)
+            if a.learner == "L2e":                                  # write this episode's record into the next slot at its end
+                ar_ = jnp.arange(B); tk_ = code[ar_, osec]; ptr = h2[:, -1].astype(jnp.int32) % 64
+                rec = jnp.concatenate([jax.nn.one_hot(tk_, 8), torus(st2["pos"] - START[None]) / 24.0, ate[:, None].astype(jnp.float32)], 1)
+                mem = h2[:, :-1].reshape(B, 64, 11); mem = mem.at[ar_, ptr].set(jnp.where(done[:, None], rec, mem[ar_, ptr]))
+                h2 = jnp.concatenate([mem.reshape(B, -1), (h2[:, -1] + done.astype(jnp.float32))[:, None]], 1)
             if net is None and a.learner == "ideal":                # record token -> the sector where food was found; reset the search
                 ar_ = jnp.arange(B); tk_ = code[ar_, osec]; kn = h2[:, :8]
                 kn = kn.at[ar_, tk_].set(jnp.where(ate, st["sec"].astype(jnp.float32) + 1.0, kn[ar_, tk_]))
@@ -248,11 +275,14 @@ def main():
         return jax.lax.scan(body, carry, jax.random.split(key, T))
     roll = jax.jit(rollout, static_argnums=(3, 5))
 
-    def seq_loss(pp_, x, h0, act, lp0, adv, ret, first):
-        def body(h, xa):
-            xx, f = xa; h = jnp.where(f > 0, 0.0, h)              # same resets as the rollout (episode / life starts)
-            h2, lg, v, _ = net.apply(pp_, h, xx); return h2, (lg, v)
-        _, (lg, v) = jax.lax.scan(body, h0, (x, first))
+    def seq_loss(pp_, x, h0, act, lp0, adv, ret, first, hseq=None):
+        if hseq is not None:                                        # L2e: the memory the rollout actually held at each step
+            lg, v = jax.vmap(lambda hh, xx: net.apply(pp_, hh, xx)[1:3])(hseq, x)
+        else:
+            def body(h, xa):
+                xx, f = xa; h = jnp.where(f > 0, 0.0, h)          # same resets as the rollout (episode / life starts)
+                h2, lg, v, _ = net.apply(pp_, h, xx); return h2, (lg, v)
+            _, (lg, v) = jax.lax.scan(body, h0, (x, first))
         ls = jax.nn.log_softmax(lg); lp = jnp.take_along_axis(ls, act[:, None], 1)[:, 0]
         ratio = jnp.exp(jnp.clip(lp - lp0, -20.0, 20.0)); pg = -jnp.minimum(ratio * adv, jnp.clip(ratio, 0.8, 1.2) * adv)
         L_ = (pg + 0.5 * (v - ret) ** 2 + 0.01 * (jnp.exp(ls) * ls).sum(-1)).mean()
@@ -263,8 +293,10 @@ def main():
         return L_
 
     @jax.jit
-    def upd(pp_, os_, x, h0, act, lp0, adv, ret, first):
+    def upd(pp_, os_, x, h0, act, lp0, adv, ret, first, hseq=None):
         def tot(q):
+            if hseq is not None:
+                return jax.vmap(seq_loss, in_axes=(None, 0, 0, 0, 0, 0, 0, 0, 0))(q, x, h0, act, lp0, adv, ret, first, hseq).mean()
             return jax.vmap(seq_loss, in_axes=(None, 0, 0, 0, 0, 0, 0, 0))(q, x, h0, act, lp0, adv, ret, first).mean()
         g = jax.grad(tot)(pp_)
         g = {"params": {k_: (jax.tree_util.tree_map(jnp.zeros_like, v_) if k_ in FROZEN else v_) for k_, v_ in g["params"].items()}}
@@ -357,11 +389,14 @@ def main():
                     print(f"CHUNK_STOP at {steps:,} steps", flush=True); sys.exit(3)
             key, k = jax.random.split(key); c, R_ = roll(p, c, k, 0, jnp.float32(d_cur), a.curriculum_mix)
             x, act, lp, v, r, dn, ate, hin, rs = (np.asarray(z) for z in R_[:9])    # (T, B, ...)
-            adv = gae(np.swapaxes(r, 0, 1), np.swapaxes(v, 0, 1), np.swapaxes(dn, 0, 1), a.gamma, a.lam)            # (B, T)
+            term = rs if (a.life_credit and a.tier == "T3") else dn                 # life-credit: terminal only where the life ended
+            adv = gae(np.swapaxes(r, 0, 1), np.swapaxes(v, 0, 1), np.swapaxes(term, 0, 1), a.gamma, a.lam)          # (B, T)
             ret = adv + np.swapaxes(v, 0, 1); A_ = (adv - adv.mean()) / (adv.std() + 1e-8)
             first = np.concatenate([np.zeros((1, B)), rs[:-1]], 0)                  # wipe memory exactly where the rollout did
             sw = lambda z: jnp.asarray(np.swapaxes(z, 0, 1))  # noqa: E731
             Bx = (sw(x), jnp.asarray(hin[0]), sw(act), sw(lp), jnp.asarray(A_.astype(np.float32)), jnp.asarray(ret.astype(np.float32)), sw(first))
+            if a.learner == "L2e":
+                Bx = Bx + (sw(hin),)
             for _e in range(a.epochs):                               # minibatches over whole sequences (envs)
                 perm = rng.permutation(B)
                 for mb in np.array_split(perm, a.minibatches):
