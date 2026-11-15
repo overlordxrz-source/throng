@@ -7741,6 +7741,20 @@ more expensive, because it produces publishable-looking nulls.
   - While it trains (free, on a copy, never in files the running jobs re-read): move the replay's batch building
     on-device (the whole update jitted), with a regression on a short run. No Modal re-probe before the readout.
 
+- **RESULT (Nov 15 ~09:35): 2-SEED PARALLEL TEST: 1.32x (< 1.6x), so back to ONE AT A TIME.**
+  - Single seed 3,932 steps/s (250 s). Two in parallel over 600 s: 2,457 + 2,730 = 5,188 steps/s.
+  - Seed 1 was stopped and resumes exactly from its checkpoint after seed 0.
+- **RESULT (Nov 15 ~09:40): ON-DEVICE UPDATE** (`w2/learner_w2_dev.py`, a copy; the running jobs use learner_w2.py):
+  - the replay batch (reshapes, GAE in jax, normalisation) is built on-device; the whole 8 x 4 PPO update is one jit;
+    the host passes the same numpy permutations.
+  - **Regression: not bit-exact; float32 rounding.** On one identical update from the same state: GAE max |d| 1.2e-7
+    (W 4) and 3.6e-7 (W 32); parameters max |d| 8.6e-6 / 3.8e-6 (largest parameter 0.87). Over a 30-iteration
+    run, the first 4 curve points match exactly, then the trajectories drift apart.
+  - **Laptop speed: 1.08x** (5,452 -> 5,868 steps/s). On CPU the host round trips were not the cost; the replay's
+    compute is (the read over every slot at every step).
+  - The GPU gain is untested (no Modal re-probe before the readout, per Cam).
+  - Next lever for stage 2: recompute the memory keys / values only where a record was written, not at every step.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
