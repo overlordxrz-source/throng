@@ -8039,6 +8039,19 @@ more expensive, because it produces publishable-looking nulls.
       shuffled); life >= 1.3x the new twin's, LB > 1.0x.
     - Early stop: frontier not past D/2 by 2.5e7. Seeds 1-3 sequential 2-of-3.
 
+- **IMPLEMENTED + PREDICTIONS (Nov 15 ~12:35, before running):**
+  - `w2/gate.py` HonestGate, in port_w2 `--gate honest`. Hungry bout = energy never reached H from the hearing until
+    the bout closed (pre-step energy, so the item's own energy does not count).
+  - Within an iteration the outcomes are laid out evenly, so window boundaries are unbiased.
+  - NEGATIVE control: `--policy follower --giveup 0.3`. A given-up bout (drawn at open) is ignored: v2-best acts and
+    never eats the item.
+  - The old-gate path is bit-identical (12/12 curve points). Simulated gate: no advance at p 0.70 or 0.78; advances
+    at 0.85 and 1.0.
+  - Predictions:
+    - positive control reaches the cap 24 (p 0.9); negative control never leaves frontier 1 (p 0.95);
+    - ORACLE REDO: mastered frontier **D >= 6 p 0.5; D = 12 (cap) p 0.15; D < 6 (stop) p 0.5**;
+    - steps to reach D <= 1.5e7: p 0.6.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
