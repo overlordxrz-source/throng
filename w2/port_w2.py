@@ -7,6 +7,9 @@ Learner: the harness agent (RecAgent: navigator trunk UNFROZEN, GRU, side head),
 entropy 0.01, gamma 0.99, lambda 0.95, the clipped log-ratio and the NaN guard. --oracle adds the named item's sector
 (one-hot) as input (the ORACLE ARM). Reward = x20 drive reduction including the item's energy. Lives respawn on death
 (memory wiped, new code). Adult lives only (no parent / juvenile phase): a disclosed simplification for the oracle arm.
+Nov 15 ~03:55 (Cam): --hunger-gate / --item-size (the world fix, shared with necessity_w2 via w2/named_item.py);
+--policy follower = the CURRICULUM POSITIVE CONTROL (scripted follower through the real gate, no updates); --eval-only
++ --init-params for readouts; reach split by bout-start energy. Gate off reproduces oracle #1's world.
 Checkpointed chunks (--ckpt --max-seconds); --save-params for the evaluator (necessity_w2.py --policy-params)."""
 import argparse, glob, json, os, sys, time
 import numpy as np
@@ -19,11 +22,11 @@ from w2.learn import Net  # noqa: E402
 from w2.learnability import RecAgent  # noqa: E402
 from w2.worlds import world_kw  # noqa: E402
 from w2.gae import gae  # noqa: E402
+from w2 import named_item as NI  # noqa: E402
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "scripts"))
 import ckpt as _ck  # noqa: E402
 
-MOVES = env.MOVES; EAT = env.EAT; R = 3
-OFF = jnp.stack(jnp.meshgrid(jnp.arange(-R, R + 1), jnp.arange(-R, R + 1), indexing="ij"), -1).reshape(-1, 2)
+EAT = env.EAT
 
 
 def main():
@@ -34,8 +37,13 @@ def main():
     ap.add_argument("--epochs", type=int, default=4); ap.add_argument("--minibatches", type=int, default=8); ap.add_argument("--lr", type=float, default=3e-4)
     ap.add_argument("--d-max", type=int, default=24); ap.add_argument("--curve-every", type=int, default=20)
     ap.add_argument("--ckpt", default=""); ap.add_argument("--max-seconds", type=float, default=0); ap.add_argument("--save-params", default="")
+    ap.add_argument("--item-size", type=float, default=0.1); ap.add_argument("--hunger-gate", action="store_true", help="bouts open only when E < E_set - size")
+    ap.add_argument("--policy", default="learner", choices=["learner", "follower"], help="follower = the scripted curriculum positive control (no updates)")
+    ap.add_argument("--v2", default=os.path.expanduser("~/throng-backup/evo2/evo2.ckpt")); ap.add_argument("--init-params", default="")
+    ap.add_argument("--eval-only", action="store_true", help="no updates (readouts)"); ap.add_argument("--frontier0", type=float, default=1.0)
     ap.add_argument("--out", required=True)
     a = ap.parse_args()
+    S = a.item_size; gated = a.hunger_gate; nupd = a.eval_only or a.policy == "follower"
     cfg = env.Cfg(L=96, N=a.N, patch_sigma=1.0, reproduce=False, A_max=3000, **world_kw(a.world)); L, W, N, T = cfg.L, a.W, a.N, a.T
     nav = flax.serialization.from_bytes(Net().init(jax.random.PRNGKey(1), jnp.zeros((1, 100))), open(sorted(glob.glob(a.navs))[0], "rb").read())
     rnet = RecAgent(128); Dx = 100 + 11 + 6 + 1 + 8                 # the harness layout (oracle slot always present; zero when off)
@@ -44,53 +52,51 @@ def main():
     for k in ("Dense_0", "Dense_1", "Dense_2", "Dense_3"):
         pp[k] = dict(nav["params"][k])
     p = {"params": pp}                                                # trunk UNFROZEN (nothing zeroed in the gradient)
+    if a.init_params:
+        p = flax.serialization.from_bytes(p, open(a.init_params, "rb").read())
+    if a.policy == "follower":
+        _, v2p = NI.build_v2best(nav, _ck.load(a.v2)["evo_pop"][0])
     opt = optax.chain(optax.clip_by_global_norm(1.0), optax.adam(a.lr)); ost = opt.init(p)
 
-    def torus(o):
-        return (o + L // 2) % L - L // 2
+    H = cfg.E_set - S
 
     def drive(E):
         return jnp.abs(cfg.E_set - E) ** cfg.drive_n
 
-    def place(key, start, dfront):
-        k1, k2 = jax.random.split(key); sec = jax.random.randint(k1, (N,), 0, 8)
-        d = jnp.floor(jax.random.uniform(k2, (N,)) * dfront) + 1.0      # mixed curriculum: uniform{1..frontier}
-        ang = sec * (jnp.pi / 4); ipos = (start + jnp.stack([jnp.round(d * jnp.cos(ang)), jnp.round(d * jnp.sin(ang))], -1).astype(jnp.int32)) % L
-        return sec, d, ipos
+    def dfn_of(dfront):
+        return lambda k: jnp.floor(jax.random.uniform(k, (N,)) * dfront) + 1.0      # mixed curriculum: uniform{1..frontier}
 
     def obs_x(s, item, code, pa, pr):
-        o = env.observe(cfg, s); cell = (s.pos[:, None, :] + OFF[None]) % L
-        vis = jnp.all(cell == item["pos"][:, None, :], -1) & (jnp.abs(OFF).max(-1) <= 1)[None]
-        o = o.at[:, :49].set(jnp.maximum(o[:, :49], vis.astype(jnp.float32)))
-        tok = code[jnp.arange(N), item["sec"]]
-        hr = jnp.concatenate([jax.nn.one_hot(tok, 8), jnp.ones((N, 1)), jnp.clip(torus(item["start"] - s.pos) / 9.0, -1, 1)], 1)
-        orc = jax.nn.one_hot(item["sec"], 8) * (1.0 if a.oracle else 0.0)
-        return jnp.concatenate([o, hr, jax.nn.one_hot(pa, 6), pr[:, None], orc], 1)
+        o = NI.observe(cfg, s, item); hr = NI.hear(s, item, code, L)
+        return jnp.concatenate([o, hr, jax.nn.one_hot(pa, 6), pr[:, None], NI.oracle(item, a.oracle)], 1)
 
     def world_reset(key, dfront):
-        s = env.reset(cfg, key); sec, d, ipos = place(jax.random.fold_in(key, 1), s.pos, dfront)
+        s = env.reset(cfg, key)
+        item, _ = NI.open_bouts(NI.new_item(N), s, jax.random.fold_in(key, 1), dfn_of(dfront), L, (s.energy < H) if gated else jnp.ones(N, bool))
         code = jax.vmap(lambda kk: jax.random.permutation(kk, 8))(jax.random.split(jax.random.fold_in(key, 3), N))
-        return (s, dict(sec=sec, d=d, pos=ipos, start=s.pos, t=jnp.zeros(N)), jnp.zeros((N, 128)), jnp.zeros(N, jnp.int32), jnp.zeros(N), code)
+        return (s, item, jnp.zeros((N, 128)), jnp.zeros(N, jnp.int32), jnp.zeros(N), code)
 
     def rollout_world(pp_, c, key, dfront):
         def body(c, k):
             s, item, h, pa, pr, code = c
             k1, k2, k3, k4 = jax.random.split(k, 4); x = obs_x(s, item, code, pa, pr)
-            h2, lg, v, _ = jax.vmap(lambda hh, xx: rnet.apply(pp_, hh, xx))(h, x); act = jax.random.categorical(k1, lg)
+            if a.policy == "follower":                                      # scripted: walks on a hearing, v2-best otherwise
+                h2, lg, v, _ = jax.vmap(lambda hh, xx: rnet.apply(v2p, hh, xx))(h, x.at[:, -8:].set(0.0))
+                act = NI.follower(s, item, L, jax.random.categorical(k1, lg))
+            else:
+                h2, lg, v, _ = jax.vmap(lambda hh, xx: rnet.apply(pp_, hh, xx))(h, x); act = jax.random.categorical(k1, lg)
             lp = jnp.take_along_axis(jax.nn.log_softmax(lg), act[:, None], 1)[:, 0]
-            on_item = jnp.all(s.pos == item["pos"], -1) & (act == EAT)
+            on_item = item["act"] & jnp.all(s.pos == item["pos"], -1) & (act == EAT)
             E0 = s.energy; s2, _, info = env.step(cfg, s, act, k2)
-            E1 = jnp.clip(s2.energy + 0.1 * on_item * s2.alive, 0.0, 1.0); s2 = s2._replace(energy=E1)
+            E1 = jnp.clip(s2.energy + S * on_item * s2.alive, 0.0, 1.0); s2 = s2._replace(energy=E1)
             r = 20.0 * (drive(E0) - drive(E1))                              # x20 drive reduction, item energy included
-            gain = cfg.eff * info["take"] + 0.1 * on_item
-            t2 = item["t"] + 1; dead = ~s2.alive; renew = on_item | (t2 >= 4 * item["d"]) | dead
-            nsec, nd, npos = place(k3, s2.pos, dfront)
-            item2 = dict(sec=jnp.where(renew, nsec, item["sec"]), d=jnp.where(renew, nd, item["d"]), pos=jnp.where(renew[:, None], npos, item["pos"]),
-                         start=jnp.where(renew[:, None], s2.pos, item["start"]), t=jnp.where(renew, 0.0, t2))
+            gain = cfg.eff * info["take"] + S * on_item; pd = NI.paid(E0, gain, cfg.E_set)
+            dead = ~s2.alive
             s3 = s2._replace(energy=jnp.where(dead, cfg.E0, s2.energy), age=jnp.where(dead, 0, s2.age), alive=jnp.ones(N, bool))
+            item2, closed, opened = NI.close_and_open(item, on_item, dead, s3, k3, dfn_of(dfront), L, gated, H)
             ncode = jax.vmap(lambda kk: jax.random.permutation(kk, 8))(jax.random.split(k4, N))
             code2 = jnp.where(dead[:, None], ncode, code); h3 = jnp.where(dead[:, None], 0.0, h2)
-            return (s3, item2, h3, act, r, code2), (x, act, lp, v, r, dead.astype(jnp.float32), h, on_item, renew & ~dead, gain)
+            return (s3, item2, h3, act, r, code2), (x, act, lp, v, r, dead.astype(jnp.float32), h, on_item, closed & ~dead, gain, pd, item["es"], item["d"], item["act"])
         return jax.lax.scan(body, c, jax.random.split(key, T))
     roll = jax.jit(jax.vmap(rollout_world, in_axes=(None, 0, 0, None)))
 
@@ -110,7 +116,7 @@ def main():
         u, os_ = opt.update(g, os_, pp_); return optax.apply_updates(pp_, u), os_
 
     rng = np.random.default_rng(a.seed); key = jax.random.PRNGKey(a.seed + 1)
-    dfront = 1.0; recent = []; steps = 0; it = 0; curve = []; nan_run = 0
+    dfront = a.frontier0; recent = []; SPLIT = []; steps = 0; it = 0; curve = []; nan_run = 0
     c = jax.vmap(world_reset, in_axes=(0, None))(jax.random.split(key, W), dfront)
     Ck = _ck.load(a.ckpt) if a.ckpt else None
     if Ck is not None:
@@ -125,7 +131,8 @@ def main():
             if a.max_seconds and time.time() - t0 > a.max_seconds:
                 print(f"CHUNK_STOP at {steps:,}", flush=True); sys.exit(3)
         key, k = jax.random.split(key); c, R_ = roll(p, c, jax.random.split(k, W), jnp.float32(dfront))
-        x, act, lp, v, r, dead, hin, ate_i, closed, gain = (np.asarray(z) for z in R_)      # (W, T, N, ...)
+        x, act, lp, v, r, dead, hin, ate_i, closed, gain, pd, es, dd_, inb = (np.asarray(z) for z in R_)      # (W, T, N, ...)
+        SPLIT.append(np.stack([es[closed > 0], ate_i[closed > 0], dd_[closed > 0]], 1))
         # (W, T, N) -> sequences (W*N, T)
         sq = lambda z: np.swapaxes(z, 1, 2).reshape((W * N, T) + z.shape[3:])  # noqa: E731
         r_, v_, d_ = sq(r), sq(v), sq(dead)
@@ -134,7 +141,7 @@ def main():
         bt = dict(x=jnp.asarray(sq(x)), h0=jnp.asarray(hin[:, 0].reshape(W * N, 128)), act=jnp.asarray(sq(act)), lp=jnp.asarray(sq(lp)),
                   adv=jnp.asarray(A_.astype(np.float32)), ret=jnp.asarray(ret.astype(np.float32)), first=jnp.asarray(first.astype(np.float32)))
         p_prev, o_prev = p, ost
-        for _ in range(a.epochs):
+        for _ in range(0 if nupd else a.epochs):
             for mb in np.array_split(rng.permutation(W * N), a.minibatches):
                 p, ost = upd(p, ost, {k_: v_[mb] for k_, v_ in bt.items()})
         if not all(bool(jnp.isfinite(l_).all()) for l_ in jax.tree_util.tree_leaves(p)):   # NaN guard
@@ -149,11 +156,17 @@ def main():
         if len(recent) >= 500 and np.mean(recent) >= 0.8 and dfront < a.d_max:
             dfront += 1; recent = []
         if it % a.curve_every == 0:
-            curve.append(dict(steps=steps, frontier=dfront, item_reach=n_eat / max(n_close, 1), food_per_step=float(gain.mean()), sec=round(time.time() - t0, 1)))
+            curve.append(dict(steps=steps, frontier=dfront, item_reach=n_eat / max(n_close, 1), food_per_step=float(gain.mean()), paid_per_step=float(pd.mean()), frac_in_bout=float(inb.mean()), sec=round(time.time() - t0, 1)))
             print("CURVE", json.dumps(curve[-1]), flush=True)
     if a.save_params:
         open(a.save_params, "wb").write(flax.serialization.to_bytes(p))
-    out = dict(cfg=vars(a), steps=steps, frontier=dfront, curve=curve, train_seconds=round(time.time() - t0, 1),
+    Sp = np.concatenate(SPLIT[-200:]) if SPLIT else np.zeros((0, 3)); split = {}
+    for nm, lo, hi in (("E<0.6", 0, 0.6), ("0.6<=E<H", 0.6, H), ("H<=E<0.75", H, 0.75), ("E>=0.75", 0.75, 9)):
+        for dsel in ("d=1", "all"):
+            m = (Sp[:, 0] >= lo) & (Sp[:, 0] < hi) & ((Sp[:, 2] == 1) if dsel == "d=1" else True)
+            split[f"{nm} {dsel}"] = dict(reach=float(Sp[m, 1].mean()) if m.any() else None, bouts=int(m.sum()))
+    print("REACH_BY_START_ENERGY (last <=200 iterations)", json.dumps(split), flush=True)
+    out = dict(cfg=vars(a), steps=steps, frontier=dfront, curve=curve, reach_by_start_energy=split, train_seconds=round(time.time() - t0, 1),
                throughput=steps / max(time.time() - t0, 1e-9))
     json.dump(out, open(a.out, "w"), indent=1); print("TRAINED", json.dumps(dict(steps=steps, frontier=dfront)), flush=True)
 

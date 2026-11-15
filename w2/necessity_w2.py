@@ -13,6 +13,9 @@ Policies:
 - scripted true-code follower (walks the named sector's ray from its bout start; goes to the item when adjacent; eats
   on the item; eats world food it stands on).
 Pass: follower food (energy gained per agent-step) >= 1.5x the better of v2-best and the navigator.
+Nov 15 ~03:55 (Cam): --hunger-gate (bouts open only when E < H = E_set - size; the world fix), --item-size, the
+follower falls back to v2-best outside bouts, and the currency is PAID INTAKE per life (energy gained below the
+setpoint; survival reported alongside). Gate off + --currency food + --follower-fallback none reproduces the original.
 Note: item energy is added after env.step, so a same-step starvation death is not rescued (rare)."""
 import argparse, glob, json, os, sys
 import numpy as np
@@ -21,13 +24,12 @@ import flax.serialization
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from w2 import env  # noqa: E402
 from w2.learn import Net  # noqa: E402
-from w2.learnability import RecAgent  # noqa: E402
 from w2.worlds import world_kw  # noqa: E402
+from w2 import named_item as NI  # noqa: E402
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "scripts"))
 import ckpt as _ck  # noqa: E402
 
-MOVES = env.MOVES; EAT = env.EAT; R = 3
-OFF = jnp.stack(jnp.meshgrid(jnp.arange(-R, R + 1), jnp.arange(-R, R + 1), indexing="ij"), -1).reshape(-1, 2)
+EAT = env.EAT
 
 
 def main():
@@ -38,104 +40,87 @@ def main():
     ap.add_argument("--d-max", type=int, default=12); ap.add_argument("--d-fixed", type=int, default=0); ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--policy-params", default="", help="ORACLE ARM eval: also score a port_w2.py-trained agent (its weights)")
     ap.add_argument("--policy-oracle", action="store_true", help="the trained agent gets the oracle sector input")
+    ap.add_argument("--item-size", type=float, default=0.1); ap.add_argument("--hunger-gate", action="store_true", help="bouts open only when E < E_set - size")
+    ap.add_argument("--follower-fallback", default="", help="none | v2best (default: v2best when gated, none otherwise)")
+    ap.add_argument("--currency", default="paid", choices=["paid", "food"]); ap.add_argument("--bar", type=float, default=1.5)
     ap.add_argument("--out", required=True)
     a = ap.parse_args()
     cfg = env.Cfg(L=96, N=a.N, patch_sigma=1.0, reproduce=False, A_max=3000, **world_kw(a.world)); L = cfg.L
     nav = flax.serialization.from_bytes(Net().init(jax.random.PRNGKey(1), jnp.zeros((1, 100))), open(sorted(glob.glob(a.navs))[0], "rb").read())
     # v2-best rebuilt as in the harness: RecAgent(128), init seed 0, Dx = 100 + 11 + 6 + 1 + 8 (oracle), navigator trunk, evolved groups
-    rnet = RecAgent(128); Dx = 126
-    rp = rnet.init(jax.random.PRNGKey(0), jnp.zeros((128,)), jnp.zeros((Dx,)))
-    pp = {k: dict(v) for k, v in rp["params"].items()}
-    for k in ("Dense_0", "Dense_1", "Dense_2", "Dense_3"):
-        pp[k] = dict(nav["params"][k])
-    top = jax.tree_util.tree_map(jnp.asarray, _ck.load(a.v2)["evo_pop"][0]); pp.update(top); v2p = {"params": pp}
+    rnet, v2p = NI.build_v2best(nav, _ck.load(a.v2)["evo_pop"][0])
+    rp = rnet.init(jax.random.PRNGKey(0), jnp.zeros((128,)), jnp.zeros((126,)))
     trp = flax.serialization.from_bytes(rp, open(a.policy_params, "rb").read()) if a.policy_params else None
 
-    def torus(o):
-        return (o + L // 2) % L - L // 2
+    S = a.item_size; H = cfg.E_set - S; gated = a.hunger_gate
+    fb = a.follower_fallback or ("v2best" if gated else "none")
+    dfn = (lambda k: jnp.full((a.N,), float(a.d_fixed))) if a.d_fixed else (lambda k: jax.random.randint(k, (a.N,), 1, a.d_max + 1).astype(jnp.float32))
 
-    def place(key, start, n):
-        k1, k2 = jax.random.split(key); sec = jax.random.randint(k1, (n,), 0, 8)
-        d = jnp.full((n,), a.d_fixed, jnp.float32) if a.d_fixed else jax.random.randint(k2, (n,), 1, a.d_max + 1).astype(jnp.float32)
-        ang = sec * (jnp.pi / 4); ipos = (start + jnp.stack([jnp.round(d * jnp.cos(ang)), jnp.round(d * jnp.sin(ang))], -1).astype(jnp.int32)) % L
-        return sec, d, ipos
-
-    def observe(s, item):
-        o = env.observe(cfg, s)                                     # (N, 100): food window, agent window, energy, age
-        cell = (s.pos[:, None, :] + OFF[None]) % L
-        vis = jnp.all(cell == item["pos"][:, None, :], -1) & (jnp.abs(OFF).max(-1) <= 1)[None]        # the item, only when adjacent
-        return o.at[:, :49].set(jnp.maximum(o[:, :49], vis.astype(jnp.float32)))
-
-    def hear(s, item, code):
-        tok = code[jnp.arange(a.N), item["sec"]]
-        return jnp.concatenate([jax.nn.one_hot(tok, 8), jnp.ones((a.N, 1)), jnp.clip(torus(item["start"] - s.pos) / 9.0, -1, 1)], 1)
-
-    def follower(s, item, o):
-        on_item = jnp.all(s.pos == item["pos"], -1); here = s.food[s.pos[:, 0], s.pos[:, 1]] >= 0.2
-        adj = torus(item["pos"] - s.pos); seen = jnp.abs(adj).max(-1) <= 1
-        tw = lambda dd: jnp.where(jnp.abs(dd[:, 0]) >= jnp.abs(dd[:, 1]), jnp.where(dd[:, 0] < 0, 1, 2), jnp.where(dd[:, 1] > 0, 3, 4))  # noqa: E731
-        ang = item["sec"] * (jnp.pi / 4); u = jnp.stack([jnp.cos(ang), jnp.sin(ang)], -1); off = torus(s.pos - item["start"]).astype(jnp.float32)
-        cand = off[:, None, :] + MOVES[1:5][None].astype(jnp.float32)
-        score = (cand * u[:, None]).sum(-1) - 2.0 * jnp.abs(cand[..., 0] * u[:, None, 1] - cand[..., 1] * u[:, None, 0])
-        return jnp.where(on_item, EAT, jnp.where(seen, tw(adj), jnp.where(here, EAT, jnp.argmax(score, 1) + 1)))
+    def nav_apply(o):
+        return jax.vmap(lambda xx: Net().apply(nav, xx[None]))(o)[0][:, 0]
 
     def run(policy, seed):
         key = jax.random.PRNGKey(seed); s = env.reset(cfg, key)
         code = jax.vmap(lambda kk: jax.random.permutation(kk, 8))(jax.random.split(jax.random.fold_in(key, 3), a.N))
-        sec, d, ipos = place(jax.random.fold_in(key, 1), s.pos, a.N)
-        item = dict(sec=sec, d=d, pos=ipos, start=s.pos, t=jnp.zeros(a.N)); h = jnp.zeros((a.N, 128)); pa = jnp.zeros(a.N, jnp.int32); pr = jnp.zeros(a.N)
+        item, _ = NI.open_bouts(NI.new_item(a.N), s, jax.random.fold_in(key, 1), dfn, L, (s.energy < H) if gated else jnp.ones(a.N, bool))
+        h = jnp.zeros((a.N, 128)); pa = jnp.zeros(a.N, jnp.int32); pr = jnp.zeros(a.N)
+
         def body(c, k):
             s, item, h, pa, pr, code = c
-            k1, k2, k3, k4 = jax.random.split(k, 4); o = observe(s, item); hr = hear(s, item, code)
+            k1, k2, k3, k4 = jax.random.split(k, 4); o = NI.observe(cfg, s, item); hr = NI.hear(s, item, code, L)
             if policy == "navigator":
-                lg, _ = nav_apply(o); act = jax.random.categorical(k1, lg); h2 = h
-            elif policy == "v2best":
+                act = jax.random.categorical(k1, nav_apply(o)); h2 = h
+            elif policy in ("v2best", "follower") and not (policy == "follower" and fb == "none"):
                 x = jnp.concatenate([o, hr, jax.nn.one_hot(pa, 6), pr[:, None], jnp.zeros((a.N, 8))], 1)
                 h2, lg, _, _ = jax.vmap(lambda hh, xx: rnet.apply(v2p, hh, xx))(h, x); act = jax.random.categorical(k1, lg)
+                if policy == "follower":
+                    act = NI.follower(s, item, L, act)
             elif policy == "trained":
-                orc = jax.nn.one_hot(item["sec"], 8) * (1.0 if a.policy_oracle else 0.0)
-                x = jnp.concatenate([o, hr, jax.nn.one_hot(pa, 6), pr[:, None], orc], 1)
+                x = jnp.concatenate([o, hr, jax.nn.one_hot(pa, 6), pr[:, None], NI.oracle(item, a.policy_oracle)], 1)
                 h2, lg, _, _ = jax.vmap(lambda hh, xx: rnet.apply(trp, hh, xx))(h, x); act = jax.random.categorical(k1, lg)
-            else:
-                act = follower(s, item, o); h2 = h
-            on_item = jnp.all(s.pos == item["pos"], -1) & (act == EAT) & s.alive
+            else:                                                               # the original follower (no fallback)
+                act = NI.follower(s, item, L, jnp.zeros(a.N, jnp.int32)); h2 = h
+            on_item = item["act"] & jnp.all(s.pos == item["pos"], -1) & (act == EAT) & s.alive
             s2, r, info = env.step(cfg, s, act, k2)
-            gain = cfg.eff * info["take"] + 0.1 * on_item                       # energy gained this step (world + item)
-            s2 = s2._replace(energy=jnp.clip(s2.energy + 0.1 * on_item * s2.alive, 0.0, 1.0))
-            t2 = item["t"] + 1; renew = on_item | (t2 >= 4 * item["d"]) | ~s2.alive
-            nsec, nd, npos = place(k3, s2.pos, a.N)
-            item2 = dict(sec=jnp.where(renew, nsec, item["sec"]), d=jnp.where(renew, nd, item["d"]), pos=jnp.where(renew[:, None], npos, item["pos"]),
-                         start=jnp.where(renew[:, None], s2.pos, item["start"]), t=jnp.where(renew, 0.0, t2))
+            gain = cfg.eff * info["take"] + S * on_item                         # energy gained this step (world + item)
+            pd = NI.paid(s.energy, gain, cfg.E_set)                             # the part the setpoint reward pays for
+            s2 = s2._replace(energy=jnp.clip(s2.energy + S * on_item * s2.alive, 0.0, 1.0))
             dead = ~s2.alive                                                    # respawn: a fresh life (new code, memory wiped)
-            E = jnp.where(dead, cfg.E0, s2.energy); age = jnp.where(dead, 0, s2.age)
-            s3 = s2._replace(energy=E, age=age, alive=jnp.ones(a.N, bool))
+            s3 = s2._replace(energy=jnp.where(dead, cfg.E0, s2.energy), age=jnp.where(dead, 0, s2.age), alive=jnp.ones(a.N, bool))
+            item2, closed, opened = NI.close_and_open(item, on_item, dead, s3, k3, dfn, L, gated, H)
             ncode = jax.vmap(lambda kk: jax.random.permutation(kk, 8))(jax.random.split(k4, a.N))
             code2 = jnp.where(dead[:, None], ncode, code); h3 = jnp.where(dead[:, None], 0.0, h2)
-            return (s3, item2, h3, act, r * 20.0, code2), (gain * s.alive, on_item, renew & ~dead, s.alive, dead)
-        (_, _, _, _, _, _), (g, ate_i, ren, alv, dd) = jax.lax.scan(body, (s, item, h, pa, pr, code), jax.random.split(jax.random.fold_in(key, 2), a.steps))
-        return g.sum(), alv.sum(), ate_i.sum(), ren.sum(), dd.sum()
-
-    def nav_apply(o):
-        return jax.vmap(lambda xx: Net().apply(nav, xx[None]))(o)[0][:, 0], None
+            fullpaid = on_item & (s.energy + S <= cfg.E_set + 1e-6)
+            return (s3, item2, h3, act, r * 20.0, code2), (gain * s.alive, on_item, closed & ~dead, s.alive, dead, pd * s.alive, opened, fullpaid, item["act"])
+        _, Z = jax.lax.scan(body, (s, item, h, pa, pr, code), jax.random.split(jax.random.fold_in(key, 2), a.steps))
+        return tuple(z.sum() for z in Z)
 
     runj = jax.jit(run, static_argnums=(0,))
-    res = {}
-    PER = {}
+    res = {}; PER = {}
     for pol in ("navigator", "v2best", "follower") + (("trained",) if trp is not None else ()):
-        tot = np.zeros(5); PER[pol] = []
-        for w in range(a.W):
-            z = np.array([float(q) for q in runj(pol, a.seed * 1000 + w)]); tot += z; PER[pol].append(z[0] / z[1])
-        g, alv, ate_i, ren, dd = tot
-        res[pol] = dict(food_per_step=g / alv, items_eaten=int(ate_i), item_reach_rate=ate_i / max(ren, 1), deaths=int(dd), agent_steps=int(alv))   # ren counts every closed bout
+        Zs = np.array([[float(q) for q in runj(pol, a.seed * 1000 + w)] for w in range(a.W)])     # (W, 9)
+        g, ate_i, ren, alv, dd, pd, opn, fp, inb = Zs.sum(0); lives = a.W * a.N + dd
+        PER[pol] = (Zs[:, 5], a.N + Zs[:, 4], Zs[:, 0], Zs[:, 3])     # per world: paid, lives, food, agent-steps
+        res[pol] = dict(food_per_step=g / alv, paid_per_life=pd / lives, paid_per_step=pd / alv, lives=int(lives), deaths=int(dd),
+                        mean_life_steps=alv / lives, items_eaten=int(ate_i), bouts_opened=int(opn), item_reach_rate=ate_i / max(ren, 1),
+                        item_meals_fully_paid=fp / max(ate_i, 1), frac_steps_in_bout=inb / alv, agent_steps=int(alv))   # ren counts every closed bout
         print(pol, json.dumps(res[pol]), flush=True)
-    best = max(res["navigator"]["food_per_step"], res["v2best"]["food_per_step"])
-    out = dict(cfg=vars(a), results=res, premium=res["follower"]["food_per_step"] / best, best_code_free="v2best" if res["v2best"]["food_per_step"] >= res["navigator"]["food_per_step"] else "navigator")
-    out["pass"] = bool(out["premium"] >= 1.5)
-    if trp is not None:                                     # ORACLE ARM bar: trained food >= 1.3x the best code-free; world-clustered bootstrap LB > 1.0x
-        bk = out["best_code_free"]; tr_, bs_ = np.array(PER["trained"]), np.array(PER[bk]); rb = np.random.default_rng(7)
-        boots = [tr_[ix].mean() / bs_[ix].mean() for ix in (rb.integers(0, a.W, a.W) for _ in range(2000))]
-        rt = res["trained"]["food_per_step"] / res[bk]["food_per_step"]
-        out["oracle_arm"] = dict(ratio=rt, boot_ci95=[float(np.percentile(boots, 2.5)), float(np.percentile(boots, 97.5))],
+    cur = "paid_per_life" if a.currency == "paid" else "food_per_step"
+    bk = "v2best" if res["v2best"][cur] >= res["navigator"][cur] else "navigator"
+    out = dict(cfg=vars(a), H=H, follower_fallback=fb, currency=cur, results=res, premium=res["follower"][cur] / res[bk][cur], best_code_free=bk,
+               premium_food=res["follower"]["food_per_step"] / max(res["v2best"]["food_per_step"], res["navigator"]["food_per_step"]),
+               premium_paid=res["follower"]["paid_per_life"] / max(res["v2best"]["paid_per_life"], res["navigator"]["paid_per_life"]))
+    out["pass"] = bool(out["premium"] >= a.bar)
+
+    def metric(pol, ix):
+        pdw, lv, fw, sw = (z[ix] for z in PER[pol])
+        return pdw.sum() / lv.sum() if cur == "paid_per_life" else fw.sum() / sw.sum()
+    if trp is not None:      # ORACLE ARM bar: trained >= 1.3x the best code-free; bootstrap over worlds (the lives / keys are paired by world)
+        rb = np.random.default_rng(7); boots = []
+        for _ in range(2000):
+            ix = rb.integers(0, a.W, a.W); boots.append(metric("trained", ix) / metric(bk, ix))
+        rt = res["trained"][cur] / res[bk][cur]
+        out["oracle_arm"] = dict(currency=cur, ratio=rt, boot_ci95=[float(np.percentile(boots, 2.5)), float(np.percentile(boots, 97.5))],
                                  pass_=bool(rt >= 1.3 and np.percentile(boots, 2.5) > 1.0))
         print("ORACLE_ARM", json.dumps(out["oracle_arm"]), flush=True)
     json.dump(out, open(a.out, "w"), indent=1); print("NECESSITY", json.dumps({k: out[k] for k in ("premium", "best_code_free", "pass")}), flush=True)
