@@ -6732,6 +6732,15 @@ more expensive, because it produces publishable-looking nulls.
   - **Pending:** the message defining items 3(i) / 3(ii) (the toy grid's design) has not reached Will. It was
     requested from the operator before any work on the grid.
 
+- **RESULT (Nov 13-14, for the record; Cam's item 1): arm E's 25M-equivalent readout** (laptop, from the u1500
+  checkpoint = 24.6M agent-steps; `--premium-check` with E's life course; hungry memory-kept life test on 32 readout
+  worlds; forage on 64 worlds).
+  - Food true vs deranged 0.486 vs 0.473 = **1.028x** (12.5M: 1.005x).
+  - Pass 0/35 (CI 0-9.9%).
+  - Forage 101% of the navigator (CI 97-106%; under E's life course the "adult" band covers all ages); KM ratio 0.99.
+  - Confirms the FAIL: E cannot plausibly reach 1.5x.
+  - File: `docs/data/klsE/E_25M_equivalent_u1500.json`.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
