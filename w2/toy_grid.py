@@ -71,6 +71,7 @@ def main():
     ap.add_argument("--evo-pop", type=int, default=32); ap.add_argument("--evo-elite", type=int, default=8); ap.add_argument("--evo-eps", type=int, default=64)
     ap.add_argument("--evo-sigma", type=float, default=0.3); ap.add_argument("--evo-sigma-body", type=float, default=0.02)
     ap.add_argument("--curriculum", action="store_true", help="round 2: d starts at 1; +1 when true-input reach over the last 500 episodes >= 80%%; cap --d-max")
+    ap.add_argument("--curriculum-mix", action="store_true", help="EXPLORATORY (Will): with --curriculum, each episode's d ~ uniform{1..current d} (stops forgetting nearer d)")
     ap.add_argument("--d-max", type=int, default=24); ap.add_argument("--test-d", type=int, default=12, help="round 2: after training, reach at this d (true vs shuffled)")
     ap.add_argument("--move-cost", type=float, default=DMOVE, help="audit only: the per-move energy cost (harness 0.003)")
     ap.add_argument("--eval-episodes", type=int, default=512); ap.add_argument("--curve-every", type=int, default=10)
@@ -128,10 +129,13 @@ def main():
         tw = jnp.where(jnp.abs(fo[:, 0]) >= jnp.abs(fo[:, 1]), jnp.where(fo[:, 0] < 0, 1, 2), jnp.where(fo[:, 1] > 0, 3, 4))
         return jnp.where(on, EAT, jnp.where(seen, tw, ray))
 
-    def env_reset(key, n, dval):
+    def env_reset(key, n, dval, mix=False):
         sec = jax.random.randint(key, (n,), 0, 8)
-        return dict(pos=jnp.tile(START[None], (n, 1)), fpos=food_cell(sec, dval), alive_f=jnp.ones(n, bool), E=jnp.full(n, E_START), t=jnp.zeros(n),
-                    sec=sec, pa=jnp.zeros(n, jnp.int32), pr=jnp.zeros(n), dd=jnp.full(n, dval, jnp.float32))
+        dd = jnp.broadcast_to(jnp.asarray(dval, jnp.float32), (n,))
+        if mix:                                                   # exploratory: d ~ uniform{1..dval} per episode
+            dd = jnp.floor(jax.random.uniform(jax.random.fold_in(key, 9), (n,)) * dd) + 1.0
+        return dict(pos=jnp.tile(START[None], (n, 1)), fpos=food_cell(sec, dd), alive_f=jnp.ones(n, bool), E=jnp.full(n, E_START), t=jnp.zeros(n),
+                    sec=sec, pa=jnp.zeros(n, jnp.int32), pr=jnp.zeros(n), dd=dd)
 
     def env_step(st, act):
         mv = MOVES[act]; pos = (st["pos"] + mv) % L; moved = (jnp.abs(mv).sum(-1) > 0).astype(jnp.float32)
@@ -147,7 +151,7 @@ def main():
     def policy(pp_, h, x):
         return jax.vmap(lambda hh, xx: net.apply(pp_, hh, xx))(h, x)
 
-    def rollout(pp_, carry, key, mode, dval):
+    def rollout(pp_, carry, key, mode, dval, mix=False):
         def body(c, k):
             st, h, code, ep_in_life = c
             k1, k2, k3, k4 = jax.random.split(k, 4)
@@ -163,7 +167,7 @@ def main():
             st2, r, done, ate = env_step(st, act)
             # reset finished episodes; T3: a new life (new code, memory wiped) every episodes_per_life episodes
             ep2 = ep_in_life + done.astype(jnp.int32); newlife = done & (ep2 >= (a.episodes_per_life if a.tier == "T3" else 1))
-            fresh = env_reset(k2, B, dval)
+            fresh = env_reset(k2, B, dval, mix=mix)
             st3 = jax.tree_util.tree_map(lambda u, w: jnp.where(done.reshape((-1,) + (1,) * (u.ndim - 1)), w, u), st2, fresh)
             if a.tier == "T3":
                 nc = jax.vmap(lambda kk: jax.random.permutation(kk, 8))(jax.random.split(k4, B))
@@ -173,7 +177,7 @@ def main():
             reset = (newlife if a.tier == "T3" else done).astype(jnp.float32)      # when the rollout wiped the memory
             return (st3, h3, code2, ep3), (x, act, lp, v, r, done.astype(jnp.float32), ate, h, reset)
         return jax.lax.scan(body, carry, jax.random.split(key, T))
-    roll = jax.jit(rollout, static_argnums=(3,))
+    roll = jax.jit(rollout, static_argnums=(3, 5))
 
     def seq_loss(pp_, x, h0, act, lp0, adv, ret, first):
         def body(h, xa):
@@ -255,7 +259,7 @@ def main():
         c = (st, jnp.zeros((B, Hd)), code0, jnp.zeros(B, jnp.int32)); steps, it, t0 = 0, 0, time.time()
         out["eval_init"] = {m_: evaluate(p, i, 777) for i, m_ in enumerate(("true", "shuffled", "silence"))}
         while steps < a.steps:
-            key, k = jax.random.split(key); c, R_ = roll(p, c, k, 0, jnp.float32(d_cur))
+            key, k = jax.random.split(key); c, R_ = roll(p, c, k, 0, jnp.float32(d_cur), a.curriculum_mix)
             x, act, lp, v, r, dn, ate, hin, rs = (np.asarray(z) for z in R_)        # (T, B, ...)
             adv = gae(np.swapaxes(r, 0, 1), np.swapaxes(v, 0, 1), np.swapaxes(dn, 0, 1), a.gamma, a.lam)            # (B, T)
             ret = adv + np.swapaxes(v, 0, 1); A_ = (adv - adv.mean()) / (adv.std() + 1e-8)
