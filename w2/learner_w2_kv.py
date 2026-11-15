@@ -35,6 +35,15 @@ import ckpt as _ck  # noqa: E402
 EAT = env.EAT
 
 
+def own_meal_mask(hear, closed, ate, dead):
+    """(B, T) arrays. A hearing step is labelled only if its bout's next end within the sequence is the agent eating the
+    item (closed & ate); an end by T_max or death, or no end within the sequence, leaves it unlabelled."""
+    B_, T_ = hear.shape; cur = np.zeros(B_, bool); mk = np.zeros((B_, T_), bool)
+    for t in range(T_ - 1, -1, -1):
+        end = closed[:, t] | dead[:, t]; cur = np.where(end, ate[:, t] & closed[:, t], cur); mk[:, t] = hear[:, t] & cur
+    return mk
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--navs", default="w2_out/nav_w13/*.msgpack"); ap.add_argument("--world", default="0.0013,8,0.001")
@@ -46,6 +55,7 @@ def main():
     ap.add_argument("--item-size", type=float, default=0.1); ap.add_argument("--hunger-gate", action="store_true")
     ap.add_argument("--learner", default="rec", choices=["rec", "ep"]); ap.add_argument("--slots", type=int, default=128)
     ap.add_argument("--hindsight", type=float, default=0.0); ap.add_argument("--shared-tok", action="store_true")
+    ap.add_argument("--head-own-meal", action="store_true", help="Cam Nov 15 ~11:05: label the head only on bouts the agent ENDED BY EATING the item (own-experience hindsight, as in the toy); bouts closed by T_max / death or not closed within the chunk are unlabelled")
     ap.add_argument("--demonstrator", action="store_true"); ap.add_argument("--demo-hearings", type=int, default=1)
     ap.add_argument("--policy", default="learner", choices=["learner", "follower", "copyparent"]); ap.add_argument("--head-only", action="store_true")
     ap.add_argument("--init-params", default=""); ap.add_argument("--frontier0", type=float, default=1.0)
@@ -282,7 +292,8 @@ def main():
         hm = sq(R_["h"]) if (ep and not KV) or os.environ.get("KV_COMPARE") else np.zeros((W * N, T, 1), np.float32)
         bt = dict(x=jnp.asarray(sq(R_["x"])), h0=jnp.asarray(R_["h"][:, 0].reshape(W * N, Hd)), act=jnp.asarray(sq(R_["act"])), lp=jnp.asarray(sq(R_["lp"])),
                   adv=jnp.asarray(A_.astype(np.float32)), ret=jnp.asarray(ret.astype(np.float32)), first=jnp.asarray(first.astype(np.float32)),
-                  hm=jnp.asarray(hm), sec=jnp.asarray(sq(R_["sec"])), hear=jnp.asarray(sq(R_["hear"]).astype(np.float32)),
+                  hm=jnp.asarray(hm), sec=jnp.asarray(sq(R_["sec"])),
+                  hear=jnp.asarray((own_meal_mask(sq(R_["hear"]), sq(R_["closed"]), sq(R_["ate"]), sq(R_["dead"]) > 0) if a.head_own_meal else sq(R_["hear"])).astype(np.float32)),
                   wflag=jnp.asarray(sq(R_["wflag"]).astype(np.float32)), wslot=jnp.asarray(sq(R_["wslot"])), wrec=jnp.asarray(sq(R_["wrec"])))
         if os.environ.get("KV_COMPARE"):                                     # the same batch through both replays: loss and gradient
             l_old, g_old = jax.value_and_grad(lambda q: jax.vmap(seq_loss_old, in_axes=(None, 0))(q, bt).mean())(p)
