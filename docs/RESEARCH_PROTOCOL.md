@@ -7673,6 +7673,18 @@ more expensive, because it produces publishable-looking nulls.
   - 128 slots hold every life seen (max 99).
   - Running the approved 2-minute Modal probe anyway (~$0.02): its price decides the alternatives (96 or 128 slots).
 
+- **RESULT (Nov 15 ~08:20): MODAL PRICE PROBE (64 slots): 5e7 projects ABOVE $0.9, so NOT launched (Cam's rule).**
+  `docs/data/learner_w2/probe/`.
+  - Steady throughput **3,457 steps/s** on Modal (4 CPUs), from 41k to 492k steps over 131 s. Spend ~$0.024 (watch
+    stopped).
+  - Projection: 5e7 steps = **$1.25** at $0.31 / h (measured rate), $1.41 at the watch's $0.35 / h. $0.8 buys
+    ~2.8-3.2e7.
+  - My laptop-scaled estimate (5.35k/s) was too optimistic. For this learner Modal runs at 0.37x the laptop, not
+    the 0.575x measured for the plain trainer.
+  - **Laptop throughput (same short runs):** 32 slots 11.4k/s, 64 slots 9.3k/s, 96 slots 8.5k/s, 128 slots
+    5.2-6.4k/s. The laptop is ~2.7x faster than a Modal container for this learner, and free.
+  - Two blockers now hold the 64-slot Modal launch: the slot check (13.3% of lives overflow) and the price.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
