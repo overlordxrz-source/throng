@@ -90,7 +90,7 @@ def main():
         tok = code[jnp.arange(N), item["sec"]]; oh = jax.nn.one_hot(tok, 8).astype(jnp.int32) * opened[:, None]
         dem_on = opened & a.demonstrator & (jnp.zeros(N, jnp.int32) < K)
         return dict(s=s, item=item, h=jnp.zeros((N, Hd)), pa=jnp.zeros(N, jnp.int32), pr=jnp.zeros(N), code=code,
-                    dem_pos=s.pos, dem_on=dem_on, hcnt=oh)
+                    dem_pos=s.pos, dem_on=dem_on, hcnt=oh, gen=jnp.zeros(N, bool))
 
     def step(pp_, c, k, dfront, mode):
         s, item, h, pa, pr, code = c["s"], c["item"], c["h"], c["pa"], c["pr"], c["code"]
@@ -139,10 +139,12 @@ def main():
         dem_on = jnp.where(opened, a.demonstrator & (jnp.take_along_axis(hcnt, tok_new[:, None], 1)[:, 0] <= K), c["dem_on"] & ~closed)
         dem_mv, _ = NI.step_toward(c["dem_pos"], item["pos"], L)
         dem_pos = jnp.where(opened[:, None], s3.pos, jnp.where(c["dem_on"][:, None], dem_mv, c["dem_pos"]))
-        c2 = dict(s=s3, item=item2, h=h3, pa=act, pr=r, code=code2, dem_pos=dem_pos, dem_on=dem_on, hcnt=hcnt)
+        gen_now = c["gen"] | (item["act"] & (info["take"] > 0))               # generic (world) food eaten during this bout
+        gen2 = jnp.where(opened | closed, False, gen_now)
+        c2 = dict(s=s3, item=item2, h=h3, pa=act, pr=r, code=code2, dem_pos=dem_pos, dem_on=dem_on, hcnt=hcnt, gen=gen2)
         info_ = dict(x=x, act=act, lp=lp, v=v, r=r, dead=dead.astype(jnp.float32), h=h, ate=on_item & ~dead, closed=closed & ~dead, gain=gain, pd=pd,
                      es=item["es"], d=item["d"], inb=item["act"], dem=c["dem_on"] & item["act"], hear=hear_now, first=first_hear, sec=item["sec"], hl=hl, age=age_close, alive=s.alive,
-                     wflag=wflag, wslot=wslot, wrec=wrec)
+                     wflag=wflag, wslot=wslot, wrec=wrec, cl_item=closed & on_item, cl_death=closed & dead, cl_tmax=closed & ~on_item & ~dead, gen=gen_now)
         return c2, info_
 
     def rollout_world(pp_, c, key, dfront):
@@ -219,13 +221,16 @@ def main():
                          hL=A["hL"] + (ok & f["hear"] & ~f["first"]).sum(), nL=A["nL"] + (f["hear"] & ~f["first"]).sum(),
                          ateD=A["ateD"] + (f["ate"] & f["dem"]).sum(), closedD=A["closedD"] + (f["closed"] & f["dem"]).sum(),
                          cd=A["cd"] + (dh * f["closed"][:, None]).sum(0), ad=A["ad"] + (dh * f["ate"][:, None]).sum(0))
+                for nm_, m_ in (("item", f["cl_item"]), ("tmax", f["cl_tmax"]), ("death", f["cl_death"])):
+                    for dn_, dm_ in (("all", jnp.ones(N, bool)), ("dem", f["dem"])):
+                        A = dict(A, **{f"c_{nm_}_{dn_}": A[f"c_{nm_}_{dn_}"] + (m_ & dm_).sum(), f"g_{nm_}_{dn_}": A[f"g_{nm_}_{dn_}"] + (m_ & dm_ & f["gen"]).sum()})
                 cnt = A["cnt"] + f["closed"].astype(jnp.float32); end = f["dead"] > 0          # records written in the current life (one per closed bout)
                 A = dict(A, mx=jnp.maximum(A["mx"], jnp.max(cnt)), ovf=A["ovf"] + (end & (cnt > a.slots)).sum(),
                          over=A["over"] + jnp.where(end, jnp.maximum(cnt - a.slots, 0.0), 0.0).sum(), recs=A["recs"] + jnp.where(end, cnt, 0.0).sum(),
                          cnt=jnp.where(end, 0.0, cnt))
                 return (c2, A), None
             z = jnp.float32(0.0)
-            A0 = dict(alive=z, deaths=z, oldage=z, ateD=z, closedD=z, cnt=jnp.zeros(N), mx=z, ovf=z, over=z, recs=z, paid=z, ate=z, closed=z, ate2=z, closed2=z, h1=z, n1=z, hL=z, nL=z, cd=jnp.zeros(25), ad=jnp.zeros(25))
+            A0 = dict(**{f"{p_}_{n_}_{d_}": z for p_ in ("c", "g") for n_ in ("item", "tmax", "death") for d_ in ("all", "dem")}, alive=z, deaths=z, oldage=z, ateD=z, closedD=z, cnt=jnp.zeros(N), mx=z, ovf=z, over=z, recs=z, paid=z, ate=z, closed=z, ate2=z, closed2=z, h1=z, n1=z, hL=z, nL=z, cd=jnp.zeros(25), ad=jnp.zeros(25))
             (cF, A), _ = jax.lax.scan(body, (c, A0), jax.random.split(jax.random.fold_in(key, 2), a.eval_steps))
             cnt = A["cnt"]                                                   # lives still open at the end of the horizon
             A = dict(A, ovf=A["ovf"] + (cnt > a.slots).sum(), over=A["over"] + jnp.maximum(cnt - a.slots, 0.0).sum(), recs=A["recs"] + cnt.sum())
@@ -239,6 +244,7 @@ def main():
             res = dict(mean_life_steps=float(tot["alive"] / lives), lives=float(lives), deaths=float(tot["deaths"]), paid_per_life=float(tot["paid"] / lives),
                        paid_per_step=float(tot["paid"] / tot["alive"]), item_reach=float(tot["ate"] / max(tot["closed"], 1)),
                        reach_2nd_half=float(tot["ate2"] / max(tot["closed2"], 1)),
+                       closures={f"{n_}_{d_}": [float(tot[f"c_{n_}_{d_}"]), float(tot[f"g_{n_}_{d_}"])] for n_ in ("item", "tmax", "death") for d_ in ("all", "dem")},
                        max_records_per_life=float(max(q["mx"] for q in per)), lives_overflowing=float(tot["ovf"]),
                        frac_lives_overflowing=float(tot["ovf"] / lives), frac_records_overwritten=float(tot["over"] / max(tot["recs"], 1)),
                        reach_demonstrated=float(tot["ateD"] / max(tot["closedD"], 1)), bouts_demonstrated=float(tot["closedD"]), bouts_2nd_half=float(tot["closed2"]),
