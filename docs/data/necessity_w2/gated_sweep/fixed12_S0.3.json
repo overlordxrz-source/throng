@@ -1,0 +1,73 @@
+{
+ "cfg": {
+  "navs": "w2_out/nav_w13/*.msgpack",
+  "world": "0.0013,8,0.001",
+  "v2": "/Users/overlord/throng-backup/evo2/evo2.ckpt",
+  "W": 32,
+  "N": 4,
+  "steps": 3000,
+  "d_max": 12,
+  "d_fixed": 12,
+  "seed": 0,
+  "policy_params": "",
+  "policy_oracle": false,
+  "item_size": 0.3,
+  "hunger_gate": true,
+  "follower_fallback": "",
+  "currency": "paid",
+  "bar": 1.5,
+  "out": "/private/tmp/claude-501/-Users-overlord-CascadeProjects-throng/aad77c1d-d7ac-437e-bef4-aa525802ccc0/scratchpad/nec/sweep2/fixed12_S0.3.json"
+ },
+ "H": 0.5,
+ "follower_fallback": "v2best",
+ "currency": "paid_per_life",
+ "results": {
+  "navigator": {
+   "food_per_step": 0.0018212306912367543,
+   "paid_per_life": 0.20444178685078637,
+   "paid_per_step": 0.00030559787930299837,
+   "lives": 574,
+   "deaths": 460,
+   "mean_life_steps": 668.9895470383275,
+   "items_eaten": 2,
+   "bouts_opened": 3964,
+   "item_reach_rate": 0.0005755395683453237,
+   "item_meals_fully_paid": 1.0,
+   "frac_steps_in_bout": 0.4691119791666667,
+   "agent_steps": 384000
+  },
+  "v2best": {
+   "food_per_step": 0.008334202975034713,
+   "paid_per_life": 0.1888717374493999,
+   "paid_per_step": 0.0002744542434811592,
+   "lives": 558,
+   "deaths": 437,
+   "mean_life_steps": 688.1720430107526,
+   "items_eaten": 0,
+   "bouts_opened": 1387,
+   "item_reach_rate": 0.0,
+   "item_meals_fully_paid": 0.0,
+   "frac_steps_in_bout": 0.14496875,
+   "agent_steps": 384000
+  },
+  "follower": {
+   "food_per_step": 0.009549819191296896,
+   "paid_per_life": 2.29333177767694,
+   "paid_per_step": 0.0007644439258923133,
+   "lives": 128,
+   "deaths": 128,
+   "mean_life_steps": 3000.0,
+   "items_eaten": 736,
+   "bouts_opened": 742,
+   "item_reach_rate": 1.0,
+   "item_meals_fully_paid": 0.9415760869565217,
+   "frac_steps_in_bout": 0.029765625,
+   "agent_steps": 384000
+  }
+ },
+ "premium": 11.217529512940269,
+ "best_code_free": "navigator",
+ "premium_food": 1.1458587245719343,
+ "premium_paid": 11.217529512940269,
+ "pass": true
+}

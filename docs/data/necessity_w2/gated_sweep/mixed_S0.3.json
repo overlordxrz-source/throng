@@ -1,0 +1,73 @@
+{
+ "cfg": {
+  "navs": "w2_out/nav_w13/*.msgpack",
+  "world": "0.0013,8,0.001",
+  "v2": "/Users/overlord/throng-backup/evo2/evo2.ckpt",
+  "W": 32,
+  "N": 4,
+  "steps": 3000,
+  "d_max": 12,
+  "d_fixed": 0,
+  "seed": 0,
+  "policy_params": "",
+  "policy_oracle": false,
+  "item_size": 0.3,
+  "hunger_gate": true,
+  "follower_fallback": "",
+  "currency": "paid",
+  "bar": 1.5,
+  "out": "/private/tmp/claude-501/-Users-overlord-CascadeProjects-throng/aad77c1d-d7ac-437e-bef4-aa525802ccc0/scratchpad/nec/sweep2/mixed_S0.3.json"
+ },
+ "H": 0.5,
+ "follower_fallback": "v2best",
+ "currency": "paid_per_life",
+ "results": {
+  "navigator": {
+   "food_per_step": 0.0018754306497673194,
+   "paid_per_life": 0.2435956060123618,
+   "paid_per_step": 0.0003469968658561508,
+   "lives": 547,
+   "deaths": 434,
+   "mean_life_steps": 702.0109689213893,
+   "items_eaten": 70,
+   "bouts_opened": 7304,
+   "item_reach_rate": 0.010230926629640456,
+   "item_meals_fully_paid": 1.0,
+   "frac_steps_in_bout": 0.4686015625,
+   "agent_steps": 384000
+  },
+  "v2best": {
+   "food_per_step": 0.007807109236717224,
+   "paid_per_life": 0.18924189578823455,
+   "paid_per_step": 0.0002922407401104768,
+   "lives": 593,
+   "deaths": 472,
+   "mean_life_steps": 647.5548060708263,
+   "items_eaten": 8,
+   "bouts_opened": 2572,
+   "item_reach_rate": 0.0038131553860819827,
+   "item_meals_fully_paid": 1.0,
+   "frac_steps_in_bout": 0.15468229166666667,
+   "agent_steps": 384000
+  },
+  "follower": {
+   "food_per_step": 0.009622201641400655,
+   "paid_per_life": 2.048853348940611,
+   "paid_per_step": 0.0006829511163135369,
+   "lives": 128,
+   "deaths": 128,
+   "mean_life_steps": 3000.0,
+   "items_eaten": 647,
+   "bouts_opened": 649,
+   "item_reach_rate": 1.0,
+   "item_meals_fully_paid": 0.9721792890262752,
+   "frac_steps_in_bout": 0.015182291666666667,
+   "agent_steps": 384000
+  }
+ },
+ "premium": 8.410879746478832,
+ "best_code_free": "navigator",
+ "premium_food": 1.2324922515682195,
+ "premium_paid": 8.410879746478832,
+ "pass": true
+}

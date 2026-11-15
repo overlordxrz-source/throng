@@ -1,0 +1,73 @@
+{
+ "cfg": {
+  "navs": "w2_out/nav_w13/*.msgpack",
+  "world": "0.0013,8,0.001",
+  "v2": "/Users/overlord/throng-backup/evo2/evo2.ckpt",
+  "W": 32,
+  "N": 4,
+  "steps": 3000,
+  "d_max": 12,
+  "d_fixed": 0,
+  "seed": 0,
+  "policy_params": "",
+  "policy_oracle": false,
+  "item_size": 0.2,
+  "hunger_gate": true,
+  "follower_fallback": "",
+  "currency": "paid",
+  "bar": 1.5,
+  "out": "/private/tmp/claude-501/-Users-overlord-CascadeProjects-throng/aad77c1d-d7ac-437e-bef4-aa525802ccc0/scratchpad/nec/sweep2/mixed_S0.2.json"
+ },
+ "H": 0.6000000000000001,
+ "follower_fallback": "v2best",
+ "currency": "paid_per_life",
+ "results": {
+  "navigator": {
+   "food_per_step": 0.0018991942225644986,
+   "paid_per_life": 0.24609336398896717,
+   "paid_per_step": 0.0003499140019218127,
+   "lives": 546,
+   "deaths": 434,
+   "mean_life_steps": 703.2967032967033,
+   "items_eaten": 64,
+   "bouts_opened": 8942,
+   "item_reach_rate": 0.0075569724878970365,
+   "item_meals_fully_paid": 1.015625,
+   "frac_steps_in_bout": 0.5869635416666666,
+   "agent_steps": 384000
+  },
+  "v2best": {
+   "food_per_step": 0.007002250055472056,
+   "paid_per_life": 0.135218798177274,
+   "paid_per_step": 0.0002912134012828271,
+   "lives": 827,
+   "deaths": 708,
+   "mean_life_steps": 464.32889963724307,
+   "items_eaten": 17,
+   "bouts_opened": 4869,
+   "item_reach_rate": 0.004101326899879373,
+   "item_meals_fully_paid": 1.0,
+   "frac_steps_in_bout": 0.302515625,
+   "agent_steps": 384000
+  },
+  "follower": {
+   "food_per_step": 0.009829650819301605,
+   "paid_per_life": 2.1290547363460064,
+   "paid_per_step": 0.0007096849121153354,
+   "lives": 128,
+   "deaths": 128,
+   "mean_life_steps": 3000.0,
+   "items_eaten": 1134,
+   "bouts_opened": 1135,
+   "item_reach_rate": 1.0,
+   "item_meals_fully_paid": 0.9700176366843033,
+   "frac_steps_in_bout": 0.026598958333333332,
+   "agent_steps": 384000
+  }
+ },
+ "premium": 8.651410594076221,
+ "best_code_free": "navigator",
+ "premium_food": 1.4037846037246293,
+ "premium_paid": 8.651410594076221,
+ "pass": true
+}

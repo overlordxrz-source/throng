@@ -1,0 +1,73 @@
+{
+ "cfg": {
+  "navs": "w2_out/nav_w13/*.msgpack",
+  "world": "0.0013,8,0.001",
+  "v2": "/Users/overlord/throng-backup/evo2/evo2.ckpt",
+  "W": 32,
+  "N": 4,
+  "steps": 3000,
+  "d_max": 12,
+  "d_fixed": 12,
+  "seed": 0,
+  "policy_params": "",
+  "policy_oracle": false,
+  "item_size": 0.2,
+  "hunger_gate": true,
+  "follower_fallback": "",
+  "currency": "paid",
+  "bar": 1.5,
+  "out": "/private/tmp/claude-501/-Users-overlord-CascadeProjects-throng/aad77c1d-d7ac-437e-bef4-aa525802ccc0/scratchpad/nec/sweep2/fixed12_S0.2.json"
+ },
+ "H": 0.6000000000000001,
+ "follower_fallback": "v2best",
+ "currency": "paid_per_life",
+ "results": {
+  "navigator": {
+   "food_per_step": 0.001826452711286644,
+   "paid_per_life": 0.20113933791284977,
+   "paid_per_step": 0.0003011852065101266,
+   "lives": 575,
+   "deaths": 461,
+   "mean_life_steps": 667.8260869565217,
+   "items_eaten": 2,
+   "bouts_opened": 5103,
+   "item_reach_rate": 0.0004348771472059143,
+   "item_meals_fully_paid": 1.0,
+   "frac_steps_in_bout": 0.5986588541666666,
+   "agent_steps": 384000
+  },
+  "v2best": {
+   "food_per_step": 0.007515273809432984,
+   "paid_per_life": 0.14306614529184936,
+   "paid_per_step": 0.0002660136139020324,
+   "lives": 714,
+   "deaths": 595,
+   "mean_life_steps": 537.8151260504202,
+   "items_eaten": 2,
+   "bouts_opened": 2318,
+   "item_reach_rate": 0.0011723329425556857,
+   "item_meals_fully_paid": 1.0,
+   "frac_steps_in_bout": 0.26342447916666667,
+   "agent_steps": 384000
+  },
+  "follower": {
+   "food_per_step": 0.009770849724610647,
+   "paid_per_life": 2.377803213894367,
+   "paid_per_step": 0.0007926010712981224,
+   "lives": 128,
+   "deaths": 128,
+   "mean_life_steps": 3000.0,
+   "items_eaten": 1267,
+   "bouts_opened": 1272,
+   "item_reach_rate": 1.0,
+   "item_meals_fully_paid": 0.9542225730071034,
+   "frac_steps_in_bout": 0.050359375,
+   "agent_steps": 384000
+  }
+ },
+ "premium": 11.821671675804305,
+ "best_code_free": "navigator",
+ "premium_food": 1.3001322336847556,
+ "premium_paid": 11.821671675804305,
+ "pass": true
+}

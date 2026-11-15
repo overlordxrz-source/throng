@@ -7335,6 +7335,43 @@ more expensive, because it produces publishable-looking nulls.
     - S 0.3 passes both (p 0.7).
     - The smallest passing size is 0.2 (p 0.4).
 
+- **RESULT (Nov 15 ~04:20): (ii) WORLD FIX + ITEM-SIZE SWEEP: PASS at item size 0.1** (gated; 32 worlds x 4
+  agents x 3000 steps; seed 0; `docs/data/necessity_w2/gated_sweep/`).
+
+  | item size | design | follower paid / life | best code-free (navigator) | premium per life | premium per step | old food premium |
+  |---|---|---|---|---|---|---|
+  | 0.1 | mixed d 1-12 | 2.378 | 0.222 | **10.7x** | 2.4x | 1.43x |
+  | 0.1 | fixed d = 12 | 3.287 | 0.204 | **16.1x** | 3.6x | 1.37x |
+  | 0.2 | mixed / fixed | | | 8.6x / 11.8x | | 1.40x / 1.30x |
+  | 0.3 | mixed / fixed | | | 8.4x / 11.2x | | 1.23x / 1.15x |
+
+  - **The smallest passing size is 0.1.** My prediction (0.1 fails at fixed d = 12, p 0.7) MISSED.
+  - **In paid intake the strongest code-free policy is the navigator, not v2-best.** v2-best eats a lot of unpaid
+    food and dies about every 450 steps.
+  - **Mechanism, a caveat for Cam:** paid intake per life is about the paid rate x the life length. The follower
+    never starves: a hungry agent always gets a meal on demand. Its lives are capped by the 3000-step horizon
+    (A_max), so the per-life premium is mostly survival and scales with the horizon. I report the per-step premium
+    alongside; it passes too (2.4x mixed, 3.6x fixed).
+  - **Two counting defects, found and fixed BEFORE these numbers** (comm-toy 3687a6a):
+    - a final-step old-age death counted a zero-length extra life;
+    - eats on a death step entered the reach numerator (reach 1.0005).
+  - With the gate on, every bout opens at E < H (0 bouts at E >= H in the control below), so every item meal is
+    paid (94-98% fully paid).
+- **RESULT (Nov 15 ~04:15): (iii) CURRICULUM POSITIVE CONTROL: PASS.**
+  - The scripted follower (v2-best outside bouts) ran through the real port_w2 gate (gated, size 0.1, W 32) and
+    pushed the frontier to the cap of 24 by 2.05M agent-steps, with reach 1.0 throughout.
+  - `docs/data/port_w2/curriculum_posctl_follower_gate_S0.1.json`.
+- **REGISTERED (before launch): ORACLE #2 bar.**
+  - Bar: trained (oracle input) paid intake per life >= 1.3x the best code-free policy, with a 2.5% bootstrap
+    LB > 1.0x. The bootstrap resamples worlds, so each policy's lives stay paired by key.
+  - Evaluation: the necessity lives / keys (gated, size 0.1, mixed d 1-12, 32 worlds x 3000 steps, seed 0).
+  - Reported alongside: the per-step premium, the fixed d = 12 premium, item reach, survival, and the frontier
+    reached in training.
+  - **Comparator caveat for Cam:** v2-best and the navigator were not trained for paid intake in this world. A PPO
+    learner could beat them through better homeostasis alone, without using the oracle. The frontier is the readout
+    that cannot be faked: beyond d = 1 an item is invisible until adjacent, so >= 80% reach at d >= 3 requires the
+    signal. A code-free PPO comparator would cost about $0.8; it is not run without approval.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
