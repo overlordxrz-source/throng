@@ -1,0 +1,97 @@
+{
+ "cfg": {
+  "d": 12,
+  "hidden": true,
+  "lam": 0.95,
+  "gamma": 0.99,
+  "tier": "T3",
+  "learner": "L2e",
+  "kl": 0.3,
+  "steps": 1000000.0,
+  "B": 256,
+  "T": 32,
+  "seed": 10,
+  "episodes_per_life": 64,
+  "epochs": 4,
+  "minibatches": 8,
+  "lr": 0.0003,
+  "evo_pop": 32,
+  "evo_elite": 8,
+  "evo_eps": 64,
+  "evo_sigma": 0.3,
+  "evo_sigma_body": 0.02,
+  "curriculum": true,
+  "curriculum_mix": true,
+  "d_max": 24,
+  "test_d": 12,
+  "save_params": "",
+  "skip_final_eval": false,
+  "eval_params": "/private/tmp/claude-501/-Users-overlord-CascadeProjects-throng/aad77c1d-d7ac-437e-bef4-aa525802ccc0/scratchpad/r3/screen2/L2e_B_s10.params",
+  "eval_modes": "0,3,4",
+  "life_credit": false,
+  "hindsight": 0.5,
+  "save_params_at": "",
+  "hind_at_start": true,
+  "head_control": false,
+  "shared_tok": true,
+  "demo_hearings": 1,
+  "demonstrator": true,
+  "ckpt": "",
+  "ckpt_every": 20,
+  "max_seconds": 0,
+  "move_cost": 0.003,
+  "eval_episodes": 9000,
+  "curve_every": 10,
+  "navs": "w2_out/nav_w13/*.msgpack",
+  "out": "/private/tmp/claude-501/-Users-overlord-CascadeProjects-throng/aad77c1d-d7ac-437e-bef4-aa525802ccc0/scratchpad/r3/screen2/L2e_B_s10_eval_d12.json"
+ },
+ "cap": 48,
+ "curve": [],
+ "eval_modes": {
+  "0": {
+   "overall": 0.9740105683166181,
+   "first_half": 0.9706540661526983,
+   "second_half": 0.9959382615759546,
+   "head_acc_by_hearing": {
+    "first": [
+     0.16518737672583828,
+     2028
+    ],
+    "later": [
+     0.9752805986103688,
+     7484
+    ]
+   }
+  },
+  "3": {
+   "overall": 0.24060479894817574,
+   "first_half": 0.2642822265625,
+   "second_half": 0.033155080213903745,
+   "head_acc_by_hearing": {
+    "first": [
+     0.12604628261939932,
+     2031
+    ],
+    "later": [
+     0.12496596787367274,
+     7346
+    ]
+   }
+  },
+  "4": {
+   "overall": 0.26504579153946795,
+   "first_half": 0.286865234375,
+   "second_half": 0.0826530612244898,
+   "head_acc_by_hearing": {
+    "first": [
+     0.11909448818897637,
+     2032
+    ],
+    "later": [
+     0.1296697347049269,
+     7388
+    ]
+   }
+  }
+ }
+}

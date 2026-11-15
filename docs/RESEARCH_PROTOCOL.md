@@ -7608,6 +7608,17 @@ more expensive, because it produces publishable-looking nulls.
   - Prediction: head accuracy on 2nd+ hearings >= 90% (p 0.6). The 1st hearing and the shuffled-code mode stay
     near 1/8 (p 0.9).
 
+- **RESULT (Nov 15 07:06): SCREEN 2 (shared token embedding, seeds 8-12): 5/5 TAKE-OFFS, 5/5 BAR PASSES. Joins the
+  port recipe.** `docs/data/toy_grid/T3_round2/screen2_sharedtok/`.
+  - d = 12 second half: true 0.996-0.999; shuffled 0.018-0.035; wiped 0.007-0.083; head on later hearings
+    0.97-0.99, 1st hearing 0.17-0.18.
+  - Compare screen 1 (head weight 1.0): 3/5 passes, 4/5 take-offs. The base recipe at 20M: 2/3.
+  - Predictions: take-offs 5/5 (p 0.35) HIT; bar 5/5 (p 0.2) HIT. I underrated the fix.
+  - Mechanism, consistent with the attention check: stalled seeds had settled on an anti-matched read; tying query
+    and key token embeddings makes same-sound records look alike from the start.
+  - **Learner recipe (Cam's rule: more passes): SCREEN 2**, i.e. L2e-style memory + `--shared-tok` + head 0.5 at the
+    hearing + demonstrator on the 1st hearing + mixed curriculum.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
