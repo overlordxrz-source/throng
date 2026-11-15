@@ -7761,7 +7761,7 @@ more expensive, because it produces publishable-looking nulls.
     gradient step (when it is written in the replayed sequence), masked by write time. Stage-2 cost item.
   - **If seed 0 is early-stopped at 2.5e7, it counts as FAIL and seed 1 does NOT start; report first.**
     (Implemented: hold files stop the runner from starting seeds 1-2 until the check passes.)
-- **RESULT (Nov 15 ~09:45): SEED 0 DIAGNOSTICS at 12.8M** (frontier 3), free, from the checkpoint and logs.
+- **RESULT (Nov 15 ~09:36): SEED 0 DIAGNOSTICS at 12.8M** (frontier 3), free, from the checkpoint and logs.
   `docs/data/learner_w2/seed0_diag/`, `docs/data/toy_grid/T3_round2/hearings/`.
   - **(a) Reach by distance** (eval, mixed d 1-3): d = 1 **0.96**; d = 2 **0.61**; d = 3 **0.15**.
     - At d = 2 only the diagonal sectors are adjacent (in view); the cardinal ones sit 2 cells away, unseen. So
