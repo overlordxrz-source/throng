@@ -1,0 +1,148 @@
+{
+ "cfg": {
+  "d": 12,
+  "hidden": true,
+  "lam": 0.95,
+  "gamma": 0.99,
+  "tier": "T3",
+  "learner": "L2",
+  "kl": 0.3,
+  "steps": 3000000.0,
+  "B": 256,
+  "T": 256,
+  "seed": 0,
+  "episodes_per_life": 64,
+  "epochs": 4,
+  "minibatches": 8,
+  "lr": 0.0003,
+  "evo_pop": 32,
+  "evo_elite": 8,
+  "evo_eps": 64,
+  "evo_sigma": 0.3,
+  "evo_sigma_body": 0.02,
+  "curriculum": true,
+  "curriculum_mix": true,
+  "d_max": 24,
+  "test_d": 12,
+  "save_params": "/private/tmp/claude-501/-Users-overlord-CascadeProjects-throng/aad77c1d-d7ac-437e-bef4-aa525802ccc0/scratchpad/r2/T3c/L2lc.params",
+  "skip_final_eval": true,
+  "eval_params": "",
+  "eval_modes": "0,3,4",
+  "life_credit": true,
+  "ckpt": "",
+  "ckpt_every": 20,
+  "max_seconds": 0,
+  "move_cost": 0.003,
+  "eval_episodes": 512,
+  "curve_every": 10,
+  "navs": "w2_out/nav_w13/*.msgpack",
+  "out": "/private/tmp/claude-501/-Users-overlord-CascadeProjects-throng/aad77c1d-d7ac-437e-bef4-aa525802ccc0/scratchpad/r2/T3c/L2lc_train.json"
+ },
+ "cap": 48,
+ "curve": [
+  {
+   "steps": 655360,
+   "d": 1,
+   "reach_train": 0.1655902717169954,
+   "sec": 18.1,
+   "act_freq": [
+    0.145,
+    0.091,
+    0.088,
+    0.079,
+    0.132,
+    0.466
+   ],
+   "adv_by_act": [
+    0.522,
+    0.613,
+    0.593,
+    0.62,
+    0.607,
+    0.6
+   ],
+   "ret_mean": -0.073,
+   "r_eat": 1.803
+  },
+  {
+   "steps": 1310720,
+   "d": 1,
+   "reach_train": 0.40803982442993253,
+   "sec": 33.2,
+   "act_freq": [
+    0.031,
+    0.151,
+    0.136,
+    0.125,
+    0.168,
+    0.389
+   ],
+   "adv_by_act": [
+    0.522,
+    0.67,
+    0.663,
+    0.666,
+    0.643,
+    0.72
+   ],
+   "ret_mean": 8.127,
+   "r_eat": 1.805
+  },
+  {
+   "steps": 1966080,
+   "d": 1,
+   "reach_train": 0.576135174201266,
+   "sec": 48.7,
+   "act_freq": [
+    0.012,
+    0.155,
+    0.142,
+    0.182,
+    0.229,
+    0.28
+   ],
+   "adv_by_act": [
+    0.347,
+    0.632,
+    0.696,
+    0.573,
+    0.51,
+    0.785
+   ],
+   "ret_mean": 13.891,
+   "r_eat": 1.807
+  },
+  {
+   "steps": 2621440,
+   "d": 1,
+   "reach_train": 0.6256548347613219,
+   "sec": 64.8,
+   "act_freq": [
+    0.006,
+    0.159,
+    0.137,
+    0.188,
+    0.255,
+    0.255
+   ],
+   "adv_by_act": [
+    0.153,
+    0.295,
+    0.333,
+    0.257,
+    0.233,
+    0.581
+   ],
+   "ret_mean": 18.535,
+   "r_eat": 1.807
+  }
+ ],
+ "eval_init": null,
+ "train_seconds": 74.0,
+ "eval": {
+  "true": 0,
+  "shuffled": 0,
+  "silence": 0
+ },
+ "d_max_reached": 1
+}

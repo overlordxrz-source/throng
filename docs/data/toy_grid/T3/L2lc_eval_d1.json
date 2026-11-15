@@ -1,0 +1,60 @@
+{
+ "cfg": {
+  "d": 12,
+  "hidden": true,
+  "lam": 0.95,
+  "gamma": 0.99,
+  "tier": "T3",
+  "learner": "L2",
+  "kl": 0.3,
+  "steps": 3000000.0,
+  "B": 256,
+  "T": 256,
+  "seed": 0,
+  "episodes_per_life": 64,
+  "epochs": 4,
+  "minibatches": 8,
+  "lr": 0.0003,
+  "evo_pop": 32,
+  "evo_elite": 8,
+  "evo_eps": 64,
+  "evo_sigma": 0.3,
+  "evo_sigma_body": 0.02,
+  "curriculum": true,
+  "curriculum_mix": true,
+  "d_max": 24,
+  "test_d": 1,
+  "save_params": "",
+  "skip_final_eval": false,
+  "eval_params": "/private/tmp/claude-501/-Users-overlord-CascadeProjects-throng/aad77c1d-d7ac-437e-bef4-aa525802ccc0/scratchpad/r2/T3c/L2lc.params",
+  "eval_modes": "0,3,4",
+  "life_credit": true,
+  "ckpt": "",
+  "ckpt_every": 20,
+  "max_seconds": 0,
+  "move_cost": 0.003,
+  "eval_episodes": 9000,
+  "curve_every": 10,
+  "navs": "w2_out/nav_w13/*.msgpack",
+  "out": "/private/tmp/claude-501/-Users-overlord-CascadeProjects-throng/aad77c1d-d7ac-437e-bef4-aa525802ccc0/scratchpad/r2/T3c/L2lc_eval_d1.json"
+ },
+ "cap": 48,
+ "curve": [],
+ "eval_modes": {
+  "0": {
+   "overall": 0.7307276741673322,
+   "first_half": 0.7307369224894998,
+   "second_half": 0.730712890625
+  },
+  "3": {
+   "overall": 0.7303191239366452,
+   "first_half": 0.730531142529614,
+   "second_half": 0.72998046875
+  },
+  "4": {
+   "overall": 0.6341618865519439,
+   "first_half": 0.6355772846934938,
+   "second_half": 0.63232421875
+  }
+ }
+}

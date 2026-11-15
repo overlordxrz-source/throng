@@ -174,3 +174,26 @@ through. L2' (the transformer memory, T3 only) is therefore not built.
 reach, defeats PPO before distance or necessity even enter. Any stage-1 world has to make the first step toward
 named food pay within reach. That means a very near start (d <= 3), with near-free movement or a denser payoff early,
 then lengthening. And the learner should not be locked to the frozen navigator trunk.
+
+### T3 (random code per life): FAIL for every memory (Nov 15, comm-toy `54c72b0`)
+
+| memory (T3, seed 0, mixed curriculum, harness cost, 3M steps) | max d | at its d: true 1st->2nd half / within-life shuffled / wiped | d = 12: true / shuffled / wiped (2nd half) |
+|---|---|---|---|
+| ideal learner (scripted ceiling) | - | d 3: 83->100 / 34->35 / 38->41; d 2: 95->100 / 76->78 | 100 / 37 / 41 |
+| L2 GRU | 4 | d 4: 37->37 / 37->38 / 37->38 | 0 / 0 / 0 |
+| L1u (unfrozen navigator, its GRU) | 3 | d 3: 31->31 / 31->31 / 37->40 | 0 / 0 / 0 |
+| L2t transformer (128-step window) | 5 | d 4: 0 / 0 / 0 | 0 / 0 / 0 |
+| L2 GRU, life-level credit + 256-step BPTT (diagnostic, B 64) | 3 | d 3: 32->33 / 32->32 / 31->32 | 4 / 3 / 6 |
+| L2e episode-level memory (64 slots) | 4 | d 2: 85->88 / 85->87 / 86->88; d 3: 60->64 / 60->63 / 60->64 | 0 / 0 / 0 |
+
+- **No memory shows the in-context signature.** First half = second half = the controls everywhere. Every
+  learner's curriculum stalls at d = 3-5.
+- **The mechanism.** Where the code is unnecessary (d <= 2), code-free search already succeeds 85-88%, so there is
+  nothing to learn. Where it becomes necessary (d >= 3), no learner bootstraps the find-then-recall loop; the ideal
+  learner shows the loop is worth ~+60 points.
+- **Not the cause:**
+  - the credit setup: life-level credit with long backprop changes nothing;
+  - a memory that cannot see far enough back: the episode-level memory holds every past episode's raw record and
+    still does not learn to read it.
+- What T1 / T2 showed works: following a fixed signal (oracle or fixed code). What fails is inferring a NEW code
+  within a life from sparse successes, under PPO, in 3M steps.

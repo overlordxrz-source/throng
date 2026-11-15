@@ -6982,6 +6982,28 @@ more expensive, because it produces publishable-looking nulls.
   - Running: T3 seed 0 for L2 (GRU), L1u and L2t (transformer). Mixed curriculum, harness cost, 3M steps; training
     saves weights, then modes 0 / 3 / 4 are evaluated in separate processes.
 
+- **RESULT (Nov 15 ~00:40): TOY T3 (random code per life): FAIL for every memory** (comm-toy `54c72b0`; table in
+  `docs/STAGE1_RETHINK.md`; files `docs/data/toy_grid/T3/`).
+| memory (T3, seed 0, mixed curriculum, harness cost, 3M steps) | max d | at its d: true 1st->2nd half / within-life shuffled / wiped | d = 12: true / shuffled / wiped (2nd half) |
+|---|---|---|---|
+| ideal learner (scripted ceiling) | - | d 3: 83->100 / 34->35 / 38->41; d 2: 95->100 / 76->78 | 100 / 37 / 41 |
+| L2 GRU | 4 | d 4: 37->37 / 37->38 / 37->38 | 0 / 0 / 0 |
+| L1u (unfrozen navigator, its GRU) | 3 | d 3: 31->31 / 31->31 / 37->40 | 0 / 0 / 0 |
+| L2t transformer (128-step window) | 5 | d 4: 0 / 0 / 0 | 0 / 0 / 0 |
+| L2 GRU, life-level credit + 256-step BPTT (diagnostic, B 64) | 3 | d 3: 32->33 / 32->32 / 31->32 | 4 / 3 / 6 |
+| L2e episode-level memory (64 slots) | 4 | d 2: 85->88 / 85->87 / 86->88; d 3: 60->64 / 60->63 / 60->64 | 0 / 0 / 0 |
+  - No memory shows the in-context signature (first = second half = controls). The curricula stall at d = 3-5.
+  - Where the code is unnecessary (d <= 2) code-free search succeeds 85-88%. Where it is necessary (d >= 3) no learner
+    bootstraps find-then-recall; the ideal shows it is worth ~+60 points.
+  - **Extra runs, labelled as mine:**
+    - life-level credit (RL^2-style: GAE terminal only at life end) with 256-step BPTT on the GRU: changes nothing.
+      It was underpowered at B 256 (46 updates), so it was re-run at B 64 (183 updates); still nothing;
+    - Cam's 3(d) episode-level memory, built as 64 slots of RAW episode records (token, end displacement, ate) with a
+      learned key/value read. A summary learned from within-episode states would need backprop hundreds of steps
+      back. It fails too.
+  - Per Cam's 3(d) the episode-level memory was the step before concluding. **All T3 memories fail.** Cam to rule.
+  - The W2 port spec (Cam's item 4) is NOT drafted: it was conditional on a T3 pass.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
