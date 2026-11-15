@@ -7863,6 +7863,10 @@ more expensive, because it produces publishable-looking nulls.
       when its read left chance is unknown.
     - The policy is now acting on it: reach at d = 3 went 0.11 -> 0.44 as the head went 0.27 -> 0.57.
 
+- **RESULT (Nov 15 10:38): SEED 0 PASSES THE EARLY-STOP CHECK.** At 25.2M steps (half of 5e7), frontier 6 (> 5),
+  training reach 0.69. It carries on to 5e7 on learner_w2.py, ETA ~12:30. Then seeds 1-2 on learner_w2_kv.py, one at
+  a time (queued). My prediction "passes 5 by half" (p 0.8) HIT.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
