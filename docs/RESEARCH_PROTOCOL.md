@@ -7990,7 +7990,7 @@ more expensive, because it produces publishable-looking nulls.
   - Afterwards: A2 + the curriculum positive control under the final gate, then one masked seed (+ the waiting
     parent).
   - Seed 1's old-recipe checkpoint is kept, not resumed.
-- **RESULT (Nov 15 ~12:25): (2) NO train / eval REACH MISMATCH. The CURRICULUM GATE fires on lucky windows.**
+- **RESULT (Nov 15 ~12:06): (2) NO train / eval REACH MISMATCH. The CURRICULUM GATE fires on lucky windows.**
   `docs/data/learner_w2/gate_sat/`.
   - Oracle #2's logged training reach (one iteration per log point) averages **0.63-0.75** in every 1.5M-step
     block, frontier 1 to 22. The evaluator gives ~0.68 over d 1-22. They agree.
