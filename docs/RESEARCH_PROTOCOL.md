@@ -6798,6 +6798,22 @@ more expensive, because it produces publishable-looking nulls.
     - L1 can learn the visible task at KL 0 (its trunk helps), but KL 0.3 holds it near the navigator.
   - The full T1 grid then runs as specified (harness reward and PPO), one seed per cell.
 
+- **Cam, Nov 14 (addenda 5-6 to the toy grid; relayed by the operator):**
+  5. **L3 = evolution**: v2's selection machinery (pop 32, elite 8), fitness = reach-food rate over the cell's
+     episodes; tiers T1 and T2 only; the same 1M-step budget per cell; reported beside L1 / L2. Cam will weigh
+     evolution vs PPO as the stage-1 learner from this.
+  6. **L2' = a small causal transformer memory** (blank init, 2-4 layers, sliding window over the life, ~the GRU's
+     parameter count), tier T3 only, beside L2's GRU, same budget. If it beats the GRU on T3, it becomes the stage-1
+     memory candidate.
+  - **Will's implementation of L3** (comm-toy `toy_grid.py --learner L3`):
+    - evolves L1's side_enc + GRU + side head on the frozen navigator trunk (as v2 did), sigma 0.3 head / 0.02 body;
+    - each member scored on 64 episodes per generation with common random numbers;
+    - fitness = reach rate; elite #1 evaluated with true / shuffled / silence.
+    - More distant cells get fewer generations within 1M steps (longer episodes).
+    - First cell (d = 3 visible, T1): 1.4% -> 62% true / 42% shuffled / 28% silence in 47 generations. Evolution
+      climbs under the move cost that freezes PPO; below the bar.
+  - **L2' is built only if some cell passes T2** (T3 is gated on T2; T1 has no passes so far for L1 / L2).
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
