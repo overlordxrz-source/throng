@@ -7711,6 +7711,26 @@ more expensive, because it produces publishable-looking nulls.
     - the head on 2nd+ hearings at d = 12 >= 0.8 for passing seeds (p 0.7).
   - Main risk: PPO must learn to follow the parent and to act on its read in a richer world than the toy's.
 
+- **RESULT (Nov 15 ~08:52): GPU PRICE PROBE: neither GPU projects 5e7 at <= $0.9, so the seeds STAY ON THE LAPTOP.**
+  `docs/data/learner_w2/gpuprobe/`.
+  - Both containers ran on CUDA (jax.devices() = CudaDevice).
+  - Steady throughput, registered config (96 slots, W 32, 8 x 4 PPO): **T4 7,447 steps/s; L4 5,936 steps/s.** The L4
+    is slower than the T4: the learner is bound by the host-side loop (2 CPUs), not the GPU.
+  - Projected 5e7 per seed, at Modal list prices (GPU + 2 CPU + 8 GB):
+    - T4 ~$0.75/h -> 1.87 h -> **~$1.40**;
+    - L4 ~$0.96/h -> 2.34 h -> **~$2.24**.
+    - Billing for the GPU app is not yet in the hourly report; I will replace these with billed figures.
+  - Laptop (CPU) for comparison: ~6.5-8.5k steps/s, $0.
+  - **OVERSPEND (disclosed):** the item watch (RATE $1/h per task) estimated $0.145 at 08:36 and stopped the app
+    above its $0.125 stop line. The probe item cap was $0.10. Causes:
+    - the L4 container started 6 minutes after the T4 (GPU scheduling);
+    - both containers had CUDA start-up and JIT time before the 120 s training window.
+    - The L4 probe was cut at 450k steps; its rate is from 11 logged points.
+  - The first watch started at the CPU rate ($0.35/h) and was restarted at $1/h before the spawn.
+  - Stage-2 costing fact: for this learner a Modal T4 is ~2.2x a Modal CPU container per step, but ~2.4x the $/h,
+    so no cheaper per step. GPU speed-ups need the host loop moved onto the device first (the replay batch
+    construction, numpy round-trips).
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
