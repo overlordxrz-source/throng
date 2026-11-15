@@ -6913,6 +6913,31 @@ more expensive, because it produces publishable-looking nulls.
     - All flagged as resting on the variant recipe.
   - Files: `docs/data/toy_grid/round2/`.
 
+- **RESULT (Nov 14 ~22:50): TOY T2 (fixed code) with the mixed-curriculum recipe: PASSES 6/6** (harness move cost,
+  hidden, minibatched PPO 8 x 4, 3M steps; test at d = 12 with the true vs a shuffled token).
+
+| learner | move cost | distance | seed | max d | d=12 true | d=12 shuffled | pass | train s |
+|---|---|---|---|---|---|---|---|---|
+| L1u | 0.003 | curriculum | 0 | 24 | 84 | 1 | PASS | 122.5 |
+| L1u | 0.003 | curriculum | 1 | 24 | 92 | 1 | PASS | 176.8 |
+| L1u | 0.003 | curriculum | 2 | 24 | 93 | 1 | PASS | 142.2 |
+| L2 | 0.003 | curriculum | 0 | 24 | 100 | 0 | PASS | 27.1 |
+| L2 | 0.003 | curriculum | 1 | 24 | 100 | 0 | PASS | 27.4 |
+| L2 | 0.003 | curriculum | 2 | 24 | 100 | 0 | PASS | 27.3 |
+
+  - With the recipe, slow weights learn token -> direction under the real move cost (L2 3/3, L1u 3/3).
+- **RUNNING: TOY T3 (random code per life)** with the same recipe; learners L2 (GRU), L2t (Cam's addendum-6
+  transformer) and L1u (its own GRU); seed 0 first.
+  - **Will's design choices (disclosed):**
+    - 64 episodes per life (8 would leave almost no repeats of a token to learn from). Even if every first exposure
+      to a token fails, the ceiling is ~88%.
+    - Evaluation over 9,000 episodes, so every environment passes mid-life; **reach in the second half of each life
+      (episodes 32+) is the in-context signal**.
+    - L2t: 2 layers, width 40, 4 heads, a 128-step sliding window with a KV cache, ~35k parameters (GRU 33k). The
+      window covers only a few episodes, while a token recurs ~every 16, so it may be unable to recall far enough
+      back: a structural limit to weigh in its result.
+    - Runs are checkpointed in < 10-minute chunks (chunked == straight run, exactly).
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
