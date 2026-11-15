@@ -6829,6 +6829,29 @@ more expensive, because it produces publishable-looking nulls.
     - evolution is the only learner that improves under the real cost, but weakly and only at d = 3.
   - Cam rules on the world change and the learner.
 
+- **Cam, Nov 14 ~22:00 (rulings on toy-grid T1).**
+  1. Readings accepted: PPO code cleared; the blocker is EXPLORATION under an action cost with a payoff outside random
+     reach (PPO learns to freeze); the frozen trunk is a second blocker; lambda irrelevant; evolution is the only
+     learner that improves under the real cost.
+     - **KEY FINDING:** harness PPO takes only ~244 gradient steps per 1M samples (2 full-batch epochs). That
+       handicapped every Modal run so far. Minibatched PPO becomes the default once round 2 validates it.
+  2. **TOY ROUND 2** (laptop; T1, hidden food, oracle input):
+     - learners: L2 (MLP from scratch), L1u (navigator-initialised, UNFROZEN, KL 0), L3 (evolution);
+     - PPO for L2 / L1u: 8 minibatches x 4 epochs, entropy 0.01 (the harness's own value is also 0.01);
+     - distance: (i) fixed d = 12; (ii) AUTO CURRICULUM: d starts at 1, +1 whenever true-input reach over the last 500
+       episodes >= 80%, cap 24, d logged over steps;
+     - move cost: harness vs 0; 3M agent-steps per run; seed 0, then 3 seeds on any passing recipe;
+     - readout: max d reached; after training, d = 12 hidden reach true vs shuffled; learning curves;
+     - **PASS:** under the HARNESS move cost, d = 12 hidden >= 80% true, >= 2x shuffled and +30 points, on 3/3 seeds.
+  3. Reading:
+     - a recipe passes -> T2 / T3 in the toy (GRU vs transformer), then the W2 stage-1 world is designed around it;
+     - only move cost 0 passes -> the next lever is a curiosity / exploration bonus (M-approved hook), tested in the
+       toy first;
+     - nothing passes even with the curriculum at move cost 0 -> rethink the learner.
+  4. Nothing on Modal.
+  - **Will's operationalisation for L3's curriculum** (evolution has no rolling episodes): d advances when the 8
+    elites' own episodes in that generation (8 x 64 = 512) reach >= 80%.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
