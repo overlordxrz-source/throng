@@ -7503,7 +7503,7 @@ more expensive, because it produces publishable-looking nulls.
     - EARLY STOP: frontier not past 5 by half the steps -> stopped, counted as FAIL.
     - PRE-APPROVED once the twin PASSES, A1-A4 pass, and the recipe is picked after screen 2.
 
-- **REGISTERED (Nov 15 ~06:05, before launch): DEAF TWIN** (`twin_w2`, comm-toy 29a8ecb).
+- **REGISTERED (Nov 15 ~05:45, before launch at 05:49): DEAF TWIN** (`twin_w2`, comm-toy 29a8ecb).
   - Design: oracle #2's exact command without `--oracle` (the oracle slot is zero in training and in evaluation) and
     the same init seed.
   - Frontier: replayed from oracle #2's logged curve via `--frontier-schedule`. It uses the latest logged value at
@@ -7518,7 +7518,7 @@ more expensive, because it produces publishable-looking nulls.
     passes for Cam's purpose only if it lives <= 2000 steps on average.
   - Predictions: the twin's mean life ~1200-2000 (the deafened oracle #2 net: 1013); **bar PASS p 0.55.**
 
-- **PREDICTION (Nov 15 ~06:00, before the attention check).**
+- **PREDICTION (Nov 15 ~05:50, before the attention check).**
   - Method: final weights of seeds 0, 1, 2 (20M) and 5 (screen 1); eval mode 0 at d = 5, the distance where the
     stalled seeds sit; the hearing steps of the 2nd+ hearings in each life.
     - Measured: the read's attention mass on same-token records and on the most recent record, each over its chance
@@ -7530,11 +7530,11 @@ more expensive, because it produces publishable-looking nulls.
     - seeds 2 and 5 (stalled) are token-blind, < 2x chance (p 0.6);
     - therefore the SWAP to a shared token embedding (p 0.5).
 
-- **RESULT (Nov 15 06:10): ABLATION (b) GRU + head + demonstrator: FAIL. The episodic memory is needed.**
+- **RESULT (Nov 15 05:39-05:51): ABLATION (b) GRU + head + demonstrator: FAIL. The episodic memory is needed.**
   - Seed 0, 20M: frontier stalled at 4. At d = 12 the second half is true 0.015, shuffled 0.013, wiped 0.016; the
     head on later hearings 0.12 (chance). My prediction: FAIL, p 0.75.
   - `docs/data/toy_grid/T3_round2/ablations/b_gru/`.
-- **RESULT (Nov 15 ~06:15): ATTENTION CHECK.**
+- **RESULT (Nov 15 ~05:51): ATTENTION CHECK.**
   - Setup: final weights; eval mode 0 at d = 5, 3000 episodes; hearing steps of 2nd+ hearings with >= 2 records.
     Script and evals in `docs/data/toy_grid/T3_round2/attention_check/`.
 
@@ -7553,7 +7553,7 @@ more expensive, because it produces publishable-looking nulls.
   - Below Cam's 2x line, so **SWAP mitigation 2 for the SHARED TOKEN EMBEDDING.**
   - Predictions scored: take-off seeds >= 3x (p 0.75) HIT; stalled seeds < 2x (p 0.6) HIT; swap (p 0.5) HIT.
     Honest note: I predicted "blind", but the stalled seeds are anti-matched.
-- **REGISTERED (Nov 15 ~06:15, before launch): SCREEN 2 = SHARED TOKEN EMBEDDING.**
+- **REGISTERED (Nov 15 ~05:52, before launch at 05:53): SCREEN 2 = SHARED TOKEN EMBEDDING.**
   - Flag `--shared-tok`, comm-toy dfddd34. The query is [E(heard token), Wq z] and the keys are
     [E(record token), Wk record], with one shared E (8 -> 16, no bias).
   - Tests:
