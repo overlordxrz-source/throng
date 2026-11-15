@@ -132,6 +132,7 @@ def main():
     ap.add_argument("--save-params-at", default="", help="DIAGNOSIS: also save weights at these step counts (and when the frontier first reaches 5)")
     ap.add_argument("--hind-at-start", action="store_true", help="train the hindsight head ONLY at each episode's first step (on hearing, before moving): mid-episode self-motion gives the sector away")
     ap.add_argument("--head-control", action="store_true", help="POSITIVE CONTROL for the head: the scripted ray-walker (true sector) acts; only the hindsight head is trained (supervised)")
+    ap.add_argument("--demo-hearings", type=int, default=1, help="with --demonstrator: show it on the first K hearings of each token in a life (default 1)")
     ap.add_argument("--demonstrator", action="store_true", help="Cam T3 round 2 arm B: a visible scripted parent walks to the food on the FIRST hearing of each token in a life")
     ap.add_argument("--ckpt", default="", help="checkpoint path: resume if present; save every --ckpt-every updates")
     ap.add_argument("--ckpt-every", type=int, default=20); ap.add_argument("--max-seconds", type=float, default=0, help="stop (exit 3) after this long; rerun to resume")
@@ -230,7 +231,7 @@ def main():
             dd = jnp.floor(jax.random.uniform(jax.random.fold_in(key, 9), (n,)) * dd) + 1.0
         return dict(pos=jnp.tile(START[None], (n, 1)), fpos=food_cell(sec, dd), alive_f=jnp.ones(n, bool), E=jnp.full(n, E_START), t=jnp.zeros(n),
                     sec=sec, pa=jnp.zeros(n, jnp.int32), pr=jnp.zeros(n), dd=dd,
-                    dem_pos=jnp.tile(START[None], (n, 1)), dem_on=jnp.zeros(n, bool), seen=jnp.zeros((n, 8), bool))
+                    dem_pos=jnp.tile(START[None], (n, 1)), dem_on=jnp.zeros(n, bool), seen=jnp.zeros((n, 8), bool), hcnt=jnp.zeros((n, 8), jnp.int32))
 
     def env_step(st, act):
         mv = MOVES[act]; pos = (st["pos"] + mv) % L; moved = (jnp.abs(mv).sum(-1) > 0).astype(jnp.float32)
@@ -299,7 +300,11 @@ def main():
                 code2 = code; h3 = jnp.where(done[:, None], 0.0, h2); ep3 = ep2 * 0
             tokn = code2[jnp.arange(B), st3["sec"]]                 # the token the next step will hear
             first = ~jnp.take_along_axis(seen, tokn[:, None], 1)[:, 0]
-            st3 = dict(st3, seen=seen, dem_on=jnp.where(done, first & a.demonstrator, st3["dem_on"]),
+            # Cam Nov 15 2nd mitigation: --demo-hearings K = the demonstrator on the first K hearings (episodes) of each token in a life
+            hcnt = jnp.where(newlife[:, None], 0, st["hcnt"] + (done[:, None] & jax.nn.one_hot(tok_now, 8).astype(bool)).astype(jnp.int32))
+            if a.demo_hearings > 1:
+                first = jnp.take_along_axis(hcnt, tokn[:, None], 1)[:, 0] < a.demo_hearings
+            st3 = dict(st3, seen=seen, hcnt=hcnt, dem_on=jnp.where(done, first & a.demonstrator, st3["dem_on"]),
                        dem_pos=jnp.where(done[:, None], st3["pos"], st3["dem_pos"]))
             reset = (newlife if a.tier == "T3" else done).astype(jnp.float32)      # when the rollout wiped the memory
             first_now = ~jnp.take_along_axis(st["seen"], tok_now[:, None], 1)[:, 0]
@@ -483,7 +488,8 @@ def main():
                                 entropy=float(en_r.mean()), first_hearing_meal_rate=(fm[0] / fm[1]) if fm[1] else None); fm = [0, 0]
                 out["curve"].append(dict(steps=steps, d=d_cur, reach_train=float(ate.sum() / max(dn.sum(), 1)), sec=round(time.time() - t0, 1), **diag,
                                          act_freq=[round(float(q), 3) for q in actf], adv_by_act=[round(float(adv[at == k].mean()), 3) if (at == k).any() else None for k in range(6)],
-                                         ret_mean=round(float(ret.mean()), 3), r_eat=round(float(r[ate].mean()), 3) if ate.any() else None))
+                                         ret_mean=round(float(ret.mean()), 3), r_eat=round(float(r[ate].mean()), 3) if ate.any() else None,
+                                         **({"dem_frac": float(np.asarray(c[0]["dem_on"]).mean())} if a.demonstrator else {})))
         out["train_seconds"] = round(time.time() - t0, 1)
         if a.save_params:
             open(a.save_params, "wb").write(flax.serialization.to_bytes(p))
