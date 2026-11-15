@@ -7157,6 +7157,38 @@ more expensive, because it produces publishable-looking nulls.
     (tested), so this is not a confound.)
   - The ablations (a)-(c) are running one at a time.
 
+- **Cam, Nov 15 ~02:35 (T3 confirmation + next steps).**
+  1. **RECORD: T3 NOT CONFIRMED** (2/3 at 20M). Status: "a per-life code is learnable in the toy, but the recipe is
+     not reliable (2/3 seeds take off)." No claim beyond that.
+  2. **Ablations, in the order (a) -> (c) -> robustness screen -> (b).** Reading rule: an ablation FAIL = keep the
+     component; an ablation PASS = not needed on this seed (confirmed on a 2nd seed only if we would drop it).
+  3. **STALL DIAGNOSIS** for seeds 0 / 1 / 2, at the moment the frontier first reaches 5 and at 2M / 5M / 10M:
+     frontier, head accuracy on 2nd+ hearings, first-hearing meal rate, policy entropy, reach at d = 5 true vs wiped.
+     Is a stall visible by 5M? Why did seed 2's head stay weak (its true 14% < wiped 27% at d = 5: the memory read
+     misleads)?
+  4. **ROBUSTNESS SCREEN:** ONE mitigation from the diagnosis, registered with its reason BEFORE launch:
+     - low first-hearing meal rate -> the copying trait as an imitation loss toward the parent's action, or the
+       demonstrator on the first 3 hearings;
+     - entropy collapse -> an entropy floor;
+     - follows fine but the head stays weak -> head weight 1.0;
+     - otherwise Will's pick with a reason.
+     - Design: full recipe + the mitigation, fresh seeds 3-7, 20M each, no early stops, the same T3 bar.
+     - Reading: 5/5 -> joins the port recipe; 4/5 -> report (second mitigation or a 3/4 W2 bar); <= 3/5 -> no fix;
+       the port learner stays on hold. No causal claim (no matched baseline).
+  5. **W2 port spec approved in principle.**
+     - NECESSITY CHECK (free): build the W2 variant and run it. Pass = scripted follower food >= 1.5x the best of
+       v2-best and the navigator.
+     - **ORACLE ARM APPROVED once the necessity check passes.** Register its bar before launch: oracle-input food
+       >= 1.3x the best code-free policy, life-clustered bootstrap LB > 1.0x, same eval lives. Modal, cap $0.8, its
+       own watch at $1.00 set before spawn, `git status -sb` before deploy, guard alive.
+     - LEARNER x 3 + CONFIRM ($3.2) not approved yet.
+  6. Budget: ~$6.8 left.
+- **Will, on the diagnosis data (disclosed):** the 20M runs kept only their final weights and the latest rolling
+  checkpoint; no weights exist at 2M / 5M / 10M, and the logs lack head accuracy, entropy and first-hearing meal
+  rate. Training is deterministic (chunked resume == straight run, exactly), so seeds 0-2 are RE-RUN to 10M with
+  those metrics logged and weights saved at the milestones. The logged frontier trajectory must match the originals
+  (a determinism check). One job at a time, after ablation (c).
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
