@@ -60,9 +60,9 @@ class GRUNet(nn.Module):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--d", type=int, required=True); ap.add_argument("--hidden", action="store_true")
+    ap.add_argument("--d", type=int, default=12); ap.add_argument("--hidden", action="store_true")
     ap.add_argument("--lam", type=float, default=0.95); ap.add_argument("--gamma", type=float, default=0.99)
-    ap.add_argument("--tier", choices=["T1", "T2", "T3"], default="T1"); ap.add_argument("--learner", choices=["L1", "L2", "L3", "scripted"], default="L1")
+    ap.add_argument("--tier", choices=["T1", "T2", "T3"], default="T1"); ap.add_argument("--learner", choices=["L1", "L1u", "L2", "L3", "scripted"], default="L1")
     ap.add_argument("--kl", type=float, default=0.3); ap.add_argument("--steps", type=float, default=1e6)
     ap.add_argument("--B", type=int, default=256); ap.add_argument("--T", type=int, default=32); ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--episodes-per-life", type=int, default=8, help="T3: episodes sharing one random code (memory carried within a life)")
@@ -70,6 +70,8 @@ def main():
     ap.add_argument("--lr", type=float, default=3e-4)
     ap.add_argument("--evo-pop", type=int, default=32); ap.add_argument("--evo-elite", type=int, default=8); ap.add_argument("--evo-eps", type=int, default=64)
     ap.add_argument("--evo-sigma", type=float, default=0.3); ap.add_argument("--evo-sigma-body", type=float, default=0.02)
+    ap.add_argument("--curriculum", action="store_true", help="round 2: d starts at 1; +1 when true-input reach over the last 500 episodes >= 80%%; cap --d-max")
+    ap.add_argument("--d-max", type=int, default=24); ap.add_argument("--test-d", type=int, default=12, help="round 2: after training, reach at this d (true vs shuffled)")
     ap.add_argument("--move-cost", type=float, default=DMOVE, help="audit only: the per-move energy cost (harness 0.003)")
     ap.add_argument("--eval-episodes", type=int, default=512); ap.add_argument("--curve-every", type=int, default=10)
     ap.add_argument("--navs", default="w2_out/nav_w13/*.msgpack"); ap.add_argument("--out", required=True)
@@ -78,14 +80,14 @@ def main():
     rng = np.random.default_rng(a.seed); FIXED = jnp.asarray(rng.permutation(8))     # T2: one code for all lives
     Dx = 100 + 11 + 6 + 1 + (8 if a.tier == "T1" else 0)
     # ---- learner
-    if a.learner in ("L1", "L3"):            # L3 = evolution of L1's side_enc + GRU + side head (v2's machinery); trunk frozen
+    if a.learner in ("L1", "L1u", "L3"):            # L3 = evolution of L1's side_enc + GRU + side head (v2's machinery); trunk frozen
         net = RecAgent(128); Hd = 128
         p = net.init(jax.random.PRNGKey(a.seed), jnp.zeros((Hd,)), jnp.zeros((Dx,)))
         nav = flax.serialization.from_bytes(Net().init(jax.random.PRNGKey(1), jnp.zeros((1, 100))), open(sorted(glob.glob(a.navs))[0], "rb").read())["params"]
         pp = {k: dict(v) for k, v in p["params"].items()}
         for k in ("Dense_0", "Dense_1", "Dense_2", "Dense_3"):
             pp[k] = dict(nav[k])
-        p = {"params": pp}; FROZEN = ("Dense_0", "Dense_1", "Dense_2", "Dense_3")
+        p = {"params": pp}; FROZEN = () if a.learner == "L1u" else ("Dense_0", "Dense_1", "Dense_2", "Dense_3")   # L1u: trunk unfrozen
     elif a.learner == "L2":
         net = (GRUNet() if a.tier == "T3" else MLP()); Hd = 64
         p = net.init(jax.random.PRNGKey(a.seed), jnp.zeros((Hd,)), jnp.zeros((Dx,))); FROZEN = ()
@@ -126,10 +128,10 @@ def main():
         tw = jnp.where(jnp.abs(fo[:, 0]) >= jnp.abs(fo[:, 1]), jnp.where(fo[:, 0] < 0, 1, 2), jnp.where(fo[:, 1] > 0, 3, 4))
         return jnp.where(on, EAT, jnp.where(seen, tw, ray))
 
-    def env_reset(key, n, code_draw):
+    def env_reset(key, n, dval):
         sec = jax.random.randint(key, (n,), 0, 8)
-        return dict(pos=jnp.tile(START[None], (n, 1)), fpos=food_cell(sec, d), alive_f=jnp.ones(n, bool), E=jnp.full(n, E_START), t=jnp.zeros(n),
-                    sec=sec, pa=jnp.zeros(n, jnp.int32), pr=jnp.zeros(n))
+        return dict(pos=jnp.tile(START[None], (n, 1)), fpos=food_cell(sec, dval), alive_f=jnp.ones(n, bool), E=jnp.full(n, E_START), t=jnp.zeros(n),
+                    sec=sec, pa=jnp.zeros(n, jnp.int32), pr=jnp.zeros(n), dd=jnp.full(n, dval, jnp.float32))
 
     def env_step(st, act):
         mv = MOVES[act]; pos = (st["pos"] + mv) % L; moved = (jnp.abs(mv).sum(-1) > 0).astype(jnp.float32)
@@ -137,7 +139,7 @@ def main():
         ate = (act == EAT) & on
         E1 = jnp.clip(st["E"] + EFF * BITE * ate - (D0 + a.move_cost * moved), 0.0, 1.0)
         r = 20.0 * (drive(st["E"]) - drive(E1)); t = st["t"] + 1
-        done = ate | (E1 <= 0.0) | (t >= cap)
+        done = ate | (E1 <= 0.0) | (t >= 4 * st["dd"])                    # the cap is 4 x this episode's distance
         return dict(st, pos=jnp.where(ate[:, None], st["pos"], pos), E=E1, t=t, pa=act, pr=r, alive_f=st["alive_f"] & ~ate), r, done, ate
 
     # ---- one rollout of T steps over B envs (stochastic policy); resets on done; carries memory within an episode
@@ -145,7 +147,7 @@ def main():
     def policy(pp_, h, x):
         return jax.vmap(lambda hh, xx: net.apply(pp_, hh, xx))(h, x)
 
-    def rollout(pp_, carry, key, mode):
+    def rollout(pp_, carry, key, mode, dval):
         def body(c, k):
             st, h, code, ep_in_life = c
             k1, k2, k3, k4 = jax.random.split(k, 4)
@@ -161,7 +163,7 @@ def main():
             st2, r, done, ate = env_step(st, act)
             # reset finished episodes; T3: a new life (new code, memory wiped) every episodes_per_life episodes
             ep2 = ep_in_life + done.astype(jnp.int32); newlife = done & (ep2 >= (a.episodes_per_life if a.tier == "T3" else 1))
-            fresh = env_reset(k2, B, None)
+            fresh = env_reset(k2, B, dval)
             st3 = jax.tree_util.tree_map(lambda u, w: jnp.where(done.reshape((-1,) + (1,) * (u.ndim - 1)), w, u), st2, fresh)
             if a.tier == "T3":
                 nc = jax.vmap(lambda kk: jax.random.permutation(kk, 8))(jax.random.split(k4, B))
@@ -195,13 +197,14 @@ def main():
         g = {"params": {k_: (jax.tree_util.tree_map(jnp.zeros_like, v_) if k_ in FROZEN else v_) for k_, v_ in g["params"].items()}}
         u, os_ = opt.update(g, os_, pp_); return optax.apply_updates(pp_, u), os_
 
-    def evaluate(pp_, mode, seed):
-        """reach-food rate over --eval-episodes complete episodes (stochastic policy)"""
-        key = jax.random.PRNGKey(seed); st = env_reset(key, B, None); h = jnp.zeros((B, Hd))
+    def evaluate(pp_, mode, seed, dval=None):
+        """reach-food rate over --eval-episodes complete episodes (stochastic policy) at distance dval (default --d)"""
+        dval = float(a.d if dval is None else dval)
+        key = jax.random.PRNGKey(seed); st = env_reset(key, B, dval); h = jnp.zeros((B, Hd))
         code = (jax.vmap(lambda kk: jax.random.permutation(kk, 8))(jax.random.split(key, B)) if a.tier == "T3" else jnp.tile(FIXED[None], (B, 1)))
         c = (st, h, code, jnp.zeros(B, jnp.int32)); n_ep = 0; n_ok = 0
         while n_ep < a.eval_episodes:
-            key, k = jax.random.split(key); c, R_ = roll(pp_, c, k, mode)
+            key, k = jax.random.split(key); c, R_ = roll(pp_, c, k, mode, jnp.float32(dval))
             dn, ate = np.asarray(R_[5]), np.asarray(R_[6]); n_ep += int(dn.sum()); n_ok += int((ate & (dn > 0)).sum())
         return n_ok / max(n_ep, 1)
 
@@ -213,10 +216,10 @@ def main():
         def mut(m):
             return {g: jax.tree_util.tree_map(lambda w: w + jnp.asarray(er.normal(0, SIGG[g], w.shape), jnp.float32), m[g]) for g in GR}
         pop = [base] + [mut(base) for _ in range(P_ - 1)]
-        def member_eps(mp, key):
+        def member_eps(mp, key, dval):
             """one member's E_ episodes in parallel (shared keys across members = common random numbers); reach rate"""
             pp_ = {"params": {**p["params"], **mp}}
-            st = env_reset(key, E_, None); h = jnp.zeros((E_, Hd)); code = jnp.tile(FIXED[None], (E_, 1)); done = jnp.zeros(E_, bool); ok = jnp.zeros(E_, bool)
+            st = env_reset(key, E_, float(dval)); h = jnp.zeros((E_, Hd)); code = jnp.tile(FIXED[None], (E_, 1)); done = jnp.zeros(E_, bool); ok = jnp.zeros(E_, bool)
             def body(c, k):
                 st, h, done, ok = c
                 base_, hear, _ = obs(st["pos"], st["fpos"], st["alive_f"], st["E"], st["t"], st["sec"], code, jnp.zeros(E_, jnp.int32))
@@ -226,16 +229,19 @@ def main():
                 keep = done[:, None]
                 st3 = jax.tree_util.tree_map(lambda u, w: jnp.where(done.reshape((-1,) + (1,) * (u.ndim - 1)), u, w), st, st2)
                 return (st3, jnp.where(keep, h, h2), done | dn, ok | (ate & ~done)), (~done).sum()
-            (_, _, _, ok), live = jax.lax.scan(body, (st, h, done, ok), jax.random.split(jax.random.fold_in(key, 1), cap))
+            (_, _, _, ok), live = jax.lax.scan(body, (st, h, done, ok), jax.random.split(jax.random.fold_in(key, 1), 4 * dval))
             return ok.mean(), live.sum()
-        score = jax.jit(jax.vmap(member_eps, in_axes=(0, None)))
+        score = jax.jit(jax.vmap(member_eps, in_axes=(0, None, None)), static_argnums=(2,))
+        d_cur = 1 if a.curriculum else a.d
         steps, gen, t0 = 0, 0, time.time()
         out["eval_init"] = {m_: evaluate(p, i, 777) for i, m_ in enumerate(("true", "shuffled", "silence"))}
         while steps < a.steps:
             stk = jax.tree_util.tree_map(lambda *ls: jnp.stack(ls), *pop)
-            fit, live = score(stk, jax.random.PRNGKey(10_000 + gen)); fit = np.asarray(fit); steps += int(np.asarray(live).sum())
+            fit, live = score(stk, jax.random.PRNGKey(10_000 + gen), d_cur); fit = np.asarray(fit); steps += int(np.asarray(live).sum())
             order = np.argsort(-fit); elites = [pop[i] for i in order[:a.evo_elite]]
-            out["curve"].append(dict(gen=gen, steps=steps, best=float(fit.max()), elite_mean=float(fit[order[:a.evo_elite]].mean()), mean=float(fit.mean())))
+            out["curve"].append(dict(gen=gen, steps=steps, d=d_cur, best=float(fit.max()), elite_mean=float(fit[order[:a.evo_elite]].mean()), mean=float(fit.mean())))
+            if a.curriculum and fit[order[:a.evo_elite]].mean() >= 0.8 and d_cur < a.d_max:   # the 8 elites' 512 episodes
+                d_cur += 1
             pop = elites + [mut(elites[er.integers(a.evo_elite)]) for _ in range(P_ - a.evo_elite)]; gen += 1
         p = {"params": {**p["params"], **elites[0]}}
         out["eval"] = {m_: evaluate(p, i, 777) for i, m_ in enumerate(("true", "shuffled", "silence"))}
@@ -243,12 +249,13 @@ def main():
     elif net is None:                                             # the scripted positive control: evaluation only
         out["eval"] = {m_: evaluate(None, i, 777) for i, m_ in enumerate(("true", "shuffled", "silence"))}
     else:
-        key = jax.random.PRNGKey(a.seed + 1); st = env_reset(key, B, None)
+        d_cur = 1 if a.curriculum else a.d; recent = []
+        key = jax.random.PRNGKey(a.seed + 1); st = env_reset(key, B, float(d_cur))
         code0 = (jax.vmap(lambda kk: jax.random.permutation(kk, 8))(jax.random.split(key, B)) if a.tier == "T3" else jnp.tile(FIXED[None], (B, 1)))
         c = (st, jnp.zeros((B, Hd)), code0, jnp.zeros(B, jnp.int32)); steps, it, t0 = 0, 0, time.time()
         out["eval_init"] = {m_: evaluate(p, i, 777) for i, m_ in enumerate(("true", "shuffled", "silence"))}
         while steps < a.steps:
-            key, k = jax.random.split(key); c, R_ = roll(p, c, k, 0)
+            key, k = jax.random.split(key); c, R_ = roll(p, c, k, 0, jnp.float32(d_cur))
             x, act, lp, v, r, dn, ate, hin, rs = (np.asarray(z) for z in R_)        # (T, B, ...)
             adv = gae(np.swapaxes(r, 0, 1), np.swapaxes(v, 0, 1), np.swapaxes(dn, 0, 1), a.gamma, a.lam)            # (B, T)
             ret = adv + np.swapaxes(v, 0, 1); A_ = (adv - adv.mean()) / (adv.std() + 1e-8)
@@ -260,17 +267,25 @@ def main():
                 for mb in np.array_split(perm, a.minibatches):
                     p, ost = upd(p, ost, *(z[mb] for z in Bx))
             steps += B * T; it += 1
+            if a.curriculum:                                                        # episodes that ended this rollout, at the current d
+                recent.extend((ate[dn > 0]).astype(int).tolist()); recent = recent[-500:]
+                if len(recent) >= 500 and np.mean(recent) >= 0.8 and d_cur < a.d_max:
+                    d_cur += 1; recent = []
             if it % a.curve_every == 0:
                 actf = np.bincount(act.reshape(-1), minlength=6) / act.size; at = np.swapaxes(act, 0, 1)
-                out["curve"].append(dict(steps=steps, reach_train=float(ate.sum() / max(dn.sum(), 1)), sec=round(time.time() - t0, 1),
+                out["curve"].append(dict(steps=steps, d=d_cur, reach_train=float(ate.sum() / max(dn.sum(), 1)), sec=round(time.time() - t0, 1),
                                          act_freq=[round(float(q), 3) for q in actf], adv_by_act=[round(float(adv[at == k].mean()), 3) if (at == k).any() else None for k in range(6)],
                                          ret_mean=round(float(ret.mean()), 3), r_eat=round(float(r[ate].mean()), 3) if ate.any() else None))
         out["eval"] = {m_: evaluate(p, i, 777) for i, m_ in enumerate(("true", "shuffled", "silence"))}
         out["train_seconds"] = round(time.time() - t0, 1)
+    if net is not None:
+        out["d_max_reached"] = int(max([c_.get("d", a.d) for c_ in out["curve"]] + [a.d if not a.curriculum else 1]))
+        out["test"] = {m_: evaluate(p, i, 778, a.test_d) for i, m_ in enumerate(("true", "shuffled"))}
+        tt = out["test"]; out["test_pass"] = bool(tt["true"] >= 0.8 and tt["true"] >= 2 * tt["shuffled"] and tt["true"] - tt["shuffled"] >= 0.30)
     e = out["eval"]
     out["learns"] = bool(e["true"] >= 0.8 and e["true"] >= 2 * e["shuffled"] and e["true"] - e["shuffled"] >= 0.30)
     os.makedirs(os.path.dirname(a.out) or ".", exist_ok=True); json.dump(out, open(a.out, "w"), indent=1)
-    print("TOY", json.dumps(dict(d=d, hidden=a.hidden, lam=a.lam, tier=a.tier, learner=a.learner, kl=a.kl, eval=e, learns=out["learns"],
+    print("TOY", json.dumps(dict(d=d, hidden=a.hidden, d_max=out.get("d_max_reached"), test=out.get("test"), test_pass=out.get("test_pass"), lam=a.lam, tier=a.tier, learner=a.learner, kl=a.kl, eval=e, learns=out["learns"],
                                   init=out.get("eval_init"), sec=out.get("train_seconds"))), flush=True)
 
 
