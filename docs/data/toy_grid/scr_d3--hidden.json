@@ -1,0 +1,28 @@
+{
+ "cfg": {
+  "d": 3,
+  "hidden": true,
+  "lam": 0.95,
+  "gamma": 0.99,
+  "tier": "T1",
+  "learner": "scripted",
+  "kl": 0.3,
+  "steps": 1000000.0,
+  "B": 256,
+  "T": 32,
+  "seed": 0,
+  "episodes_per_life": 8,
+  "eval_episodes": 512,
+  "curve_every": 10,
+  "navs": "w2_out/nav_w13/*.msgpack",
+  "out": "/private/tmp/claude-501/-Users-overlord-CascadeProjects-throng/aad77c1d-d7ac-437e-bef4-aa525802ccc0/scratchpad/toy/scr_d3--hidden.json"
+ },
+ "cap": 12,
+ "curve": [],
+ "eval": {
+  "true": 1.0,
+  "shuffled": 0.028846153846153848,
+  "silence": 1.0
+ },
+ "learns": true
+}

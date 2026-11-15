@@ -6744,6 +6744,60 @@ more expensive, because it produces publishable-looking nulls.
 - **Ops (Nov 14 20:54):** the guard had died (heartbeat ~27 h stale; nothing ran in the gap; metered $34.21 ->
   $34.22). Restarted with CAP 41.0. Both apps are deployed and idle.
 
+- **Cam, Nov 14 ~21:00 (full STAGE1_RETHINK review; replaces items 3(i)/3(ii)).**
+  0. E's record readout accepted; FAIL confirmed.
+  1. Diagnosis endorsed: partial following doesn't pay (the shared mechanism).
+  2. **A second condition: the code must be NECESSARY.** Listening can emerge only where (i) the strongest code-free
+     policy cannot come close to the follower AND (ii) partial following pays within credit / selection reach. Route
+     (b) becomes "NEAR AND NECESSARY".
+     - **STANDING RULE: premiums are always measured against the STRONGEST code-free policy (now v2-best), never the
+       navigator.**
+  3. **THE TOY GRID** (free, laptop only):
+     - one agent; one beacon at its start naming the sector of one food item at distance d; harness reward and move
+       cost; cap 4d;
+     - grid: d in {3, 6, 12, 24} x food visible / hidden x GAE lambda {0.95, 0.99};
+     - tiers T1 oracle -> T2 fixed code -> T3 random code per life, each run only where the previous passed;
+     - learners L1 (harness, KL 0.3 and 0) and L2 (plain MLP / GRU from scratch);
+     - 1M agent-steps per cell, one seed (3 on boundary cells);
+     - readout: reach rate true vs shuffled (and silence as the necessity measure). Bar: true >= 80% AND >= 2x
+       shuffled AND >= +30 points.
+     - Readings:
+       - L2 learns where L1 doesn't -> the architecture is the blocker;
+       - neither learns at d = 3 in T1 -> audit PPO first;
+       - both learn up to d* -> d* sets the world design.
+  4. Results as a table in `STAGE1_RETHINK.md` and the handoff.
+- **TOY GRID: build, controls and PPO AUDIT** (comm-toy `3cef923`, `w2/toy_grid.py`; laptop).
+  - **Build.** A standalone JAX toy with the harness's observation format (7x7 food / agent windows, energy, age;
+    hear = token + flag + beacon offset; previous action and reward; +oracle in T1). Harness reward x20 drive
+    reduction, move cost 0.003, drain 0.0013, bite +0.1 energy; start energy 0.3. Food is placed on the sector ray at
+    (round(d cos), round(d sin)). Episode ends at the eat, starvation or the 4d cap (all terminal).
+  - **Deviations (disclosed):**
+    - hearing is global (the beacon offset is scaled by 24), so T1 / T2 need no memory;
+    - PPO is a re-implementation of the harness's loss and settings (not its code path);
+    - "hidden" = food shown only when adjacent (Chebyshev <= 1).
+  - **Positive control (scripted ray-walker): true-input reach 100%** at d = 3 and 24, visible and hidden.
+    - Shuffled 0-3% wherever the food starts out of view (100% at d = 3 visible, where food is in view from the
+      start).
+    - The env and readout work.
+  - **PPO AUDIT** (Cam's "neither learns at d = 3": it fired on the first cell), d = 3, visible, T1:
+
+    | learner / setting | reach before -> after 1M steps |
+    |---|---|
+    | L2 MLP, harness move cost, harness PPO (2 full-batch epochs = 244 gradient steps) | 0.8% -> 0.0% (freezes) |
+    | L2, harness move cost, 4 epochs x 8 minibatches | 0% (freezes faster) |
+    | **L2, move cost 0**, harness PPO | 0.8% -> **97%** |
+    | L2, move cost 0, 4 x 8 minibatches | -> **100%** within ~80k steps |
+    | L1 harness learner, KL 0.3 | 1.4% -> 9% |
+    | L1, KL 0 | 1.4% -> 70% (true = shuffled: the code is not needed at d = 3 visible) |
+
+    - **The PPO implementation works:** the same code learns the task once moving is free.
+    - **With the harness's move cost and a sparse payoff, from-scratch PPO learns to FREEZE** even at the easiest
+      cell. Random reach is ~1.7% (~12 successes per 8k-step update), and the advantage is dominated by per-step
+      energy cost, so stay / eat win. This is the stage-1 pathology in miniature.
+    - The navigator itself reaches visible food 3 cells away only 1.4% of the time.
+    - L1 can learn the visible task at KL 0 (its trunk helps), but KL 0.3 holds it near the navigator.
+  - The full T1 grid then runs as specified (harness reward and PPO), one seed per cell.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under

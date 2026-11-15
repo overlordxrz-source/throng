@@ -1,0 +1,98 @@
+{
+ "cfg": {
+  "d": 3,
+  "hidden": false,
+  "lam": 0.95,
+  "gamma": 0.99,
+  "tier": "T1",
+  "learner": "L2",
+  "kl": 0.3,
+  "steps": 1000000.0,
+  "B": 256,
+  "T": 32,
+  "seed": 0,
+  "episodes_per_life": 8,
+  "epochs": 4,
+  "minibatches": 8,
+  "lr": 0.0003,
+  "eval_episodes": 512,
+  "curve_every": 10,
+  "navs": "w2_out/nav_w13/*.msgpack",
+  "out": "/private/tmp/claude-501/-Users-overlord-CascadeProjects-throng/aad77c1d-d7ac-437e-bef4-aa525802ccc0/scratchpad/toy/L2_d3_audit.json"
+ },
+ "cap": 12,
+ "curve": [
+  {
+   "steps": 81920,
+   "reach_train": 0.0,
+   "sec": 3.4
+  },
+  {
+   "steps": 163840,
+   "reach_train": 0.0,
+   "sec": 4.2
+  },
+  {
+   "steps": 245760,
+   "reach_train": 0.0,
+   "sec": 4.9
+  },
+  {
+   "steps": 327680,
+   "reach_train": 0.0,
+   "sec": 5.6
+  },
+  {
+   "steps": 409600,
+   "reach_train": 0.0,
+   "sec": 6.4
+  },
+  {
+   "steps": 491520,
+   "reach_train": 0.0,
+   "sec": 7.1
+  },
+  {
+   "steps": 573440,
+   "reach_train": 0.0,
+   "sec": 7.9
+  },
+  {
+   "steps": 655360,
+   "reach_train": 0.0,
+   "sec": 8.7
+  },
+  {
+   "steps": 737280,
+   "reach_train": 0.0,
+   "sec": 9.5
+  },
+  {
+   "steps": 819200,
+   "reach_train": 0.0,
+   "sec": 10.3
+  },
+  {
+   "steps": 901120,
+   "reach_train": 0.0,
+   "sec": 11.1
+  },
+  {
+   "steps": 983040,
+   "reach_train": 0.0,
+   "sec": 11.8
+  }
+ ],
+ "eval_init": {
+  "true": 0.007797270955165692,
+  "shuffled": 0.009746588693957114,
+  "silence": 0.005836575875486381
+ },
+ "eval": {
+  "true": 0.0,
+  "shuffled": 0.0,
+  "silence": 0.0
+ },
+ "train_seconds": 12.1,
+ "learns": false
+}
