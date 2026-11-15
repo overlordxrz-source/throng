@@ -7004,6 +7004,35 @@ more expensive, because it produces publishable-looking nulls.
   - Per Cam's 3(d) the episode-level memory was the step before concluding. **All T3 memories fail.** Cam to rule.
   - The W2 port spec (Cam's item 4) is NOT drafted: it was conditional on a T3 pass.
 
+- **Cam, Nov 15 ~00:55 (T3 rulings).**
+  1. T3 FAIL accepted for all memories; nobody bootstraps find-then-recall from sparse RL reward in 3M steps. Credit
+     setup and memory reach ruled out.
+  2. Lever (i) needs no new approval: it is M's approved drive "hindsight: where my next meal was" (slow weights, no
+     in-life gradient).
+  3. **T3 ROUND 2** (laptop; L2e and the L2 GRU; mixed curriculum; harness cost; 3M; seed 0, then 3 seeds on a pass):
+     - every arm gets a HINDSIGHT NEXT-MEAL HEAD (8-way sector of the next meal, target filled at episode end), whose
+       softmax feeds the policy;
+     - arm A: the head only;
+     - arm B: the head + a DEMONSTRATOR on the FIRST hearing of each token in a life (a visible scripted parent walks
+       from the agent to the food);
+     - LEVER CHECK: the head's accuracy on the 2nd+ hearing vs the 1st (1st ~ chance);
+     - BAR: the same T3 bar at d = 12 hidden.
+  4. Reading:
+     - A passes: the hindsight drive is the key piece;
+     - only B passes: demonstration is needed;
+     - the head shows the signature but the policy does not act: wiring or more steps;
+     - no signature in either arm: one 10M-step scale-up for the better arm, then rethink.
+     - On any pass: the one-page W2 port spec.
+  - **Will's implementation (disclosed):**
+    - head loss weight **0.5** (the harness's aux weight);
+    - the head reads the memory's output (GRU state / L2e read + features);
+    - the target is the sector of the meal that ENDS the episode; steps of episodes without a meal are masked;
+    - labels only for episodes whose end falls in the same 32-step training chunk (earlier-chunk steps of a
+      straddling episode lose their label);
+    - demonstrator: starts beside the agent and steps greedily toward the food (stops on it), visible in the agent
+      window within 3 cells; it appears when the episode's token has not been heard yet in this life;
+    - lever check = the head's argmax at each episode's FIRST step vs the true sector, split by 1st vs 2nd+ hearing.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
