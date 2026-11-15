@@ -8119,6 +8119,15 @@ more expensive, because it produces publishable-looking nulls.
     - The likely failure: the reach criterion (0.777), since the oracle redo itself is 0.86 and the pilot's read
       took ~800k hearings.
 
+- **RESULT (Nov 15 13:38): TWIN REDO** (frontier replayed from the oracle redo, oracle input zeroed, 3e7 steps,
+  laptop). `docs/data/port_w2/twin3/`.
+  - d = 12: mean life **486**, reach 0.000 (hungry 0.000).
+  - Reach by d: 1.00 (d 1), 0.51 (d 2: the diagonal sectors are in view), **0.00 at every d from 3 to 22**.
+  - The oracle redo lives 3000, i.e. 6.17x the twin.
+  - **The learner's life bar: >= 1.3 x 486 = 632 steps.**
+- **LAUNCH (Nov 15 13:44): W2 LEARNER SEED 1** (final recipe; the queue started after the twin's evaluation had
+  landed at 13:38). Seeds 2-3 follow by the 2-of-3 rule.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
