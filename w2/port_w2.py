@@ -23,6 +23,7 @@ from w2.learnability import RecAgent  # noqa: E402
 from w2.worlds import world_kw  # noqa: E402
 from w2.gae import gae  # noqa: E402
 from w2 import named_item as NI  # noqa: E402
+from w2.gate import HonestGate  # noqa: E402
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "scripts"))
 import ckpt as _ck  # noqa: E402
 
@@ -42,6 +43,8 @@ def main():
     ap.add_argument("--v2", default=os.path.expanduser("~/throng-backup/evo2/evo2.ckpt")); ap.add_argument("--init-params", default="")
     ap.add_argument("--eval-only", action="store_true", help="no updates (readouts)"); ap.add_argument("--frontier0", type=float, default=1.0)
     ap.add_argument("--frontier-schedule", default="", help="DEAF TWIN: replay another run's frontier from its train JSON curve (latest logged value at or before the current step); the gate is off")
+    ap.add_argument("--gate", default="old", choices=["old", "honest"], help="Cam Nov 15 ~12:20: honest = hungry-bout reach, two consecutive 2000-bout windows >= 0.8")
+    ap.add_argument("--giveup", type=float, default=0.0, help="NEGATIVE gate control (with --policy follower): give up at random on this fraction of bouts")
     ap.add_argument("--out", required=True)
     a = ap.parse_args()
     S = a.item_size; gated = a.hunger_gate; nupd = a.eval_only or a.policy == "follower"
@@ -81,9 +84,13 @@ def main():
         def body(c, k):
             s, item, h, pa, pr, code = c
             k1, k2, k3, k4 = jax.random.split(k, 4); x = obs_x(s, item, code, pa, pr)
+            item = dict(item, sat=item["sat"] | (item["act"] & (s.energy >= H)))   # the bout is no longer hungry once E reached H
             if a.policy == "follower":                                      # scripted: walks on a hearing, v2-best otherwise
                 h2, lg, v, _ = jax.vmap(lambda hh, xx: rnet.apply(v2p, hh, xx))(h, x.at[:, -8:].set(0.0))
-                act = NI.follower(s, item, L, jax.random.categorical(k1, lg))
+                fb = jax.random.categorical(k1, lg); act = NI.follower(s, item, L, fb)
+                if a.giveup > 0:                                            # NEGATIVE control: a given-up bout is ignored (v2-best acts, never eats the item)
+                    gave = item["gu"] & item["act"]; noeat = jnp.where(jnp.all(s.pos == item["pos"], -1) & (fb == EAT), 0, fb)
+                    act = jnp.where(gave, noeat, act)
             else:
                 h2, lg, v, _ = jax.vmap(lambda hh, xx: rnet.apply(pp_, hh, xx))(h, x); act = jax.random.categorical(k1, lg)
             lp = jnp.take_along_axis(jax.nn.log_softmax(lg), act[:, None], 1)[:, 0]
@@ -95,9 +102,12 @@ def main():
             dead = ~s2.alive
             s3 = s2._replace(energy=jnp.where(dead, cfg.E0, s2.energy), age=jnp.where(dead, 0, s2.age), alive=jnp.ones(N, bool))
             item2, closed, opened = NI.close_and_open(item, on_item, dead, s3, k3, dfn_of(dfront), L, gated, H)
+            if a.giveup > 0:
+                item2 = dict(item2, gu=jnp.where(opened, jax.random.uniform(jax.random.fold_in(k3, 5), (N,)) < a.giveup, item2["gu"]))
+            hung = closed & ~dead & ~item["sat"]
             ncode = jax.vmap(lambda kk: jax.random.permutation(kk, 8))(jax.random.split(k4, N))
             code2 = jnp.where(dead[:, None], ncode, code); h3 = jnp.where(dead[:, None], 0.0, h2)
-            return (s3, item2, h3, act, r, code2), (x, act, lp, v, r, dead.astype(jnp.float32), h, on_item & ~dead, closed & ~dead, gain, pd, item["es"], item["d"], item["act"])
+            return (s3, item2, h3, act, r, code2), (x, act, lp, v, r, dead.astype(jnp.float32), h, on_item & ~dead, closed & ~dead, gain, pd, item["es"], item["d"], item["act"], hung, on_item & ~dead & ~item["sat"])
         return jax.lax.scan(body, c, jax.random.split(key, T))
     roll = jax.jit(jax.vmap(rollout_world, in_axes=(None, 0, 0, None)))
 
@@ -117,13 +127,15 @@ def main():
         u, os_ = opt.update(g, os_, pp_); return optax.apply_updates(pp_, u), os_
 
     rng = np.random.default_rng(a.seed); key = jax.random.PRNGKey(a.seed + 1)
-    dfront = a.frontier0; recent = []; SPLIT = []; steps = 0; it = 0; curve = []; nan_run = 0
+    dfront = a.frontier0; recent = []; SPLIT = []; GATE = HonestGate(); steps = 0; it = 0; curve = []; nan_run = 0
     c = jax.vmap(world_reset, in_axes=(0, None))(jax.random.split(key, W), dfront)
     Ck = _ck.load(a.ckpt) if a.ckpt else None
     if Ck is not None:
         tj = lambda t_: jax.tree_util.tree_map(jnp.asarray, t_)  # noqa: E731
         p, ost, c, key = tj(Ck["p"]), tj(Ck["ost"]), tj(Ck["c"]), jnp.asarray(Ck["key"])
         dfront, recent, steps, it, curve = Ck["dfront"], Ck["recent"], Ck["steps"], Ck["it"], Ck["curve"]; rng.bit_generator.state = Ck["rng"]
+        if "gate" in Ck:
+            GATE.load(Ck["gate"])
         print(f"resumed at {steps:,} steps, frontier {dfront}", flush=True)
     SCHED = [(c_["steps"], c_["frontier"]) for c_ in json.load(open(a.frontier_schedule))["curve"]] if a.frontier_schedule else None
 
@@ -138,11 +150,11 @@ def main():
         if SCHED is not None:
             dfront = sched_front(steps)
         if a.ckpt and it % 20 == 0 and it > 0:
-            _ck.save(a.ckpt, dict(p=p, ost=ost, c=c, key=key, dfront=dfront, recent=recent, steps=steps, it=it, curve=curve, rng=rng.bit_generator.state))
+            _ck.save(a.ckpt, dict(p=p, ost=ost, c=c, key=key, dfront=dfront, recent=recent, steps=steps, it=it, curve=curve, rng=rng.bit_generator.state, gate=GATE.state()))
             if a.max_seconds and time.time() - t0 > a.max_seconds:
                 print(f"CHUNK_STOP at {steps:,}", flush=True); sys.exit(3)
         key, k = jax.random.split(key); c, R_ = roll(p, c, jax.random.split(k, W), jnp.float32(dfront))
-        x, act, lp, v, r, dead, hin, ate_i, closed, gain, pd, es, dd_, inb = (np.asarray(z) for z in R_)      # (W, T, N, ...)
+        x, act, lp, v, r, dead, hin, ate_i, closed, gain, pd, es, dd_, inb, hung, hate = (np.asarray(z) for z in R_)      # (W, T, N, ...)
         SPLIT.append(np.stack([es[closed > 0], ate_i[closed > 0], dd_[closed > 0]], 1))
         # (W, T, N) -> sequences (W*N, T)
         sq = lambda z: np.swapaxes(z, 1, 2).reshape((W * N, T) + z.shape[3:])  # noqa: E731
@@ -164,10 +176,14 @@ def main():
         steps += W * N * T; it += 1
         n_close = int(closed.sum()); n_eat = int(ate_i.sum())
         recent.extend([1] * n_eat + [0] * max(n_close - n_eat, 0)); recent = recent[-500:]
-        if SCHED is None and len(recent) >= 500 and np.mean(recent) >= 0.8 and dfront < a.d_max:
+        if a.gate == "honest":
+            if SCHED is None and GATE.add(int(hate.sum()), int(hung.sum())) and dfront < a.d_max:
+                dfront += 1; print(f"GATE_UP frontier -> {dfront:.0f} at {steps:,} (last windows {GATE.scores[-2:]})", flush=True)
+        elif SCHED is None and len(recent) >= 500 and np.mean(recent) >= 0.8 and dfront < a.d_max:
             dfront += 1; recent = []
         if it % a.curve_every == 0:
-            curve.append(dict(steps=steps, frontier=dfront, item_reach=n_eat / max(n_close, 1), food_per_step=float(gain.mean()), paid_per_step=float(pd.mean()), frac_in_bout=float(inb.mean()), sec=round(time.time() - t0, 1)))
+            curve.append(dict(steps=steps, frontier=dfront, item_reach=n_eat / max(n_close, 1), food_per_step=float(gain.mean()), paid_per_step=float(pd.mean()), frac_in_bout=float(inb.mean()),
+                              hungry_reach=float(hate.sum() / max(hung.sum(), 1)), n_hungry=int(hung.sum()), gate_last=(GATE.scores[-1] if GATE.scores else None), sec=round(time.time() - t0, 1)))
             print("CURVE", json.dumps(curve[-1]), flush=True)
     if a.save_params:
         open(a.save_params, "wb").write(flax.serialization.to_bytes(p))
@@ -177,7 +193,7 @@ def main():
             m = (Sp[:, 0] >= lo) & (Sp[:, 0] < hi) & ((Sp[:, 2] == 1) if dsel == "d=1" else True)
             split[f"{nm} {dsel}"] = dict(reach=float(Sp[m, 1].mean()) if m.any() else None, bouts=int(m.sum()))
     print("REACH_BY_START_ENERGY (last <=200 iterations)", json.dumps(split), flush=True)
-    out = dict(cfg=vars(a), steps=steps, frontier=dfront, curve=curve, reach_by_start_energy=split, train_seconds=round(time.time() - t0, 1),
+    out = dict(cfg=vars(a), steps=steps, frontier=dfront, curve=curve, reach_by_start_energy=split, gate_scores=GATE.scores, train_seconds=round(time.time() - t0, 1),
                throughput=steps / max(time.time() - t0, 1e-9))
     json.dump(out, open(a.out, "w"), indent=1); print("TRAINED", json.dumps(dict(steps=steps, frontier=dfront)), flush=True)
 

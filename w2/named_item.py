@@ -35,15 +35,16 @@ def place(key, start, dfn, L):
 def new_item(N):
     z = jnp.zeros(N)
     return dict(sec=jnp.zeros(N, jnp.int32), d=jnp.ones(N), pos=jnp.zeros((N, 2), jnp.int32), start=jnp.zeros((N, 2), jnp.int32),
-                t=z, act=jnp.zeros(N, bool), es=z)
+                t=z, act=jnp.zeros(N, bool), es=z, sat=jnp.zeros(N, bool), gu=jnp.zeros(N, bool))
 
 
 def open_bouts(item, s, key, dfn, L, want):
     """Open a bout where `want` (bool, N) and none is open."""
     sec, d, ipos = place(key, s.pos, dfn, L); o = want & ~item["act"]
-    return dict(sec=jnp.where(o, sec, item["sec"]), d=jnp.where(o, d, item["d"]), pos=jnp.where(o[:, None], ipos, item["pos"]),
+    return dict(item, sec=jnp.where(o, sec, item["sec"]), d=jnp.where(o, d, item["d"]), pos=jnp.where(o[:, None], ipos, item["pos"]),
                 start=jnp.where(o[:, None], s.pos, item["start"]), t=jnp.where(o, 0.0, item["t"]), act=item["act"] | o,
-                es=jnp.where(o, s.energy, item["es"])), o
+                es=jnp.where(o, s.energy, item["es"]), sat=jnp.where(o, False, item.get("sat", jnp.zeros_like(o))),
+                gu=jnp.where(o, False, item.get("gu", jnp.zeros_like(o)))), o
 
 
 def close_and_open(item, on_item, dead, s3, key, dfn, L, gated, H):
