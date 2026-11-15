@@ -1,0 +1,122 @@
+{
+ "cfg": {
+  "d": 12,
+  "hidden": false,
+  "lam": 0.99,
+  "gamma": 0.99,
+  "tier": "T1",
+  "learner": "L3",
+  "kl": 0.0,
+  "steps": 1000000.0,
+  "B": 256,
+  "T": 32,
+  "seed": 0,
+  "episodes_per_life": 8,
+  "epochs": 2,
+  "minibatches": 1,
+  "lr": 0.0003,
+  "evo_pop": 32,
+  "evo_elite": 8,
+  "evo_eps": 64,
+  "evo_sigma": 0.3,
+  "evo_sigma_body": 0.02,
+  "move_cost": 0.003,
+  "eval_episodes": 512,
+  "curve_every": 10,
+  "navs": "w2_out/nav_w13/*.msgpack",
+  "out": "/private/tmp/claude-501/-Users-overlord-CascadeProjects-throng/aad77c1d-d7ac-437e-bef4-aa525802ccc0/scratchpad/grid/T1/T1_L3_kl0_d12_h0_l0.99.json"
+ },
+ "cap": 48,
+ "curve": [
+  {
+   "gen": 0,
+   "steps": 98304,
+   "best": 0.0,
+   "elite_mean": 0.0,
+   "mean": 0.0
+  },
+  {
+   "gen": 1,
+   "steps": 196578,
+   "best": 0.03125,
+   "elite_mean": 0.00390625,
+   "mean": 0.0009765625
+  },
+  {
+   "gen": 2,
+   "steps": 294871,
+   "best": 0.03125,
+   "elite_mean": 0.00390625,
+   "mean": 0.0009765625
+  },
+  {
+   "gen": 3,
+   "steps": 392776,
+   "best": 0.09375,
+   "elite_mean": 0.037109375,
+   "mean": 0.00927734375
+  },
+  {
+   "gen": 4,
+   "steps": 490284,
+   "best": 0.109375,
+   "elite_mean": 0.060546875,
+   "mean": 0.017578125
+  },
+  {
+   "gen": 5,
+   "steps": 587782,
+   "best": 0.078125,
+   "elite_mean": 0.052734375,
+   "mean": 0.0166015625
+  },
+  {
+   "gen": 6,
+   "steps": 681131,
+   "best": 0.1875,
+   "elite_mean": 0.173828125,
+   "mean": 0.08837890625
+  },
+  {
+   "gen": 7,
+   "steps": 775205,
+   "best": 0.15625,
+   "elite_mean": 0.13671875,
+   "mean": 0.076171875
+  },
+  {
+   "gen": 8,
+   "steps": 868645,
+   "best": 0.140625,
+   "elite_mean": 0.130859375,
+   "mean": 0.08447265625
+  },
+  {
+   "gen": 9,
+   "steps": 964277,
+   "best": 0.078125,
+   "elite_mean": 0.078125,
+   "mean": 0.04345703125
+  },
+  {
+   "gen": 10,
+   "steps": 1059661,
+   "best": 0.09375,
+   "elite_mean": 0.091796875,
+   "mean": 0.048828125
+  }
+ ],
+ "eval_init": {
+  "true": 0.0,
+  "shuffled": 0.0,
+  "silence": 0.0
+ },
+ "eval": {
+  "true": 0.14990512333965844,
+  "shuffled": 0.12284069097888675,
+  "silence": 0.12115384615384615
+ },
+ "train_seconds": 7.1,
+ "generations": 11,
+ "learns": false
+}

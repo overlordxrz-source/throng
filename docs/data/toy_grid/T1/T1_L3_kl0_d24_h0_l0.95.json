@@ -1,0 +1,87 @@
+{
+ "cfg": {
+  "d": 24,
+  "hidden": false,
+  "lam": 0.95,
+  "gamma": 0.99,
+  "tier": "T1",
+  "learner": "L3",
+  "kl": 0.0,
+  "steps": 1000000.0,
+  "B": 256,
+  "T": 32,
+  "seed": 0,
+  "episodes_per_life": 8,
+  "epochs": 2,
+  "minibatches": 1,
+  "lr": 0.0003,
+  "evo_pop": 32,
+  "evo_elite": 8,
+  "evo_eps": 64,
+  "evo_sigma": 0.3,
+  "evo_sigma_body": 0.02,
+  "move_cost": 0.003,
+  "eval_episodes": 512,
+  "curve_every": 10,
+  "navs": "w2_out/nav_w13/*.msgpack",
+  "out": "/private/tmp/claude-501/-Users-overlord-CascadeProjects-throng/aad77c1d-d7ac-437e-bef4-aa525802ccc0/scratchpad/grid/T1/T1_L3_kl0_d24_h0_l0.95.json"
+ },
+ "cap": 96,
+ "curve": [
+  {
+   "gen": 0,
+   "steps": 196608,
+   "best": 0.0,
+   "elite_mean": 0.0,
+   "mean": 0.0
+  },
+  {
+   "gen": 1,
+   "steps": 392829,
+   "best": 0.03125,
+   "elite_mean": 0.00390625,
+   "mean": 0.0009765625
+  },
+  {
+   "gen": 2,
+   "steps": 588772,
+   "best": 0.0625,
+   "elite_mean": 0.013671875,
+   "mean": 0.00341796875
+  },
+  {
+   "gen": 3,
+   "steps": 780310,
+   "best": 0.078125,
+   "elite_mean": 0.0546875,
+   "mean": 0.01416015625
+  },
+  {
+   "gen": 4,
+   "steps": 955212,
+   "best": 0.171875,
+   "elite_mean": 0.1171875,
+   "mean": 0.0546875
+  },
+  {
+   "gen": 5,
+   "steps": 1130555,
+   "best": 0.125,
+   "elite_mean": 0.080078125,
+   "mean": 0.03369140625
+  }
+ ],
+ "eval_init": {
+  "true": 0.0,
+  "shuffled": 0.0,
+  "silence": 0.0
+ },
+ "eval": {
+  "true": 0.10546875,
+  "shuffled": 0.1171875,
+  "silence": 0.064453125
+ },
+ "train_seconds": 6.9,
+ "generations": 6,
+ "learns": false
+}

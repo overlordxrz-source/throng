@@ -1,0 +1,315 @@
+{
+ "cfg": {
+  "d": 6,
+  "hidden": true,
+  "lam": 0.99,
+  "gamma": 0.99,
+  "tier": "T1",
+  "learner": "L1",
+  "kl": 0.0,
+  "steps": 1000000.0,
+  "B": 256,
+  "T": 32,
+  "seed": 0,
+  "episodes_per_life": 8,
+  "epochs": 2,
+  "minibatches": 1,
+  "lr": 0.0003,
+  "move_cost": 0.003,
+  "eval_episodes": 512,
+  "curve_every": 10,
+  "navs": "w2_out/nav_w13/*.msgpack",
+  "out": "/private/tmp/claude-501/-Users-overlord-CascadeProjects-throng/aad77c1d-d7ac-437e-bef4-aa525802ccc0/scratchpad/grid/T1/T1_L1_kl0_d6_h1_l0.99.json"
+ },
+ "cap": 24,
+ "curve": [
+  {
+   "steps": 81920,
+   "reach_train": 0.0,
+   "sec": 4.5,
+   "act_freq": [
+    0.47,
+    0.001,
+    0.008,
+    0.001,
+    0.011,
+    0.509
+   ],
+   "adv_by_act": [
+    1.373,
+    0.9,
+    1.228,
+    1.244,
+    1.331,
+    1.349
+   ],
+   "ret_mean": -0.98,
+   "r_eat": null
+  },
+  {
+   "steps": 163840,
+   "reach_train": 0.0,
+   "sec": 5.2,
+   "act_freq": [
+    0.549,
+    0.001,
+    0.005,
+    0.001,
+    0.005,
+    0.439
+   ],
+   "adv_by_act": [
+    0.522,
+    0.648,
+    0.312,
+    0.52,
+    0.378,
+    0.509
+   ],
+   "ret_mean": -0.896,
+   "r_eat": null
+  },
+  {
+   "steps": 245760,
+   "reach_train": 0.0,
+   "sec": 5.9,
+   "act_freq": [
+    0.721,
+    0.001,
+    0.003,
+    0.001,
+    0.002,
+    0.272
+   ],
+   "adv_by_act": [
+    0.251,
+    0.314,
+    0.252,
+    0.232,
+    0.192,
+    0.259
+   ],
+   "ret_mean": -0.294,
+   "r_eat": null
+  },
+  {
+   "steps": 327680,
+   "reach_train": 0.0,
+   "sec": 6.6,
+   "act_freq": [
+    0.64,
+    0.0,
+    0.002,
+    0.0,
+    0.001,
+    0.357
+   ],
+   "adv_by_act": [
+    -0.025,
+    -0.32,
+    -0.101,
+    null,
+    0.094,
+    -0.021
+   ],
+   "ret_mean": -0.32,
+   "r_eat": null
+  },
+  {
+   "steps": 409600,
+   "reach_train": 0.0,
+   "sec": 7.3,
+   "act_freq": [
+    0.515,
+    0.0,
+    0.001,
+    0.0,
+    0.001,
+    0.483
+   ],
+   "adv_by_act": [
+    -0.034,
+    -0.031,
+    -0.076,
+    null,
+    -0.083,
+    -0.034
+   ],
+   "ret_mean": -0.357,
+   "r_eat": null
+  },
+  {
+   "steps": 491520,
+   "reach_train": 0.0,
+   "sec": 8.0,
+   "act_freq": [
+    0.378,
+    0.0,
+    0.0,
+    0.0,
+    0.001,
+    0.62
+   ],
+   "adv_by_act": [
+    0.052,
+    0.026,
+    0.044,
+    0.107,
+    -0.088,
+    0.054
+   ],
+   "ret_mean": -0.274,
+   "r_eat": null
+  },
+  {
+   "steps": 573440,
+   "reach_train": 0.0,
+   "sec": 8.7,
+   "act_freq": [
+    0.344,
+    0.001,
+    0.0,
+    0.0,
+    0.0,
+    0.654
+   ],
+   "adv_by_act": [
+    0.001,
+    -0.011,
+    -0.09,
+    -0.083,
+    0.098,
+    0.001
+   ],
+   "ret_mean": -0.348,
+   "r_eat": null
+  },
+  {
+   "steps": 655360,
+   "reach_train": 0.0,
+   "sec": 9.5,
+   "act_freq": [
+    0.348,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.651
+   ],
+   "adv_by_act": [
+    -0.026,
+    0.01,
+    -0.109,
+    -0.075,
+    -0.105,
+    -0.025
+   ],
+   "ret_mean": -0.338,
+   "r_eat": null
+  },
+  {
+   "steps": 737280,
+   "reach_train": 0.0,
+   "sec": 10.2,
+   "act_freq": [
+    0.431,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.568
+   ],
+   "adv_by_act": [
+    0.027,
+    null,
+    -0.127,
+    null,
+    -0.103,
+    0.025
+   ],
+   "ret_mean": -0.27,
+   "r_eat": null
+  },
+  {
+   "steps": 819200,
+   "reach_train": 0.0,
+   "sec": 10.9,
+   "act_freq": [
+    0.619,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.38
+   ],
+   "adv_by_act": [
+    0.006,
+    null,
+    -0.057,
+    null,
+    null,
+    0.005
+   ],
+   "ret_mean": -0.354,
+   "r_eat": null
+  },
+  {
+   "steps": 901120,
+   "reach_train": 0.0,
+   "sec": 11.6,
+   "act_freq": [
+    0.531,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.469
+   ],
+   "adv_by_act": [
+    -0.016,
+    -0.041,
+    null,
+    -0.107,
+    -0.006,
+    -0.017
+   ],
+   "ret_mean": -0.325,
+   "r_eat": null
+  },
+  {
+   "steps": 983040,
+   "reach_train": 0.0,
+   "sec": 12.3,
+   "act_freq": [
+    0.498,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.502
+   ],
+   "adv_by_act": [
+    0.014,
+    null,
+    -0.097,
+    -0.084,
+    -0.09,
+    0.016
+   ],
+   "ret_mean": -0.268,
+   "r_eat": null
+  }
+ ],
+ "eval_init": {
+  "true": 0.0,
+  "shuffled": 0.0,
+  "silence": 0.0
+ },
+ "eval": {
+  "true": 0.0,
+  "shuffled": 0.0,
+  "silence": 0.0
+ },
+ "train_seconds": 12.6,
+ "learns": false
+}

@@ -1,0 +1,346 @@
+{
+ "cfg": {
+  "d": 3,
+  "hidden": true,
+  "lam": 0.95,
+  "gamma": 0.99,
+  "tier": "T1",
+  "learner": "L3",
+  "kl": 0.3,
+  "steps": 1000000.0,
+  "B": 256,
+  "T": 32,
+  "seed": 2,
+  "episodes_per_life": 8,
+  "epochs": 2,
+  "minibatches": 1,
+  "lr": 0.0003,
+  "evo_pop": 32,
+  "evo_elite": 8,
+  "evo_eps": 64,
+  "evo_sigma": 0.3,
+  "evo_sigma_body": 0.02,
+  "move_cost": 0.003,
+  "eval_episodes": 512,
+  "curve_every": 10,
+  "navs": "w2_out/nav_w13/*.msgpack",
+  "out": "/private/tmp/claude-501/-Users-overlord-CascadeProjects-throng/aad77c1d-d7ac-437e-bef4-aa525802ccc0/scratchpad/grid/seeds/L3___d_3___hidden_s2.json"
+ },
+ "cap": 12,
+ "curve": [
+  {
+   "gen": 0,
+   "steps": 24572,
+   "best": 0.015625,
+   "elite_mean": 0.00390625,
+   "mean": 0.0009765625
+  },
+  {
+   "gen": 1,
+   "steps": 49148,
+   "best": 0.015625,
+   "elite_mean": 0.001953125,
+   "mean": 0.00048828125
+  },
+  {
+   "gen": 2,
+   "steps": 73694,
+   "best": 0.046875,
+   "elite_mean": 0.021484375,
+   "mean": 0.00537109375
+  },
+  {
+   "gen": 3,
+   "steps": 98196,
+   "best": 0.078125,
+   "elite_mean": 0.041015625,
+   "mean": 0.0126953125
+  },
+  {
+   "gen": 4,
+   "steps": 122612,
+   "best": 0.109375,
+   "elite_mean": 0.06640625,
+   "mean": 0.02197265625
+  },
+  {
+   "gen": 5,
+   "steps": 146971,
+   "best": 0.078125,
+   "elite_mean": 0.068359375,
+   "mean": 0.0283203125
+  },
+  {
+   "gen": 6,
+   "steps": 171437,
+   "best": 0.078125,
+   "elite_mean": 0.041015625,
+   "mean": 0.01513671875
+  },
+  {
+   "gen": 7,
+   "steps": 195893,
+   "best": 0.0625,
+   "elite_mean": 0.041015625,
+   "mean": 0.01513671875
+  },
+  {
+   "gen": 8,
+   "steps": 220209,
+   "best": 0.078125,
+   "elite_mean": 0.056640625,
+   "mean": 0.0283203125
+  },
+  {
+   "gen": 9,
+   "steps": 244447,
+   "best": 0.09375,
+   "elite_mean": 0.0703125,
+   "mean": 0.03466796875
+  },
+  {
+   "gen": 10,
+   "steps": 268498,
+   "best": 0.125,
+   "elite_mean": 0.103515625,
+   "mean": 0.0546875
+  },
+  {
+   "gen": 11,
+   "steps": 292706,
+   "best": 0.109375,
+   "elite_mean": 0.080078125,
+   "mean": 0.04052734375
+  },
+  {
+   "gen": 12,
+   "steps": 316004,
+   "best": 0.203125,
+   "elite_mean": 0.19921875,
+   "mean": 0.12451171875
+  },
+  {
+   "gen": 13,
+   "steps": 339378,
+   "best": 0.15625,
+   "elite_mean": 0.15625,
+   "mean": 0.12060546875
+  },
+  {
+   "gen": 14,
+   "steps": 363203,
+   "best": 0.109375,
+   "elite_mean": 0.10546875,
+   "mean": 0.068359375
+  },
+  {
+   "gen": 15,
+   "steps": 387158,
+   "best": 0.078125,
+   "elite_mean": 0.078125,
+   "mean": 0.05810546875
+  },
+  {
+   "gen": 16,
+   "steps": 410386,
+   "best": 0.171875,
+   "elite_mean": 0.16015625,
+   "mean": 0.12060546875
+  },
+  {
+   "gen": 17,
+   "steps": 434471,
+   "best": 0.109375,
+   "elite_mean": 0.068359375,
+   "mean": 0.0458984375
+  },
+  {
+   "gen": 18,
+   "steps": 458302,
+   "best": 0.15625,
+   "elite_mean": 0.142578125,
+   "mean": 0.07177734375
+  },
+  {
+   "gen": 19,
+   "steps": 482021,
+   "best": 0.171875,
+   "elite_mean": 0.1171875,
+   "mean": 0.0791015625
+  },
+  {
+   "gen": 20,
+   "steps": 505626,
+   "best": 0.203125,
+   "elite_mean": 0.125,
+   "mean": 0.08203125
+  },
+  {
+   "gen": 21,
+   "steps": 528935,
+   "best": 0.15625,
+   "elite_mean": 0.150390625,
+   "mean": 0.103515625
+  },
+  {
+   "gen": 22,
+   "steps": 552352,
+   "best": 0.203125,
+   "elite_mean": 0.162109375,
+   "mean": 0.10009765625
+  },
+  {
+   "gen": 23,
+   "steps": 575886,
+   "best": 0.203125,
+   "elite_mean": 0.125,
+   "mean": 0.08154296875
+  },
+  {
+   "gen": 24,
+   "steps": 599370,
+   "best": 0.140625,
+   "elite_mean": 0.126953125,
+   "mean": 0.0859375
+  },
+  {
+   "gen": 25,
+   "steps": 622730,
+   "best": 0.125,
+   "elite_mean": 0.125,
+   "mean": 0.09228515625
+  },
+  {
+   "gen": 26,
+   "steps": 646077,
+   "best": 0.171875,
+   "elite_mean": 0.107421875,
+   "mean": 0.09033203125
+  },
+  {
+   "gen": 27,
+   "steps": 669941,
+   "best": 0.140625,
+   "elite_mean": 0.0859375,
+   "mean": 0.0556640625
+  },
+  {
+   "gen": 28,
+   "steps": 693605,
+   "best": 0.140625,
+   "elite_mean": 0.11328125,
+   "mean": 0.07373046875
+  },
+  {
+   "gen": 29,
+   "steps": 717066,
+   "best": 0.125,
+   "elite_mean": 0.125,
+   "mean": 0.0908203125
+  },
+  {
+   "gen": 30,
+   "steps": 741041,
+   "best": 0.0625,
+   "elite_mean": 0.0625,
+   "mean": 0.0478515625
+  },
+  {
+   "gen": 31,
+   "steps": 764273,
+   "best": 0.140625,
+   "elite_mean": 0.140625,
+   "mean": 0.11279296875
+  },
+  {
+   "gen": 32,
+   "steps": 787599,
+   "best": 0.125,
+   "elite_mean": 0.125,
+   "mean": 0.1025390625
+  },
+  {
+   "gen": 33,
+   "steps": 811777,
+   "best": 0.046875,
+   "elite_mean": 0.046875,
+   "mean": 0.03466796875
+  },
+  {
+   "gen": 34,
+   "steps": 835267,
+   "best": 0.109375,
+   "elite_mean": 0.109375,
+   "mean": 0.080078125
+  },
+  {
+   "gen": 35,
+   "steps": 858857,
+   "best": 0.09375,
+   "elite_mean": 0.09375,
+   "mean": 0.07568359375
+  },
+  {
+   "gen": 36,
+   "steps": 881934,
+   "best": 0.140625,
+   "elite_mean": 0.140625,
+   "mean": 0.11865234375
+  },
+  {
+   "gen": 37,
+   "steps": 905623,
+   "best": 0.078125,
+   "elite_mean": 0.078125,
+   "mean": 0.068359375
+  },
+  {
+   "gen": 38,
+   "steps": 929184,
+   "best": 0.09375,
+   "elite_mean": 0.09375,
+   "mean": 0.0751953125
+  },
+  {
+   "gen": 39,
+   "steps": 952371,
+   "best": 0.140625,
+   "elite_mean": 0.140625,
+   "mean": 0.11083984375
+  },
+  {
+   "gen": 40,
+   "steps": 975788,
+   "best": 0.109375,
+   "elite_mean": 0.109375,
+   "mean": 0.09326171875
+  },
+  {
+   "gen": 41,
+   "steps": 998890,
+   "best": 0.125,
+   "elite_mean": 0.125,
+   "mean": 0.1103515625
+  },
+  {
+   "gen": 42,
+   "steps": 1022570,
+   "best": 0.109375,
+   "elite_mean": 0.109375,
+   "mean": 0.07958984375
+  }
+ ],
+ "eval_init": {
+  "true": 0.001953125,
+  "shuffled": 0.001953125,
+  "silence": 0.001953125
+ },
+ "eval": {
+  "true": 0.1505016722408027,
+  "shuffled": 0.13527397260273974,
+  "silence": 0.1490787269681742
+ },
+ "train_seconds": 5.8,
+ "generations": 43,
+ "learns": false
+}

@@ -1,0 +1,346 @@
+{
+ "cfg": {
+  "d": 3,
+  "hidden": true,
+  "lam": 0.95,
+  "gamma": 0.99,
+  "tier": "T1",
+  "learner": "L3",
+  "kl": 0.3,
+  "steps": 1000000.0,
+  "B": 256,
+  "T": 32,
+  "seed": 1,
+  "episodes_per_life": 8,
+  "epochs": 2,
+  "minibatches": 1,
+  "lr": 0.0003,
+  "evo_pop": 32,
+  "evo_elite": 8,
+  "evo_eps": 64,
+  "evo_sigma": 0.3,
+  "evo_sigma_body": 0.02,
+  "move_cost": 0.003,
+  "eval_episodes": 512,
+  "curve_every": 10,
+  "navs": "w2_out/nav_w13/*.msgpack",
+  "out": "/private/tmp/claude-501/-Users-overlord-CascadeProjects-throng/aad77c1d-d7ac-437e-bef4-aa525802ccc0/scratchpad/grid/seeds/L3___d_3___hidden_s1.json"
+ },
+ "cap": 12,
+ "curve": [
+  {
+   "gen": 0,
+   "steps": 24562,
+   "best": 0.03125,
+   "elite_mean": 0.0078125,
+   "mean": 0.001953125
+  },
+  {
+   "gen": 1,
+   "steps": 49124,
+   "best": 0.046875,
+   "elite_mean": 0.01171875,
+   "mean": 0.0029296875
+  },
+  {
+   "gen": 2,
+   "steps": 73630,
+   "best": 0.046875,
+   "elite_mean": 0.029296875,
+   "mean": 0.0087890625
+  },
+  {
+   "gen": 3,
+   "steps": 97972,
+   "best": 0.109375,
+   "elite_mean": 0.080078125,
+   "mean": 0.03466796875
+  },
+  {
+   "gen": 4,
+   "steps": 122137,
+   "best": 0.125,
+   "elite_mean": 0.107421875,
+   "mean": 0.05029296875
+  },
+  {
+   "gen": 5,
+   "steps": 146399,
+   "best": 0.078125,
+   "elite_mean": 0.064453125,
+   "mean": 0.03466796875
+  },
+  {
+   "gen": 6,
+   "steps": 170339,
+   "best": 0.1875,
+   "elite_mean": 0.158203125,
+   "mean": 0.0673828125
+  },
+  {
+   "gen": 7,
+   "steps": 194402,
+   "best": 0.125,
+   "elite_mean": 0.107421875,
+   "mean": 0.05712890625
+  },
+  {
+   "gen": 8,
+   "steps": 218439,
+   "best": 0.140625,
+   "elite_mean": 0.12109375,
+   "mean": 0.06494140625
+  },
+  {
+   "gen": 9,
+   "steps": 242611,
+   "best": 0.078125,
+   "elite_mean": 0.078125,
+   "mean": 0.04443359375
+  },
+  {
+   "gen": 10,
+   "steps": 266669,
+   "best": 0.109375,
+   "elite_mean": 0.095703125,
+   "mean": 0.06005859375
+  },
+  {
+   "gen": 11,
+   "steps": 290487,
+   "best": 0.140625,
+   "elite_mean": 0.11328125,
+   "mean": 0.07177734375
+  },
+  {
+   "gen": 12,
+   "steps": 314659,
+   "best": 0.109375,
+   "elite_mean": 0.060546875,
+   "mean": 0.037109375
+  },
+  {
+   "gen": 13,
+   "steps": 338235,
+   "best": 0.1875,
+   "elite_mean": 0.14453125,
+   "mean": 0.083984375
+  },
+  {
+   "gen": 14,
+   "steps": 361903,
+   "best": 0.109375,
+   "elite_mean": 0.1015625,
+   "mean": 0.06982421875
+  },
+  {
+   "gen": 15,
+   "steps": 385434,
+   "best": 0.109375,
+   "elite_mean": 0.107421875,
+   "mean": 0.07470703125
+  },
+  {
+   "gen": 16,
+   "steps": 408715,
+   "best": 0.125,
+   "elite_mean": 0.125,
+   "mean": 0.091796875
+  },
+  {
+   "gen": 17,
+   "steps": 431835,
+   "best": 0.140625,
+   "elite_mean": 0.140625,
+   "mean": 0.10498046875
+  },
+  {
+   "gen": 18,
+   "steps": 455523,
+   "best": 0.109375,
+   "elite_mean": 0.095703125,
+   "mean": 0.06640625
+  },
+  {
+   "gen": 19,
+   "steps": 479453,
+   "best": 0.078125,
+   "elite_mean": 0.064453125,
+   "mean": 0.0458984375
+  },
+  {
+   "gen": 20,
+   "steps": 502255,
+   "best": 0.203125,
+   "elite_mean": 0.15234375,
+   "mean": 0.11767578125
+  },
+  {
+   "gen": 21,
+   "steps": 524550,
+   "best": 0.234375,
+   "elite_mean": 0.197265625,
+   "mean": 0.15673828125
+  },
+  {
+   "gen": 22,
+   "steps": 547438,
+   "best": 0.21875,
+   "elite_mean": 0.158203125,
+   "mean": 0.11376953125
+  },
+  {
+   "gen": 23,
+   "steps": 569597,
+   "best": 0.234375,
+   "elite_mean": 0.21484375,
+   "mean": 0.16162109375
+  },
+  {
+   "gen": 24,
+   "steps": 593104,
+   "best": 0.140625,
+   "elite_mean": 0.12109375,
+   "mean": 0.078125
+  },
+  {
+   "gen": 25,
+   "steps": 615958,
+   "best": 0.203125,
+   "elite_mean": 0.18359375,
+   "mean": 0.12744140625
+  },
+  {
+   "gen": 26,
+   "steps": 638599,
+   "best": 0.25,
+   "elite_mean": 0.216796875,
+   "mean": 0.13623046875
+  },
+  {
+   "gen": 27,
+   "steps": 661840,
+   "best": 0.203125,
+   "elite_mean": 0.15625,
+   "mean": 0.09912109375
+  },
+  {
+   "gen": 28,
+   "steps": 684482,
+   "best": 0.234375,
+   "elite_mean": 0.21484375,
+   "mean": 0.140625
+  },
+  {
+   "gen": 29,
+   "steps": 707280,
+   "best": 0.21875,
+   "elite_mean": 0.212890625,
+   "mean": 0.138671875
+  },
+  {
+   "gen": 30,
+   "steps": 730341,
+   "best": 0.203125,
+   "elite_mean": 0.1796875,
+   "mean": 0.11572265625
+  },
+  {
+   "gen": 31,
+   "steps": 753325,
+   "best": 0.21875,
+   "elite_mean": 0.19921875,
+   "mean": 0.130859375
+  },
+  {
+   "gen": 32,
+   "steps": 777091,
+   "best": 0.15625,
+   "elite_mean": 0.146484375,
+   "mean": 0.07861328125
+  },
+  {
+   "gen": 33,
+   "steps": 800156,
+   "best": 0.203125,
+   "elite_mean": 0.18359375,
+   "mean": 0.11474609375
+  },
+  {
+   "gen": 34,
+   "steps": 822908,
+   "best": 0.25,
+   "elite_mean": 0.21484375,
+   "mean": 0.13720703125
+  },
+  {
+   "gen": 35,
+   "steps": 845257,
+   "best": 0.296875,
+   "elite_mean": 0.279296875,
+   "mean": 0.18212890625
+  },
+  {
+   "gen": 36,
+   "steps": 867155,
+   "best": 0.34375,
+   "elite_mean": 0.30859375,
+   "mean": 0.21337890625
+  },
+  {
+   "gen": 37,
+   "steps": 890142,
+   "best": 0.21875,
+   "elite_mean": 0.19921875,
+   "mean": 0.125
+  },
+  {
+   "gen": 38,
+   "steps": 912482,
+   "best": 0.234375,
+   "elite_mean": 0.23046875,
+   "mean": 0.17431640625
+  },
+  {
+   "gen": 39,
+   "steps": 935057,
+   "best": 0.265625,
+   "elite_mean": 0.25,
+   "mean": 0.1787109375
+  },
+  {
+   "gen": 40,
+   "steps": 958256,
+   "best": 0.203125,
+   "elite_mean": 0.1875,
+   "mean": 0.12158203125
+  },
+  {
+   "gen": 41,
+   "steps": 980333,
+   "best": 0.328125,
+   "elite_mean": 0.302734375,
+   "mean": 0.203125
+  },
+  {
+   "gen": 42,
+   "steps": 1002965,
+   "best": 0.25,
+   "elite_mean": 0.2421875,
+   "mean": 0.16796875
+  }
+ ],
+ "eval_init": {
+  "true": 0.001953125,
+  "shuffled": 0.001953125,
+  "silence": 0.001953125
+ },
+ "eval": {
+  "true": 0.26489028213166144,
+  "shuffled": 0.21986970684039087,
+  "silence": 0.22039473684210525
+ },
+ "train_seconds": 5.7,
+ "generations": 43,
+ "learns": false
+}

@@ -1,0 +1,346 @@
+{
+ "cfg": {
+  "d": 3,
+  "hidden": true,
+  "lam": 0.95,
+  "gamma": 0.99,
+  "tier": "T1",
+  "learner": "L3",
+  "kl": 0.0,
+  "steps": 1000000.0,
+  "B": 256,
+  "T": 32,
+  "seed": 0,
+  "episodes_per_life": 8,
+  "epochs": 2,
+  "minibatches": 1,
+  "lr": 0.0003,
+  "evo_pop": 32,
+  "evo_elite": 8,
+  "evo_eps": 64,
+  "evo_sigma": 0.3,
+  "evo_sigma_body": 0.02,
+  "move_cost": 0.003,
+  "eval_episodes": 512,
+  "curve_every": 10,
+  "navs": "w2_out/nav_w13/*.msgpack",
+  "out": "/private/tmp/claude-501/-Users-overlord-CascadeProjects-throng/aad77c1d-d7ac-437e-bef4-aa525802ccc0/scratchpad/grid/T1/T1_L3_kl0_d3_h1_l0.95.json"
+ },
+ "cap": 12,
+ "curve": [
+  {
+   "gen": 0,
+   "steps": 24574,
+   "best": 0.015625,
+   "elite_mean": 0.001953125,
+   "mean": 0.00048828125
+  },
+  {
+   "gen": 1,
+   "steps": 49144,
+   "best": 0.015625,
+   "elite_mean": 0.005859375,
+   "mean": 0.00146484375
+  },
+  {
+   "gen": 2,
+   "steps": 73669,
+   "best": 0.0625,
+   "elite_mean": 0.03125,
+   "mean": 0.00927734375
+  },
+  {
+   "gen": 3,
+   "steps": 98050,
+   "best": 0.109375,
+   "elite_mean": 0.060546875,
+   "mean": 0.02490234375
+  },
+  {
+   "gen": 4,
+   "steps": 122382,
+   "best": 0.140625,
+   "elite_mean": 0.08984375,
+   "mean": 0.03173828125
+  },
+  {
+   "gen": 5,
+   "steps": 146601,
+   "best": 0.109375,
+   "elite_mean": 0.08203125,
+   "mean": 0.04345703125
+  },
+  {
+   "gen": 6,
+   "steps": 170691,
+   "best": 0.1875,
+   "elite_mean": 0.150390625,
+   "mean": 0.05615234375
+  },
+  {
+   "gen": 7,
+   "steps": 194563,
+   "best": 0.125,
+   "elite_mean": 0.111328125,
+   "mean": 0.0693359375
+  },
+  {
+   "gen": 8,
+   "steps": 218494,
+   "best": 0.15625,
+   "elite_mean": 0.126953125,
+   "mean": 0.0703125
+  },
+  {
+   "gen": 9,
+   "steps": 242521,
+   "best": 0.09375,
+   "elite_mean": 0.076171875,
+   "mean": 0.0458984375
+  },
+  {
+   "gen": 10,
+   "steps": 266654,
+   "best": 0.125,
+   "elite_mean": 0.09765625,
+   "mean": 0.05029296875
+  },
+  {
+   "gen": 11,
+   "steps": 290471,
+   "best": 0.125,
+   "elite_mean": 0.115234375,
+   "mean": 0.07177734375
+  },
+  {
+   "gen": 12,
+   "steps": 314515,
+   "best": 0.171875,
+   "elite_mean": 0.12109375,
+   "mean": 0.05419921875
+  },
+  {
+   "gen": 13,
+   "steps": 338163,
+   "best": 0.203125,
+   "elite_mean": 0.171875,
+   "mean": 0.09375
+  },
+  {
+   "gen": 14,
+   "steps": 361967,
+   "best": 0.140625,
+   "elite_mean": 0.126953125,
+   "mean": 0.06591796875
+  },
+  {
+   "gen": 15,
+   "steps": 385616,
+   "best": 0.15625,
+   "elite_mean": 0.138671875,
+   "mean": 0.08251953125
+  },
+  {
+   "gen": 16,
+   "steps": 408601,
+   "best": 0.28125,
+   "elite_mean": 0.224609375,
+   "mean": 0.14990234375
+  },
+  {
+   "gen": 17,
+   "steps": 432103,
+   "best": 0.1875,
+   "elite_mean": 0.162109375,
+   "mean": 0.0947265625
+  },
+  {
+   "gen": 18,
+   "steps": 455522,
+   "best": 0.21875,
+   "elite_mean": 0.189453125,
+   "mean": 0.10986328125
+  },
+  {
+   "gen": 19,
+   "steps": 479435,
+   "best": 0.171875,
+   "elite_mean": 0.1171875,
+   "mean": 0.06787109375
+  },
+  {
+   "gen": 20,
+   "steps": 502575,
+   "best": 0.234375,
+   "elite_mean": 0.193359375,
+   "mean": 0.11669921875
+  },
+  {
+   "gen": 21,
+   "steps": 525440,
+   "best": 0.34375,
+   "elite_mean": 0.28515625,
+   "mean": 0.1630859375
+  },
+  {
+   "gen": 22,
+   "steps": 548724,
+   "best": 0.265625,
+   "elite_mean": 0.232421875,
+   "mean": 0.12060546875
+  },
+  {
+   "gen": 23,
+   "steps": 571469,
+   "best": 0.296875,
+   "elite_mean": 0.267578125,
+   "mean": 0.1650390625
+  },
+  {
+   "gen": 24,
+   "steps": 595022,
+   "best": 0.203125,
+   "elite_mean": 0.162109375,
+   "mean": 0.09521484375
+  },
+  {
+   "gen": 25,
+   "steps": 618144,
+   "best": 0.21875,
+   "elite_mean": 0.197265625,
+   "mean": 0.13037109375
+  },
+  {
+   "gen": 26,
+   "steps": 641182,
+   "best": 0.25,
+   "elite_mean": 0.20703125,
+   "mean": 0.1357421875
+  },
+  {
+   "gen": 27,
+   "steps": 664550,
+   "best": 0.25,
+   "elite_mean": 0.17578125,
+   "mean": 0.1064453125
+  },
+  {
+   "gen": 28,
+   "steps": 687516,
+   "best": 0.234375,
+   "elite_mean": 0.224609375,
+   "mean": 0.14013671875
+  },
+  {
+   "gen": 29,
+   "steps": 710387,
+   "best": 0.25,
+   "elite_mean": 0.228515625,
+   "mean": 0.1533203125
+  },
+  {
+   "gen": 30,
+   "steps": 733430,
+   "best": 0.234375,
+   "elite_mean": 0.185546875,
+   "mean": 0.1171875
+  },
+  {
+   "gen": 31,
+   "steps": 756613,
+   "best": 0.25,
+   "elite_mean": 0.208984375,
+   "mean": 0.11865234375
+  },
+  {
+   "gen": 32,
+   "steps": 779994,
+   "best": 0.234375,
+   "elite_mean": 0.171875,
+   "mean": 0.10498046875
+  },
+  {
+   "gen": 33,
+   "steps": 803113,
+   "best": 0.21875,
+   "elite_mean": 0.18359375,
+   "mean": 0.11767578125
+  },
+  {
+   "gen": 34,
+   "steps": 825791,
+   "best": 0.296875,
+   "elite_mean": 0.244140625,
+   "mean": 0.1630859375
+  },
+  {
+   "gen": 35,
+   "steps": 847589,
+   "best": 0.375,
+   "elite_mean": 0.30859375,
+   "mean": 0.23046875
+  },
+  {
+   "gen": 36,
+   "steps": 870176,
+   "best": 0.328125,
+   "elite_mean": 0.318359375,
+   "mean": 0.18701171875
+  },
+  {
+   "gen": 37,
+   "steps": 892906,
+   "best": 0.25,
+   "elite_mean": 0.21875,
+   "mean": 0.15771484375
+  },
+  {
+   "gen": 38,
+   "steps": 915750,
+   "best": 0.265625,
+   "elite_mean": 0.232421875,
+   "mean": 0.1533203125
+  },
+  {
+   "gen": 39,
+   "steps": 938507,
+   "best": 0.28125,
+   "elite_mean": 0.25390625,
+   "mean": 0.16064453125
+  },
+  {
+   "gen": 40,
+   "steps": 961518,
+   "best": 0.25,
+   "elite_mean": 0.216796875,
+   "mean": 0.1494140625
+  },
+  {
+   "gen": 41,
+   "steps": 983391,
+   "best": 0.421875,
+   "elite_mean": 0.375,
+   "mean": 0.2314453125
+  },
+  {
+   "gen": 42,
+   "steps": 1005838,
+   "best": 0.3125,
+   "elite_mean": 0.26953125,
+   "mean": 0.18896484375
+  }
+ ],
+ "eval_init": {
+  "true": 0.001953125,
+  "shuffled": 0.001953125,
+  "silence": 0.001953125
+ },
+ "eval": {
+  "true": 0.3623417721518987,
+  "shuffled": 0.03508771929824561,
+  "silence": 0.07088122605363985
+ },
+ "train_seconds": 7.3,
+ "generations": 43,
+ "learns": false
+}

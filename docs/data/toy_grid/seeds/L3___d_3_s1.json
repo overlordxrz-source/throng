@@ -1,0 +1,360 @@
+{
+ "cfg": {
+  "d": 3,
+  "hidden": false,
+  "lam": 0.95,
+  "gamma": 0.99,
+  "tier": "T1",
+  "learner": "L3",
+  "kl": 0.3,
+  "steps": 1000000.0,
+  "B": 256,
+  "T": 32,
+  "seed": 1,
+  "episodes_per_life": 8,
+  "epochs": 2,
+  "minibatches": 1,
+  "lr": 0.0003,
+  "evo_pop": 32,
+  "evo_elite": 8,
+  "evo_eps": 64,
+  "evo_sigma": 0.3,
+  "evo_sigma_body": 0.02,
+  "move_cost": 0.003,
+  "eval_episodes": 512,
+  "curve_every": 10,
+  "navs": "w2_out/nav_w13/*.msgpack",
+  "out": "/private/tmp/claude-501/-Users-overlord-CascadeProjects-throng/aad77c1d-d7ac-437e-bef4-aa525802ccc0/scratchpad/grid/seeds/L3___d_3_s1.json"
+ },
+ "cap": 12,
+ "curve": [
+  {
+   "gen": 0,
+   "steps": 24385,
+   "best": 0.1875,
+   "elite_mean": 0.078125,
+   "mean": 0.0234375
+  },
+  {
+   "gen": 1,
+   "steps": 48588,
+   "best": 0.140625,
+   "elite_mean": 0.09375,
+   "mean": 0.03955078125
+  },
+  {
+   "gen": 2,
+   "steps": 72607,
+   "best": 0.140625,
+   "elite_mean": 0.109375,
+   "mean": 0.052734375
+  },
+  {
+   "gen": 3,
+   "steps": 96174,
+   "best": 0.25,
+   "elite_mean": 0.177734375,
+   "mean": 0.0908203125
+  },
+  {
+   "gen": 4,
+   "steps": 119872,
+   "best": 0.203125,
+   "elite_mean": 0.158203125,
+   "mean": 0.09912109375
+  },
+  {
+   "gen": 5,
+   "steps": 143391,
+   "best": 0.1875,
+   "elite_mean": 0.16015625,
+   "mean": 0.1064453125
+  },
+  {
+   "gen": 6,
+   "steps": 166938,
+   "best": 0.21875,
+   "elite_mean": 0.18359375,
+   "mean": 0.09814453125
+  },
+  {
+   "gen": 7,
+   "steps": 190460,
+   "best": 0.21875,
+   "elite_mean": 0.1796875,
+   "mean": 0.1044921875
+  },
+  {
+   "gen": 8,
+   "steps": 213924,
+   "best": 0.203125,
+   "elite_mean": 0.166015625,
+   "mean": 0.10693359375
+  },
+  {
+   "gen": 9,
+   "steps": 237514,
+   "best": 0.1875,
+   "elite_mean": 0.162109375,
+   "mean": 0.09228515625
+  },
+  {
+   "gen": 10,
+   "steps": 260974,
+   "best": 0.359375,
+   "elite_mean": 0.19921875,
+   "mean": 0.119140625
+  },
+  {
+   "gen": 11,
+   "steps": 284334,
+   "best": 0.40625,
+   "elite_mean": 0.23828125,
+   "mean": 0.11962890625
+  },
+  {
+   "gen": 12,
+   "steps": 307531,
+   "best": 0.296875,
+   "elite_mean": 0.240234375,
+   "mean": 0.1298828125
+  },
+  {
+   "gen": 13,
+   "steps": 330492,
+   "best": 0.34375,
+   "elite_mean": 0.234375,
+   "mean": 0.13330078125
+  },
+  {
+   "gen": 14,
+   "steps": 352734,
+   "best": 0.375,
+   "elite_mean": 0.29296875,
+   "mean": 0.185546875
+  },
+  {
+   "gen": 15,
+   "steps": 374796,
+   "best": 0.390625,
+   "elite_mean": 0.35546875,
+   "mean": 0.20751953125
+  },
+  {
+   "gen": 16,
+   "steps": 397380,
+   "best": 0.3125,
+   "elite_mean": 0.21875,
+   "mean": 0.1513671875
+  },
+  {
+   "gen": 17,
+   "steps": 419371,
+   "best": 0.4375,
+   "elite_mean": 0.279296875,
+   "mean": 0.19921875
+  },
+  {
+   "gen": 18,
+   "steps": 441923,
+   "best": 0.3125,
+   "elite_mean": 0.25,
+   "mean": 0.16796875
+  },
+  {
+   "gen": 19,
+   "steps": 463889,
+   "best": 0.40625,
+   "elite_mean": 0.328125,
+   "mean": 0.2119140625
+  },
+  {
+   "gen": 20,
+   "steps": 485151,
+   "best": 0.484375,
+   "elite_mean": 0.361328125,
+   "mean": 0.2607421875
+  },
+  {
+   "gen": 21,
+   "steps": 507152,
+   "best": 0.40625,
+   "elite_mean": 0.3359375,
+   "mean": 0.2080078125
+  },
+  {
+   "gen": 22,
+   "steps": 529772,
+   "best": 0.328125,
+   "elite_mean": 0.296875,
+   "mean": 0.16259765625
+  },
+  {
+   "gen": 23,
+   "steps": 551725,
+   "best": 0.328125,
+   "elite_mean": 0.306640625,
+   "mean": 0.205078125
+  },
+  {
+   "gen": 24,
+   "steps": 573753,
+   "best": 0.359375,
+   "elite_mean": 0.291015625,
+   "mean": 0.201171875
+  },
+  {
+   "gen": 25,
+   "steps": 595755,
+   "best": 0.3125,
+   "elite_mean": 0.294921875,
+   "mean": 0.19287109375
+  },
+  {
+   "gen": 26,
+   "steps": 617348,
+   "best": 0.359375,
+   "elite_mean": 0.306640625,
+   "mean": 0.21875
+  },
+  {
+   "gen": 27,
+   "steps": 639642,
+   "best": 0.40625,
+   "elite_mean": 0.294921875,
+   "mean": 0.18701171875
+  },
+  {
+   "gen": 28,
+   "steps": 661348,
+   "best": 0.390625,
+   "elite_mean": 0.34765625,
+   "mean": 0.21875
+  },
+  {
+   "gen": 29,
+   "steps": 683390,
+   "best": 0.390625,
+   "elite_mean": 0.328125,
+   "mean": 0.20751953125
+  },
+  {
+   "gen": 30,
+   "steps": 703921,
+   "best": 0.59375,
+   "elite_mean": 0.484375,
+   "mean": 0.31787109375
+  },
+  {
+   "gen": 31,
+   "steps": 726038,
+   "best": 0.4375,
+   "elite_mean": 0.3671875,
+   "mean": 0.21826171875
+  },
+  {
+   "gen": 32,
+   "steps": 747747,
+   "best": 0.5,
+   "elite_mean": 0.41015625,
+   "mean": 0.25830078125
+  },
+  {
+   "gen": 33,
+   "steps": 768805,
+   "best": 0.5,
+   "elite_mean": 0.439453125,
+   "mean": 0.26708984375
+  },
+  {
+   "gen": 34,
+   "steps": 789512,
+   "best": 0.46875,
+   "elite_mean": 0.435546875,
+   "mean": 0.28369140625
+  },
+  {
+   "gen": 35,
+   "steps": 810261,
+   "best": 0.5,
+   "elite_mean": 0.46875,
+   "mean": 0.2998046875
+  },
+  {
+   "gen": 36,
+   "steps": 831574,
+   "best": 0.40625,
+   "elite_mean": 0.34765625,
+   "mean": 0.251953125
+  },
+  {
+   "gen": 37,
+   "steps": 853042,
+   "best": 0.515625,
+   "elite_mean": 0.44921875,
+   "mean": 0.25439453125
+  },
+  {
+   "gen": 38,
+   "steps": 873614,
+   "best": 0.546875,
+   "elite_mean": 0.490234375,
+   "mean": 0.30517578125
+  },
+  {
+   "gen": 39,
+   "steps": 894880,
+   "best": 0.46875,
+   "elite_mean": 0.384765625,
+   "mean": 0.25634765625
+  },
+  {
+   "gen": 40,
+   "steps": 915920,
+   "best": 0.546875,
+   "elite_mean": 0.451171875,
+   "mean": 0.28466796875
+  },
+  {
+   "gen": 41,
+   "steps": 936190,
+   "best": 0.5,
+   "elite_mean": 0.453125,
+   "mean": 0.31591796875
+  },
+  {
+   "gen": 42,
+   "steps": 957695,
+   "best": 0.40625,
+   "elite_mean": 0.369140625,
+   "mean": 0.24072265625
+  },
+  {
+   "gen": 43,
+   "steps": 978748,
+   "best": 0.5,
+   "elite_mean": 0.41015625,
+   "mean": 0.28076171875
+  },
+  {
+   "gen": 44,
+   "steps": 1000050,
+   "best": 0.484375,
+   "elite_mean": 0.419921875,
+   "mean": 0.27099609375
+  }
+ ],
+ "eval_init": {
+  "true": 0.013565891472868217,
+  "shuffled": 0.013565891472868217,
+  "silence": 0.013565891472868217
+ },
+ "eval": {
+  "true": 0.5824175824175825,
+  "shuffled": 0.40974212034383956,
+  "silence": 0.4651474530831099
+ },
+ "train_seconds": 5.9,
+ "generations": 45,
+ "learns": false
+}

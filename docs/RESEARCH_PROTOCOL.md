@@ -6814,6 +6814,21 @@ more expensive, because it produces publishable-looking nulls.
       climbs under the move cost that freezes PPO; below the bar.
   - **L2' is built only if some cell passes T2** (T3 is gated on T2; T1 has no passes so far for L1 / L2).
 
+- **RESULT (Nov 14 ~21:45): THE TOY GRID, tier T1 (laptop, comm-toy `dd9299d`; full table in
+  `docs/STAGE1_RETHINK.md` "Toy grid results"; files `docs/data/toy_grid/`).**
+  - **No learner (L1 KL 0.3, L1 KL 0, L2, L3) passes T1 in ANY cell under the harness reward.**
+    - L1 / L2: 0% reach everywhere except d = 3 visible (L1 KL 0: 70% true = shuffled, code not needed; KL 0.3: 9%).
+    - L3 (evolution): d = 3 visible 62/42/28; d = 3 hidden 36/4/7; d >= 6 <= 18% with no oracle use.
+    - T2 / T3 therefore do not run, and L2' is not built.
+  - **The PPO audit clears the code:** at move cost 0, L2 learns d = 3 (hidden 90/10 on 3/3 seeds, visible 97/36) but
+    nothing at d >= 6. L1 still fails every hidden cell.
+  - Readings:
+    - the harness move cost plus a payoff out of random reach makes PPO freeze;
+    - the frozen-trunk architecture blocks even when movement is free;
+    - lambda changes nothing;
+    - evolution is the only learner that improves under the real cost, but weakly and only at d = 3.
+  - Cam rules on the world change and the learner.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under

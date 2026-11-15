@@ -91,3 +91,86 @@ account's remaining credit are low.
   will work. It costs nothing on the laptop.
 - **Instruments are now in place:** the oracle-first rule; the sanity rule with permutation null and cluster CI;
   per-item watches; the evolve resume fix.
+
+## Toy grid results (Nov 14, laptop, comm-toy `dd9299d`; Cam's spec plus addenda 5-6)
+
+Cells read as reach-food rate (%) true / shuffled / silence within the 4d cap. `*` = learns (true >= 80% AND >= 2x
+shuffled AND >= +30 points). 1M agent-steps per cell, seed 0. L3 = evolution (lambda does not apply to it, so the paired
+lambda rows coincide, which also confirms determinism).
+
+**Tier T1 (oracle input), the harness reward (move cost 0.003):**
+
+| d | food | lambda | L1 KL0.0 | L1 KL0.3 | L2 | L3 |
+|---|---|---|---|---|---|---|
+| 3 | hidden | 0.95 | 0/0/0 | 0/0/0 | 0/0/0 | 36/4/7 |
+| 3 | hidden | 0.99 | 0/0/0 | 0/0/0 | 0/0/0 | 36/4/7 |
+| 3 | visible | 0.95 | 70/69/70 | 9/10/9 | 0/0/0 | 62/42/28 |
+| 3 | visible | 0.99 | 70/70/72 | 9/10/10 | 0/0/0 | 62/42/28 |
+| 6 | hidden | 0.95 | 0/0/0 | 0/0/0 | 0/0/0 | 16/9/7 |
+| 6 | hidden | 0.99 | 0/0/0 | 0/0/0 | 0/0/0 | 16/9/7 |
+| 6 | visible | 0.95 | 0/0/0 | 0/0/0 | 0/0/0 | 18/18/18 |
+| 6 | visible | 0.99 | 0/0/0 | 0/0/0 | 0/0/0 | 18/18/18 |
+| 12 | hidden | 0.95 | 0/0/0 | 0/0/0 | 0/0/0 | 14/12/12 |
+| 12 | hidden | 0.99 | 0/0/0 | 0/0/0 | 0/0/0 | 14/12/12 |
+| 12 | visible | 0.95 | 0/0/0 | 0/0/0 | 0/0/0 | 15/12/12 |
+| 12 | visible | 0.99 | 0/0/0 | 0/0/0 | 0/0/0 | 15/12/12 |
+| 24 | hidden | 0.95 | 0/0/0 | 0/0/0 | 0/0/0 | 9/14/12 |
+| 24 | hidden | 0.99 | 0/0/0 | 0/0/0 | 0/0/0 | 9/14/12 |
+| 24 | visible | 0.95 | 0/0/0 | 0/0/0 | 0/0/0 | 11/12/6 |
+| 24 | visible | 0.99 | 0/0/0 | 0/0/0 | 0/0/0 | 11/12/6 |
+
+**Audit, the same grid with the move cost set to 0** (not the registered grid; run because Cam's "neither learns at
+d = 3 -> audit PPO" fired):
+
+| d | food | lambda | L1 KL0.0 | L1 KL0.3 | L2 |
+|---|---|---|---|---|---|
+| 3 | hidden | 0.95 | 0/0/0 | 0/0/0 | 90/10/23* |
+| 3 | hidden | 0.99 | 0/0/0 | 0/0/0 | 86/10/23* |
+| 3 | visible | 0.95 | 71/70/70 | 10/11/10 | 97/36/68* |
+| 3 | visible | 0.99 | 72/70/70 | 10/11/11 | 95/32/63* |
+| 6 | hidden | 0.95 | 0/0/0 | 0/0/0 | 7/3/4 |
+| 6 | hidden | 0.99 | 0/0/0 | 0/0/0 | 7/4/3 |
+| 6 | visible | 0.95 | 0/0/0 | 0/0/0 | 13/6/9 |
+| 6 | visible | 0.99 | 0/0/0 | 0/0/0 | 13/6/5 |
+| 12 | hidden | 0.95 | 0/0/0 | 0/0/0 | 1/0/1 |
+| 12 | hidden | 0.99 | 1/1/1 | 0/0/0 | 0/0/0 |
+| 12 | visible | 0.95 | 0/0/0 | 0/0/0 | 0/0/1 |
+| 12 | visible | 0.99 | 0/0/0 | 0/0/0 | 0/0/0 |
+| 24 | hidden | 0.95 | 0/0/0 | 0/0/0 | 0/0/0 |
+| 24 | hidden | 0.99 | 0/0/0 | 0/0/0 | 0/0/0 |
+| 24 | visible | 0.95 | 0/0/0 | 0/0/0 | 0/0/0 |
+| 24 | visible | 0.99 | 0/0/0 | 0/0/0 | 0/0/0 |
+
+**Extra seeds on the boundary cells** (true / shuffled, seeds 0 / 1 / 2):
+- L2, move cost 0, d = 3 hidden: 90/10, 88/12, 89/13 (learns 3/3).
+- L2, move cost 0, d = 6 hidden: 7/3, 15/4, 6/2 (0/3).
+- L3, harness, d = 3 hidden: 36/4, 26/22, 15/14 (0/3; oracle use clear only in seed 0).
+- L3, harness, d = 3 visible: 62/42, 58/41, 49/29 (0/3).
+
+**Controls:** a scripted ray-walker reaches 100% with the true input in every cell tested (d = 3, 24; visible, hidden).
+Shuffled input drops it to 0-3% wherever the food starts out of view.
+
+**Tiers T2 / T3 did not run:** no learner passed T1 in any cell under the harness reward, so no cell is gated
+through. L2' (the transformer memory, T3 only) is therefore not built.
+
+### Reading against Cam's rules
+
+1. **"Neither learns at d = 3 in T1 -> audit PPO first": fired, and the audit clears the code.** The same PPO code
+   learns d = 3 (hidden 90%, visible 97%) once moving is free. With the harness's move cost and a sparse payoff,
+   PPO from scratch freezes: stay / eat win the advantage. That is the stage-1 pathology reproduced at the smallest
+   scale.
+2. **"L2 learns where L1 doesn't -> the frozen-trunk architecture is a blocker": yes, under free movement.** L1 (frozen
+   navigator trunk + side head) fails every hidden cell even at move cost 0, at KL 0 and 0.3. The navigator itself
+   reaches visible food 3 cells away only 1.4% of the time.
+3. **d\*:** under the harness reward there is none (nothing learns at d = 3). With free movement, L2's d\* = 3: it
+   fails at d >= 6 within 1M steps, because random exploration rarely reaches 6+ cells inside the cap.
+4. **lambda 0.99 vs 0.95 changes nothing** anywhere. Hidden vs visible matters only at d = 3 (visible food is in view
+   from the start).
+5. **Evolution (L3)** is the only learner that improves under the real move cost: d = 3 visible 1.4% -> 49-62%. It
+   shows some oracle use at d = 3 hidden in one of three seeds (36/4). It is far from the bar and does nothing useful
+   at d >= 6 within the budget.
+
+**Implication for the world and learner (for Cam's ruling):** the move cost, together with a payoff out of random
+reach, defeats PPO before distance or necessity even enter. Any stage-1 world has to make the first step toward
+named food pay within reach. That means a very near start (d <= 3), with near-free movement or a denser payoff early,
+then lengthening. And the learner should not be locked to the frozen navigator trunk.
