@@ -7105,6 +7105,16 @@ more expensive, because it produces publishable-looking nulls.
   - **Running (mine, flagged; laptop, free):** seed 0 resumed to 20M; seed 1 at 20M (two heavy jobs; seed 2 after).
     Cam's 3-seed rule applies to the bar at the final step count.
 
+- **RESULT (Nov 15 ~01:50): L2e arm B at 20M (seed 0, resumed from 10M): PASSES the T3 bar.**
+  - At d = 12: 1st half 97% -> **2nd half 100%**; within-life shuffled 3%; wiped 1%; head 16% (1st hearing) -> **98%**
+    (2nd+).
+  - At d = 24 (the curriculum cap, reached): 81% -> 92% (shuffled 3%); head 13% -> 86%.
+  - Bar (2nd half >= 90%, >= shuffled + 30, >= 2x): PASS on seed 0. Seeds 1-2 at 20M are running (3/3 required).
+  - The W2 port spec is DRAFTED (`docs/W2_PORT_SPEC.md`), pending the seeds.
+  - A notable match: the toy's winning memory record (token heard, displacement from the hearing place to the next
+    meal) is the counting observer's evidence B. The port reuses evidence already measured in W2.
+  - Files: `docs/data/toy_grid/T3_round2/scale20M/`.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
