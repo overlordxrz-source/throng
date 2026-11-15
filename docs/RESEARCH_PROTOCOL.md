@@ -7947,6 +7947,20 @@ more expensive, because it produces publishable-looking nulls.
     pass at 5e7 are now low (p ~0.1).
   - My pilot prediction (per-seed pass p 0.5) MISSED.
 
+- **CAM RULINGS (Nov 15 ~12:00):**
+  - Pilot: FAIL as a reference. "The step budget decides" is NOT accepted: the frontier sat at 8 for 18M steps
+    (~560k hearings), a PLATEAU. Reach is flat at ~0.55 over d 4-14 while the head is right 0.76-0.91.
+  - **MASKED LEARNER AT 5e7: WITHDRAWN for futility, declared before any seed-1 result.**
+  - Seed 1 is PAUSED at its checkpoint (`learner_kv2/s1.ckpt`, ~1.8M steps, 11:49; exact resume), not deleted.
+  - Free diagnosis on the pilot's final weights at d = 4, 6, 8, 12:
+    - (a) reach on first (demonstrated) vs later hearings;
+    - (b) where first-hearing bouts fail (parent out of view, timeout, death);
+    - (c) later-hearing reach when the head's top sector is right vs wrong;
+    - (d) oracle #2's failure split at d = 12.
+  - Decision tree: first-hearing cap -> "the parent waits" (max 2 cells ahead), then A2 + the curriculum positive
+    control + one masked seed. A low later-hearing reach with a right head -> report. Oracle failures dominate ->
+    report. More hearings per step is held in reserve (one change at a time).
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
