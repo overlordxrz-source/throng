@@ -7564,6 +7564,20 @@ more expensive, because it produces publishable-looking nulls.
     `--shared-tok`; seeds 8-12; 20M; no early stops; the T3 bar at d = 12; take-off reported separately.
   - Predictions: take-offs 5/5 p 0.35, >= 4/5 p 0.7; bar passes 5/5 p 0.2, 4/5 p 0.35, <= 3/5 p 0.45.
 
+- **W2 LEARNER BUILD (Nov 15 ~06:20; work in progress, comm-toy, `w2/learner_w2.py` + `w2/ep_agent.py`).**
+  - **A3 PASS (training):** `--learner rec` reproduces port_w2's curve bit-exactly (12/12 points).
+  - **DEFECT FOUND in necessity_w2 (mine, disclosed):** for trained policies, its previous-reward input leaves out the
+    item's energy, while training includes it.
+    - Fixing that one input in a scratch copy makes necessity_w2 match learner_w2's evaluator exactly (oracle #2 at
+      d = 12: mean life 2931.30 both).
+    - Effect on reported numbers: oracle #2 mixed paid / life 6.38 either way (reach 0.714 vs 0.705); at d = 12, life
+      2763 vs 2931.
+    - No verdict changes: oracle #2's bar passes by 24x+.
+    - The deaf-twin bar will be computed with BOTH evaluators and any disagreement reported. Learner evaluations use
+      learner_w2 (consistent with training).
+  - **Not yet done:** A1 (memory positive control), A2 (copy-the-parent >= 90%), A4 (price probe); the deaf-twin
+    readout (Modal job twin_w2, launched 05:49); screen 2 (seeds 8-12, running on the laptop).
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
