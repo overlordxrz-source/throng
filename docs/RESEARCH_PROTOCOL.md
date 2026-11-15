@@ -7961,7 +7961,7 @@ more expensive, because it produces publishable-looking nulls.
     control + one masked seed. A low later-hearing reach with a right head -> report. Oracle failures dominate ->
     report. More hearings per step is held in reserve (one change at a time).
 
-- **RESULT (Nov 15 ~12:15): PILOT DIAGNOSIS (final weights; the necessity keys; fixed d).**
+- **RESULT (Nov 15 ~11:52): PILOT DIAGNOSIS (final weights; the necessity keys; fixed d).**
   `docs/data/learner_w2/pilot_diag/`; `w2/learner_w2_diag.py`, a copy with the extra splits.
 
   | d | FIRST hearing (demonstrated): reach | parent stays in view: share / reach | parent leaves view: share / reach (T_max) | LATER hearings: reach | head right: share / reach | head wrong: reach |
