@@ -7685,6 +7685,32 @@ more expensive, because it produces publishable-looking nulls.
     5.2-6.4k/s. The laptop is ~2.7x faster than a Modal container for this learner, and free.
   - Two blockers now hold the 64-slot Modal launch: the slot check (13.3% of lives overflow) and the price.
 
+- **CAM RULINGS (Nov 15 ~08:30) + M's pick ("NOW", 08:22):**
+  - Both blocks stand; 64 slots is out. Slots = 96 if <= 5% of oracle #2's eval lives overflow 96, else 128.
+  - **LAPTOP RUN APPROVED, a ONE-OFF EXCEPTION to M's laptop rule, granted by M's pick:** 5e7 steps per seed, 3
+    seeds, sequential, chunked with exact resume. Pause the moment M asks.
+  - A GPU probe on Modal runs in parallel: T4 + L4, 2 minutes each, total cap $0.10, own watch $0.125. If one
+    projects 5e7 at <= $0.9 per seed, the seeds not yet started move there (pre-approved; cap = projection, watch at
+    cap x 1.25, one app per seed).
+- **RESULT (Nov 15 ~08:35): SLOT CHECK at 96: PASS.** Lives over 96:
+  - mixed d 1-12: 0 / 128 (max 90);
+  - d = 12: 1 / 131 = 0.8% (max 99; 0.08% of records overwritten, oldest first).
+  - **Slots = 96.**
+- **REGISTERED + PREDICTIONS (before seed 0 starts): W2 LEARNER, laptop.**
+  - Command: `learner_w2.py --learner ep --slots 96 --shared-tok --hindsight 0.5 --demonstrator --hunger-gate
+    --item-size 0.1 --W 32 --steps 5e7 --early-stop-frontier 5 --seed S`; seeds 0, 1, 2; comm-toy 120ccc8.
+  - Bar per seed (registered Nov 15 ~05:50), evaluated by learner_w2 on the necessity keys at d = 12 hidden:
+    - 2nd-half reach >= 0.9x oracle #2's 2nd-half reach at d = 12 (0.6495 in the same evaluator, so >= 0.585);
+    - AND >= shuffled + 0.30, AND >= 2x shuffled; wiped reported;
+    - mean life >= 1.3x the deaf twin's at d = 12, bootstrap over worlds LB > 1.0x.
+    - PASS = >= 2 / 3 seeds.
+  - Predictions:
+    - frontier passes 5 by half the steps (no early stop): p 0.8 per seed;
+    - frontier >= 12 at the end: p 0.6 per seed;
+    - per-seed bar PASS p 0.5; **learner PASS (>= 2 / 3) p 0.45**;
+    - the head on 2nd+ hearings at d = 12 >= 0.8 for passing seeds (p 0.7).
+  - Main risk: PPO must learn to follow the parent and to act on its read in a richer world than the toy's.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
