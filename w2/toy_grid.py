@@ -424,7 +424,7 @@ def main():
             rng.bit_generator.state = Ck["rng"]; print(f"resumed at {steps:,} steps, d {d_cur}", flush=True)
         else:
             out["eval_init"] = ({m_: evaluate(p, i, 777) for i, m_ in enumerate(("true", "shuffled", "silence"))} if a.tier != "T3" else None)
-        t_start = time.time(); SAVE_AT = [float(z) for z in a.save_params_at.split(",")] if a.save_params_at else []
+        t_start = time.time(); SAVE_AT = [float(z) for z in a.save_params_at.split(",") if float(z) > steps] if a.save_params_at else []   # (fix: skip milestones already passed before this chunk)
         ep_first = np.zeros(B, bool); fm = [0, 0]; saved_d5 = any(c_.get("d", 0) >= 5 for c_ in out["curve"])
         while steps < a.steps:
             if a.ckpt and it % a.ckpt_every == 0 and it > 0:
