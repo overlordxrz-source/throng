@@ -7731,6 +7731,16 @@ more expensive, because it produces publishable-looking nulls.
     so no cheaper per step. GPU speed-ups need the host loop moved onto the device first (the replay batch
     construction, numpy round-trips).
 
+- **CAM RULINGS (Nov 15 ~09:00):**
+  - Slots 96 accepted. GPU stays off.
+  - **New rule for GPU items:** the watch counts queue time + CUDA start-up from the spawn, uses the GPU's list
+    $/h, and stops AT the cap (not cap x 1.25).
+  - Timing (M agreed ~5 h): test 2 seeds in PARALLEL (seed 1 beside seed 0) over 10 minutes.
+    - Combined >= 1.6x a single run -> keep 2 at a time; else back to one at a time.
+    - Back to one at a time the moment M says the laptop is sluggish; pause on M's word.
+  - While it trains (free, on a copy, never in files the running jobs re-read): move the replay's batch building
+    on-device (the whole update jitted), with a regression on a short run. No Modal re-probe before the readout.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
