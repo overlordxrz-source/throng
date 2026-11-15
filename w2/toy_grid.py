@@ -58,11 +58,38 @@ class GRUNet(nn.Module):
         return h, nn.Dense(6)(y), nn.Dense(1)(y)[..., 0], None
 
 
+class TfNet(nn.Module):
+    """Cam addendum 6, L2': a small causal transformer memory over a sliding window of the life (blank init). The state
+    holds two cached buffers (inputs and layer-1 outputs, each with a 'filled' flag), so each step attends over the window
+    in O(W) per layer (exact causal attention with a KV cache; the window slides)."""
+    W: int = 128; dm: int = 40; nh: int = 4          # dm 40 ~ the GRU's parameter count
+
+    def mha(self, q, kv, mask, name):
+        dh = self.dm // self.nh
+        Q = nn.Dense(self.dm, name=f"{name}_q")(q).reshape(self.nh, dh); K = nn.Dense(self.dm, name=f"{name}_k")(kv).reshape(-1, self.nh, dh)
+        V = nn.Dense(self.dm, name=f"{name}_v")(kv).reshape(-1, self.nh, dh)
+        att = jnp.einsum("hd,whd->hw", Q, K) / jnp.sqrt(dh); att = jnp.where(mask[None] > 0, att, -1e9)
+        return nn.Dense(self.dm, name=f"{name}_o")(jnp.einsum("hw,whd->hd", jax.nn.softmax(att, -1), V).reshape(-1))
+
+    @nn.compact
+    def __call__(self, h, x):
+        W, dm = self.W, self.dm; buf = h.reshape(2, W, dm + 1)
+        pos = self.param("pos", nn.initializers.normal(0.02), (W, dm))
+        e = nn.Dense(dm, name="emb")(x)
+        B0 = jnp.concatenate([buf[0][1:], jnp.concatenate([e, jnp.ones(1)])[None]], 0)
+        y = e + self.mha(nn.LayerNorm(name="ln1")(e + pos[-1]), nn.LayerNorm(name="ln1k")(B0[:, :dm] + pos), B0[:, -1], "a1")
+        y = y + nn.Dense(dm, name="m1b")(nn.gelu(nn.Dense(2 * dm, name="m1a")(nn.LayerNorm(name="ln2")(y))))
+        B1 = jnp.concatenate([buf[1][1:], jnp.concatenate([y, jnp.ones(1)])[None]], 0)
+        z = y + self.mha(nn.LayerNorm(name="ln3")(y + pos[-1]), nn.LayerNorm(name="ln3k")(B1[:, :dm] + pos), B1[:, -1], "a2")
+        z = z + nn.Dense(dm, name="m2b")(nn.gelu(nn.Dense(2 * dm, name="m2a")(nn.LayerNorm(name="ln4")(z))))
+        return jnp.stack([B0, B1]).reshape(-1), nn.Dense(6, name="pi")(z), nn.Dense(1, name="v")(z)[0], None
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--d", type=int, default=12); ap.add_argument("--hidden", action="store_true")
     ap.add_argument("--lam", type=float, default=0.95); ap.add_argument("--gamma", type=float, default=0.99)
-    ap.add_argument("--tier", choices=["T1", "T2", "T3"], default="T1"); ap.add_argument("--learner", choices=["L1", "L1u", "L2", "L3", "scripted"], default="L1")
+    ap.add_argument("--tier", choices=["T1", "T2", "T3"], default="T1"); ap.add_argument("--learner", choices=["L1", "L1u", "L2", "L2t", "L3", "scripted"], default="L1")
     ap.add_argument("--kl", type=float, default=0.3); ap.add_argument("--steps", type=float, default=1e6)
     ap.add_argument("--B", type=int, default=256); ap.add_argument("--T", type=int, default=32); ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--episodes-per-life", type=int, default=8, help="T3: episodes sharing one random code (memory carried within a life)")
@@ -73,6 +100,8 @@ def main():
     ap.add_argument("--curriculum", action="store_true", help="round 2: d starts at 1; +1 when true-input reach over the last 500 episodes >= 80%%; cap --d-max")
     ap.add_argument("--curriculum-mix", action="store_true", help="EXPLORATORY (Will): with --curriculum, each episode's d ~ uniform{1..current d} (stops forgetting nearer d)")
     ap.add_argument("--d-max", type=int, default=24); ap.add_argument("--test-d", type=int, default=12, help="round 2: after training, reach at this d (true vs shuffled)")
+    ap.add_argument("--ckpt", default="", help="checkpoint path: resume if present; save every --ckpt-every updates")
+    ap.add_argument("--ckpt-every", type=int, default=20); ap.add_argument("--max-seconds", type=float, default=0, help="stop (exit 3) after this long; rerun to resume")
     ap.add_argument("--move-cost", type=float, default=DMOVE, help="audit only: the per-move energy cost (harness 0.003)")
     ap.add_argument("--eval-episodes", type=int, default=512); ap.add_argument("--curve-every", type=int, default=10)
     ap.add_argument("--navs", default="w2_out/nav_w13/*.msgpack"); ap.add_argument("--out", required=True)
@@ -89,6 +118,9 @@ def main():
         for k in ("Dense_0", "Dense_1", "Dense_2", "Dense_3"):
             pp[k] = dict(nav[k])
         p = {"params": pp}; FROZEN = () if a.learner == "L1u" else ("Dense_0", "Dense_1", "Dense_2", "Dense_3")   # L1u: trunk unfrozen
+    elif a.learner == "L2t":                      # addendum 6: transformer memory (T3 only)
+        net = TfNet(); Hd = 2 * net.W * (net.dm + 1)
+        p = net.init(jax.random.PRNGKey(a.seed), jnp.zeros((Hd,)), jnp.zeros((Dx,))); FROZEN = ()
     elif a.learner == "L2":
         net = (GRUNet() if a.tier == "T3" else MLP()); Hd = 64
         p = net.init(jax.random.PRNGKey(a.seed), jnp.zeros((Hd,)), jnp.zeros((Dx,))); FROZEN = ()
@@ -175,7 +207,7 @@ def main():
             else:
                 code2 = code; h3 = jnp.where(done[:, None], 0.0, h2); ep3 = ep2 * 0
             reset = (newlife if a.tier == "T3" else done).astype(jnp.float32)      # when the rollout wiped the memory
-            return (st3, h3, code2, ep3), (x, act, lp, v, r, done.astype(jnp.float32), ate, h, reset)
+            return (st3, h3, code2, ep3), (x, act, lp, v, r, done.astype(jnp.float32), ate, h, reset, ep_in_life)
         return jax.lax.scan(body, carry, jax.random.split(key, T))
     roll = jax.jit(rollout, static_argnums=(3, 5))
 
@@ -201,15 +233,19 @@ def main():
         g = {"params": {k_: (jax.tree_util.tree_map(jnp.zeros_like, v_) if k_ in FROZEN else v_) for k_, v_ in g["params"].items()}}
         u, os_ = opt.update(g, os_, pp_); return optax.apply_updates(pp_, u), os_
 
+    LATE = {}
+
     def evaluate(pp_, mode, seed, dval=None):
         """reach-food rate over --eval-episodes complete episodes (stochastic policy) at distance dval (default --d)"""
         dval = float(a.d if dval is None else dval)
         key = jax.random.PRNGKey(seed); st = env_reset(key, B, dval); h = jnp.zeros((B, Hd))
         code = (jax.vmap(lambda kk: jax.random.permutation(kk, 8))(jax.random.split(key, B)) if a.tier == "T3" else jnp.tile(FIXED[None], (B, 1)))
-        c = (st, h, code, jnp.zeros(B, jnp.int32)); n_ep = 0; n_ok = 0
+        c = (st, h, code, jnp.zeros(B, jnp.int32)); n_ep = 0; n_ok = 0; late_ep = 0; late_ok = 0
         while n_ep < a.eval_episodes:
             key, k = jax.random.split(key); c, R_ = roll(pp_, c, k, mode, jnp.float32(dval))
-            dn, ate = np.asarray(R_[5]), np.asarray(R_[6]); n_ep += int(dn.sum()); n_ok += int((ate & (dn > 0)).sum())
+            dn, ate, epi = np.asarray(R_[5]), np.asarray(R_[6]), np.asarray(R_[9]); n_ep += int(dn.sum()); n_ok += int((ate & (dn > 0)).sum())
+            lt = (dn > 0) & (epi >= a.episodes_per_life // 2); late_ep += int(lt.sum()); late_ok += int((ate & lt).sum())
+        LATE[(mode, dval)] = late_ok / max(late_ep, 1)                # T3: reach in the second half of each life
         return n_ok / max(n_ep, 1)
 
     out = dict(cfg=vars(a), cap=cap, curve=[])
@@ -254,13 +290,27 @@ def main():
         out["eval"] = {m_: evaluate(None, i, 777) for i, m_ in enumerate(("true", "shuffled", "silence"))}
     else:
         d_cur = 1 if a.curriculum else a.d; recent = []
+        sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "scripts")); import ckpt as _ck  # noqa: E401
         key = jax.random.PRNGKey(a.seed + 1); st = env_reset(key, B, float(d_cur))
         code0 = (jax.vmap(lambda kk: jax.random.permutation(kk, 8))(jax.random.split(key, B)) if a.tier == "T3" else jnp.tile(FIXED[None], (B, 1)))
         c = (st, jnp.zeros((B, Hd)), code0, jnp.zeros(B, jnp.int32)); steps, it, t0 = 0, 0, time.time()
-        out["eval_init"] = {m_: evaluate(p, i, 777) for i, m_ in enumerate(("true", "shuffled", "silence"))}
+        Ck = _ck.load(a.ckpt) if a.ckpt else None
+        if Ck is not None:                                          # resume
+            tj = lambda t_: jax.tree_util.tree_map(jnp.asarray, t_)  # noqa: E731
+            p, ost, c, key = tj(Ck["p"]), tj(Ck["ost"]), tj(Ck["c"]), jnp.asarray(Ck["key"])
+            steps, it, d_cur, recent, out["curve"], out["eval_init"] = Ck["steps"], Ck["it"], Ck["d_cur"], Ck["recent"], Ck["curve"], Ck["eval_init"]
+            rng.bit_generator.state = Ck["rng"]; print(f"resumed at {steps:,} steps, d {d_cur}", flush=True)
+        else:
+            out["eval_init"] = ({m_: evaluate(p, i, 777) for i, m_ in enumerate(("true", "shuffled", "silence"))} if a.tier != "T3" else None)
+        t_start = time.time()
         while steps < a.steps:
+            if a.ckpt and it % a.ckpt_every == 0 and it > 0:
+                _ck.save(a.ckpt, dict(p=p, ost=ost, c=c, key=key, steps=steps, it=it, d_cur=d_cur, recent=recent, curve=out["curve"],
+                                      eval_init=out["eval_init"], rng=rng.bit_generator.state))
+                if a.max_seconds and time.time() - t_start > a.max_seconds:
+                    print(f"CHUNK_STOP at {steps:,} steps", flush=True); sys.exit(3)
             key, k = jax.random.split(key); c, R_ = roll(p, c, k, 0, jnp.float32(d_cur), a.curriculum_mix)
-            x, act, lp, v, r, dn, ate, hin, rs = (np.asarray(z) for z in R_)        # (T, B, ...)
+            x, act, lp, v, r, dn, ate, hin, rs = (np.asarray(z) for z in R_[:9])    # (T, B, ...)
             adv = gae(np.swapaxes(r, 0, 1), np.swapaxes(v, 0, 1), np.swapaxes(dn, 0, 1), a.gamma, a.lam)            # (B, T)
             ret = adv + np.swapaxes(v, 0, 1); A_ = (adv - adv.mean()) / (adv.std() + 1e-8)
             first = np.concatenate([np.zeros((1, B)), rs[:-1]], 0)                  # wipe memory exactly where the rollout did
@@ -280,11 +330,15 @@ def main():
                 out["curve"].append(dict(steps=steps, d=d_cur, reach_train=float(ate.sum() / max(dn.sum(), 1)), sec=round(time.time() - t0, 1),
                                          act_freq=[round(float(q), 3) for q in actf], adv_by_act=[round(float(adv[at == k].mean()), 3) if (at == k).any() else None for k in range(6)],
                                          ret_mean=round(float(ret.mean()), 3), r_eat=round(float(r[ate].mean()), 3) if ate.any() else None))
-        out["eval"] = {m_: evaluate(p, i, 777) for i, m_ in enumerate(("true", "shuffled", "silence"))}
+        out["eval"] = (None if a.tier == "T3" else {m_: evaluate(p, i, 777) for i, m_ in enumerate(("true", "shuffled", "silence"))})
         out["train_seconds"] = round(time.time() - t0, 1)
     if net is not None:
         out["d_max_reached"] = int(max([c_.get("d", a.d) for c_ in out["curve"]] + [a.d if not a.curriculum else 1]))
-        out["test"] = {m_: evaluate(p, i, 778, a.test_d) for i, m_ in enumerate(("true", "shuffled"))}
+        out["test"] = {m_: evaluate(p, i, 778, a.test_d) for i, m_ in enumerate(("true", "shuffled") if a.tier != "T3" else ("true", "shuffled", "silence"))}
+        if out["eval"] is None:                                     # T3: whole-life evaluation done once, at the test d
+            out["eval"] = out["test"]
+        if a.tier == "T3":
+            out["test_late_life"] = {m_: LATE.get((i, float(a.test_d))) for i, m_ in enumerate(("true", "shuffled"))}
         tt = out["test"]; out["test_pass"] = bool(tt["true"] >= 0.8 and tt["true"] >= 2 * tt["shuffled"] and tt["true"] - tt["shuffled"] >= 0.30)
     e = out["eval"]
     out["learns"] = bool(e["true"] >= 0.8 and e["true"] >= 2 * e["shuffled"] and e["true"] - e["shuffled"] >= 0.30)
