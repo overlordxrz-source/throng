@@ -7755,6 +7755,35 @@ more expensive, because it produces publishable-looking nulls.
   - The GPU gain is untested (no Modal re-probe before the readout, per Cam).
   - Next lever for stage 2: recompute the memory keys / values only where a record was written, not at every step.
 
+- **CAM RULINGS (Nov 15 ~09:30):**
+  - Parallel not adopted. The on-device update is parked.
+  - **The real lever** (on the copy, a regression to float32): each record's key / value is computed once per
+    gradient step (when it is written in the replayed sequence), masked by write time. Stage-2 cost item.
+  - **If seed 0 is early-stopped at 2.5e7, it counts as FAIL and seed 1 does NOT start; report first.**
+    (Implemented: hold files stop the runner from starting seeds 1-2 until the check passes.)
+- **RESULT (Nov 15 ~09:45): SEED 0 DIAGNOSTICS at 12.8M** (frontier 3), free, from the checkpoint and logs.
+  `docs/data/learner_w2/seed0_diag/`, `docs/data/toy_grid/T3_round2/hearings/`.
+  - **(a) Reach by distance** (eval, mixed d 1-3): d = 1 **0.96**; d = 2 **0.61**; d = 3 **0.15**.
+    - At d = 2 only the diagonal sectors are adjacent (in view); the cardinal ones sit 2 cells away, unseen. So
+      0.61 ~ half in view (~1.0) + half recall (~0.2).
+    - **Basic eating of items in view is fine; the slow part is RECALL.**
+    - "Over training": per-distance history does not exist before 09:25 (no snapshots); since then, checkpoints are
+      copied every 4 min. The logged overall training reach: 0.75 at frontier 1 (2.1M); 0.73 at frontier 2 (4.1M);
+      0.48-0.62 at frontier 3 (6-12M).
+  - **(b) At d = 3 fixed:**
+    - demonstrated bouts reach **0.65** (n 2808), so following the parent mostly works;
+    - the head on 2nd+ hearings is **0.33** vs 0.12 with a shuffled code: the read is forming (2.7x chance);
+    - but 2nd-half reach (mostly undemonstrated bouts) is **0.019** vs 0.016 shuffled: the policy does not yet act
+      on the read.
+  - **(c) Hearings:**
+    - W2 seed 0 has had 395,916 hearings in 12.9M steps (0.031 per step), ~1.5M projected by 5e7;
+    - toy seeds 8-12 reached frontier 7 after **245k-450k hearings** (0.13-0.15 per step; replays bit-identical to
+      the originals).
+    - So W2 has ALREADY had as many hearings as the toy needed for frontier 7, at frontier 3. Per step W2 hears 4.5x
+      less; per hearing it is also slower. The step budget is not the only limit.
+  - **(d) Oracle #2 at the same steps:** frontier 3 at 2.5M, 11 at 4.9M, 17 at 7.4M, 20 at 12.3M (reach 0.63-0.74);
+    final reach at d = 1 / 2 / 3: 0.96 / 0.98 / 0.70. No per-distance snapshots exist for oracle #2.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
