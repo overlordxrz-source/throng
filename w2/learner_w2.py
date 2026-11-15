@@ -176,20 +176,28 @@ def main():
                          hL=A["hL"] + (ok & f["hear"] & ~f["first"]).sum(), nL=A["nL"] + (f["hear"] & ~f["first"]).sum(),
                          ateD=A["ateD"] + (f["ate"] & f["dem"]).sum(), closedD=A["closedD"] + (f["closed"] & f["dem"]).sum(),
                          cd=A["cd"] + (dh * f["closed"][:, None]).sum(0), ad=A["ad"] + (dh * f["ate"][:, None]).sum(0))
+                cnt = A["cnt"] + f["closed"].astype(jnp.float32); end = f["dead"] > 0          # records written in the current life (one per closed bout)
+                A = dict(A, mx=jnp.maximum(A["mx"], jnp.max(cnt)), ovf=A["ovf"] + (end & (cnt > a.slots)).sum(),
+                         over=A["over"] + jnp.where(end, jnp.maximum(cnt - a.slots, 0.0), 0.0).sum(), recs=A["recs"] + jnp.where(end, cnt, 0.0).sum(),
+                         cnt=jnp.where(end, 0.0, cnt))
                 return (c2, A), None
             z = jnp.float32(0.0)
-            A0 = dict(alive=z, deaths=z, oldage=z, ateD=z, closedD=z, paid=z, ate=z, closed=z, ate2=z, closed2=z, h1=z, n1=z, hL=z, nL=z, cd=jnp.zeros(25), ad=jnp.zeros(25))
+            A0 = dict(alive=z, deaths=z, oldage=z, ateD=z, closedD=z, cnt=jnp.zeros(N), mx=z, ovf=z, over=z, recs=z, paid=z, ate=z, closed=z, ate2=z, closed2=z, h1=z, n1=z, hL=z, nL=z, cd=jnp.zeros(25), ad=jnp.zeros(25))
             (cF, A), _ = jax.lax.scan(body, (c, A0), jax.random.split(jax.random.fold_in(key, 2), a.eval_steps))
+            cnt = A["cnt"]                                                   # lives still open at the end of the horizon
+            A = dict(A, ovf=A["ovf"] + (cnt > a.slots).sum(), over=A["over"] + jnp.maximum(cnt - a.slots, 0.0).sum(), recs=A["recs"] + cnt.sum())
             return A
         out = dict(cfg=vars(a), modes={})
         for mode in [int(m) for m in a.eval_necessity.split(",")]:
             fn = jax.jit(lambda pp_, sd: run_eval(pp_, sd, mode))
             per = [jax.tree_util.tree_map(np.asarray, fn(p, a.seed * 1000 + w)) for w in range(a.eval_W)]
-            tot = {k_: sum(q[k_] for q in per) for k_ in per[0]}
+            tot = {k_: sum(q[k_] for q in per) for k_ in per[0] if k_ not in ('cnt', 'mx')}
             lives = a.eval_W * N + tot["deaths"] - tot["oldage"]   # an old-age death can only fall on the final step: it starts no counted life
             res = dict(mean_life_steps=float(tot["alive"] / lives), lives=float(lives), deaths=float(tot["deaths"]), paid_per_life=float(tot["paid"] / lives),
                        paid_per_step=float(tot["paid"] / tot["alive"]), item_reach=float(tot["ate"] / max(tot["closed"], 1)),
                        reach_2nd_half=float(tot["ate2"] / max(tot["closed2"], 1)),
+                       max_records_per_life=float(max(q["mx"] for q in per)), lives_overflowing=float(tot["ovf"]),
+                       frac_lives_overflowing=float(tot["ovf"] / lives), frac_records_overwritten=float(tot["over"] / max(tot["recs"], 1)),
                        reach_demonstrated=float(tot["ateD"] / max(tot["closedD"], 1)), bouts_demonstrated=float(tot["closedD"]), bouts_2nd_half=float(tot["closed2"]),
                        head_acc_first=float(tot["h1"] / max(tot["n1"], 1)), head_n_first=float(tot["n1"]),
                        head_acc_later=float(tot["hL"] / max(tot["nL"], 1)), head_n_later=float(tot["nL"]),
