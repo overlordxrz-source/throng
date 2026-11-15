@@ -8,6 +8,7 @@ the volume is committed every 2 minutes so a preempted job resumes from its last
 """
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 import modal
@@ -18,7 +19,7 @@ REPO_URL = "https://github.com/overlordxrz-source/throng.git"
 VOLUME_MOUNT = "/mnt/throng-runs"
 OUTD = f"{VOLUME_MOUNT}/testbed/w2jobs"
 
-app = modal.App("throng-w2jobs")
+app = modal.App(os.environ.get("W2_APP", "throng-w2jobs"))   # Cam Nov 15: one app per learner seed, so each seed has its own watch
 volume = modal.Volume.from_name("throng-runs", create_if_missing=False)
 image = (modal.Image.debian_slim(python_version="3.11").apt_install("git")
          .run_commands(f"git clone {REPO_URL} /root/throng", f"cd /root/throng && git checkout {PINNED_SHA}",

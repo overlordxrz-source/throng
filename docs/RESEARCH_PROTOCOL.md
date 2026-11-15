@@ -7619,6 +7619,41 @@ more expensive, because it produces publishable-looking nulls.
   - **Learner recipe (Cam's rule: more passes): SCREEN 2**, i.e. L2e-style memory + `--shared-tok` + head 0.5 at the
     hearing + demonstrator on the 1st hearing + mixed curriculum.
 
+- **RESULT (Nov 15 ~07:30): W2 LEARNER CHECK A1 (memory positive control): PASS at d = 12.**
+  `docs/data/learner_w2/A1/`.
+  - Setup: the scripted follower drove; only the head trained (screen-2 agent, 128 slots, `--shared-tok`, weight
+    0.5); 4M steps, 9.1k steps/s on the laptop.
+  - Evaluation on the necessity keys, d = 12 hidden:
+    - true code: head on later hearings **0.999** (n 4003), 1st hearing 0.082;
+    - shuffled code: later 0.129;
+    - memory wiped: later 0.121 (chance 0.125).
+  - **Disclosed:** at mixed d 1-12 the later-hearing accuracy is 0.82, and the 1st hearing and shuffled are 0.22.
+    At d <= 2 the item is in view at the hearing, so its sector is visible; at short distances the stored
+    displacement is small.
+  - The registered learner bar is evaluated at d = 12, where the control is clean.
+  - Prediction (>= 90%, p 0.6) HIT.
+- **RESULT: A3 PASS** (above): learner_w2 in plain mode reproduces port_w2 bit-exactly.
+- **RESULT (Nov 15 ~07:35): A4 PRICE PROBE: the 128-slot learner does NOT fit 5e7 steps in $0.8. By Cam's rule:
+  REPORT, do not launch.** `docs/data/learner_w2/A4/`.
+  - Method (free): laptop throughput, scaled by the measured Modal / laptop ratio for the same trainer (oracle #2:
+    10.9k on Modal vs 18.95k on the laptop = 0.575), at $0.31 / h (measured from oracle #2 and the twin).
+
+    | learner | laptop steps/s | Modal (est.) | steps per $0.8 | cost of 5e7 | cost of 1e8 |
+    |---|---|---|---|---|---|
+    | rec (oracle #2 trainer) | 18,950 | 10.9k (measured) | - | - | - |
+    | **ep, 128 slots (spec)** | 5,225 | ~3.0k | **~2.8e7** | ~$1.43 | ~$2.87 |
+    | ep, 64 slots | 9,303 | ~5.35k | ~5.0e7 | ~$0.80 | ~$1.61 |
+    | ep, 32 slots | 11,388 | ~6.55k | ~6.1e7 | ~$0.66 | ~$1.31 |
+
+  - The cost is in the PPO update: rollouts alone run at 60.6k steps/s. It grows with the slot count, because the
+    replay recomputes the read over every slot at every step.
+  - **A life fills ~36 records** (oracle #2: 35.9 bouts per life), so 64 slots hold a whole life. 128 slots
+    are mostly empty but cost 1.8x.
+  - Estimates carry +-20%; a real 2-minute Modal probe would cost ~$0.02.
+  - **Budget flag:** metered $35.18 (guard). My standing notes carry a HARD CEILING of $37.0 metered, and three
+    learner seeds at $0.8 would cross it. Cam's budget lines count against the $41 guard. **Which applies needs M's
+    word before any learner spend.**
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
