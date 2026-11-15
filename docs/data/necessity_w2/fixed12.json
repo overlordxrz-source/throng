@@ -1,0 +1,40 @@
+{
+ "cfg": {
+  "navs": "w2_out/nav_w13/*.msgpack",
+  "world": "0.0013,8,0.001",
+  "v2": "/Users/overlord/throng-backup/evo2/evo2.ckpt",
+  "W": 32,
+  "N": 4,
+  "steps": 3000,
+  "d_max": 12,
+  "d_fixed": 12,
+  "seed": 0,
+  "out": "/private/tmp/claude-501/-Users-overlord-CascadeProjects-throng/aad77c1d-d7ac-437e-bef4-aa525802ccc0/scratchpad/nec/fixed12.json"
+ },
+ "results": {
+  "navigator": {
+   "food_per_step": 0.001825435652397573,
+   "items_eaten": 6,
+   "item_reach_rate": 0.0007705149608321562,
+   "deaths": 460,
+   "agent_steps": 384000
+  },
+  "v2best": {
+   "food_per_step": 0.00815831380089124,
+   "items_eaten": 3,
+   "item_reach_rate": 0.00039824771007566706,
+   "deaths": 655,
+   "agent_steps": 384000
+  },
+  "follower": {
+   "food_per_step": 0.00789093534151713,
+   "items_eaten": 25213,
+   "item_reach_rate": 0.5000694182748567,
+   "deaths": 128,
+   "agent_steps": 384000
+  }
+ },
+ "premium": 0.9672262595066028,
+ "best_code_free": "v2best",
+ "pass": false
+}

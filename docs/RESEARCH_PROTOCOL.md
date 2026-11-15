@@ -7189,6 +7189,34 @@ more expensive, because it produces publishable-looking nulls.
   those metrics logged and weights saved at the milestones. The logged frontier trajectory must match the originals
   (a determinism check). One job at a time, after ablation (c).
 
+- **RESULT (Nov 15 ~03:15): W2 NECESSITY CHECK (Cam's port item 1; laptop, comm-toy `7cabc9a` `w2/necessity_w2.py`; no
+  training).**
+  - **Variant:** the picked W2 world (L 96, adults, no beacons). Each agent always has one personal named item at
+    distance d from its bout start, announced every step through its life code (token, flag, offset to the bout
+    start / 9). The item is visible only when adjacent, gives +0.1 energy, and is replaced when eaten or after 4d
+    steps. 32 worlds x 4 agents x 3,000 steps, the same worlds and keys per policy.
+  - **Policies:** the navigator; v2-best (top elite, rebuilt as in the harness, oracle input silent); a scripted
+    true-code follower (ray-walk to the item, eat it, eat world food it stands on).
+
+  | variant | navigator food / step | v2-best | follower | premium (follower / best code-free) | PASS (>= 1.5x) |
+  |---|---|---|---|---|---|
+  | **d ~ uniform{1..12} (the port's mixed design)** | 0.0019 | 0.0074 | 0.0124 | **1.68x** | **PASS** |
+  | d = 12 fixed | 0.0018 | 0.0082 | 0.0079 | 0.97x | FAIL |
+
+  - Named-item reach: follower ~100% (every bout); v2-best 0.9% (mixed) / 0.04% (d = 12); navigator 0.5% / 0.08%.
+    (The first printout showed reach / (1 + reach) from a double-counted denominator; corrected in the code. Food
+    numbers are unaffected.)
+  - **Reading:**
+    - in the port's design (mixed d) the code is necessary: 1.68x over the strongest code-free forager;
+    - at a fixed far distance a single +0.1 item does not pay against v2-best's general foraging, so the item's size
+      is a design knob for far named food;
+    - the scripted follower is conservative (it chases items, ignores visible world food), so the premium is a
+      lower bound.
+  - Note: v2-best dies often in this adult-only variant (802 deaths vs the navigator's 450). It evolved under the
+    juvenile top-up and parent, but it is still the registered "strongest code-free" reference.
+  - **Gate: PASS on the design variant -> the ORACLE ARM is approved** (Cam, item 5). Next: register its bar, build
+    the W2 port trainer, laptop smoke + price probe, then Modal.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
