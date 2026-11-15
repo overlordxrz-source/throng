@@ -7799,6 +7799,39 @@ more expensive, because it produces publishable-looking nulls.
   - Caveat: the laptop throughput varies by run (the same original measured 5,452 an hour earlier), so the ratio is
     the robust number. It is not yet measured on Modal (no probe before the readout).
 
+- **CAM RULINGS (Nov 15 ~10:05):**
+  - Recall is the gap; early stop as registered.
+  - Compare the READ against cumulative hearings at an unseen distance (toy 8-12 vs W2 seed 0).
+  - Check the generic-food suspect.
+  - If seed 0 passes the check, **seeds 1-2 may run on learner_w2_kv.py** (registered before seed 1). Seed 0
+    stays on learner_w2.py. The KV replay is accepted as the stage-2 implementation.
+- **RESULT (Nov 15 ~10:15): THE GENERIC-FOOD SUSPECT: NOT THE CAUSE.**
+  - Seed 0 snapshot at 19.5M steps, **frontier 6**: it has passed 5, and the frontier never drops, so the
+    early-stop check will pass.
+  - **Design fact, a disclosed deviation from the spec's "next meal" wording:** in the W2 world a bout's record
+    closes only when (i) the named item is eaten, (iii) T_max passes, or the agent dies. Eating generic food does
+    not close it, and the head's label is ALWAYS the named item's true sector. So case (ii) is 0% by construction,
+    for records and for labels.
+  - Closures (eval, the necessity keys; fixed d):
+
+    | d | bouts: item / T_max / death | demonstrated bouts: item / T_max | generic food eaten during the bout (item-closed / T_max-closed) |
+    |---|---|---|---|
+    | 1 | 0.968 / 0.031 / 0.001 | 0.916 / 0.084 | 0.29 / 0.19 |
+    | 2 | 0.882 / 0.117 / 0.000 | 0.840 / 0.160 | 0.28 / 0.22 |
+    | 3 | 0.442 / 0.555 / 0.003 | **0.406 / 0.593** | 0.33 / 0.25 |
+
+  - Generic eating during a bout is no more common in failed bouts than in successful ones, so it is not the
+    distraction.
+  - **Failures are T_max timeouts.** At d = 3, 59% of DEMONSTRATED bouts time out: the learner does not yet follow
+    the parent well beyond view (the scripted copy-the-parent agent: 100%). The other 35-60% end at T_max, not at
+    generic food.
+  - The noise in the records is the T_max records (ate = 0, displacement = wherever the agent ended).
+- **REGISTERED (before seed 1 starts): SEEDS 1-2 RUN ON `w2/learner_w2_kv.py`** (comm-toy 6619f95).
+  - Same flags, bar and early stop. Seed 0 stays on learner_w2.py.
+  - Seed 1 starts FRESH from step 0. Its 1.3M-step partial checkpoint from the parallel test (learner_w2.py) is
+    discarded.
+  - The readout names the implementation per seed.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
