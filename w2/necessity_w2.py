@@ -40,6 +40,8 @@ def main():
     ap.add_argument("--d-max", type=int, default=12); ap.add_argument("--d-fixed", type=int, default=0); ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--policy-params", default="", help="ORACLE ARM eval: also score a port_w2.py-trained agent (its weights)")
     ap.add_argument("--policy-oracle", action="store_true", help="the trained agent gets the oracle sector input")
+    ap.add_argument("--twin-params", default="", help="DEAF TWIN: also score a second port_w2-trained agent (no oracle input); lifespan bar trained / twin")
+    ap.add_argument("--twin-bar", type=float, default=1.5); ap.add_argument("--twin-lb", type=float, default=1.2)
     ap.add_argument("--item-size", type=float, default=0.1); ap.add_argument("--hunger-gate", action="store_true", help="bouts open only when E < E_set - size")
     ap.add_argument("--follower-fallback", default="", help="none | v2best (default: v2best when gated, none otherwise)")
     ap.add_argument("--currency", default="paid", choices=["paid", "food"]); ap.add_argument("--bar", type=float, default=1.5)
@@ -51,6 +53,7 @@ def main():
     rnet, v2p = NI.build_v2best(nav, _ck.load(a.v2)["evo_pop"][0])
     rp = rnet.init(jax.random.PRNGKey(0), jnp.zeros((128,)), jnp.zeros((126,)))
     trp = flax.serialization.from_bytes(rp, open(a.policy_params, "rb").read()) if a.policy_params else None
+    twp = flax.serialization.from_bytes(rp, open(a.twin_params, "rb").read()) if a.twin_params else None
 
     S = a.item_size; H = cfg.E_set - S; gated = a.hunger_gate
     fb = a.follower_fallback or ("v2best" if gated else "none")
@@ -75,9 +78,9 @@ def main():
                 h2, lg, _, _ = jax.vmap(lambda hh, xx: rnet.apply(v2p, hh, xx))(h, x); act = jax.random.categorical(k1, lg)
                 if policy == "follower":
                     act = NI.follower(s, item, L, act)
-            elif policy == "trained":
-                x = jnp.concatenate([o, hr, jax.nn.one_hot(pa, 6), pr[:, None], NI.oracle(item, a.policy_oracle)], 1)
-                h2, lg, _, _ = jax.vmap(lambda hh, xx: rnet.apply(trp, hh, xx))(h, x); act = jax.random.categorical(k1, lg)
+            elif policy in ("trained", "twin"):
+                x = jnp.concatenate([o, hr, jax.nn.one_hot(pa, 6), pr[:, None], NI.oracle(item, a.policy_oracle and policy == "trained")], 1)
+                h2, lg, _, _ = jax.vmap(lambda hh, xx: rnet.apply(trp if policy == "trained" else twp, hh, xx))(h, x); act = jax.random.categorical(k1, lg)
             else:                                                               # the original follower (no fallback)
                 act = NI.follower(s, item, L, jnp.zeros(a.N, jnp.int32)); h2 = h
             on_item = item["act"] & jnp.all(s.pos == item["pos"], -1) & (act == EAT) & s.alive
@@ -91,19 +94,24 @@ def main():
             ncode = jax.vmap(lambda kk: jax.random.permutation(kk, 8))(jax.random.split(k4, a.N))
             code2 = jnp.where(dead[:, None], ncode, code); h3 = jnp.where(dead[:, None], 0.0, h2)
             fullpaid = on_item & ~(~s2.alive) & (s.energy + S <= cfg.E_set + 1e-6)
-            return (s3, item2, h3, act, r * 20.0, code2), (gain * s.alive, on_item & ~dead, closed & ~dead, s.alive, dead, pd * s.alive, opened, fullpaid, item["act"])
+            dh = jax.nn.one_hot(item["d"].astype(jnp.int32), 25)            # reach by distance (the closing bout's d)
+            return (s3, item2, h3, act, r * 20.0, code2), (gain * s.alive, on_item & ~dead, closed & ~dead, s.alive, dead, pd * s.alive, opened, fullpaid, item["act"],
+                                                          (dh * (closed & ~dead)[:, None]).sum(0), (dh * (on_item & ~dead)[:, None]).sum(0))
         _, Z = jax.lax.scan(body, (s, item, h, pa, pr, code), jax.random.split(jax.random.fold_in(key, 2), a.steps))
-        return tuple(z.sum() for z in Z) + (Z[4][-1].sum(),)      # last: deaths on the final step (they start no counted life)
+        return tuple(z.sum() for z in Z[:9]) + (Z[4][-1].sum(),), (Z[9].sum(0), Z[10].sum(0))      # last: deaths on the final step (they start no counted life)
 
     runj = jax.jit(run, static_argnums=(0,))
     res = {}; PER = {}
-    for pol in ("navigator", "v2best", "follower") + (("trained",) if trp is not None else ()):
-        Zs = np.array([[float(q) for q in runj(pol, a.seed * 1000 + w)] for w in range(a.W)])     # (W, 9)
+    for pol in ("navigator", "v2best", "follower") + (("trained",) if trp is not None else ()) + (("twin",) if twp is not None else ()):
+        RR = [runj(pol, a.seed * 1000 + w) for w in range(a.W)]
+        Zs = np.array([[float(q) for q in rr[0]] for rr in RR])     # (W, 10)
+        cl_d = sum(np.asarray(rr[1][0]) for rr in RR); ea_d = sum(np.asarray(rr[1][1]) for rr in RR)
         g, ate_i, ren, alv, dd, pd, opn, fp, inb, dl = Zs.sum(0); lives = a.W * a.N + dd - dl    # lives with >= 1 step
         PER[pol] = (Zs[:, 5], a.N + Zs[:, 4] - Zs[:, 9], Zs[:, 0], Zs[:, 3])     # per world: paid, lives, food, agent-steps
         res[pol] = dict(food_per_step=g / alv, paid_per_life=pd / lives, paid_per_step=pd / alv, lives=int(lives), deaths=int(dd),
                         mean_life_steps=alv / lives, items_eaten=int(ate_i), bouts_opened=int(opn), item_reach_rate=ate_i / max(ren, 1),
-                        item_meals_fully_paid=fp / max(ate_i, 1), frac_steps_in_bout=inb / alv, agent_steps=int(alv))   # ren counts every closed bout
+                        item_meals_fully_paid=fp / max(ate_i, 1), frac_steps_in_bout=inb / alv, agent_steps=int(alv),
+                        reach_by_d={int(k): [round(float(ea_d[k] / cl_d[k]), 4), int(cl_d[k])] for k in range(1, 25) if cl_d[k] > 0})   # ren counts every closed bout
         print(pol, json.dumps(res[pol]), flush=True)
     cur = "paid_per_life" if a.currency == "paid" else "food_per_step"
     bk = "v2best" if res["v2best"][cur] >= res["navigator"][cur] else "navigator"
@@ -123,6 +131,21 @@ def main():
         out["oracle_arm"] = dict(currency=cur, ratio=rt, boot_ci95=[float(np.percentile(boots, 2.5)), float(np.percentile(boots, 97.5))],
                                  pass_=bool(rt >= 1.3 and np.percentile(boots, 2.5) > 1.0))
         print("ORACLE_ARM", json.dumps(out["oracle_arm"]), flush=True)
+    if trp is not None and twp is not None:   # DEAF TWIN bar: trained mean lifespan >= twin_bar x the twin's; bootstrap over worlds (lives paired by key) LB >= twin_lb
+        def life(pol, ix):
+            pdw, lv, fw, sw = (z[ix] for z in PER[pol]); return sw.sum() / lv.sum()
+        def ppl(pol, ix):
+            pdw, lv, fw, sw = (z[ix] for z in PER[pol]); return pdw.sum() / lv.sum()
+        rb = np.random.default_rng(11); bl, bp = [], []
+        for _ in range(2000):
+            ix = rb.integers(0, a.W, a.W); bl.append(life("trained", ix) / life("twin", ix)); bp.append(ppl("trained", ix) / ppl("twin", ix))
+        rl = res["trained"]["mean_life_steps"] / res["twin"]["mean_life_steps"]
+        out["deaf_twin"] = dict(lifespan_ratio=rl, lifespan_boot_ci95=[float(np.percentile(bl, 2.5)), float(np.percentile(bl, 97.5))],
+                                paid_per_life_ratio=res["trained"]["paid_per_life"] / res["twin"]["paid_per_life"],
+                                paid_per_life_boot_ci95=[float(np.percentile(bp, 2.5)), float(np.percentile(bp, 97.5))],
+                                paid_per_step_ratio=res["trained"]["paid_per_step"] / res["twin"]["paid_per_step"],
+                                pass_=bool(rl >= a.twin_bar and np.percentile(bl, 2.5) >= a.twin_lb))
+        print("DEAF_TWIN", json.dumps(out["deaf_twin"]), flush=True)
     json.dump(out, open(a.out, "w"), indent=1); print("NECESSITY", json.dumps({k: out[k] for k in ("premium", "best_code_free", "pass")}), flush=True)
 
 

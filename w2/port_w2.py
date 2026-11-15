@@ -41,6 +41,7 @@ def main():
     ap.add_argument("--policy", default="learner", choices=["learner", "follower"], help="follower = the scripted curriculum positive control (no updates)")
     ap.add_argument("--v2", default=os.path.expanduser("~/throng-backup/evo2/evo2.ckpt")); ap.add_argument("--init-params", default="")
     ap.add_argument("--eval-only", action="store_true", help="no updates (readouts)"); ap.add_argument("--frontier0", type=float, default=1.0)
+    ap.add_argument("--frontier-schedule", default="", help="DEAF TWIN: replay another run's frontier from its train JSON curve (latest logged value at or before the current step); the gate is off")
     ap.add_argument("--out", required=True)
     a = ap.parse_args()
     S = a.item_size; gated = a.hunger_gate; nupd = a.eval_only or a.policy == "follower"
@@ -124,8 +125,18 @@ def main():
         p, ost, c, key = tj(Ck["p"]), tj(Ck["ost"]), tj(Ck["c"]), jnp.asarray(Ck["key"])
         dfront, recent, steps, it, curve = Ck["dfront"], Ck["recent"], Ck["steps"], Ck["it"], Ck["curve"]; rng.bit_generator.state = Ck["rng"]
         print(f"resumed at {steps:,} steps, frontier {dfront}", flush=True)
+    SCHED = [(c_["steps"], c_["frontier"]) for c_ in json.load(open(a.frontier_schedule))["curve"]] if a.frontier_schedule else None
+
+    def sched_front(st_):
+        fr = 1.0
+        for s_, f_ in SCHED:
+            if s_ <= st_:
+                fr = f_
+        return float(fr)
     t0 = time.time()
     while steps < a.steps:
+        if SCHED is not None:
+            dfront = sched_front(steps)
         if a.ckpt and it % 20 == 0 and it > 0:
             _ck.save(a.ckpt, dict(p=p, ost=ost, c=c, key=key, dfront=dfront, recent=recent, steps=steps, it=it, curve=curve, rng=rng.bit_generator.state))
             if a.max_seconds and time.time() - t0 > a.max_seconds:
@@ -153,7 +164,7 @@ def main():
         steps += W * N * T; it += 1
         n_close = int(closed.sum()); n_eat = int(ate_i.sum())
         recent.extend([1] * n_eat + [0] * max(n_close - n_eat, 0)); recent = recent[-500:]
-        if len(recent) >= 500 and np.mean(recent) >= 0.8 and dfront < a.d_max:
+        if SCHED is None and len(recent) >= 500 and np.mean(recent) >= 0.8 and dfront < a.d_max:
             dfront += 1; recent = []
         if it % a.curve_every == 0:
             curve.append(dict(steps=steps, frontier=dfront, item_reach=n_eat / max(n_close, 1), food_per_step=float(gain.mean()), paid_per_step=float(pd.mean()), frac_in_bout=float(inb.mean()), sec=round(time.time() - t0, 1)))
