@@ -1,0 +1,95 @@
+{
+ "cfg": {
+  "d": 12,
+  "hidden": true,
+  "lam": 0.95,
+  "gamma": 0.99,
+  "tier": "T3",
+  "learner": "L2e",
+  "kl": 0.3,
+  "steps": 1000000.0,
+  "B": 256,
+  "T": 32,
+  "seed": 3,
+  "episodes_per_life": 64,
+  "epochs": 4,
+  "minibatches": 8,
+  "lr": 0.0003,
+  "evo_pop": 32,
+  "evo_elite": 8,
+  "evo_eps": 64,
+  "evo_sigma": 0.3,
+  "evo_sigma_body": 0.02,
+  "curriculum": true,
+  "curriculum_mix": true,
+  "d_max": 24,
+  "test_d": 24,
+  "save_params": "",
+  "skip_final_eval": false,
+  "eval_params": "/private/tmp/claude-501/-Users-overlord-CascadeProjects-throng/aad77c1d-d7ac-437e-bef4-aa525802ccc0/scratchpad/r3/screen/L2e_B_s3.params",
+  "eval_modes": "0,3,4",
+  "life_credit": false,
+  "hindsight": 1.0,
+  "save_params_at": "",
+  "hind_at_start": true,
+  "head_control": false,
+  "demonstrator": true,
+  "ckpt": "",
+  "ckpt_every": 20,
+  "max_seconds": 0,
+  "move_cost": 0.003,
+  "eval_episodes": 9000,
+  "curve_every": 10,
+  "navs": "w2_out/nav_w13/*.msgpack",
+  "out": "/private/tmp/claude-501/-Users-overlord-CascadeProjects-throng/aad77c1d-d7ac-437e-bef4-aa525802ccc0/scratchpad/r3/screen/L2e_B_s3_eval_d24.json"
+ },
+ "cap": 48,
+ "curve": [],
+ "eval_modes": {
+  "0": {
+   "overall": 0.679722741775773,
+   "first_half": 0.6720090863200404,
+   "second_half": 0.7321888412017168,
+   "head_acc_by_hearing": {
+    "first": [
+     0.13883399209486166,
+     2024
+    ],
+    "later": [
+     0.7680207905895227,
+     7311
+    ]
+   }
+  },
+  "3": {
+   "overall": 0.20832871857348545,
+   "first_half": 0.2254638671875,
+   "second_half": 0.04062126642771804,
+   "head_acc_by_hearing": {
+    "first": [
+     0.11915312653865091,
+     2031
+    ],
+    "later": [
+     0.12036398731559354,
+     7253
+    ]
+   }
+  },
+  "4": {
+   "overall": 0.19580343552946292,
+   "first_half": 0.2183837890625,
+   "second_half": 0.011928429423459244,
+   "head_acc_by_hearing": {
+    "first": [
+     0.12383292383292384,
+     2035
+    ],
+    "later": [
+     0.12144493867097991,
+     7419
+    ]
+   }
+  }
+ }
+}

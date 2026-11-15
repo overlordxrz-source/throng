@@ -1,0 +1,95 @@
+{
+ "cfg": {
+  "d": 12,
+  "hidden": true,
+  "lam": 0.95,
+  "gamma": 0.99,
+  "tier": "T3",
+  "learner": "L2e",
+  "kl": 0.3,
+  "steps": 1000000.0,
+  "B": 256,
+  "T": 32,
+  "seed": 5,
+  "episodes_per_life": 64,
+  "epochs": 4,
+  "minibatches": 8,
+  "lr": 0.0003,
+  "evo_pop": 32,
+  "evo_elite": 8,
+  "evo_eps": 64,
+  "evo_sigma": 0.3,
+  "evo_sigma_body": 0.02,
+  "curriculum": true,
+  "curriculum_mix": true,
+  "d_max": 24,
+  "test_d": 12,
+  "save_params": "",
+  "skip_final_eval": false,
+  "eval_params": "/private/tmp/claude-501/-Users-overlord-CascadeProjects-throng/aad77c1d-d7ac-437e-bef4-aa525802ccc0/scratchpad/r3/screen/L2e_B_s5.params",
+  "eval_modes": "0,3,4",
+  "life_credit": false,
+  "hindsight": 1.0,
+  "save_params_at": "",
+  "hind_at_start": true,
+  "head_control": false,
+  "demonstrator": true,
+  "ckpt": "",
+  "ckpt_every": 20,
+  "max_seconds": 0,
+  "move_cost": 0.003,
+  "eval_episodes": 9000,
+  "curve_every": 10,
+  "navs": "w2_out/nav_w13/*.msgpack",
+  "out": "/private/tmp/claude-501/-Users-overlord-CascadeProjects-throng/aad77c1d-d7ac-437e-bef4-aa525802ccc0/scratchpad/r3/screen/L2e_B_s5_eval_d12.json"
+ },
+ "cap": 48,
+ "curve": [],
+ "eval_modes": {
+  "0": {
+   "overall": 0.06589443776636433,
+   "first_half": 0.07177734375,
+   "second_half": 0.01564129301355579,
+   "head_acc_by_hearing": {
+    "first": [
+     0.14616141732283464,
+     2032
+    ],
+    "later": [
+     0.19503594195035942,
+     7373
+    ]
+   }
+  },
+  "3": {
+   "overall": 0.05340821495430019,
+   "first_half": 0.0587158203125,
+   "second_half": 0.0044994375703037125,
+   "head_acc_by_hearing": {
+    "first": [
+     0.1280909990108803,
+     2022
+    ],
+    "later": [
+     0.11915184678522572,
+     7310
+    ]
+   }
+  },
+  "4": {
+   "overall": 0.107158446093409,
+   "first_half": 0.1192626953125,
+   "second_half": 0.0051440329218107,
+   "head_acc_by_hearing": {
+    "first": [
+     0.12696850393700787,
+     2032
+    ],
+    "later": [
+     0.12117519631735717,
+     7386
+    ]
+   }
+  }
+ }
+}

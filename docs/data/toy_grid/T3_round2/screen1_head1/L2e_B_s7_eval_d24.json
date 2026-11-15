@@ -1,0 +1,95 @@
+{
+ "cfg": {
+  "d": 12,
+  "hidden": true,
+  "lam": 0.95,
+  "gamma": 0.99,
+  "tier": "T3",
+  "learner": "L2e",
+  "kl": 0.3,
+  "steps": 1000000.0,
+  "B": 256,
+  "T": 32,
+  "seed": 7,
+  "episodes_per_life": 64,
+  "epochs": 4,
+  "minibatches": 8,
+  "lr": 0.0003,
+  "evo_pop": 32,
+  "evo_elite": 8,
+  "evo_eps": 64,
+  "evo_sigma": 0.3,
+  "evo_sigma_body": 0.02,
+  "curriculum": true,
+  "curriculum_mix": true,
+  "d_max": 24,
+  "test_d": 24,
+  "save_params": "",
+  "skip_final_eval": false,
+  "eval_params": "/private/tmp/claude-501/-Users-overlord-CascadeProjects-throng/aad77c1d-d7ac-437e-bef4-aa525802ccc0/scratchpad/r3/screen/L2e_B_s7.params",
+  "eval_modes": "0,3,4",
+  "life_credit": false,
+  "hindsight": 1.0,
+  "save_params_at": "",
+  "hind_at_start": true,
+  "head_control": false,
+  "demonstrator": true,
+  "ckpt": "",
+  "ckpt_every": 20,
+  "max_seconds": 0,
+  "move_cost": 0.003,
+  "eval_episodes": 9000,
+  "curve_every": 10,
+  "navs": "w2_out/nav_w13/*.msgpack",
+  "out": "/private/tmp/claude-501/-Users-overlord-CascadeProjects-throng/aad77c1d-d7ac-437e-bef4-aa525802ccc0/scratchpad/r3/screen/L2e_B_s7_eval_d24.json"
+ },
+ "cap": 48,
+ "curve": [],
+ "eval_modes": {
+  "0": {
+   "overall": 0.7822079075966237,
+   "first_half": 0.7553135659931777,
+   "second_half": 0.9305354558610709,
+   "head_acc_by_hearing": {
+    "first": [
+     0.1383242439266237,
+     2017
+    ],
+    "later": [
+     0.8163857419176568,
+     7238
+    ]
+   }
+  },
+  "3": {
+   "overall": 0.201,
+   "first_half": 0.2175824175824176,
+   "second_half": 0.03333333333333333,
+   "head_acc_by_hearing": {
+    "first": [
+     0.1186023622047244,
+     2032
+    ],
+    "later": [
+     0.12489615065078925,
+     7222
+    ]
+   }
+  },
+  "4": {
+   "overall": 0.23599734336949302,
+   "first_half": 0.2568359375,
+   "second_half": 0.0332541567695962,
+   "head_acc_by_hearing": {
+    "first": [
+     0.12395474667978357,
+     2033
+    ],
+    "later": [
+     0.11082012405237766,
+     7255
+    ]
+   }
+  }
+ }
+}

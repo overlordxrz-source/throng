@@ -7454,6 +7454,55 @@ more expensive, because it produces publishable-looking nulls.
 - **SCREEN UPDATE:** seed 5 **FAIL** (stalled, frontier 5; true 0.016 at d = 12). Seed 6 **PASS** (0.998). So far
   2/4; at most 3/5, which reads "no fix, the port learner stays on hold".
 
+- **RESULT (Nov 15 05:39): SCREEN 1 (head weight 1.0, seeds 3-7): 3/5 bar passes, 4/5 TAKE-OFFS. By Cam's rule
+  (<= 3/5), NOT A FIX.** `docs/data/toy_grid/T3_round2/screen1_head1/`.
+
+  | seed | took off (frontier at the cap of 24) | d = 12 second half: true / shuffled / wiped | head 1st / later | bar |
+  |---|---|---|---|---|
+  | 3 | yes | 0.798 / 0.065 / 0.011 | 0.17 / 0.89 | FAIL (< 0.9) |
+  | 4 | yes | 0.999 / 0.034 / 0.047 | 0.14 / 1.00 | PASS |
+  | 5 | **no (stalled at 5)** | 0.016 / 0.004 / 0.005 | 0.15 / 0.20 | FAIL |
+  | 6 | yes | 0.998 / 0.020 / 0.021 | 0.16 / 0.98 | PASS |
+  | 7 | yes | 1.000 / 0.031 / 0.067 | 0.16 / 0.97 | PASS |
+
+  - My predictions: 5/5 p 0.25; 4/5 p 0.3; <= 3/5 p 0.45. Landed in the <= 3/5 bin.
+  - Ablation (b) started at 05:39 (queued, registered).
+- **CAM RULINGS (Nov 15 ~05:50):**
+  - **Oracle #1:** VOID, closed.
+  - **Oracle #2:** PASS with a caveat. The first W2 PPO agent to act on a correct signal.
+  - **STANDING RULE, tightened:** a premium is measured against the SAME ARCHITECTURE TRAINED WITHOUT THE SIGNAL.
+    Never only against fixed policies or a deafened net (deafening measures reliance, not necessity).
+  - **DEAF TWIN (Modal, APPROVED):**
+    - oracle #2's recipe with the oracle input zeroed in training, and oracle #2's frontier schedule replayed from
+      its log;
+    - 3e7 steps; cap $0.4; own watch at $0.50.
+    - Bar on the necessity lives / keys: oracle #2 mean lifespan >= 1.5x the twin's, life-clustered bootstrap
+      LB >= 1.2x.
+    - Also report paid per life, paid per step, and reach by distance 1..22.
+    - FAIL -> the learner stays on hold; Cam rules on a world retune.
+  - **Screen reports from now on** give TAKE-OFF separately from the bar.
+  - **Before mitigation 2 (free check):** the read's attention at the hearing step on seeds 0, 1, 2, 5 (final weights):
+    the mass on same-token records vs on the most recent record, each against its chance share.
+    - Stalled seeds token-blind (same-token mass < 2x chance) while take-off seeds match tokens -> SWAP mitigation 2
+      for a SHARED TOKEN EMBEDDING for query and keys (head 0.5, demo on 1 hearing, seeds 8-12, 20M, same bar),
+      registered with the numbers.
+    - Otherwise run mitigation 2 as registered.
+    - A prediction goes in first.
+  - **W2 LEARNER: build now (free).**
+    - Apparatus checks:
+      - (A1) memory positive control: head acc on 2nd+ hearings >= 90%, 1st and shuffled near chance;
+      - (A2) a copy-the-parent agent reaches >= 90% of first hearings;
+      - (A3) regression vs oracle #2's curve;
+      - (A4) a price probe with the memory on.
+    - Recipe: the screen with more passes, then more take-offs, then screen 2.
+    - Bar per seed (d = 12 hidden, necessity keys, gated): second-half reach >= 0.9x oracle #2's at d = 12, AND
+      >= shuffled + 30 pts, AND >= 2x shuffled; mean lifespan >= 1.3x the deaf twin's, LB > 1.0x. PASS = >= 2/3
+      seeds.
+    - Steps: 1e8 if the price fits $0.8 per seed, else the most that fits (minimum 5e7).
+    - Caps $0.8 per seed, each with its own watch at $1.00.
+    - EARLY STOP: frontier not past 5 by half the steps -> stopped, counted as FAIL.
+    - PRE-APPROVED once the twin PASSES, A1-A4 pass, and the recipe is picked after screen 2.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
