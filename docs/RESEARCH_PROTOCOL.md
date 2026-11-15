@@ -7115,6 +7115,24 @@ more expensive, because it produces publishable-looking nulls.
     meal) is the counting observer's evidence B. The port reuses evidence already measured in W2.
   - Files: `docs/data/toy_grid/T3_round2/scale20M/`.
 
+- **Cam, Nov 15 ~02:05 (T3 round 2 rulings).**
+  1. **CONFIRMATION REGISTERED:** the T3 pass is decided at 20M steps on seeds 0, 1, 2 with the same bar at d = 12
+     hidden. No further step extensions; a failed seed is reported, not rerun. (The 10M / 20M scale-ups were Will's
+     call after seeing data; fixing the count now with 3/3 covers that.)
+  2. **ABLATIONS** (laptop, after seeds 1-2; seed 0, 20M, same bar): (a) L2e, head, NO demonstrator; (b) GRU, head +
+     demonstrator; (c) L2e + demonstrator, head OFF.
+  3. L2e's write is FIXED (raw record); only the read is learned. Put to M.
+  4. **W2 port spec text after seeds 1-2.** Must include: the W2 "episode" (a record opens at each hearing and closes
+     at the next meal or after T_max); the hindsight head trained ONLY at the hearing moment; a NECESSITY CHECK in the
+     new W2 variant before any learner run (scripted follower vs the strongest code-free policy, premium >= 1.5x
+     food); the oracle arm first; item caps and total cost.
+  5. Budget: the port may fit the ~$6.8 left under the $41 guard; Cam decides after the seeds, the necessity check
+     and M. Nothing on Modal until then.
+  7. **M APPROVED (Nov 15):** the inborn episodic memory (each sound heard + where the agent ended up / next ate) is
+     used now; a learned / evolved write replaces it later.
+- **Ops (Nov 15 ~01:55):** at the operator's request (CPU / RAM load) seed 2 was paused (checkpointed) and queued
+  behind seed 1. Laptop jobs now run one at a time.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
