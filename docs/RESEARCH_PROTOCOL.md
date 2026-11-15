@@ -6938,6 +6938,32 @@ more expensive, because it produces publishable-looking nulls.
       back: a structural limit to weigh in its result.
     - Runs are checkpointed in < 10-minute chunks (chunked == straight run, exactly).
 
+- **Cam, Nov 14 ~22:45 (round 2 rulings).**
+  1. **MIXED CURRICULUM ACCEPTED as the recipe and REGISTERED for all later work:** each episode's d drawn from 1 to
+     the current frontier; the frontier rises at >= 80% over the last 500 episodes; cap 24.
+     - An explore-lane variant found after the registered curriculum failed; mechanistically motivated
+       (over-specialisation on d = 24) and 3/3 on both learners.
+     - **LESSON: a curriculum must keep sampling the whole range up to its frontier.**
+     - Recorded FAILS: the registered auto-curriculum (58 / 47% at d = 12); the move-cost-0 recipes (2/3 and 1/3
+       seeds); evolution L3 (stalled at d = 3).
+  2. T2 PASS 6/6. The T3 design choices are accepted.
+  3. **T3 interpretation, before any bar is applied:**
+     - (a) IDEAL IN-CONTEXT LEARNER (scripted, same lives): for an unlearned token, search like the best code-free
+       policy until the food is found; record token -> sector; walk straight on every later hearing. Its
+       second-half reach is the ceiling.
+     - (b) controls: a within-life SHUFFLED code (no consistent mapping inside a life); memory WIPED at each episode
+       start.
+     - (c) **BAR for a memory:** second-half reach >= 90% of the ideal learner's AND >= shuffled + 30 points AND
+       >= 2x shuffled, on 3/3 seeds. Report the first-half -> second-half rise (the in-context signature).
+     - (d) A transformer FAIL is not a verdict (128-step window vs recurrence every ~16 episodes). If the GRU also
+       fails, try an EPISODE-LEVEL memory (attention over one learned summary per past episode, 64 slots) before
+       concluding.
+  4. After T3 passes: no Modal. Draft a one-page W2 port spec (the unfrozen learner, minibatched PPO, a
+     near-to-far curriculum mapped onto development, food hidden until close, a random code per life, the oracle arm
+     first, cost). It runs on new credits.
+  - **Ops:** the first T3 launch was stopped by Will at its start (no results) to add the controls and final-weight
+    saving, then relaunched.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
