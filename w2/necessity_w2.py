@@ -36,6 +36,8 @@ def main():
     ap.add_argument("--v2", default=os.path.expanduser("~/throng-backup/evo2/evo2.ckpt"))
     ap.add_argument("--W", type=int, default=32); ap.add_argument("--N", type=int, default=4); ap.add_argument("--steps", type=int, default=3000)
     ap.add_argument("--d-max", type=int, default=12); ap.add_argument("--d-fixed", type=int, default=0); ap.add_argument("--seed", type=int, default=0)
+    ap.add_argument("--policy-params", default="", help="ORACLE ARM eval: also score a port_w2.py-trained agent (its weights)")
+    ap.add_argument("--policy-oracle", action="store_true", help="the trained agent gets the oracle sector input")
     ap.add_argument("--out", required=True)
     a = ap.parse_args()
     cfg = env.Cfg(L=96, N=a.N, patch_sigma=1.0, reproduce=False, A_max=3000, **world_kw(a.world)); L = cfg.L
@@ -47,6 +49,7 @@ def main():
     for k in ("Dense_0", "Dense_1", "Dense_2", "Dense_3"):
         pp[k] = dict(nav["params"][k])
     top = jax.tree_util.tree_map(jnp.asarray, _ck.load(a.v2)["evo_pop"][0]); pp.update(top); v2p = {"params": pp}
+    trp = flax.serialization.from_bytes(rp, open(a.policy_params, "rb").read()) if a.policy_params else None
 
     def torus(o):
         return (o + L // 2) % L - L // 2
@@ -89,6 +92,10 @@ def main():
             elif policy == "v2best":
                 x = jnp.concatenate([o, hr, jax.nn.one_hot(pa, 6), pr[:, None], jnp.zeros((a.N, 8))], 1)
                 h2, lg, _, _ = jax.vmap(lambda hh, xx: rnet.apply(v2p, hh, xx))(h, x); act = jax.random.categorical(k1, lg)
+            elif policy == "trained":
+                orc = jax.nn.one_hot(item["sec"], 8) * (1.0 if a.policy_oracle else 0.0)
+                x = jnp.concatenate([o, hr, jax.nn.one_hot(pa, 6), pr[:, None], orc], 1)
+                h2, lg, _, _ = jax.vmap(lambda hh, xx: rnet.apply(trp, hh, xx))(h, x); act = jax.random.categorical(k1, lg)
             else:
                 act = follower(s, item, o); h2 = h
             on_item = jnp.all(s.pos == item["pos"], -1) & (act == EAT) & s.alive
@@ -113,16 +120,24 @@ def main():
 
     runj = jax.jit(run, static_argnums=(0,))
     res = {}
-    for pol in ("navigator", "v2best", "follower"):
-        tot = np.zeros(5)
+    PER = {}
+    for pol in ("navigator", "v2best", "follower") + (("trained",) if trp is not None else ()):
+        tot = np.zeros(5); PER[pol] = []
         for w in range(a.W):
-            tot += np.array([float(z) for z in runj(pol, a.seed * 1000 + w)])
+            z = np.array([float(q) for q in runj(pol, a.seed * 1000 + w)]); tot += z; PER[pol].append(z[0] / z[1])
         g, alv, ate_i, ren, dd = tot
         res[pol] = dict(food_per_step=g / alv, items_eaten=int(ate_i), item_reach_rate=ate_i / max(ren, 1), deaths=int(dd), agent_steps=int(alv))   # ren counts every closed bout
         print(pol, json.dumps(res[pol]), flush=True)
     best = max(res["navigator"]["food_per_step"], res["v2best"]["food_per_step"])
     out = dict(cfg=vars(a), results=res, premium=res["follower"]["food_per_step"] / best, best_code_free="v2best" if res["v2best"]["food_per_step"] >= res["navigator"]["food_per_step"] else "navigator")
     out["pass"] = bool(out["premium"] >= 1.5)
+    if trp is not None:                                     # ORACLE ARM bar: trained food >= 1.3x the best code-free; world-clustered bootstrap LB > 1.0x
+        bk = out["best_code_free"]; tr_, bs_ = np.array(PER["trained"]), np.array(PER[bk]); rb = np.random.default_rng(7)
+        boots = [tr_[ix].mean() / bs_[ix].mean() for ix in (rb.integers(0, a.W, a.W) for _ in range(2000))]
+        rt = res["trained"]["food_per_step"] / res[bk]["food_per_step"]
+        out["oracle_arm"] = dict(ratio=rt, boot_ci95=[float(np.percentile(boots, 2.5)), float(np.percentile(boots, 97.5))],
+                                 pass_=bool(rt >= 1.3 and np.percentile(boots, 2.5) > 1.0))
+        print("ORACLE_ARM", json.dumps(out["oracle_arm"]), flush=True)
     json.dump(out, open(a.out, "w"), indent=1); print("NECESSITY", json.dumps({k: out[k] for k in ("premium", "best_code_free", "pass")}), flush=True)
 
 
