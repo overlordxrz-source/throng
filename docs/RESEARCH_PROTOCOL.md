@@ -7295,6 +7295,32 @@ more expensive, because it produces publishable-looking nulls.
   - Test once the weights arrive: item reach split by energy at bout start (< 0.6 vs >= 0.75). The prediction is
     hungry-bout reach well above sated-bout reach.
 
+- **CAM RULINGS (Nov 15 ~03:55):**
+  - Ablations: (a) FAIL, so the demonstrator stays. (c) PASS, but the head stays anyway (an M-approved drive and the
+    screen's mitigation), so there is no 2nd-seed check of (c). (b) stays last.
+  - Screen: runs as registered. The report carries the full seed 0-2 diagnosis table (a weak head may be a symptom of
+    poor records).
+  - **REGISTERED SECOND MITIGATION:** if the screen scores < 5/5, then after (b) run fresh seeds 8-12, 20M, the same
+    bar: the base recipe (head weight 0.5) + the demonstrator on the FIRST 3 hearings of each token. Cam then picks
+    the port recipe.
+  - **ORACLE ARM #1: VOID as an oracle test** (it never reached the regime it tests). The readout must also explain
+    reach ~10%: hungry-bout reach at d = 1. If < 80%, find the second problem before any relaunch.
+  - **The fix:**
+    - REJECTED: reward eating regardless of hunger. The reward stays the setpoint reward.
+    - **HUNGER-GATED CALLS:** a hearing (token + named item) only when E < H = E_set - item size.
+    - **Item-size sweep** 0.1 / 0.2 / 0.3. Pick the smallest with premium >= 1.5x (mixed) AND >= 1.2x (fixed d = 12).
+    - **Currency: PAID INTAKE per life** (energy gained below the setpoint), survival alongside.
+    - **Follower:** on a hearing it walks to the item; otherwise it acts as v2-best.
+  - **Order before oracle #2** (free, laptop):
+    - (i) the oracle #1 readout, with no unexplained gap;
+    - (ii) the world fix + the sweep + necessity in paid intake;
+    - (iii) the CURRICULUM POSITIVE CONTROL: the scripted follower through the real gate pushes the frontier to the
+      cap.
+    - **NEW STANDING RULE:** every curriculum gate is checked with a scripted agent before any learner run.
+    - If (i)-(iii) pass, **ORACLE #2 is APPROVED:** 3e7 steps, cap $0.8, watch $1.00; bar (registered before launch):
+      paid intake >= 1.3x the best code-free policy, life-clustered bootstrap LB > 1.0x, on the necessity lives / keys.
+  - Budget: ~$6.2 after oracle #1, ~$5.6 after #2. A learner > $0.8 per seed becomes a credit question for M.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
