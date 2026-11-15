@@ -7961,6 +7961,29 @@ more expensive, because it produces publishable-looking nulls.
     control + one masked seed. A low later-hearing reach with a right head -> report. Oracle failures dominate ->
     report. More hearings per step is held in reserve (one change at a time).
 
+- **RESULT (Nov 15 ~12:15): PILOT DIAGNOSIS (final weights; the necessity keys; fixed d).**
+  `docs/data/learner_w2/pilot_diag/`; `w2/learner_w2_diag.py`, a copy with the extra splits.
+
+  | d | FIRST hearing (demonstrated): reach | parent stays in view: share / reach | parent leaves view: share / reach (T_max) | LATER hearings: reach | head right: share / reach | head wrong: reach |
+  |---|---|---|---|---|---|---|
+  | 4 | 0.82 | 0.84 / **0.96** | 0.16 / **0.01** (0.99) | 0.63 | 0.82 / **0.77** | 0.02 |
+  | 6 | 0.77 | 0.77 / 0.99 | 0.23 / 0.00 (0.99) | 0.59 | 0.84 / 0.70 | 0.02 |
+  | 8 | 0.70 | 0.71 / 0.99 | 0.29 / 0.01 (0.99) | 0.48 | 0.82 / 0.58 | 0.04 |
+  | 12 | 0.64 | 0.65 / 0.99 | 0.35 / 0.02 (0.96) | 0.34 | 0.76 / **0.44** | 0.03 |
+
+  - **(d) Oracle #2 at d = 12:** item 0.647, T_max 0.344, death 0.008. Generic food was eaten in 45% of its T_max
+    bouts.
+  - **Reading (both mechanisms are real):**
+    - **First hearings:** Cam's hunch holds. With the parent in view, reach is 0.96-0.99. Once it leaves the 7x7
+      view, ~0.01 (all T_max). The parent leaves the view in 16% (d 4) to 35% (d 12) of demonstrated bouts.
+    - **Later hearings:** the head is right in 76-84% of bouts, and the policy acts on a right read (right 0.44-0.77
+      vs wrong 0.02-0.04). But acting at RANGE decays: 0.77 at d 4 -> 0.44 at d 12, below the ~0.7 of Cam's first
+      branch.
+    - The same range decay shows in the ORACLE itself (0.65 at d 12, 34% timeouts). Walking an unseen ray to
+      d = 12 within 4d steps is hard for these PPO policies, with or without the code.
+  - **By Cam's decision tree:** not the first branch alone (later-hearing reach is < 0.7 at d >= 8 even with a right
+    head). It is the second branch, plus a weak oracle reference at d = 12. Reported for Cam's ruling; no runs.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
