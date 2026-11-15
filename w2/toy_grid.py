@@ -93,13 +93,18 @@ class EpMem(nn.Module):  # noqa: D101
     the start at the episode's end, ate flag) written by the environment loop at each episode end; the policy reads them
     with learned key / value projections queried by the current input (masked to filled slots). The read is learned; the
     record is raw (no long backprop needed)."""
-    S: int = 64; R: int = 11; hind: bool = False
+    S: int = 64; R: int = 11; hind: bool = False; shared_tok: bool = False
     @nn.compact
     def __call__(self, h, x):
         mem = h[: self.S * self.R].reshape(self.S, self.R); filled = mem[:, -2:].sum(-1) != 0  # any record written (offset or ate)
         filled = filled | (mem[:, :8].sum(-1) > 0)
         z = nn.tanh(nn.Dense(64, name="f1")(x))
-        q = nn.Dense(32, name="q")(z); k = nn.Dense(32, name="k")(mem); v = nn.Dense(32, name="v")(mem)
+        if self.shared_tok:      # Cam Nov 15 ~05:50 swap: query and keys share ONE token embedding (an architecture prior; the read stays learned)
+            E = nn.Dense(16, use_bias=False, name="tokemb")                  # x[-18:-10] = the heard token's one-hot (T2 / T3 layout)
+            q = jnp.concatenate([E(x[-18:-10]), nn.Dense(16, name="q")(z)]); k = jnp.concatenate([E(mem[:, :8]), nn.Dense(16, name="k")(mem)], -1)
+        else:
+            q = nn.Dense(32, name="q")(z); k = nn.Dense(32, name="k")(mem)
+        v = nn.Dense(32, name="v")(mem)
         att = jnp.where(filled, k @ q / jnp.sqrt(32.0), -1e9); w = jax.nn.softmax(att) * filled.any()
         rd = w @ v
         y = nn.tanh(nn.Dense(64, name="f2")(jnp.concatenate([z, rd])))
@@ -132,6 +137,7 @@ def main():
     ap.add_argument("--save-params-at", default="", help="DIAGNOSIS: also save weights at these step counts (and when the frontier first reaches 5)")
     ap.add_argument("--hind-at-start", action="store_true", help="train the hindsight head ONLY at each episode's first step (on hearing, before moving): mid-episode self-motion gives the sector away")
     ap.add_argument("--head-control", action="store_true", help="POSITIVE CONTROL for the head: the scripted ray-walker (true sector) acts; only the hindsight head is trained (supervised)")
+    ap.add_argument("--shared-tok", action="store_true", help="L2e: query and keys share one token embedding (Cam Nov 15 swap for mitigation 2)")
     ap.add_argument("--demo-hearings", type=int, default=1, help="with --demonstrator: show it on the first K hearings of each token in a life (default 1)")
     ap.add_argument("--demonstrator", action="store_true", help="Cam T3 round 2 arm B: a visible scripted parent walks to the food on the FIRST hearing of each token in a life")
     ap.add_argument("--ckpt", default="", help="checkpoint path: resume if present; save every --ckpt-every updates")
@@ -153,7 +159,8 @@ def main():
             pp[k] = dict(nav[k])
         p = {"params": pp}; FROZEN = () if a.learner == "L1u" else ("Dense_0", "Dense_1", "Dense_2", "Dense_3")   # L1u: trunk unfrozen
     elif a.learner == "L2e":                      # Cam 3(d): episode-level memory (T3)
-        net = EpMem(hind=a.hindsight > 0); Hd = net.S * net.R + 1          # slots + write pointer
+        assert not (a.shared_tok and a.tier == "T1"), "--shared-tok needs the T2/T3 input layout"
+        net = EpMem(hind=a.hindsight > 0, shared_tok=a.shared_tok); Hd = net.S * net.R + 1          # slots + write pointer
         p = net.init(jax.random.PRNGKey(a.seed), jnp.zeros((Hd,)), jnp.zeros((Dx,))); FROZEN = ()
     elif a.learner == "L2t":                      # addendum 6: transformer memory (T3 only)
         net = TfNet(); Hd = 2 * net.W * (net.dm + 1)
