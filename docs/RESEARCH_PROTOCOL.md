@@ -6741,6 +6741,9 @@ more expensive, because it produces publishable-looking nulls.
   - Confirms the FAIL: E cannot plausibly reach 1.5x.
   - File: `docs/data/klsE/E_25M_equivalent_u1500.json`.
 
+- **Ops (Nov 14 20:54):** the guard had died (heartbeat ~27 h stale; nothing ran in the gap; metered $34.21 ->
+  $34.22). Restarted with CAP 41.0. Both apps are deployed and idle.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
