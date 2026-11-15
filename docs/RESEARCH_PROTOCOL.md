@@ -7395,6 +7395,16 @@ more expensive, because it produces publishable-looking nulls.
     - Hunger-gated calls remove the fountain: no item while E >= H.
   - **(i)-(iii) all pass, so ORACLE #2 launches per Cam's pre-approval** (bar registered above).
 
+- **LAUNCH (Nov 15 04:41): ORACLE #2** (`oracle2_w2`, comm-toy 3687a6a, gated world, size 0.1, 3e7 steps, W 32;
+  call fc-01M7F9A29SQFQEMA7TFYWX7MW5).
+  - Pre-launch checks: guard alive (metered $34.71); both repos show nothing ahead.
+  - Watch: its own watch on throng-w2jobs at cap $0.8, stop at $1.0, with baseline C0 = $0.45 (oracle #1's spend on the
+    same app id). A first start with C0 = 0 counted oracle #1's billing, so I killed it before the spawn.
+  - Predictions:
+    - the frontier reaches >= 12 by 3e7 (p 0.6) and the cap of 24 (p 0.35);
+    - the paid-intake bar passes (p 0.55);
+    - a pass with a frontier still <= 3, which would flag the comparator caveat (p 0.1).
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
