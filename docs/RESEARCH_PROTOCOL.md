@@ -7405,6 +7405,23 @@ more expensive, because it produces publishable-looking nulls.
     - the paid-intake bar passes (p 0.55);
     - a pass with a frontier still <= 3, which would flag the comparator caveat (p 0.1).
 
+- **SCREEN PARTIAL (Nov 15 ~04:45; registered design unchanged, mid-flight).** At d = 12 hidden, second half:
+  - seed 3: true 0.798, shuffled 0.065, wiped 0.011, head on later hearings 0.89. **FAIL** (below 0.9 of ideal).
+  - seed 4: true 0.999, shuffled 0.034, wiped 0.047, head 1.00. **PASS**.
+  - 5/5 is no longer possible, so Cam's second mitigation runs after (b).
+- **QUEUED, to run when the screen ends (registered before launch):**
+  - (1) **Ablation (b):** GRU (L2) + head 0.5 at the hearing + first-hearing demonstrator; mixed curriculum; 20M;
+    seed 0; the T3 bar at d = 12.
+  - (2) **Second mitigation:** L2e + head 0.5 + the demonstrator on the FIRST 3 hearings of each token; seeds 8-12;
+    20M; no early stops; the same bar.
+  - New flag `--demo-hearings K` (comm-toy, swapped in at the gap so no running chunk sees it), tested on a 0.3M T3
+    run:
+    - K = 1 reproduces the original curve exactly (18/18 points);
+    - the demonstrator is present in 13.3% of episodes at K = 1 vs 36.1% at K = 3 (expected ~12.5% and ~37.5%).
+  - Predictions:
+    - (b) FAIL (p 0.75): the GRU memories failed before;
+    - the mitigation scores 5/5 (p 0.25), 4/5 (p 0.35), <= 3/5 (p 0.4).
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
