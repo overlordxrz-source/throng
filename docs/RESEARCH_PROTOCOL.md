@@ -7832,6 +7832,37 @@ more expensive, because it produces publishable-looking nulls.
     discarded.
   - The readout names the implementation per seed.
 
+- **RESULT (Nov 15 ~10:45): THE READ vs CUMULATIVE HEARINGS** (Cam's item 2). Head accuracy on 2nd+ hearings at
+  d = 3, where the item is unseen in both worlds (toy hidden: visible only when adjacent).
+  `docs/data/learner_w2/readcurve/`.
+  - **Toy seeds 8-12** (bit-identical replays with weight snapshots; snapshot labels corrected for a file-name
+    rounding: `at2e+06` holds the 2.5e6 save; the 1.5e6 and 2e6 saves were overwritten):
+
+    | toy steps | hearings | frontier | head 2nd+ (seeds 8-12) |
+    |---|---|---|---|
+    | 0.25M | 55-57k | 3 | 0.10-0.13 (chance) |
+    | 0.5M | 98-99k | 3-4 | 0.11-0.15 |
+    | 1M | 160-170k | 4 | 0.14-0.18 (seed 8: 0.38) |
+    | 2.5M | 314-347k | 6-7 | **0.72-0.90** |
+    | 3M | 356-403k | 6-7 | 0.76-0.94 |
+
+  - **W2 seed 0** (learner_w2.py; checkpoint snapshots):
+
+    | steps | hearings | frontier | head 2nd+ | head 1st | reach at d = 3 |
+    |---|---|---|---|---|---|
+    | 12.6M | 389k | 3 | 0.27 | 0.09 | 0.11 |
+    | 13.3M | 403k | 3 | 0.43 | 0.07 | 0.13 |
+    | 14.3M | 424k | 3 | 0.54 | 0.08 | 0.27 |
+    | 16.4M | 459k | 5 | 0.53 | 0.08 | 0.27 |
+    | 17.9M | 484k | 5 | 0.47 | 0.11 | 0.35 |
+    | 19.5M | 504k | 6 | 0.57 | 0.13 | 0.44 |
+
+  - **Reading:** per hearing, the W2 read forms LATER and more slowly.
+    - The toy read jumps from chance to 0.72-0.90 between ~165k and ~330k hearings.
+    - W2's read is at 0.27 at 389k and 0.57 at 504k, still rising. There are no W2 snapshots before 12.6M, so
+      when its read left chance is unknown.
+    - The policy is now acting on it: reach at d = 3 went 0.11 -> 0.44 as the head went 0.27 -> 0.57.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
