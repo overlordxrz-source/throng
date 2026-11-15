@@ -7984,6 +7984,42 @@ more expensive, because it produces publishable-looking nulls.
   - **By Cam's decision tree:** not the first branch alone (later-hearing reach is < 0.7 at d >= 8 even with a right
     head). It is the second branch, plus a weak oracle reference at d = 12. Reported for Cam's ruling; no runs.
 
+- **CAM RULINGS (Nov 15 ~12:05):**
+  - ADOPTED: THE PARENT WAITS (never more than 2 cells ahead of its young; the learner design only).
+  - Reconcile training vs eval reach first, then the satiation split; decision tree on both.
+  - Afterwards: A2 + the curriculum positive control under the final gate, then one masked seed (+ the waiting
+    parent).
+  - Seed 1's old-recipe checkpoint is kept, not resumed.
+- **RESULT (Nov 15 ~12:25): (2) NO train / eval REACH MISMATCH. The CURRICULUM GATE fires on lucky windows.**
+  `docs/data/learner_w2/gate_sat/`.
+  - Oracle #2's logged training reach (one iteration per log point) averages **0.63-0.75** in every 1.5M-step
+    block, frontier 1 to 22. The evaluator gives ~0.68 over d 1-22. They agree.
+  - The gate is checked EVERY iteration on the last 500 closed bouts, only 2-8 iterations' worth (100-300
+    correlated bouts per iteration), so it fires on the first lucky window.
+  - Laptop replay of oracle #2's training (`port_gate.py`):
+    - frontier 1 -> 2 at 2.66M with window mean 0.804, while reach since the start was **0.366**;
+    - 2 -> 3 at 5.75M with window 0.800, while reach since the previous increase was **0.665**.
+  - **A DEFECT in the curriculum gate (mine; it applies to every W2 run so far):** the frontier records the best lucky
+    window, not 80% mastery. The scripted positive control (reach 1.0) could not reveal it. A gate check also needs a
+    NEGATIVE control: an agent at ~70% must not pass.
+  - The toy gate had the same form (last 500 episodes), but the toy logged reach well above 0.8 at its frontiers.
+- **RESULT: (3) SATIATION SPLIT at d = 12: sated abandonment explains only a MINORITY of timeouts.**
+
+  | policy, mode | reach (2nd half) | T_max bouts | ... in which E reached H during the bout | mean E at timeout | HUNGRY-bout reach (E < H until eaten or T_max) |
+  |---|---|---|---|---|---|
+  | oracle #2 | 0.653 (0.650) | 1327 | **0.26** | 0.590 | **0.716** |
+  | pilot, true | 0.495 (0.330) | 1393 | 0.33 | 0.539 | 0.590 |
+  | pilot, shuffled | 0.390 (0.198) | 1554 | 0.35 | 0.539 | 0.495 |
+  | pilot, wiped | 0.343 (0.142) | 2279 | 0.16 | 0.486 | 0.380 |
+
+  - Most timeouts happen while the agent is still hungry (mean E at timeout 0.49-0.59 < H = 0.7).
+  - Hungry-bout reach raises everyone by ~0.06-0.10 and preserves the ordering true > shuffled > wiped.
+- **By Cam's tree:**
+  - The evaluator does not need fixing, but the GATE is defective.
+  - Satiation is not the main cause.
+  - So the range decay is a real skill gap, aggravated by a gate that advanced the curriculum before mastery.
+  - Reported for Cam's ruling; nothing run.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
