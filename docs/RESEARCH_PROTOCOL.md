@@ -7518,6 +7518,18 @@ more expensive, because it produces publishable-looking nulls.
     passes for Cam's purpose only if it lives <= 2000 steps on average.
   - Predictions: the twin's mean life ~1200-2000 (the deafened oracle #2 net: 1013); **bar PASS p 0.55.**
 
+- **PREDICTION (Nov 15 ~06:00, before the attention check).**
+  - Method: final weights of seeds 0, 1, 2 (20M) and 5 (screen 1); eval mode 0 at d = 5, the distance where the
+    stalled seeds sit; the hearing steps of the 2nd+ hearings in each life.
+    - Measured: the read's attention mass on same-token records and on the most recent record, each over its chance
+      share (same-token records / filled; 1 / filled).
+  - The read is NOT already tied: q comes from the input through f1, and k is a separate projection of the raw
+    record.
+  - Predictions:
+    - seeds 0 and 1 (took off) match tokens, mass >= 3x chance (p 0.75);
+    - seeds 2 and 5 (stalled) are token-blind, < 2x chance (p 0.6);
+    - therefore the SWAP to a shared token embedding (p 0.5).
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
