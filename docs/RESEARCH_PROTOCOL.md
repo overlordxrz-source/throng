@@ -7321,6 +7321,20 @@ more expensive, because it produces publishable-looking nulls.
       paid intake >= 1.3x the best code-free policy, life-clustered bootstrap LB > 1.0x, on the necessity lives / keys.
   - Budget: ~$6.2 after oracle #1, ~$5.6 after #2. A learner > $0.8 per seed becomes a credit question for M.
 
+- **CODE + PREDICTION (Nov 15 ~04:06, before the sweep):**
+  - **The world fix is built.** The shared module `w2/named_item.py` (comm-toy) holds the hunger gate, the item size,
+    paid intake and the follower with its v2-best fallback.
+  - **Regression:** with the gate off, necessity_w2 (food, 2 worlds) and port_w2 (8 PPO iterations) reproduce the
+    original code bit-exactly.
+  - **Early sign (2-world regression run, gate off):** v2-best eats much food but little of it is paid (food
+    0.0069 / step, paid 0.00026 / step) and it dies often. In paid intake per life the navigator may be the
+    strongest code-free policy.
+  - **Sweep predictions** (gated, paid per life; pass = >= 1.5x mixed AND >= 1.2x fixed d = 12):
+    - S 0.1 fails fixed d = 12 (p 0.7);
+    - S 0.2 passes both (p 0.5);
+    - S 0.3 passes both (p 0.7).
+    - The smallest passing size is 0.2 (p 0.4).
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
