@@ -7089,6 +7089,22 @@ more expensive, because it produces publishable-looking nulls.
     - **Running (mine, flagged): a 10M-step scale-up of L2e arm B** (laptop, chunked): free, and it tests the
       "more steps" reading.
 
+- **RESULT (Nov 15 ~01:30): 10M scale-up of L2e arm B (head at episode start + first-hearing demonstrator), seed 0:
+  NEAR-PASS, still climbing.**
+
+| run | max d | eval d | true 1st->2nd | shuffled 2nd | wiped 2nd | head acc 1st / 2nd+ hearing | bar |
+|---|---|---|---|---|---|---|---|
+| L2e_B_s0 | 19 | 12 | 70->85 | 12 | 1 | 15 / 82 | - |
+| L2e_B_s0 | 19 | 19 | 43->57 | 8 | 1 | 7 / 51 |  |
+
+  - At d = 12: second half **85%** vs within-life shuffled 12% and wiped 1%; head 15% (1st hearing) -> **82%** (2nd+).
+  - Bar: >= shuffled + 30 PASS; >= 2x PASS; >= 90% of the ideal (90%) FAIL by 5 points.
+  - The curriculum was still rising at the end (d 4 -> 7 -> 10 -> 15 -> 19 over 10M).
+  - **In-context learning of a per-life code is obtained in the toy for the first time,** with the approved hindsight
+    drive plus a first-hearing demonstrator, under the harness move cost.
+  - **Running (mine, flagged; laptop, free):** seed 0 resumed to 20M; seed 1 at 20M (two heavy jobs; seed 2 after).
+    Cam's 3-seed rule applies to the bar at the final step count.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
