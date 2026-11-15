@@ -7217,6 +7217,27 @@ more expensive, because it produces publishable-looking nulls.
   - **Gate: PASS on the design variant -> the ORACLE ARM is approved** (Cam, item 5). Next: register its bar, build
     the W2 port trainer, laptop smoke + price probe, then Modal.
 
+- **REGISTERED (Nov 15 ~03:45, before launch): the W2 ORACLE ARM `oracle_w2`** (Cam item 5; approved once the
+  necessity check passed, which it did on the mixed design).
+  - Trainer `w2/port_w2.py` (comm-toy `b06dc6d`):
+    - the necessity variant (picked W2 world; a personal named item at d ~ uniform{1..frontier}, visible only when
+      adjacent, announced through the life code);
+    - the registered mixed curriculum (frontier +1 at >= 80% item reach over the last 500 bouts; cap 24);
+    - RecAgent with the navigator trunk UNFROZEN, KL 0; ORACLE input = the item's sector (one-hot);
+    - minibatched PPO 8 x 4, entropy 0.01; the clipped log-ratio and the NaN guard; reward = x20 drive reduction
+      including item energy;
+    - lives respawn on death (new code, memory wiped). Adult lives only: a disclosed simplification for the oracle
+      arm.
+    - Resume verified bit-exact (curves and weights identical after 3 chunks).
+  - **Budget:** 3e7 agent-steps (W 32 x N 4). Price probe: 4.7k steps/s steady on the laptop, about container
+    speed. ~1.8 h, ~$0.65. Cap $0.8, its own watch at $1.00 set before the spawn. (1e8 would have been ~$2.1.)
+  - **BAR (Cam):** evaluated with `w2/necessity_w2.py --policy-params --policy-oracle` on the SAME worlds and keys as
+    the necessity check (32 worlds x 3,000 steps, d ~ uniform{1..12}).
+    - Trained oracle agent's food per step >= 1.3x the best code-free policy (v2-best, 0.0074);
+    - AND the world-clustered bootstrap 95% lower bound of that ratio > 1.0x.
+    - (Life-clustering approximated by world clusters: each world carries 4 slots of many lives; conservative.)
+  - Prediction: PASS p 0.4.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under

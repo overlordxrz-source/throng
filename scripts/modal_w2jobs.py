@@ -13,7 +13,7 @@ from pathlib import Path
 import modal
 
 _REQUIREMENTS = str(Path(__file__).resolve().parents[1] / "requirements.txt")
-PINNED_SHA = "d262f7087f87368f77a919832c97ed72a29f2a38"  # comm-toy: evolution v2 (groups, food fitness, init-from)
+PINNED_SHA = "b06dc6db5a54ad481b906e0c79681c84b0d9978b"  # comm-toy: W2 port trainer (oracle arm)
 REPO_URL = "https://github.com/overlordxrz-source/throng.git"
 VOLUME_MOUNT = "/mnt/throng-runs"
 OUTD = f"{VOLUME_MOUNT}/testbed/w2jobs"
@@ -94,6 +94,8 @@ PLANS = {
                          "--readout-tests", "hungry_kept", "--readout-no-probe", "--ti-fixed", "--forage-worlds", "64", "--forage-updates", "200",
                          "--evolve", "--evolve-params", "side_enc,gru,side_head", "--evolve-fitness", "food", "--evolve-worlds", "8",
                          "--evolve-budget", "1e8", "--evolve-sigma", "0.3", "--evolve-sigma-body", "0.02", "--evolve-readout-override"])],
+    # Cam Nov 15 ~02:35: the W2 ORACLE ARM (approved after the necessity check passed). 3e7 agent-steps; cap $0.8, own watch at $1.00.
+    "oracle_w2": [("oracle_w2", ["w2/port_w2.py", "--oracle", "--W", "32", "--steps", "3e7", "--save-params", f"{OUTD}/oracle_w2.params"])],
     "dprime": [("klsDp_evolve_food", [*_PILOT, "--oracle-input", "--updates", "1526", "--readout-at", "1.25e7,2.5e7", "--readout-worlds-at", "32,32",
                                       "--readout-tests", "hungry_kept", "--readout-no-probe", "--ti-fixed", "--forage-worlds", "64", "--forage-updates", "200",
                                       "--evolve", "--evolve-fitness", "food", "--evolve-budget", "25e6", "--evolve-sigma", "0.3"])],
