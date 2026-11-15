@@ -29,6 +29,7 @@ from w2.ep_agent_dev import EpAgentDev  # noqa: E402
 from w2.worlds import world_kw  # noqa: E402
 from w2.gae import gae  # noqa: E402
 from w2 import named_item as NI  # noqa: E402
+from w2.gate import HonestGate  # noqa: E402
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "scripts"))
 import ckpt as _ck  # noqa: E402
 
@@ -55,6 +56,7 @@ def main():
     ap.add_argument("--item-size", type=float, default=0.1); ap.add_argument("--hunger-gate", action="store_true")
     ap.add_argument("--learner", default="rec", choices=["rec", "ep"]); ap.add_argument("--slots", type=int, default=128)
     ap.add_argument("--hindsight", type=float, default=0.0); ap.add_argument("--shared-tok", action="store_true")
+    ap.add_argument("--gate", default="old", choices=["old", "honest"]); ap.add_argument("--parent-waits", action="store_true", help="Cam Nov 15 ~12:05: the scripted parent never gets more than 2 cells ahead of its young")
     ap.add_argument("--head-own-meal", action="store_true", help="Cam Nov 15 ~11:05: label the head only on bouts the agent ENDED BY EATING the item (own-experience hindsight, as in the toy); bouts closed by T_max / death or not closed within the chunk are unlabelled")
     ap.add_argument("--demonstrator", action="store_true"); ap.add_argument("--demo-hearings", type=int, default=1)
     ap.add_argument("--policy", default="learner", choices=["learner", "follower", "copyparent"]); ap.add_argument("--head-only", action="store_true")
@@ -119,6 +121,7 @@ def main():
         else:
             act = samp
         lp = jnp.take_along_axis(jax.nn.log_softmax(lg), act[:, None], 1)[:, 0]
+        item = dict(item, sat=item["sat"] | (item["act"] & (s.energy >= H)))  # no longer a hungry bout once E reached H
         tok_now = code[ar, item["sec"]]; hear_now = item["act"] & (item["t"] == 0)
         first_hear = hear_now & (c["hcnt"][ar, tok_now] <= 1)
         on_item = item["act"] & jnp.all(s.pos == item["pos"], -1) & (act == EAT)
@@ -148,13 +151,16 @@ def main():
         hcnt = hcnt + (jax.nn.one_hot(tok_new, 8).astype(jnp.int32) * opened[:, None])
         dem_on = jnp.where(opened, a.demonstrator & (jnp.take_along_axis(hcnt, tok_new[:, None], 1)[:, 0] <= K), c["dem_on"] & ~closed)
         dem_mv, _ = NI.step_toward(c["dem_pos"], item["pos"], L)
+        if a.parent_waits:                                                  # the parent waits: never more than 2 cells (Chebyshev) ahead of its young
+            dem_mv = jnp.where((jnp.abs(NI.torus(dem_mv - s3.pos, L)).max(-1) <= 2)[:, None], dem_mv, c["dem_pos"])
         dem_pos = jnp.where(opened[:, None], s3.pos, jnp.where(c["dem_on"][:, None], dem_mv, c["dem_pos"]))
         gen_now = c["gen"] | (item["act"] & (info["take"] > 0))               # generic (world) food eaten during this bout
         gen2 = jnp.where(opened | closed, False, gen_now)
         c2 = dict(s=s3, item=item2, h=h3, pa=act, pr=r, code=code2, dem_pos=dem_pos, dem_on=dem_on, hcnt=hcnt, gen=gen2)
         info_ = dict(x=x, act=act, lp=lp, v=v, r=r, dead=dead.astype(jnp.float32), h=h, ate=on_item & ~dead, closed=closed & ~dead, gain=gain, pd=pd,
                      es=item["es"], d=item["d"], inb=item["act"], dem=c["dem_on"] & item["act"], hear=hear_now, first=first_hear, sec=item["sec"], hl=hl, age=age_close, alive=s.alive,
-                     wflag=wflag, wslot=wslot, wrec=wrec, cl_item=closed & on_item, cl_death=closed & dead, cl_tmax=closed & ~on_item & ~dead, gen=gen_now)
+                     wflag=wflag, wslot=wslot, wrec=wrec, hung=closed & ~dead & ~item["sat"], hate=on_item & ~dead & ~item["sat"],
+                     demstep=c["dem_on"] & item["act"], demfar=c["dem_on"] & item["act"] & (jnp.abs(NI.torus(c["dem_pos"] - s.pos, L)).max(-1) > 2), cl_item=closed & on_item, cl_death=closed & dead, cl_tmax=closed & ~on_item & ~dead, gen=gen_now)
         return c2, info_
 
     def rollout_world(pp_, c, key, dfront):
@@ -227,6 +233,9 @@ def main():
                 A = dict(A, alive=A["alive"] + f["alive"].sum(), deaths=A["deaths"] + f["dead"].sum(), oldage=A["oldage"] + (f["dead"] * (f["age"] >= cfg.A_max)).sum(), paid=A["paid"] + f["pd"].sum(),
                          ate=A["ate"] + f["ate"].sum(), closed=A["closed"] + f["closed"].sum(),
                          ate2=A["ate2"] + (f["ate"] & late).sum(), closed2=A["closed2"] + (f["closed"] & late).sum(),
+                         ate2h=A["ate2h"] + (f["hate"] & late).sum(), closed2h=A["closed2h"] + (f["hung"] & late).sum(),
+                         ateh=A["ateh"] + f["hate"].sum(), closedh=A["closedh"] + f["hung"].sum(),
+                         demstep=A["demstep"] + f["demstep"].sum(), demfar=A["demfar"] + f["demfar"].sum(),
                          h1=A["h1"] + (ok & f["first"]).sum(), n1=A["n1"] + f["first"].sum(),
                          hL=A["hL"] + (ok & f["hear"] & ~f["first"]).sum(), nL=A["nL"] + (f["hear"] & ~f["first"]).sum(),
                          ateD=A["ateD"] + (f["ate"] & f["dem"]).sum(), closedD=A["closedD"] + (f["closed"] & f["dem"]).sum(),
@@ -240,7 +249,7 @@ def main():
                          cnt=jnp.where(end, 0.0, cnt))
                 return (c2, A), None
             z = jnp.float32(0.0)
-            A0 = dict(**{f"{p_}_{n_}_{d_}": z for p_ in ("c", "g") for n_ in ("item", "tmax", "death") for d_ in ("all", "dem")}, alive=z, deaths=z, oldage=z, ateD=z, closedD=z, cnt=jnp.zeros(N), mx=z, ovf=z, over=z, recs=z, paid=z, ate=z, closed=z, ate2=z, closed2=z, h1=z, n1=z, hL=z, nL=z, cd=jnp.zeros(25), ad=jnp.zeros(25))
+            A0 = dict(ate2h=z, closed2h=z, ateh=z, closedh=z, demstep=z, demfar=z, **{f"{p_}_{n_}_{d_}": z for p_ in ("c", "g") for n_ in ("item", "tmax", "death") for d_ in ("all", "dem")}, alive=z, deaths=z, oldage=z, ateD=z, closedD=z, cnt=jnp.zeros(N), mx=z, ovf=z, over=z, recs=z, paid=z, ate=z, closed=z, ate2=z, closed2=z, h1=z, n1=z, hL=z, nL=z, cd=jnp.zeros(25), ad=jnp.zeros(25))
             (cF, A), _ = jax.lax.scan(body, (c, A0), jax.random.split(jax.random.fold_in(key, 2), a.eval_steps))
             cnt = A["cnt"]                                                   # lives still open at the end of the horizon
             A = dict(A, ovf=A["ovf"] + (cnt > a.slots).sum(), over=A["over"] + jnp.maximum(cnt - a.slots, 0.0).sum(), recs=A["recs"] + cnt.sum())
@@ -254,6 +263,9 @@ def main():
             res = dict(mean_life_steps=float(tot["alive"] / lives), lives=float(lives), deaths=float(tot["deaths"]), paid_per_life=float(tot["paid"] / lives),
                        paid_per_step=float(tot["paid"] / tot["alive"]), item_reach=float(tot["ate"] / max(tot["closed"], 1)),
                        reach_2nd_half=float(tot["ate2"] / max(tot["closed2"], 1)),
+                       hungry_reach=float(tot["ateh"] / max(tot["closedh"], 1)), hungry_reach_2nd_half=float(tot["ate2h"] / max(tot["closed2h"], 1)),
+                       hungry_bouts_2nd_half=float(tot["closed2h"]),
+                       demo_steps=float(tot["demstep"]), demo_frac_parent_over_2_cells=float(tot["demfar"] / max(tot["demstep"], 1)),
                        closures={f"{n_}_{d_}": [float(tot[f"c_{n_}_{d_}"]), float(tot[f"g_{n_}_{d_}"])] for n_ in ("item", "tmax", "death") for d_ in ("all", "dem")},
                        max_records_per_life=float(max(q["mx"] for q in per)), lives_overflowing=float(tot["ovf"]),
                        frac_lives_overflowing=float(tot["ovf"] / lives), frac_records_overwritten=float(tot["over"] / max(tot["recs"], 1)),
@@ -261,24 +273,26 @@ def main():
                        head_acc_first=float(tot["h1"] / max(tot["n1"], 1)), head_n_first=float(tot["n1"]),
                        head_acc_later=float(tot["hL"] / max(tot["nL"], 1)), head_n_later=float(tot["nL"]),
                        reach_by_d={int(d_): [round(float(tot["ad"][d_] / tot["cd"][d_]), 4), int(tot["cd"][d_])] for d_ in range(1, 25) if tot["cd"][d_] > 0},
-                       per_world=[[float(q["alive"]), float(a.N + q["deaths"] - q["oldage"]), float(q["ate2"]), float(q["closed2"]), float(q["paid"])] for q in per])
+                       per_world=[[float(q["alive"]), float(a.N + q["deaths"] - q["oldage"]), float(q["ate2"]), float(q["closed2"]), float(q["paid"]), float(q["ate2h"]), float(q["closed2h"])] for q in per])
             out["modes"][mode] = res; print("EVAL_MODE", mode, json.dumps({k_: v_ for k_, v_ in res.items() if k_ != "per_world"}), flush=True)
         json.dump(out, open(a.out, "w"), indent=1); return
 
     # ------------------------------------------------------------------ training
     rng = np.random.default_rng(a.seed); key = jax.random.PRNGKey(a.seed + 1)
-    dfront = a.frontier0; recent = []; steps = 0; it = 0; curve = []; nan_run = 0; hacc = [0, 0, 0, 0]
+    dfront = a.frontier0; recent = []; GATE = HonestGate(); steps = 0; it = 0; curve = []; nan_run = 0; hacc = [0, 0, 0, 0]
     c = jax.vmap(world_reset, in_axes=(0, None))(jax.random.split(key, W), dfront)
     Ck = _ck.load(a.ckpt) if a.ckpt else None
     if Ck is not None:
         tj = lambda t_: jax.tree_util.tree_map(jnp.asarray, t_)  # noqa: E731
         p, ost, c, key = tj(Ck["p"]), tj(Ck["ost"]), tj(Ck["c"]), jnp.asarray(Ck["key"])
         dfront, recent, steps, it, curve = Ck["dfront"], Ck["recent"], Ck["steps"], Ck["it"], Ck["curve"]; rng.bit_generator.state = Ck["rng"]
+        if "gate" in Ck:
+            GATE.load(Ck["gate"])
         print(f"resumed at {steps:,} steps, frontier {dfront}", flush=True)
     t0 = time.time(); nupd = a.policy != "learner" and not a.head_only
     while steps < a.steps:
         if a.ckpt and it % 20 == 0 and it > 0:
-            _ck.save(a.ckpt, dict(p=p, ost=ost, c=c, key=key, dfront=dfront, recent=recent, steps=steps, it=it, curve=curve, rng=rng.bit_generator.state))
+            _ck.save(a.ckpt, dict(p=p, ost=ost, c=c, key=key, dfront=dfront, recent=recent, steps=steps, it=it, curve=curve, rng=rng.bit_generator.state, gate=GATE.state()))
             if a.max_seconds and time.time() - t0 > a.max_seconds:
                 print(f"CHUNK_STOP at {steps:,}", flush=True); sys.exit(3)
         if a.early_stop_frontier and steps >= a.steps / 2 and dfront <= a.early_stop_frontier:
@@ -319,20 +333,23 @@ def main():
         else:
             nan_run = 0
         steps += W * N * T; it += 1
-        closed, ate_i = R_["closed"], R_["ate"]; n_close = int(closed.sum()); n_eat = int(ate_i.sum())
+        closed, ate_i = R_["closed"], R_["ate"]; n_close = int(closed.sum()); n_eat = int(ate_i.sum()); st_h = (int(R_["hate"].sum()), int(R_["hung"].sum()))
         ok = R_["hl"].argmax(-1) == R_["sec"]; fh, hh_ = R_["first"], R_["hear"] & ~R_["first"]
         hacc = [hacc[0] + int((ok & fh).sum()), hacc[1] + int(fh.sum()), hacc[2] + int((ok & hh_).sum()), hacc[3] + int(hh_.sum())]
         recent.extend([1] * n_eat + [0] * max(n_close - n_eat, 0)); recent = recent[-500:]
-        if len(recent) >= 500 and np.mean(recent) >= 0.8 and dfront < a.d_max:
+        if a.gate == "honest":
+            if GATE.add(int(st_h[0]), int(st_h[1])) and dfront < a.d_max:
+                dfront += 1; print(f"GATE_UP frontier -> {dfront:.0f} at {steps:,} (last windows {GATE.scores[-2:]})", flush=True)
+        elif len(recent) >= 500 and np.mean(recent) >= 0.8 and dfront < a.d_max:
             dfront += 1; recent = []
         if it % a.curve_every == 0:
             curve.append(dict(steps=steps, frontier=dfront, item_reach=n_eat / max(n_close, 1), food_per_step=float(R_["gain"].mean()), paid_per_step=float(R_["pd"].mean()),
                               frac_in_bout=float(R_["inb"].mean()), head_acc_first=hacc[0] / max(hacc[1], 1), head_acc_later=hacc[2] / max(hacc[3], 1),
-                              n_first=hacc[1], n_later=hacc[3], sec=round(time.time() - t0, 1)))
+                              n_first=hacc[1], n_later=hacc[3], hungry_reach=st_h[0] / max(st_h[1], 1), gate_last=(GATE.scores[-1] if GATE.scores else None), sec=round(time.time() - t0, 1)))
             hacc = [0, 0, 0, 0]; print("CURVE", json.dumps(curve[-1]), flush=True)
     if a.save_params:
         open(a.save_params, "wb").write(flax.serialization.to_bytes(p))
-    out = dict(cfg=vars(a), steps=steps, frontier=dfront, curve=curve, train_seconds=round(time.time() - t0, 1), throughput=steps / max(time.time() - t0, 1e-9))
+    out = dict(cfg=vars(a), steps=steps, frontier=dfront, curve=curve, gate_scores=GATE.scores, train_seconds=round(time.time() - t0, 1), throughput=steps / max(time.time() - t0, 1e-9))
     json.dump(out, open(a.out, "w"), indent=1); print("TRAINED", json.dumps(dict(steps=steps, frontier=dfront)), flush=True)
 
 
