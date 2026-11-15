@@ -7926,6 +7926,27 @@ more expensive, because it produces publishable-looking nulls.
   - Flagged earlier and fixed: the unmasked head label (seed 0 = pilot).
   - So seed 1 proceeds as queued.
 
+- **RESULT (Nov 15 11:43): PILOT (seed 0, learner_w2.py, PRIVILEGED head labels; reported, NOT counted): FAILS the
+  registered bar.** `docs/data/learner_w2/pilot_s0/` (bar script `bar.py`).
+  - 5.0e7 steps; frontier 1 -> 3 (8M) -> 6 (20M) -> **8 (32M), flat at 8 for the last 18M steps** (cap 24).
+  - Bar at d = 12 hidden (necessity keys; oracle #2 and the deaf twin in the same evaluator):
+    - second-half reach true **0.330**, need >= 0.585 (0.9 x oracle #2's 0.650): FAIL;
+    - shuffled **0.198**, so true >= shuffled + 0.30 FAILS and >= 2x shuffled FAILS; wiped 0.142;
+    - mean life 1761 vs the twin's 478 = **3.69x**, LB 3.31: passes (bar 1.3x).
+    - Head at d = 12: 1st hearing 0.11, later hearings **0.76**.
+  - Reach by distance (eval d 1-22): 0.91 (1), 0.90 (2), 0.65 (3), 0.52-0.57 (4-10), 0.47-0.55 (11-14),
+    0.27-0.44 (15-22).
+  - **Read vs hearings at d = 3:** head on 2nd+ hearings 0.27 (389k hearings) -> 0.57 (504k) -> 0.71 (586k) ->
+    0.81 (659k) -> 0.85 (711k) -> **0.91 (778k)** -> 0.89 (834k). Reach at d = 3: 0.11 -> 0.80.
+    - The toy reached 0.72-0.90 at ~330k hearings. W2 needed ~2.4x the hearings, and per step it hears 4.5x
+      less.
+  - **Reading:** the read and its use form at short range (d = 3: head 0.89, reach 0.79). But in 5e7 steps the
+    frontier reached only 8, below the bar distance of 12. The learner never trained at d = 12, and the shuffled
+    0.20 shows part of its d = 12 reach is search.
+  - Within 5e7, the step budget limits even the privileged-label learner. Honest odds that the masked seeds 1-3
+    pass at 5e7 are now low (p ~0.1).
+  - My pilot prediction (per-seed pass p 0.5) MISSED.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
