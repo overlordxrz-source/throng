@@ -6885,6 +6885,34 @@ more expensive, because it produces publishable-looking nulls.
     episode's d ~ uniform{1..current d}) for L2 / L1u under the harness cost, to test the over-specialisation
     explanation.
 
+- **RESULT (Nov 14 ~22:30): TOY ROUND 2: A RECIPE PASSES under the HARNESS move cost, but it is MY VARIANT (the
+  mixed curriculum).**
+  - **Registered seeds on the move-cost-0 passes:** L1u fixed d = 12 gives 100 / 56 / 87 (2/3 seeds); L1u curriculum
+    84 / 65 / 69 (1/3). Neither is robust.
+  - **EXPLORATORY: mixed curriculum** (`--curriculum-mix`: each episode's d ~ uniform{1..current d}; the same +1 rule
+    at >= 80% over 500 episodes; cap 24), harness move cost 0.003, hidden, T1, 3M steps, minibatched PPO 8 x 4:
+
+| learner | move cost | distance | seed | max d | d=12 true | d=12 shuffled | pass | train s |
+|---|---|---|---|---|---|---|---|---|
+| L1u | 0.003 | curriculum | 0 | 24 | 100 | 0 | PASS | 170.3 |
+| L1u | 0.003 | curriculum | 1 | 24 | 94 | 1 | PASS | 163.6 |
+| L1u | 0.003 | curriculum | 2 | 24 | 92 | 0 | PASS | 163.3 |
+| L2 | 0.003 | curriculum | 0 | 24 | 100 | 0 | PASS | 39.1 |
+| L2 | 0.003 | curriculum | 1 | 24 | 100 | 0 | PASS | 36.9 |
+| L2 | 0.003 | curriculum | 2 | 24 | 100 | 0 | PASS | 35.6 |
+
+  - **3/3 seeds for both L2 (100 / 100 / 100 true, 0 shuffled) and L1u (100 / 94 / 92).** Both reach d = 24 by ~0.5M
+    steps; L2 trains in ~37 s.
+  - This meets Cam's registered PASS (harness cost, d = 12 hidden, >= 80%, >= 2x and +30 points, 3/3), but the
+    curriculum variant is not the registered one. Cam to rule.
+  - Mechanism: the registered curriculum trains only at the current d. Once at d = 24 the policy over-specialises to
+    that route and misses nearer hidden food (d = 12 test 47-58%). Mixing distances keeps it a ray-follower.
+  - **Per Cam's pre-registered reading ("a recipe passes -> T2 / T3 in the toy"), proceeding with free laptop runs:**
+    - T2 (fixed code) with this recipe for L2 and L1u;
+    - then T3 (random code per life; GRU vs the small transformer, addendum 6).
+    - All flagged as resting on the variant recipe.
+  - Files: `docs/data/toy_grid/round2/`.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
