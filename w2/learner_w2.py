@@ -134,7 +134,7 @@ def main():
         dem_pos = jnp.where(opened[:, None], s3.pos, jnp.where(c["dem_on"][:, None], dem_mv, c["dem_pos"]))
         c2 = dict(s=s3, item=item2, h=h3, pa=act, pr=r, code=code2, dem_pos=dem_pos, dem_on=dem_on, hcnt=hcnt)
         info_ = dict(x=x, act=act, lp=lp, v=v, r=r, dead=dead.astype(jnp.float32), h=h, ate=on_item & ~dead, closed=closed & ~dead, gain=gain, pd=pd,
-                     es=item["es"], d=item["d"], inb=item["act"], hear=hear_now, first=first_hear, sec=item["sec"], hl=hl, age=age_close, alive=s.alive)
+                     es=item["es"], d=item["d"], inb=item["act"], dem=c["dem_on"] & item["act"], hear=hear_now, first=first_hear, sec=item["sec"], hl=hl, age=age_close, alive=s.alive)
         return c2, info_
 
     def rollout_world(pp_, c, key, dfront):
@@ -174,10 +174,11 @@ def main():
                          ate2=A["ate2"] + (f["ate"] & late).sum(), closed2=A["closed2"] + (f["closed"] & late).sum(),
                          h1=A["h1"] + (ok & f["first"]).sum(), n1=A["n1"] + f["first"].sum(),
                          hL=A["hL"] + (ok & f["hear"] & ~f["first"]).sum(), nL=A["nL"] + (f["hear"] & ~f["first"]).sum(),
+                         ateD=A["ateD"] + (f["ate"] & f["dem"]).sum(), closedD=A["closedD"] + (f["closed"] & f["dem"]).sum(),
                          cd=A["cd"] + (dh * f["closed"][:, None]).sum(0), ad=A["ad"] + (dh * f["ate"][:, None]).sum(0))
                 return (c2, A), None
             z = jnp.float32(0.0)
-            A0 = dict(alive=z, deaths=z, oldage=z, paid=z, ate=z, closed=z, ate2=z, closed2=z, h1=z, n1=z, hL=z, nL=z, cd=jnp.zeros(25), ad=jnp.zeros(25))
+            A0 = dict(alive=z, deaths=z, oldage=z, ateD=z, closedD=z, paid=z, ate=z, closed=z, ate2=z, closed2=z, h1=z, n1=z, hL=z, nL=z, cd=jnp.zeros(25), ad=jnp.zeros(25))
             (cF, A), _ = jax.lax.scan(body, (c, A0), jax.random.split(jax.random.fold_in(key, 2), a.eval_steps))
             return A
         out = dict(cfg=vars(a), modes={})
@@ -188,7 +189,8 @@ def main():
             lives = a.eval_W * N + tot["deaths"] - tot["oldage"]   # an old-age death can only fall on the final step: it starts no counted life
             res = dict(mean_life_steps=float(tot["alive"] / lives), lives=float(lives), deaths=float(tot["deaths"]), paid_per_life=float(tot["paid"] / lives),
                        paid_per_step=float(tot["paid"] / tot["alive"]), item_reach=float(tot["ate"] / max(tot["closed"], 1)),
-                       reach_2nd_half=float(tot["ate2"] / max(tot["closed2"], 1)), bouts_2nd_half=float(tot["closed2"]),
+                       reach_2nd_half=float(tot["ate2"] / max(tot["closed2"], 1)),
+                       reach_demonstrated=float(tot["ateD"] / max(tot["closedD"], 1)), bouts_demonstrated=float(tot["closedD"]), bouts_2nd_half=float(tot["closed2"]),
                        head_acc_first=float(tot["h1"] / max(tot["n1"], 1)), head_n_first=float(tot["n1"]),
                        head_acc_later=float(tot["hL"] / max(tot["nL"], 1)), head_n_later=float(tot["nL"]),
                        reach_by_d={int(d_): [round(float(tot["ad"][d_] / tot["cd"][d_]), 4), int(tot["cd"][d_])] for d_ in range(1, 25) if tot["cd"][d_] > 0},
