@@ -7033,6 +7033,37 @@ more expensive, because it produces publishable-looking nulls.
       window within 3 cells; it appears when the episode's token has not been heard yet in this life;
     - lever check = the head's argmax at each episode's FIRST step vs the true sector, split by 1st vs 2nd+ hearing.
 
+- **RESULT + CORRECTION (Nov 15 ~01:15): T3 round 2, first pass, is WITHDRAWN as uninformative (my instrument
+  flaw).**
+  - First-pass table (head trained at every step; seed 0):
+
+| run | max d | eval d | true 1st->2nd | shuffled 2nd | wiped 2nd | head acc 1st / 2nd+ hearing | bar |
+|---|---|---|---|---|---|---|---|
+| L2_A_s0 | 3 | 3 | 38->42 | 41 | 42 | 12 / 13 |  |
+| L2_A_s0 | 3 | 12 | 0->0 | 0 | 0 | 13 / 13 | - |
+| L2_B_s0 | 4 | 4 | 52->39 | 39 | 40 | 12 / 13 |  |
+| L2_B_s0 | 4 | 12 | 21->1 | 1 | 1 | 11 / 13 | - |
+| L2e_A_s0 | 3 | 3 | 39->38 | 38 | 39 | 10 / 15 |  |
+| L2e_A_s0 | 3 | 12 | 0->0 | 0 | 0 | 12 / 14 | - |
+| L2e_B_s0 | 4 | 4 | 43->28 | 28 | 28 | 13 / 12 |  |
+| L2e_B_s0 | 4 | 12 | 11->0 | 0 | 0 | 15 / 13 | - |
+
+    No arm passes; the head is at chance (only L2e A: 10% -> 15%, z ~ 4). Arm B's first-half gain is following the
+    demonstrator; its second half falls to the shuffled level.
+  - **Positive control (mine):** the scripted true-sector walker acts (every episode finds food); only the L2e head
+    is trained, supervised.
+    - With the head trained at EVERY step: training-batch accuracy 93%, but at each episode's first step (t = 0)
+      chance (14%); later-hearing accuracy at evaluation 14%.
+    - **Cause:** mid-episode, the agent's own displacement (the beacon offset input) gives the sector away, so the
+      loss is minimised from self-motion without reading memory. Only at t = 0, before moving, does predicting the
+      meal's sector require memory.
+    - **Fix (`--hind-at-start`): train the head only at each episode's first step.** Positive control then PASSES:
+      later hearings **100%**, first hearings 5%, within-life shuffled 13%. The architecture can learn token ->
+      sector from memory.
+  - So the first-pass arm results were sunk by my per-step target, not by the learners. Also withdrawn: the 10M
+    scale-up I had started for "L2e arm A" (same flawed head; stopped before results).
+  - **Re-running arms A and B with the start-only head** (seed 0; L2e and the GRU).
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
