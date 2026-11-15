@@ -7867,6 +7867,35 @@ more expensive, because it produces publishable-looking nulls.
   training reach 0.69. It carries on to 5e7 on learner_w2.py, ETA ~12:30. Then seeds 1-2 on learner_w2_kv.py, one at
   a time (queued). My prediction "passes 5 by half" (p 0.8) HIT.
 
+- **CAM RULINGS (Nov 15 ~11:05) + M (10:59):**
+  - The generic-food records are honest noise; no change.
+  - **Question B settled by M (stage 1 only):** records close on the CALLED item; from stage 2, at any meal.
+  - **Sequential 2-of-3:** stop once the outcome is decided.
+- **ANSWER TO QUESTION A + CORRECTION ON THE RECORD (Nov 15 ~11:15): the W2 learner's head label was PRIVILEGED.**
+  - In `learner_w2.py` the head is trained at EVERY hearing against the named item's TRUE sector (`ce * bt["hear"]`),
+    including bouts that ended at T_max or in death, where the agent never found the item. The world told it where
+    the item was.
+  - The toy did not: `toy_grid.py` labels only episodes that END IN A MEAL within the chunk (own-experience hindsight,
+    `hmsk`). My W2 port deviated from the toy and from the approved drive, and I did not catch it.
+  - **Consequence, by Cam's rule: SEED 0 IS A PILOT** (it finishes and is reported, NOT counted).
+  - A1 also ran with unmasked labels. Its scripted follower ate every item (reach 1.0), so the masked and unmasked
+    labels nearly coincide there. Not rerun; disclosed.
+  - **Fix:** `--head-own-meal` (comm-toy 8e9f88e, learner_w2_kv.py). A hearing is labelled only if its bout's next end
+    within the replayed sequence is the agent eating the item. T_max, death or no end within the chunk leave it
+    unlabelled. Unit-tested on constructed sequences (eat -> labelled; T_max, death, unclosed -> not; no leak
+    across a T_max end).
+- **REGISTERED (before seed 1 starts): THE W2 LEARNER = SEEDS 1, 2, 3, own-meal head labels.**
+  - Command: `learner_w2_kv.py --learner ep --slots 96 --shared-tok --hindsight 0.5 --head-own-meal --demonstrator
+    --hunger-gate --item-size 0.1 --W 32 --steps 5e7 --early-stop-frontier 5 --seed S`; laptop, one at a time.
+  - **Sequential 2-of-3:** two passes -> PASS; two fails -> FAIL; a split -> the third seed decides.
+  - The bar (as registered Nov 15 ~05:50): second-half reach at d = 12 >= 0.9x oracle #2's (same evaluator),
+    >= shuffled + 0.30, >= 2x shuffled; mean life >= 1.3x the deaf twin's, LB > 1.0x; early stop at
+    frontier <= 5 by half the steps.
+  - Predictions:
+    - removing the privileged label slows the read a little (ablation (c) says the head is optional): per-seed
+      pass p 0.4;
+    - **learner PASS p 0.35**; early stop of at least one seed p 0.3.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
