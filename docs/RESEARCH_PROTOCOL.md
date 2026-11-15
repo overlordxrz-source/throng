@@ -8094,6 +8094,31 @@ more expensive, because it produces publishable-looking nulls.
 - **LAUNCH (13:03): TWIN REDO** (laptop): port_w2 without `--oracle`, frontier replayed from the oracle redo's log,
   3e7 steps; evaluations at d = 12 and d 1-22 follow.
 
+- **CAM RULINGS (Nov 15 ~13:30) + M ("now, keep going overnight", 13:39):**
+  - Bar reference 0.863, so the learner needs 2nd-half hungry-bout reach >= 0.777, >= shuffled + 0.30, >= 2x
+    shuffled; life >= 1.3x the new twin's (LB > 1.0x).
+  - **1e8 steps per seed;** early stop if frontier <= 6 at 5e7 (stop, FAIL, report before the next seed);
+    sequential 2-of-3.
+  - **Waiting parent + step-back:** the parent steps back toward the young when > 2 cells away, else leads on (never
+    more than 2 ahead).
+  - The learner launches only after the twin redo's evaluation. Seeds 2-3 are released back to back as 2-of-3
+    needs, without waiting for M.
+- **CHECKS (Nov 15 ~13:45; comm-toy a06e024):**
+  - **Parent distance**, untrained young, d = 12: > 2 cells in **0.0000** of 146,695 demonstration steps (<= 5%:
+    PASS; it was 17.5% without the step-back).
+  - **A2: 100%** of demonstrated bouts (mixed 2380, d = 12 2436, d 1-22 2335): PASS.
+  - **A5 re-audit of the diff:** the step-back changes only the scripted parent's motion (a scaffold). No new inputs
+    or targets. No flags.
+- **REGISTERED + PREDICTIONS (before seed 1): THE W2 LEARNER, final recipe.**
+  - Command: `learner_w2_kv.py --learner ep --slots 96 --shared-tok --hindsight 0.5 --head-own-meal --demonstrator
+    --parent-waits --gate honest --hunger-gate --item-size 0.1 --W 32 --steps 1e8 --early-stop-frontier 6 --seed S`;
+    seeds 1, 2, 3 (fresh); laptop; queue `learner3/queue.sh`; bar by `docs/data/learner_w2/bar2.py`.
+  - Predictions:
+    - per seed: early stop p 0.3; frontier reaches 12 p 0.4; **bar PASS p 0.25**;
+    - **learner PASS (2-of-3) p 0.15.**
+    - The likely failure: the reach criterion (0.777), since the oracle redo itself is 0.86 and the pilot's read
+      took ~800k hearings.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
