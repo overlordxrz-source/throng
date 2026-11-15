@@ -129,6 +129,8 @@ def main():
     ap.add_argument("--eval-modes", default="0,3,4", help="0 true, 1 always-wrong sector, 2 silence, 3 within-life shuffled code (T3), 4 memory wiped each episode")
     ap.add_argument("--life-credit", action="store_true", help="T3 DIAGNOSTIC (Will): RL^2-style credit - GAE terminal only at life end (episode ends are not terminal), so success in later episodes credits what the memory stored earlier")
     ap.add_argument("--hindsight", type=float, default=0.0, help="Cam T3 round 2: weight of the hindsight next-meal head loss (0 = no head)")
+    ap.add_argument("--hind-at-start", action="store_true", help="train the hindsight head ONLY at each episode's first step (on hearing, before moving): mid-episode self-motion gives the sector away")
+    ap.add_argument("--head-control", action="store_true", help="POSITIVE CONTROL for the head: the scripted ray-walker (true sector) acts; only the hindsight head is trained (supervised)")
     ap.add_argument("--demonstrator", action="store_true", help="Cam T3 round 2 arm B: a visible scripted parent walks to the food on the FIRST hearing of each token in a life")
     ap.add_argument("--ckpt", default="", help="checkpoint path: resume if present; save every --ckpt-every updates")
     ap.add_argument("--ckpt-every", type=int, default=20); ap.add_argument("--max-seconds", type=float, default=0, help="stop (exit 3) after this long; rerun to resume")
@@ -259,6 +261,8 @@ def main():
                 act = scripted_act(st["pos"], st["fpos"], osec, base); lp = jnp.zeros(B); v = jnp.zeros(B); h2 = h
             else:
                 h2, lg, v, hl_ = policy(pp_, h, x); act = jax.random.categorical(k1, lg)
+                if a.head_control:                                   # behaviour from the scripted true-sector walker (finds food)
+                    act = scripted_act(st["pos"], st["fpos"], osec, base)
                 lp = jnp.take_along_axis(jax.nn.log_softmax(lg), act[:, None], 1)[:, 0]
                 hl = hl_ if hl_ is not None else hl
             st2, r, done, ate = env_step(st, act)
@@ -321,7 +325,8 @@ def main():
             L_ = L_ + a.kl * (jnp.exp(ls) * (ls - lsn)).sum(-1).mean()
         if a.hindsight > 0:                                         # target = the sector where this episode's meal was found
             ce = -jnp.take_along_axis(jax.nn.log_softmax(hl), bt["htgt"][:, None], 1)[:, 0]
-            L_ = L_ + a.hindsight * (ce * bt["hmsk"]).sum() / (bt["hmsk"].sum() + 1e-8)
+            Lh = a.hindsight * (ce * bt["hmsk"]).sum() / (bt["hmsk"].sum() + 1e-8)
+            L_ = Lh if a.head_control else L_ + Lh
         return L_
 
     @jax.jit
@@ -441,7 +446,12 @@ def main():
                 for t_ in range(T - 1, -1, -1):
                     cur = np.where(dn[t_] > 0, np.where(ate[t_], secs[t_], -1), cur)
                     tg[t_] = np.maximum(cur, 0); mk[t_] = cur >= 0
+                if a.hind_at_start:
+                    mk = mk * np.asarray(R_[13]).astype(np.float32)
                 bt["htgt"], bt["hmsk"] = sw(tg), sw(mk)
+                if os.environ.get("HEAD_DEBUG") and it % 5 == 0:     # training-batch head accuracy on labelled steps (and at episode starts)
+                    hlb = np.asarray(R_[11]); okb = (hlb.argmax(-1) == tg) & (mk > 0); t0b = np.asarray(R_[13]) & (mk > 0)
+                    print(f"HEAD it {it}: labelled {int(mk.sum())} acc {okb.sum() / max(mk.sum(), 1):.3f} | at t=0 {int(t0b.sum())} acc {(okb & t0b).sum() / max(t0b.sum(), 1):.3f} | filled-slot mean {float((np.abs(hin[..., :-1]).reshape(T, B, 64, 11).sum(-1) > 0).mean()):.3f}", flush=True)
             for _e in range(a.epochs):                               # minibatches over whole sequences (envs)
                 perm = rng.permutation(B)
                 for mb in np.array_split(perm, a.minibatches):
