@@ -8139,6 +8139,34 @@ more expensive, because it produces publishable-looking nulls.
     - The readout tool is `w2/learner_w2_diag2.py`, a copy of the final learner with the pilot splits plus
       hungry-bout variants.
 
+- **RESULT (Nov 15 14:55): W2 LEARNER SEED 1: EARLY-STOPPED, so FAIL. The queue HALTED; seed 2 is not started
+  (report first).** `docs/data/learner_w2/final_seed1/`.
+  - Training: 5.0e7 steps in 71 min (~11.7k steps/s, kv replay). Honest gate: frontier 1 -> 2 at 10.8M, 3 at
+    31.6M; still 3 at 5e7 (<= 6), so stopped.
+  - **The read never formed.** Head accuracy on 2nd+ hearings stays at chance (1/8) from 24M to 50M steps:
+
+    | steps | hearings | head 2nd+ (d = 3) | hungry reach (d = 3) | head 2nd+ (d = 12) | hungry reach (d = 12) |
+    |---|---|---|---|---|---|
+    | 24.4M | 443k | 0.123 | 0.054 | 0.105 | 0.025 |
+    | 30.8M | 524k | 0.122 | 0.091 | 0.144 | 0.093 |
+    | 40.3M | 650k | 0.128 | 0.113 | 0.118 | 0.104 |
+    | 50.0M | 767k | 0.130 | 0.212 | 0.130 | 0.294 |
+
+    (The pilot with privileged labels: 0.27 at 389k hearings, 0.57 at 504k.)
+  - **Final weights, d = 3: true = shuffled = wiped** (hungry reach 0.212 / 0.216 / 0.215; later hearings
+    0.10 / 0.10 / 0.10). There is no code use.
+  - **First hearings:** the parent stays in view in 100% of demonstrated bouts (the step-back works). The young
+    still follows only partly: first-hearing reach 0.85 (d 2), 0.64 (d 3), 0.53 (d 4), 0.33 (d 12).
+  - **Later hearings:** at d = 2 the head is right 0.60 and reach is then 0.91. That is the VIEW: diagonal d = 2
+    items are adjacent at the hearing. At d >= 3 the head is at chance.
+  - **Likely mechanism (a hypothesis, not tested):**
+    - Under the honest gate the learner sits at frontier 1-3 for the whole run. There, most bouts have the item in
+      view, so own-meal labels mostly come from in-view eats that the head can solve from the view.
+    - The memory read gets almost no training pressure.
+    - The pilot's inflated gate pushed it to d 6-8 early (and it had privileged labels), where only memory
+      predicts the sector.
+  - My predictions: early stop p 0.3 (it happened); learner PASS p 0.15 (pending).
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
