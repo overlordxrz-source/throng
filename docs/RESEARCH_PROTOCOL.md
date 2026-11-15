@@ -7064,6 +7064,31 @@ more expensive, because it produces publishable-looking nulls.
     scale-up I had started for "L2e arm A" (same flawed head; stopped before results).
   - **Re-running arms A and B with the start-only head** (seed 0; L2e and the GRU).
 
+- **RESULT (Nov 15 ~01:15): T3 round 2, corrected (head trained at episode start), seed 0:**
+
+| run | max d | eval d | true 1st->2nd | shuffled 2nd | wiped 2nd | head acc 1st / 2nd+ hearing | bar |
+|---|---|---|---|---|---|---|---|
+| L2_A_s0 | 4 | 4 | 37->38 | 39 | 36 | 12 / 12 |  |
+| L2_A_s0 | 4 | 12 | 0->0 | 0 | 0 | 12 / 12 | - |
+| L2_B_s0 | 4 | 4 | 34->13 | 14 | 15 | 13 / 11 |  |
+| L2_B_s0 | 4 | 12 | 20->1 | 1 | 1 | 13 / 13 | - |
+| L2e_A_s0 | 5 | 5 | 3->5 | 2 | 0 | 12 / 12 |  |
+| L2e_A_s0 | 5 | 12 | 2->5 | 2 | 0 | 12 / 13 | - |
+| L2e_B_s0 | 7 | 7 | 16->18 | 8 | 3 | 5 / 19 |  |
+| L2e_B_s0 | 7 | 12 | 17->25 | 8 | 2 | 7 / 31 | - |
+
+  - **L2e arm B (head + first-hearing demonstrator) shows the IN-CONTEXT SIGNATURE, in both the head and the policy:**
+    - head accuracy 7% on the 1st hearing -> **31%** on the 2nd+ (chance 12.5%);
+    - d = 12 reach 17% -> 25% from the first to the second half of life, vs within-life shuffled 8% and wiped 2%;
+    - its curriculum got furthest of any memory (d = 7).
+  - No arm passes the bar (2nd half >= 90%).
+  - L2e arm A and both GRU arms show no signature (head 12-13% on both hearings).
+  - Reading against Cam's branches: only L2e WITH the demonstrator gets find-then-recall going, partially.
+    - This is closest to "the head shows the signature, the policy only partly acts: wiring or more steps", and
+      points toward the demonstrator being needed.
+    - **Running (mine, flagged): a 10M-step scale-up of L2e arm B** (laptop, chunked): free, and it tests the
+      "more steps" reading.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under

@@ -1,0 +1,94 @@
+{
+ "cfg": {
+  "d": 12,
+  "hidden": true,
+  "lam": 0.95,
+  "gamma": 0.99,
+  "tier": "T3",
+  "learner": "L2",
+  "kl": 0.3,
+  "steps": 1000000.0,
+  "B": 256,
+  "T": 32,
+  "seed": 0,
+  "episodes_per_life": 64,
+  "epochs": 4,
+  "minibatches": 8,
+  "lr": 0.0003,
+  "evo_pop": 32,
+  "evo_elite": 8,
+  "evo_eps": 64,
+  "evo_sigma": 0.3,
+  "evo_sigma_body": 0.02,
+  "curriculum": true,
+  "curriculum_mix": true,
+  "d_max": 24,
+  "test_d": 4,
+  "save_params": "",
+  "skip_final_eval": false,
+  "eval_params": "/private/tmp/claude-501/-Users-overlord-CascadeProjects-throng/aad77c1d-d7ac-437e-bef4-aa525802ccc0/scratchpad/r3/runs2/L2_B_s0.params",
+  "eval_modes": "0,3,4",
+  "life_credit": false,
+  "hindsight": 0.5,
+  "hind_at_start": true,
+  "head_control": false,
+  "demonstrator": true,
+  "ckpt": "",
+  "ckpt_every": 20,
+  "max_seconds": 0,
+  "move_cost": 0.003,
+  "eval_episodes": 9000,
+  "curve_every": 10,
+  "navs": "w2_out/nav_w13/*.msgpack",
+  "out": "/private/tmp/claude-501/-Users-overlord-CascadeProjects-throng/aad77c1d-d7ac-437e-bef4-aa525802ccc0/scratchpad/r3/runs2/L2_B_s0_eval_d4.json"
+ },
+ "cap": 48,
+ "curve": [],
+ "eval_modes": {
+  "0": {
+   "overall": 0.30800842992623817,
+   "first_half": 0.33544921875,
+   "second_half": 0.13482280431432975,
+   "head_acc_by_hearing": {
+    "first": [
+     0.127826941986234,
+     2034
+    ],
+    "later": [
+     0.11274573623226142,
+     7681
+    ]
+   }
+  },
+  "3": {
+   "overall": 0.3102178259497001,
+   "first_half": 0.337890625,
+   "second_half": 0.13729977116704806,
+   "head_acc_by_hearing": {
+    "first": [
+     0.13569321533923304,
+     2034
+    ],
+    "later": [
+     0.123490455784963,
+     7701
+    ]
+   }
+  },
+  "4": {
+   "overall": 0.30979978925184404,
+   "first_half": 0.3355712890625,
+   "second_half": 0.14714946070878274,
+   "head_acc_by_hearing": {
+    "first": [
+     0.12653865091088135,
+     2031
+    ],
+    "later": [
+     0.11313394018205461,
+     7690
+    ]
+   }
+  }
+ }
+}
