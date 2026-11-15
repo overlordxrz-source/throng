@@ -8039,7 +8039,7 @@ more expensive, because it produces publishable-looking nulls.
       shuffled); life >= 1.3x the new twin's, LB > 1.0x.
     - Early stop: frontier not past D/2 by 2.5e7. Seeds 1-3 sequential 2-of-3.
 
-- **IMPLEMENTED + PREDICTIONS (Nov 15 ~12:35, before running):**
+- **IMPLEMENTED + PREDICTIONS (Nov 15 ~12:18, before running):**
   - `w2/gate.py` HonestGate, in port_w2 `--gate honest`. Hungry bout = energy never reached H from the hearing until
     the bout closed (pre-step energy, so the item's own energy does not count).
   - Within an iteration the outcomes are laid out evenly, so window boundaries are unbiased.
@@ -8052,14 +8052,29 @@ more expensive, because it produces publishable-looking nulls.
     - ORACLE REDO: mastered frontier **D >= 6 p 0.5; D = 12 (cap) p 0.15; D < 6 (stop) p 0.5**;
     - steps to reach D <= 1.5e7: p 0.6.
 
-- **RESULT (Nov 15 ~12:45): HONEST-GATE CONTROLS: BOTH PASS** (port_w2 `--gate honest`, gated, size 0.1, W 32,
+- **RESULT (Nov 15 ~12:22): HONEST-GATE CONTROLS: BOTH PASS** (port_w2 `--gate honest`, gated, size 0.1, W 32,
   1.5e7 steps; `docs/data/port_w2/honest_gate/`).
   - POSITIVE (scripted follower): 23 advances, **frontier 24 (cap)**; all 47 windows 1.000.
   - NEGATIVE (follower giving up on 30% of bouts): **0 advances, frontier stays 1**; 49 windows, mean 0.703, max
     0.723.
   - Predictions HIT (p 0.9 / 0.95).
-- **LAUNCH (Nov 15 ~12:46): ORACLE REDO** on the laptop: `port_w2.py --oracle --hunger-gate --item-size 0.1 --W 32
+- **LAUNCH (Nov 15 ~12:23): ORACLE REDO** on the laptop: `port_w2.py --oracle --hunger-gate --item-size 0.1 --W 32
   --steps 3e7 --gate honest` (comm-toy, seed 0), chunked with exact resume.
+
+- **LEARNER PREP (Nov 15 ~12:35; free; comm-toy cf69d5a, learner_w2_kv.py).**
+  - Added `--gate honest` (the same HonestGate as port_w2), `--parent-waits`, and hungry-bout reach (all and 2nd
+    half) in training and evaluation.
+  - **A2 with the waiting parent: PASS.** Copy-the-parent reaches 100% of demonstrated bouts (mixed 2380, d = 12
+    2436, d 1-22 2335).
+  - **Waiting-parent check (untrained young, d = 12):** the parent is > 2 cells from its young in **91.4%** of
+    demonstration steps without the rule, **17.5% with it**.
+    - The rule stops the parent from walking AHEAD. When the young itself wanders away, the parent does not come
+      back, so a young that never follows can still lose it.
+    - For Cam: keep the literal rule, or add "the parent steps back toward its young when it is > 2 cells away"?
+  - **A5 re-audit of the diff:** no new inputs or targets.
+    - The waiting rule changes only the scripted parent's motion (a scaffold).
+    - The gate's hungry flag (own energy vs H) is used only by the world-side curriculum and the evaluator.
+    - **No flags.**
 
 ## Part 3 — Fossils
 
