@@ -97,3 +97,38 @@ def build_v2best(nav, evo_pop0, Dx=126):
     for k in ("Dense_0", "Dense_1", "Dense_2", "Dense_3"):
         pp[k] = dict(nav["params"][k])
     pp.update(jax.tree_util.tree_map(jnp.asarray, evo_pop0)); return rnet, {"params": pp}
+
+
+# ---- W2 learner additions (Cam Nov 15 ~05:50): the parent demonstrator and the episodic-memory write ----
+def step_toward(pos, target, L):
+    """One 4-neighbour step from pos toward target (larger axis first); stays when on it. Returns (new pos, action)."""
+    d = torus(target - pos, L); ax = jnp.abs(d[:, 0]) >= jnp.abs(d[:, 1]); on = jnp.all(d == 0, -1)
+    act = jnp.where(on, 0, jnp.where(ax, jnp.where(d[:, 0] < 0, 1, 2), jnp.where(d[:, 1] > 0, 3, 4)))
+    return (pos + MOVES[act]) % L, act
+
+
+def mark_demo(o, s, dem_pos, dem_on, L):
+    """The demonstrator is another agent in view: +1 in the agent window (o[:, 49:98]) when within the 7x7 view."""
+    off = torus(dem_pos - s.pos, L); inw = (jnp.abs(off).max(-1) <= R) & dem_on
+    idx = (off[:, 0] + R) * (2 * R + 1) + (off[:, 1] + R)
+    return o.at[:, 49:98].add(jax.nn.one_hot(idx, 49) * inw[:, None])
+
+
+def copy_parent(s, item, dem_pos, dem_on, L, fallback):
+    """A2 scripted 'copy the parent': during a demonstrated bout, eat on the item, step to it when adjacent, else step
+    toward the demonstrator; otherwise `fallback`."""
+    on_item = jnp.all(s.pos == item["pos"], -1); adj = torus(item["pos"] - s.pos, L); seen = jnp.abs(adj).max(-1) <= 1
+    _, to_item = step_toward(s.pos, item["pos"], L); _, to_dem = step_toward(s.pos, dem_pos, L)
+    act = jnp.where(on_item, EAT, jnp.where(seen, to_item, to_dem))
+    return jnp.where(item["act"] & dem_on, act, fallback)
+
+
+def mem_write(h, off0, S_, R_, write, tok, disp, ate):
+    """Write one raw record per agent where `write`: [token one-hot (8), displacement / 24 (2), ate (1)] into a ring
+    of S_ slots at h[:, off0: off0 + S_ * R_]; the pointer is h[:, off0 + S_ * R_]."""
+    n = h.shape[0]; ar = jnp.arange(n)
+    mem = h[:, off0: off0 + S_ * R_].reshape(n, S_, R_); ptr = h[:, off0 + S_ * R_].astype(jnp.int32) % S_
+    rec = jnp.concatenate([jax.nn.one_hot(tok, 8), disp / 24.0, ate[:, None].astype(jnp.float32)], 1)
+    mem = mem.at[ar, ptr].set(jnp.where(write[:, None], rec, mem[ar, ptr]))
+    ptr2 = jnp.where(write, ptr + 1, ptr).astype(jnp.float32)
+    return h.at[:, off0: off0 + S_ * R_].set(mem.reshape(n, -1)).at[:, off0 + S_ * R_].set(ptr2)
