@@ -7578,6 +7578,23 @@ more expensive, because it produces publishable-looking nulls.
   - **Not yet done:** A1 (memory positive control), A2 (copy-the-parent >= 90%), A4 (price probe); the deaf-twin
     readout (Modal job twin_w2, launched 05:49); screen 2 (seeds 8-12, running on the laptop).
 
+- **RESULT (Nov 15 ~06:58): DEAF TWIN: PASS. Listening pays against a trained forager in this world.**
+  `docs/data/port_w2/twin/`.
+  - Training: 30.0M steps, the frontier replayed to 22, training reach 5-11%, ~$0.31 (watch; stopped).
+  - **Registered bar** (necessity_w2, necessity keys): oracle #2 mean life 3000 vs the twin's 706 = **4.25x**,
+    bootstrap 95% CI [4.11, 4.40]. **PASS** (bar 1.5x, LB 1.2x).
+    - Paid per life 12.2x [10.8, 13.7]; paid per step 2.87x.
+    - learner_w2's evaluator (training-consistent reward input) agrees: 3000 vs 712 = 4.21x.
+  - **Reach by distance** (eval d 1-22):
+    - oracle #2: 0.96 (d 1), 0.98 (d 2), then 0.57-0.71 at every d from 3 to 22;
+    - **the twin: 0.99 (d 1), 0.48 (d 2), then 0.00 at every d from 3 to 22.**
+  - The twin survives like the navigator (706 vs 686). Without the signal, a trained forager cannot find a named item
+    it cannot see.
+  - Predictions: twin life 1200-2000 MISSED (706); PASS p 0.55 HIT.
+- **SCREEN 2 partial:** seeds 8-11 all TAKE OFF and PASS (d = 12 second half 0.996-0.999; shuffled 0.018-0.035;
+  wiped 0.007-0.083; head later 0.97-0.99). Seed 12 running. Screen 2 has >= 4 passes vs screen 1's 3, so by
+  Cam's rule **the learner recipe is screen 2** (shared token embedding).
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under

@@ -1,0 +1,377 @@
+{
+ "cfg": {
+  "navs": "w2_out/nav_w13/*.msgpack",
+  "world": "0.0013,8,0.001",
+  "v2": "/Users/overlord/throng-backup/evo2/evo2.ckpt",
+  "W": 32,
+  "N": 4,
+  "steps": 3000,
+  "d_max": 12,
+  "d_fixed": 0,
+  "seed": 0,
+  "policy_params": "/Users/overlord/throng-backup/oracle2_w2/oracle2_w2.params",
+  "policy_oracle": true,
+  "twin_params": "/Users/overlord/throng-backup/twin_w2/twin_w2.params",
+  "twin_bar": 1.5,
+  "twin_lb": 1.2,
+  "item_size": 0.1,
+  "hunger_gate": true,
+  "follower_fallback": "",
+  "currency": "paid",
+  "bar": 1.5,
+  "out": "/private/tmp/claude-501/-Users-overlord-CascadeProjects-throng/aad77c1d-d7ac-437e-bef4-aa525802ccc0/scratchpad/port/twineval/registered.json"
+ },
+ "H": 0.7000000000000001,
+ "follower_fallback": "v2best",
+ "currency": "paid_per_life",
+ "results": {
+  "navigator": {
+   "food_per_step": 0.0018774370489021142,
+   "paid_per_life": 0.22174757846764157,
+   "paid_per_step": 0.00032338188526531063,
+   "lives": 560,
+   "deaths": 448,
+   "mean_life_steps": 685.7142857142857,
+   "items_eaten": 79,
+   "bouts_opened": 9441,
+   "item_reach_rate": 0.008725425226419262,
+   "item_meals_fully_paid": 1.0,
+   "frac_steps_in_bout": 0.62209375,
+   "agent_steps": 384000,
+   "reach_by_d": {
+    "1": [
+     0.044,
+     818
+    ],
+    "2": [
+     0.0362,
+     802
+    ],
+    "3": [
+     0.0108,
+     741
+    ],
+    "4": [
+     0.0025,
+     796
+    ],
+    "5": [
+     0.0027,
+     744
+    ],
+    "6": [
+     0.0012,
+     814
+    ],
+    "7": [
+     0.0,
+     760
+    ],
+    "8": [
+     0.0,
+     709
+    ],
+    "9": [
+     0.0014,
+     732
+    ],
+    "10": [
+     0.0,
+     657
+    ],
+    "11": [
+     0.0,
+     744
+    ],
+    "12": [
+     0.0,
+     737
+    ]
+   }
+  },
+  "v2best": {
+   "food_per_step": 0.007069371491670608,
+   "paid_per_life": 0.13204953612886172,
+   "paid_per_step": 0.00029883085129161677,
+   "lives": 869,
+   "deaths": 747,
+   "mean_life_steps": 441.8872266973533,
+   "items_eaten": 24,
+   "bouts_opened": 5459,
+   "item_reach_rate": 0.004988567865308668,
+   "item_meals_fully_paid": 0.9166666666666666,
+   "frac_steps_in_bout": 0.34172135416666666,
+   "agent_steps": 384000,
+   "reach_by_d": {
+    "1": [
+     0.0194,
+     464
+    ],
+    "2": [
+     0.0201,
+     497
+    ],
+    "3": [
+     0.0023,
+     437
+    ],
+    "4": [
+     0.0,
+     398
+    ],
+    "5": [
+     0.0,
+     445
+    ],
+    "6": [
+     0.0026,
+     378
+    ],
+    "7": [
+     0.005,
+     400
+    ],
+    "8": [
+     0.0,
+     352
+    ],
+    "9": [
+     0.0026,
+     378
+    ],
+    "10": [
+     0.0,
+     369
+    ],
+    "11": [
+     0.0,
+     332
+    ],
+    "12": [
+     0.0,
+     361
+    ]
+   }
+  },
+  "follower": {
+   "food_per_step": 0.0100790606935819,
+   "paid_per_life": 2.377736557275057,
+   "paid_per_step": 0.000792578852425019,
+   "lives": 128,
+   "deaths": 128,
+   "mean_life_steps": 3000.0,
+   "items_eaten": 2773,
+   "bouts_opened": 2780,
+   "item_reach_rate": 1.0,
+   "item_meals_fully_paid": 0.9787234042553191,
+   "frac_steps_in_bout": 0.0635,
+   "agent_steps": 384000,
+   "reach_by_d": {
+    "1": [
+     1.0,
+     231
+    ],
+    "2": [
+     1.0,
+     229
+    ],
+    "3": [
+     1.0,
+     237
+    ],
+    "4": [
+     1.0,
+     269
+    ],
+    "5": [
+     1.0,
+     235
+    ],
+    "6": [
+     1.0,
+     246
+    ],
+    "7": [
+     1.0,
+     241
+    ],
+    "8": [
+     1.0,
+     246
+    ],
+    "9": [
+     1.0,
+     212
+    ],
+    "10": [
+     1.0,
+     206
+    ],
+    "11": [
+     1.0,
+     198
+    ],
+    "12": [
+     1.0,
+     223
+    ]
+   }
+  },
+  "trained": {
+   "food_per_step": 0.0026421174307664236,
+   "paid_per_life": 6.3813271671533585,
+   "paid_per_step": 0.002127109055717786,
+   "lives": 128,
+   "deaths": 128,
+   "mean_life_steps": 3000.0,
+   "items_eaten": 3268,
+   "bouts_opened": 4600,
+   "item_reach_rate": 0.7138488422892093,
+   "item_meals_fully_paid": 0.9990820073439413,
+   "frac_steps_in_bout": 0.18402604166666667,
+   "agent_steps": 384000,
+   "reach_by_d": {
+    "1": [
+     0.9659,
+     381
+    ],
+    "2": [
+     0.9542,
+     371
+    ],
+    "3": [
+     0.6873,
+     387
+    ],
+    "4": [
+     0.6903,
+     381
+    ],
+    "5": [
+     0.6917,
+     399
+    ],
+    "6": [
+     0.6923,
+     403
+    ],
+    "7": [
+     0.672,
+     372
+    ],
+    "8": [
+     0.6444,
+     405
+    ],
+    "9": [
+     0.6641,
+     390
+    ],
+    "10": [
+     0.5994,
+     342
+    ],
+    "11": [
+     0.6676,
+     376
+    ],
+    "12": [
+     0.6361,
+     371
+    ]
+   }
+  },
+  "twin": {
+   "food_per_step": 0.0008257133786876996,
+   "paid_per_life": 0.5234246280263452,
+   "paid_per_step": 0.0007415182230373224,
+   "lives": 544,
+   "deaths": 419,
+   "mean_life_steps": 705.8823529411765,
+   "items_eaten": 1640,
+   "bouts_opened": 13458,
+   "item_reach_rate": 0.12559350589676826,
+   "item_meals_fully_paid": 0.998780487804878,
+   "frac_steps_in_bout": 0.8939427083333333,
+   "agent_steps": 384000,
+   "reach_by_d": {
+    "1": [
+     0.9937,
+     1106
+    ],
+    "2": [
+     0.5014,
+     1077
+    ],
+    "3": [
+     0.0009,
+     1094
+    ],
+    "4": [
+     0.0,
+     1112
+    ],
+    "5": [
+     0.0,
+     1089
+    ],
+    "6": [
+     0.0,
+     1082
+    ],
+    "7": [
+     0.0,
+     1093
+    ],
+    "8": [
+     0.0,
+     1112
+    ],
+    "9": [
+     0.0,
+     1032
+    ],
+    "10": [
+     0.0,
+     1089
+    ],
+    "11": [
+     0.0,
+     1110
+    ],
+    "12": [
+     0.0,
+     1062
+    ]
+   }
+  }
+ },
+ "premium": 10.72271712595963,
+ "best_code_free": "navigator",
+ "premium_food": 1.425736461219702,
+ "premium_paid": 10.72271712595963,
+ "pass": true,
+ "oracle_arm": {
+  "currency": "paid_per_life",
+  "ratio": 28.777437892448287,
+  "boot_ci95": [
+   24.28016932364104,
+   34.35939043276175
+  ],
+  "pass_": true
+ },
+ "deaf_twin": {
+  "lifespan_ratio": 4.25,
+  "lifespan_boot_ci95": [
+   4.109375,
+   4.3984375
+  ],
+  "paid_per_life_ratio": 12.191492003758317,
+  "paid_per_life_boot_ci95": [
+   10.847710339485712,
+   13.719266218696086
+  ],
+  "paid_per_step_ratio": 2.868586353825486,
+  "pass_": true
+ }
+}
