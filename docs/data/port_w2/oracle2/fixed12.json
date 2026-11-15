@@ -1,0 +1,96 @@
+{
+ "cfg": {
+  "navs": "w2_out/nav_w13/*.msgpack",
+  "world": "0.0013,8,0.001",
+  "v2": "/Users/overlord/throng-backup/evo2/evo2.ckpt",
+  "W": 32,
+  "N": 4,
+  "steps": 3000,
+  "d_max": 12,
+  "d_fixed": 12,
+  "seed": 0,
+  "policy_params": "/Users/overlord/throng-backup/oracle2_w2/oracle2_w2.params",
+  "policy_oracle": true,
+  "item_size": 0.1,
+  "hunger_gate": true,
+  "follower_fallback": "",
+  "currency": "paid",
+  "bar": 1.5,
+  "out": "/private/tmp/claude-501/-Users-overlord-CascadeProjects-throng/aad77c1d-d7ac-437e-bef4-aa525802ccc0/scratchpad/port/o2eval/fixed12.json"
+ },
+ "H": 0.7000000000000001,
+ "follower_fallback": "v2best",
+ "currency": "paid_per_life",
+ "results": {
+  "navigator": {
+   "food_per_step": 0.0018241512145226201,
+   "paid_per_life": 0.20382817385504054,
+   "paid_per_step": 0.00030468065571039916,
+   "lives": 574,
+   "deaths": 460,
+   "mean_life_steps": 668.9895470383275,
+   "items_eaten": 4,
+   "bouts_opened": 5233,
+   "item_reach_rate": 0.0008266170696424882,
+   "item_meals_fully_paid": 1.0,
+   "frac_steps_in_bout": 0.628078125,
+   "agent_steps": 384000
+  },
+  "v2best": {
+   "food_per_step": 0.0072044379810492195,
+   "paid_per_life": 0.13229921272738795,
+   "paid_per_step": 0.00027941318104664486,
+   "lives": 811,
+   "deaths": 686,
+   "mean_life_steps": 473.4895191122072,
+   "items_eaten": 1,
+   "bouts_opened": 2738,
+   "item_reach_rate": 0.00046382189239332097,
+   "item_meals_fully_paid": 1.0,
+   "frac_steps_in_bout": 0.3233723958333333,
+   "agent_steps": 384000
+  },
+  "follower": {
+   "food_per_step": 0.009864009976387023,
+   "paid_per_life": 3.2873185127973557,
+   "paid_per_step": 0.0010957728375991186,
+   "lives": 128,
+   "deaths": 128,
+   "mean_life_steps": 3000.0,
+   "items_eaten": 3928,
+   "bouts_opened": 3948,
+   "item_reach_rate": 1.0,
+   "item_meals_fully_paid": 0.9684317718940937,
+   "frac_steps_in_bout": 0.15586197916666666,
+   "agent_steps": 384000
+  },
+  "trained": {
+   "food_per_step": 0.00294594939549764,
+   "paid_per_life": 6.33733642358574,
+   "paid_per_step": 0.00229398375749588,
+   "lives": 139,
+   "deaths": 128,
+   "mean_life_steps": 2762.589928057554,
+   "items_eaten": 2284,
+   "bouts_opened": 3649,
+   "item_reach_rate": 0.630416781672647,
+   "item_meals_fully_paid": 0.9978108581436077,
+   "frac_steps_in_bout": 0.2688229166666667,
+   "agent_steps": 384000
+  }
+ },
+ "premium": 16.127890716105057,
+ "best_code_free": "navigator",
+ "premium_food": 1.3691574557701276,
+ "premium_paid": 16.127890716105057,
+ "pass": true,
+ "oracle_arm": {
+  "currency": "paid_per_life",
+  "ratio": 31.091562582966358,
+  "boot_ci95": [
+   25.668490807444726,
+   37.938334097880286
+  ],
+  "pass_": true
+ }
+}

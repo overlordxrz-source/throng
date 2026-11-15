@@ -7422,6 +7422,38 @@ more expensive, because it produces publishable-looking nulls.
     - (b) FAIL (p 0.75): the GRU memories failed before;
     - the mitigation scores 5/5 (p 0.25), 4/5 (p 0.35), <= 3/5 (p 0.4).
 
+- **RESULT (Nov 15 ~05:35): ORACLE #2: the REGISTERED BAR PASSES, but the bar is NOT DIAGNOSTIC. PPO does act on
+  the signal, shown by the frontier and the deafened control.** `docs/data/port_w2/oracle2/`.
+  - Training: 30.0M steps in 46 min. The frontier rose 1 -> 3 (2.5M) -> 11 (4.9M) -> 17 (7.4M) -> 22 (14.7M) and
+    plateaued at 22 (cap 24). Late training reach was 0.57-0.84 per logged window. Spend ~$0.24 (watch estimate).
+  - Evaluation (gated, size 0.1, 32 worlds x 3000 steps, the necessity keys):
+
+    | policy | paid / life | paid / step | mean life (steps) | item reach |
+    |---|---|---|---|---|
+    | navigator (best code-free) | 0.222 | 0.00032 | 686 | 0.009 |
+    | scripted follower | 2.378 | 0.00079 | 3000 | 1.00 |
+    | **oracle #2, mixed d 1-12** | **6.381** | 0.00213 | 3000 | 0.71 |
+    | oracle #2, fixed d = 12 | 6.337 | 0.00229 | 2763 | 0.63 |
+    | **CONTROL: the same weights, oracle input zeroed** | 1.931 | 0.00191 | 1013 | 0.17 |
+
+  - **Registered bar:** 28.8x the navigator, bootstrap 95% CI [24.3, 34.4]. **PASS.** Fixed d = 12: 31.1x.
+  - **Not diagnostic:** the deafened control ALSO clears the bar (8.7x, LB 7.1x). PPO learned a far better
+    homeostatic forager than the fixed code-free comparators, so beating them does not show that it uses the signal.
+    This is the comparator caveat registered at launch, now confirmed.
+  - **The evidence that it acts on the signal:**
+    - the frontier reached 22. Items beyond d = 1 are invisible until adjacent, so >= 80% reach at those
+      distances requires the oracle;
+    - **deafening the same network** cuts item reach 0.71 -> 0.17, mean life 3000 -> 1013 steps, and paid per life
+      6.38 -> 1.93 (**3.3x from the signal**).
+  - **Metric caveat:** paid intake per step is nearly the same with and without the signal (1.12x). Among agents
+    that survive, paid intake per step mostly tracks energy spent below the setpoint (moving costs 0.003 / step).
+    The per-life premium is mainly survival. The trained agent's paid / step (0.0021) exceeds the follower's
+    (0.0008) because it spends more energy, not because it gets more value.
+  - **Proposed for the learner bar (Cam to rule):** compare against the SAME architecture trained code-free (deaf)
+    in the same world, or against the deafened ablation, and use survival plus item reach by distance.
+- **SCREEN UPDATE:** seed 5 **FAIL** (stalled, frontier 5; true 0.016 at d = 12). Seed 6 **PASS** (0.998). So far
+  2/4; at most 3/5, which reads "no fix, the port learner stays on hold".
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under

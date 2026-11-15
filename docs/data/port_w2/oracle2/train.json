@@ -1,0 +1,1715 @@
+{
+ "cfg": {
+  "navs": "w2_out/nav_w13/*.msgpack",
+  "world": "0.0013,8,0.001",
+  "W": 32,
+  "N": 4,
+  "T": 64,
+  "steps": 30000000.0,
+  "oracle": true,
+  "seed": 0,
+  "epochs": 4,
+  "minibatches": 8,
+  "lr": 0.0003,
+  "d_max": 24,
+  "curve_every": 20,
+  "ckpt": "/mnt/throng-runs/testbed/w2jobs/oracle2_w2.ckpt",
+  "max_seconds": 0,
+  "save_params": "/mnt/throng-runs/testbed/w2jobs/oracle2_w2.params",
+  "item_size": 0.1,
+  "hunger_gate": true,
+  "policy": "learner",
+  "v2": "/root/throng-backup/evo2/evo2.ckpt",
+  "init_params": "",
+  "eval_only": false,
+  "frontier0": 1.0,
+  "out": "/mnt/throng-runs/testbed/w2jobs/oracle2_w2_3687a6a"
+ },
+ "steps": 30007296,
+ "frontier": 22.0,
+ "curve": [
+  {
+   "steps": 163840,
+   "frontier": 1.0,
+   "item_reach": 0.2191780821917808,
+   "food_per_step": 0.0014289164682850242,
+   "paid_per_step": 0.0012720844242721796,
+   "frac_in_bout": 0.1961669921875,
+   "sec": 20.3
+  },
+  {
+   "steps": 327680,
+   "frontier": 1.0,
+   "item_reach": 0.2869269949066214,
+   "food_per_step": 0.0021324697881937027,
+   "paid_per_step": 0.002116323681548238,
+   "frac_in_bout": 0.255615234375,
+   "sec": 35.4
+  },
+  {
+   "steps": 491520,
+   "frontier": 1.0,
+   "item_reach": 0.711340206185567,
+   "food_per_step": 0.002526868600398302,
+   "paid_per_step": 0.0025268690660595894,
+   "frac_in_bout": 0.10888671875,
+   "sec": 51.1
+  },
+  {
+   "steps": 655360,
+   "frontier": 1.0,
+   "item_reach": 0.6106870229007634,
+   "food_per_step": 0.0020063775591552258,
+   "paid_per_step": 0.0019693681970238686,
+   "frac_in_bout": 0.0965576171875,
+   "sec": 66.6
+  },
+  {
+   "steps": 819200,
+   "frontier": 1.0,
+   "item_reach": 0.8090909090909091,
+   "food_per_step": 0.003267325460910797,
+   "paid_per_step": 0.0032653487287461758,
+   "frac_in_bout": 0.1134033203125,
+   "sec": 81.5
+  },
+  {
+   "steps": 983040,
+   "frontier": 2.0,
+   "item_reach": 0.7414634146341463,
+   "food_per_step": 0.0018907865742221475,
+   "paid_per_step": 0.0018836972303688526,
+   "frac_in_bout": 0.1025390625,
+   "sec": 96.5
+  },
+  {
+   "steps": 1146880,
+   "frontier": 2.0,
+   "item_reach": 0.610909090909091,
+   "food_per_step": 0.00223355321213603,
+   "paid_per_step": 0.0021829467732459307,
+   "frac_in_bout": 0.145751953125,
+   "sec": 111.2
+  },
+  {
+   "steps": 1310720,
+   "frontier": 2.0,
+   "item_reach": 0.794392523364486,
+   "food_per_step": 0.0021545509807765484,
+   "paid_per_step": 0.002138113137334585,
+   "frac_in_bout": 0.1019287109375,
+   "sec": 125.9
+  },
+  {
+   "steps": 1474560,
+   "frontier": 2.0,
+   "item_reach": 0.823045267489712,
+   "food_per_step": 0.0026523564010858536,
+   "paid_per_step": 0.0026211864314973354,
+   "frac_in_bout": 0.111083984375,
+   "sec": 140.8
+  },
+  {
+   "steps": 1638400,
+   "frontier": 3.0,
+   "item_reach": 0.6598639455782312,
+   "food_per_step": 0.002420224715024233,
+   "paid_per_step": 0.002398809650912881,
+   "frac_in_bout": 0.2119140625,
+   "sec": 155.3
+  },
+  {
+   "steps": 1802240,
+   "frontier": 3.0,
+   "item_reach": 0.6691449814126395,
+   "food_per_step": 0.002329051960259676,
+   "paid_per_step": 0.0023031970486044884,
+   "frac_in_bout": 0.1944580078125,
+   "sec": 169.6
+  },
+  {
+   "steps": 1966080,
+   "frontier": 3.0,
+   "item_reach": 0.6338983050847458,
+   "food_per_step": 0.002319087740033865,
+   "paid_per_step": 0.0023123761638998985,
+   "frac_in_bout": 0.2225341796875,
+   "sec": 184.8
+  },
+  {
+   "steps": 2129920,
+   "frontier": 3.0,
+   "item_reach": 0.6716417910447762,
+   "food_per_step": 0.0018813820788636804,
+   "paid_per_step": 0.001833418384194374,
+   "frac_in_bout": 0.1549072265625,
+   "sec": 199.5
+  },
+  {
+   "steps": 2293760,
+   "frontier": 3.0,
+   "item_reach": 0.5993265993265994,
+   "food_per_step": 0.0025642644613981247,
+   "paid_per_step": 0.0024931980296969414,
+   "frac_in_bout": 0.2198486328125,
+   "sec": 213.9
+  },
+  {
+   "steps": 2457600,
+   "frontier": 3.0,
+   "item_reach": 0.6324324324324324,
+   "food_per_step": 0.0020378748886287212,
+   "paid_per_step": 0.0019311311189085245,
+   "frac_in_bout": 0.1328125,
+   "sec": 228.8
+  },
+  {
+   "steps": 2621440,
+   "frontier": 3.0,
+   "item_reach": 0.6986301369863014,
+   "food_per_step": 0.001964230788871646,
+   "paid_per_step": 0.0018415172817185521,
+   "frac_in_bout": 0.1041259765625,
+   "sec": 243.5
+  },
+  {
+   "steps": 2785280,
+   "frontier": 3.0,
+   "item_reach": 0.6467391304347826,
+   "food_per_step": 0.001876084366813302,
+   "paid_per_step": 0.0018098287982866168,
+   "frac_in_bout": 0.125,
+   "sec": 257.8
+  },
+  {
+   "steps": 2949120,
+   "frontier": 3.0,
+   "item_reach": 0.7947019867549668,
+   "food_per_step": 0.0022860560566186905,
+   "paid_per_step": 0.00212755985558033,
+   "frac_in_bout": 0.0960693359375,
+   "sec": 272.5
+  },
+  {
+   "steps": 3112960,
+   "frontier": 3.0,
+   "item_reach": 0.7052023121387283,
+   "food_per_step": 0.002094040159136057,
+   "paid_per_step": 0.002017810009419918,
+   "frac_in_bout": 0.123291015625,
+   "sec": 287.4
+  },
+  {
+   "steps": 3276800,
+   "frontier": 4.0,
+   "item_reach": 0.7397260273972602,
+   "food_per_step": 0.002099871402606368,
+   "paid_per_step": 0.0018674025777727365,
+   "frac_in_bout": 0.1119384765625,
+   "sec": 302.2
+  },
+  {
+   "steps": 3440640,
+   "frontier": 4.0,
+   "item_reach": 0.7380952380952381,
+   "food_per_step": 0.002016788348555565,
+   "paid_per_step": 0.0015440511051565409,
+   "frac_in_bout": 0.1016845703125,
+   "sec": 316.8
+  },
+  {
+   "steps": 3604480,
+   "frontier": 5.0,
+   "item_reach": 0.8037383177570093,
+   "food_per_step": 0.0019748839549720287,
+   "paid_per_step": 0.0017950995825231075,
+   "frac_in_bout": 0.0928955078125,
+   "sec": 331.3
+  },
+  {
+   "steps": 3768320,
+   "frontier": 9.0,
+   "item_reach": 0.848,
+   "food_per_step": 0.0025576420594006777,
+   "paid_per_step": 0.0022167316637933254,
+   "frac_in_bout": 0.167236328125,
+   "sec": 346.2
+  },
+  {
+   "steps": 3932160,
+   "frontier": 11.0,
+   "item_reach": 0.6960352422907489,
+   "food_per_step": 0.0025998721830546856,
+   "paid_per_step": 0.0025519959162920713,
+   "frac_in_bout": 0.422607421875,
+   "sec": 361.2
+  },
+  {
+   "steps": 4096000,
+   "frontier": 11.0,
+   "item_reach": 0.7604166666666666,
+   "food_per_step": 0.0025100591592490673,
+   "paid_per_step": 0.0017275193240493536,
+   "frac_in_bout": 0.1566162109375,
+   "sec": 375.8
+  },
+  {
+   "steps": 4259840,
+   "frontier": 11.0,
+   "item_reach": 0.4772727272727273,
+   "food_per_step": 0.0024442775174975395,
+   "paid_per_step": 0.0023298475425690413,
+   "frac_in_bout": 0.4847412109375,
+   "sec": 390.3
+  },
+  {
+   "steps": 4423680,
+   "frontier": 11.0,
+   "item_reach": 0.7333333333333333,
+   "food_per_step": 0.0025810720399022102,
+   "paid_per_step": 0.00223179766908288,
+   "frac_in_bout": 0.234130859375,
+   "sec": 405.4
+  },
+  {
+   "steps": 4587520,
+   "frontier": 11.0,
+   "item_reach": 0.7058823529411765,
+   "food_per_step": 0.0025811740197241306,
+   "paid_per_step": 0.0018939035944640636,
+   "frac_in_bout": 0.0982666015625,
+   "sec": 420.1
+  },
+  {
+   "steps": 4751360,
+   "frontier": 11.0,
+   "item_reach": 0.5669291338582677,
+   "food_per_step": 0.0025155278854072094,
+   "paid_per_step": 0.0022464869543910027,
+   "frac_in_bout": 0.2669677734375,
+   "sec": 434.6
+  },
+  {
+   "steps": 4915200,
+   "frontier": 11.0,
+   "item_reach": 0.6475409836065574,
+   "food_per_step": 0.0026966012082993984,
+   "paid_per_step": 0.002160221803933382,
+   "frac_in_bout": 0.2435302734375,
+   "sec": 448.9
+  },
+  {
+   "steps": 5079040,
+   "frontier": 11.0,
+   "item_reach": 0.5827338129496403,
+   "food_per_step": 0.0025010560639202595,
+   "paid_per_step": 0.002348807640373707,
+   "frac_in_bout": 0.24853515625,
+   "sec": 463.3
+  },
+  {
+   "steps": 5242880,
+   "frontier": 11.0,
+   "item_reach": 0.7446808510638298,
+   "food_per_step": 0.0027453931979835033,
+   "paid_per_step": 0.002222687704488635,
+   "frac_in_bout": 0.150390625,
+   "sec": 477.6
+  },
+  {
+   "steps": 5406720,
+   "frontier": 12.0,
+   "item_reach": 0.6782608695652174,
+   "food_per_step": 0.002890240401029587,
+   "paid_per_step": 0.002621138235554099,
+   "frac_in_bout": 0.1990966796875,
+   "sec": 491.8
+  },
+  {
+   "steps": 5570560,
+   "frontier": 14.0,
+   "item_reach": 0.7945205479452054,
+   "food_per_step": 0.0027327979914844036,
+   "paid_per_step": 0.0022328500635921955,
+   "frac_in_bout": 0.135009765625,
+   "sec": 506.1
+  },
+  {
+   "steps": 5734400,
+   "frontier": 15.0,
+   "item_reach": 0.7297297297297297,
+   "food_per_step": 0.0030257173348218203,
+   "paid_per_step": 0.0023594466038048267,
+   "frac_in_bout": 0.150146484375,
+   "sec": 520.5
+  },
+  {
+   "steps": 5898240,
+   "frontier": 15.0,
+   "item_reach": 0.7659574468085106,
+   "food_per_step": 0.002804013667628169,
+   "paid_per_step": 0.0023073027841746807,
+   "frac_in_bout": 0.203857421875,
+   "sec": 535.0
+  },
+  {
+   "steps": 6062080,
+   "frontier": 15.0,
+   "item_reach": 0.76,
+   "food_per_step": 0.002666166750714183,
+   "paid_per_step": 0.0022265110164880753,
+   "frac_in_bout": 0.1771240234375,
+   "sec": 549.7
+  },
+  {
+   "steps": 6225920,
+   "frontier": 15.0,
+   "item_reach": 0.39285714285714285,
+   "food_per_step": 0.002686121966689825,
+   "paid_per_step": 0.0024650171399116516,
+   "frac_in_bout": 0.27685546875,
+   "sec": 565.0
+  },
+  {
+   "steps": 6389760,
+   "frontier": 15.0,
+   "item_reach": 0.7166666666666667,
+   "food_per_step": 0.0031920725014060736,
+   "paid_per_step": 0.0024918527342379093,
+   "frac_in_bout": 0.1431884765625,
+   "sec": 579.8
+  },
+  {
+   "steps": 6553600,
+   "frontier": 15.0,
+   "item_reach": 0.6461538461538462,
+   "food_per_step": 0.0029872795566916466,
+   "paid_per_step": 0.002329854294657707,
+   "frac_in_bout": 0.1558837890625,
+   "sec": 594.3
+  },
+  {
+   "steps": 6717440,
+   "frontier": 15.0,
+   "item_reach": 0.7592592592592593,
+   "food_per_step": 0.00335210794582963,
+   "paid_per_step": 0.0023406168911606073,
+   "frac_in_bout": 0.119384765625,
+   "sec": 608.7
+  },
+  {
+   "steps": 6881280,
+   "frontier": 15.0,
+   "item_reach": 0.8131868131868132,
+   "food_per_step": 0.0030342875979840755,
+   "paid_per_step": 0.0026584111619740725,
+   "frac_in_bout": 0.193115234375,
+   "sec": 623.2
+  },
+  {
+   "steps": 7045120,
+   "frontier": 16.0,
+   "item_reach": 0.6376811594202898,
+   "food_per_step": 0.0031342972069978714,
+   "paid_per_step": 0.0025572869926691055,
+   "frac_in_bout": 0.1502685546875,
+   "sec": 638.0
+  },
+  {
+   "steps": 7208960,
+   "frontier": 17.0,
+   "item_reach": 0.7362637362637363,
+   "food_per_step": 0.0031332778744399548,
+   "paid_per_step": 0.0028678171802312136,
+   "frac_in_bout": 0.2320556640625,
+   "sec": 652.6
+  },
+  {
+   "steps": 7372800,
+   "frontier": 17.0,
+   "item_reach": 0.7241379310344828,
+   "food_per_step": 0.0027965493500232697,
+   "paid_per_step": 0.0020746339578181505,
+   "frac_in_bout": 0.156005859375,
+   "sec": 667.1
+  },
+  {
+   "steps": 7536640,
+   "frontier": 18.0,
+   "item_reach": 0.5806451612903226,
+   "food_per_step": 0.0029933431651443243,
+   "paid_per_step": 0.0026433891616761684,
+   "frac_in_bout": 0.3245849609375,
+   "sec": 681.7
+  },
+  {
+   "steps": 7700480,
+   "frontier": 18.0,
+   "item_reach": 0.6065573770491803,
+   "food_per_step": 0.0030333632603287697,
+   "paid_per_step": 0.002353464253246784,
+   "frac_in_bout": 0.1876220703125,
+   "sec": 696.2
+  },
+  {
+   "steps": 7864320,
+   "frontier": 18.0,
+   "item_reach": 0.7654320987654321,
+   "food_per_step": 0.003022650256752968,
+   "paid_per_step": 0.0023695656564086676,
+   "frac_in_bout": 0.2032470703125,
+   "sec": 711.1
+  },
+  {
+   "steps": 8028160,
+   "frontier": 18.0,
+   "item_reach": 0.5454545454545454,
+   "food_per_step": 0.0029951361939311028,
+   "paid_per_step": 0.0027069745119661093,
+   "frac_in_bout": 0.3250732421875,
+   "sec": 725.6
+  },
+  {
+   "steps": 8192000,
+   "frontier": 18.0,
+   "item_reach": 0.6575342465753424,
+   "food_per_step": 0.003266629297286272,
+   "paid_per_step": 0.0025645093992352486,
+   "frac_in_bout": 0.1912841796875,
+   "sec": 740.4
+  },
+  {
+   "steps": 8355840,
+   "frontier": 18.0,
+   "item_reach": 0.39864864864864863,
+   "food_per_step": 0.0033004446886479855,
+   "paid_per_step": 0.0030298596248030663,
+   "frac_in_bout": 0.487060546875,
+   "sec": 755.0
+  },
+  {
+   "steps": 8519680,
+   "frontier": 18.0,
+   "item_reach": 0.6515151515151515,
+   "food_per_step": 0.0027870528865605593,
+   "paid_per_step": 0.0023957188241183758,
+   "frac_in_bout": 0.25732421875,
+   "sec": 769.8
+  },
+  {
+   "steps": 8683520,
+   "frontier": 18.0,
+   "item_reach": 0.5357142857142857,
+   "food_per_step": 0.0030116429552435875,
+   "paid_per_step": 0.0026549696922302246,
+   "frac_in_bout": 0.2930908203125,
+   "sec": 784.4
+  },
+  {
+   "steps": 8847360,
+   "frontier": 18.0,
+   "item_reach": 0.5333333333333333,
+   "food_per_step": 0.0024775820784270763,
+   "paid_per_step": 0.0019551562145352364,
+   "frac_in_bout": 0.195068359375,
+   "sec": 799.0
+  },
+  {
+   "steps": 9011200,
+   "frontier": 18.0,
+   "item_reach": 0.6410256410256411,
+   "food_per_step": 0.003030685940757394,
+   "paid_per_step": 0.002648724243044853,
+   "frac_in_bout": 0.2552490234375,
+   "sec": 813.9
+  },
+  {
+   "steps": 9175040,
+   "frontier": 18.0,
+   "item_reach": 0.696969696969697,
+   "food_per_step": 0.0027693230658769608,
+   "paid_per_step": 0.0023459356743842363,
+   "frac_in_bout": 0.1668701171875,
+   "sec": 828.6
+  },
+  {
+   "steps": 9338880,
+   "frontier": 18.0,
+   "item_reach": 0.71875,
+   "food_per_step": 0.002989100059494376,
+   "paid_per_step": 0.0023414334282279015,
+   "frac_in_bout": 0.1561279296875,
+   "sec": 843.0
+  },
+  {
+   "steps": 9502720,
+   "frontier": 18.0,
+   "item_reach": 0.8275862068965517,
+   "food_per_step": 0.0030610677786171436,
+   "paid_per_step": 0.0020678371656686068,
+   "frac_in_bout": 0.1478271484375,
+   "sec": 857.8
+  },
+  {
+   "steps": 9666560,
+   "frontier": 18.0,
+   "item_reach": 0.671875,
+   "food_per_step": 0.003102668561041355,
+   "paid_per_step": 0.002551298588514328,
+   "frac_in_bout": 0.1844482421875,
+   "sec": 872.5
+  },
+  {
+   "steps": 9830400,
+   "frontier": 18.0,
+   "item_reach": 0.7358490566037735,
+   "food_per_step": 0.0032782594207674265,
+   "paid_per_step": 0.0022682668641209602,
+   "frac_in_bout": 0.1563720703125,
+   "sec": 887.6
+  },
+  {
+   "steps": 9994240,
+   "frontier": 18.0,
+   "item_reach": 0.30985915492957744,
+   "food_per_step": 0.0031888082157820463,
+   "paid_per_step": 0.0018864957382902503,
+   "frac_in_bout": 0.2476806640625,
+   "sec": 902.5
+  },
+  {
+   "steps": 10158080,
+   "frontier": 18.0,
+   "item_reach": 0.6973684210526315,
+   "food_per_step": 0.00298598175868392,
+   "paid_per_step": 0.0024351172614842653,
+   "frac_in_bout": 0.205322265625,
+   "sec": 917.0
+  },
+  {
+   "steps": 10321920,
+   "frontier": 18.0,
+   "item_reach": 0.76,
+   "food_per_step": 0.0029872325249016285,
+   "paid_per_step": 0.0025741870049387217,
+   "frac_in_bout": 0.1783447265625,
+   "sec": 931.4
+  },
+  {
+   "steps": 10485760,
+   "frontier": 18.0,
+   "item_reach": 0.7333333333333333,
+   "food_per_step": 0.002830301644280553,
+   "paid_per_step": 0.002268337644636631,
+   "frac_in_bout": 0.13671875,
+   "sec": 945.8
+  },
+  {
+   "steps": 10649600,
+   "frontier": 18.0,
+   "item_reach": 0.6867469879518072,
+   "food_per_step": 0.0030837911181151867,
+   "paid_per_step": 0.0026670782826840878,
+   "frac_in_bout": 0.217529296875,
+   "sec": 960.6
+  },
+  {
+   "steps": 10813440,
+   "frontier": 18.0,
+   "item_reach": 0.7307692307692307,
+   "food_per_step": 0.0031310953199863434,
+   "paid_per_step": 0.0021409408655017614,
+   "frac_in_bout": 0.1470947265625,
+   "sec": 975.2
+  },
+  {
+   "steps": 10977280,
+   "frontier": 19.0,
+   "item_reach": 0.75,
+   "food_per_step": 0.0028544990345835686,
+   "paid_per_step": 0.002144976519048214,
+   "frac_in_bout": 0.1314697265625,
+   "sec": 989.7
+  },
+  {
+   "steps": 11141120,
+   "frontier": 19.0,
+   "item_reach": 0.609375,
+   "food_per_step": 0.003939042799174786,
+   "paid_per_step": 0.003339424729347229,
+   "frac_in_bout": 0.2474365234375,
+   "sec": 1004.8
+  },
+  {
+   "steps": 11304960,
+   "frontier": 19.0,
+   "item_reach": 0.8181818181818182,
+   "food_per_step": 0.0033533023670315742,
+   "paid_per_step": 0.0024565751664340496,
+   "frac_in_bout": 0.1669921875,
+   "sec": 1019.6
+  },
+  {
+   "steps": 11468800,
+   "frontier": 19.0,
+   "item_reach": 0.6125,
+   "food_per_step": 0.0034727705642580986,
+   "paid_per_step": 0.002899863524362445,
+   "frac_in_bout": 0.215576171875,
+   "sec": 1034.8
+  },
+  {
+   "steps": 11632640,
+   "frontier": 19.0,
+   "item_reach": 0.7592592592592593,
+   "food_per_step": 0.0032717196736484766,
+   "paid_per_step": 0.002526581985875964,
+   "frac_in_bout": 0.16845703125,
+   "sec": 1049.5
+  },
+  {
+   "steps": 11796480,
+   "frontier": 19.0,
+   "item_reach": 0.7605633802816901,
+   "food_per_step": 0.0029837090987712145,
+   "paid_per_step": 0.002241301815956831,
+   "frac_in_bout": 0.18701171875,
+   "sec": 1064.5
+  },
+  {
+   "steps": 11960320,
+   "frontier": 19.0,
+   "item_reach": 0.7236842105263158,
+   "food_per_step": 0.003120817942544818,
+   "paid_per_step": 0.0020040269009768963,
+   "frac_in_bout": 0.201416015625,
+   "sec": 1079.3
+  },
+  {
+   "steps": 12124160,
+   "frontier": 20.0,
+   "item_reach": 0.7831325301204819,
+   "food_per_step": 0.003190662246197462,
+   "paid_per_step": 0.002655996009707451,
+   "frac_in_bout": 0.2357177734375,
+   "sec": 1094.4
+  },
+  {
+   "steps": 12288000,
+   "frontier": 20.0,
+   "item_reach": 0.7333333333333333,
+   "food_per_step": 0.00297501846216619,
+   "paid_per_step": 0.002212221035733819,
+   "frac_in_bout": 0.2332763671875,
+   "sec": 1109.3
+  },
+  {
+   "steps": 12451840,
+   "frontier": 21.0,
+   "item_reach": 0.8356164383561644,
+   "food_per_step": 0.0030596149154007435,
+   "paid_per_step": 0.0021170214749872684,
+   "frac_in_bout": 0.1702880859375,
+   "sec": 1124.4
+  },
+  {
+   "steps": 12615680,
+   "frontier": 21.0,
+   "item_reach": 0.6136363636363636,
+   "food_per_step": 0.0032081459648907185,
+   "paid_per_step": 0.002379808109253645,
+   "frac_in_bout": 0.1302490234375,
+   "sec": 1139.8
+  },
+  {
+   "steps": 12779520,
+   "frontier": 21.0,
+   "item_reach": 0.7090909090909091,
+   "food_per_step": 0.0031669549643993378,
+   "paid_per_step": 0.0022946821991354227,
+   "frac_in_bout": 0.18212890625,
+   "sec": 1155.3
+  },
+  {
+   "steps": 12943360,
+   "frontier": 21.0,
+   "item_reach": 0.7301587301587301,
+   "food_per_step": 0.002765654819086194,
+   "paid_per_step": 0.0023322526831179857,
+   "frac_in_bout": 0.2393798828125,
+   "sec": 1170.9
+  },
+  {
+   "steps": 13107200,
+   "frontier": 21.0,
+   "item_reach": 0.7966101694915254,
+   "food_per_step": 0.002939758822321892,
+   "paid_per_step": 0.002301147673279047,
+   "frac_in_bout": 0.1578369140625,
+   "sec": 1186.0
+  },
+  {
+   "steps": 13271040,
+   "frontier": 22.0,
+   "item_reach": 0.8088235294117647,
+   "food_per_step": 0.003175507765263319,
+   "paid_per_step": 0.0024265674874186516,
+   "frac_in_bout": 0.216552734375,
+   "sec": 1201.2
+  },
+  {
+   "steps": 13434880,
+   "frontier": 22.0,
+   "item_reach": 0.6829268292682927,
+   "food_per_step": 0.003385917516425252,
+   "paid_per_step": 0.0025790645740926266,
+   "frac_in_bout": 0.178466796875,
+   "sec": 1216.4
+  },
+  {
+   "steps": 13598720,
+   "frontier": 22.0,
+   "item_reach": 0.64,
+   "food_per_step": 0.0033696945756673813,
+   "paid_per_step": 0.0024524936452507973,
+   "frac_in_bout": 0.164794921875,
+   "sec": 1231.3
+  },
+  {
+   "steps": 13762560,
+   "frontier": 22.0,
+   "item_reach": 0.5396825396825397,
+   "food_per_step": 0.002869565039873123,
+   "paid_per_step": 0.002404374536126852,
+   "frac_in_bout": 0.2467041015625,
+   "sec": 1245.6
+  },
+  {
+   "steps": 13926400,
+   "frontier": 22.0,
+   "item_reach": 0.5254237288135594,
+   "food_per_step": 0.0031982262153178453,
+   "paid_per_step": 0.0026785004884004593,
+   "frac_in_bout": 0.2205810546875,
+   "sec": 1260.5
+  },
+  {
+   "steps": 14090240,
+   "frontier": 22.0,
+   "item_reach": 0.6111111111111112,
+   "food_per_step": 0.0034511142875999212,
+   "paid_per_step": 0.002408707281574607,
+   "frac_in_bout": 0.1817626953125,
+   "sec": 1275.3
+  },
+  {
+   "steps": 14254080,
+   "frontier": 22.0,
+   "item_reach": 0.6888888888888889,
+   "food_per_step": 0.003083930816501379,
+   "paid_per_step": 0.00241844542324543,
+   "frac_in_bout": 0.1297607421875,
+   "sec": 1290.3
+  },
+  {
+   "steps": 14417920,
+   "frontier": 22.0,
+   "item_reach": 0.7088607594936709,
+   "food_per_step": 0.0031083389185369015,
+   "paid_per_step": 0.0025705157313495874,
+   "frac_in_bout": 0.2685546875,
+   "sec": 1305.1
+  },
+  {
+   "steps": 14581760,
+   "frontier": 22.0,
+   "item_reach": 0.6829268292682927,
+   "food_per_step": 0.003528295084834099,
+   "paid_per_step": 0.0024222605861723423,
+   "frac_in_bout": 0.136474609375,
+   "sec": 1320.8
+  },
+  {
+   "steps": 14745600,
+   "frontier": 22.0,
+   "item_reach": 0.7936507936507936,
+   "food_per_step": 0.0032805849332362413,
+   "paid_per_step": 0.0023359903134405613,
+   "frac_in_bout": 0.197021484375,
+   "sec": 1336.4
+  },
+  {
+   "steps": 14909440,
+   "frontier": 22.0,
+   "item_reach": 0.7777777777777778,
+   "food_per_step": 0.003034875262528658,
+   "paid_per_step": 0.0023741840850561857,
+   "frac_in_bout": 0.1573486328125,
+   "sec": 1351.5
+  },
+  {
+   "steps": 15073280,
+   "frontier": 22.0,
+   "item_reach": 0.7717391304347826,
+   "food_per_step": 0.0029471199959516525,
+   "paid_per_step": 0.0024715932086110115,
+   "frac_in_bout": 0.261474609375,
+   "sec": 1366.3
+  },
+  {
+   "steps": 15237120,
+   "frontier": 22.0,
+   "item_reach": 0.7,
+   "food_per_step": 0.003338767681270838,
+   "paid_per_step": 0.00240264437161386,
+   "frac_in_bout": 0.1683349609375,
+   "sec": 1380.9
+  },
+  {
+   "steps": 15400960,
+   "frontier": 22.0,
+   "item_reach": 0.5555555555555556,
+   "food_per_step": 0.002978252712637186,
+   "paid_per_step": 0.0022022626362740993,
+   "frac_in_bout": 0.2655029296875,
+   "sec": 1395.3
+  },
+  {
+   "steps": 15564800,
+   "frontier": 22.0,
+   "item_reach": 0.6923076923076923,
+   "food_per_step": 0.003025633282959461,
+   "paid_per_step": 0.001563827507197857,
+   "frac_in_bout": 0.1602783203125,
+   "sec": 1409.9
+  },
+  {
+   "steps": 15728640,
+   "frontier": 22.0,
+   "item_reach": 0.7564102564102564,
+   "food_per_step": 0.0032347035594284534,
+   "paid_per_step": 0.0024272105656564236,
+   "frac_in_bout": 0.248779296875,
+   "sec": 1424.4
+  },
+  {
+   "steps": 15892480,
+   "frontier": 22.0,
+   "item_reach": 0.7444444444444445,
+   "food_per_step": 0.0030248789116740227,
+   "paid_per_step": 0.002277415245771408,
+   "frac_in_bout": 0.2630615234375,
+   "sec": 1439.0
+  },
+  {
+   "steps": 16056320,
+   "frontier": 22.0,
+   "item_reach": 0.7543859649122807,
+   "food_per_step": 0.002814331091940403,
+   "paid_per_step": 0.0019967735279351473,
+   "frac_in_bout": 0.166259765625,
+   "sec": 1453.9
+  },
+  {
+   "steps": 16220160,
+   "frontier": 22.0,
+   "item_reach": 0.7045454545454546,
+   "food_per_step": 0.00263714836910367,
+   "paid_per_step": 0.001861021388322115,
+   "frac_in_bout": 0.1544189453125,
+   "sec": 1468.7
+  },
+  {
+   "steps": 16384000,
+   "frontier": 22.0,
+   "item_reach": 0.7721518987341772,
+   "food_per_step": 0.0027498695999383926,
+   "paid_per_step": 0.0017133366782218218,
+   "frac_in_bout": 0.22802734375,
+   "sec": 1483.7
+  },
+  {
+   "steps": 16547840,
+   "frontier": 22.0,
+   "item_reach": 0.7205882352941176,
+   "food_per_step": 0.0031142784282565117,
+   "paid_per_step": 0.0022145300172269344,
+   "frac_in_bout": 0.2032470703125,
+   "sec": 1499.0
+  },
+  {
+   "steps": 16711680,
+   "frontier": 22.0,
+   "item_reach": 0.6515151515151515,
+   "food_per_step": 0.0030882253777235746,
+   "paid_per_step": 0.002367905806750059,
+   "frac_in_bout": 0.172607421875,
+   "sec": 1514.2
+  },
+  {
+   "steps": 16875520,
+   "frontier": 22.0,
+   "item_reach": 0.7317073170731707,
+   "food_per_step": 0.0032147506717592478,
+   "paid_per_step": 0.001684145419858396,
+   "frac_in_bout": 0.156982421875,
+   "sec": 1529.8
+  },
+  {
+   "steps": 17039360,
+   "frontier": 22.0,
+   "item_reach": 0.7446808510638298,
+   "food_per_step": 0.0033809086307883263,
+   "paid_per_step": 0.0021805092692375183,
+   "frac_in_bout": 0.1812744140625,
+   "sec": 1545.6
+  },
+  {
+   "steps": 17203200,
+   "frontier": 22.0,
+   "item_reach": 0.6714285714285714,
+   "food_per_step": 0.003056312445551157,
+   "paid_per_step": 0.002554149366915226,
+   "frac_in_bout": 0.2420654296875,
+   "sec": 1561.1
+  },
+  {
+   "steps": 17367040,
+   "frontier": 22.0,
+   "item_reach": 0.7083333333333334,
+   "food_per_step": 0.0032629859633743763,
+   "paid_per_step": 0.002344733104109764,
+   "frac_in_bout": 0.169677734375,
+   "sec": 1576.6
+  },
+  {
+   "steps": 17530880,
+   "frontier": 22.0,
+   "item_reach": 0.45652173913043476,
+   "food_per_step": 0.0029601294081658125,
+   "paid_per_step": 0.002217626664787531,
+   "frac_in_bout": 0.197265625,
+   "sec": 1592.3
+  },
+  {
+   "steps": 17694720,
+   "frontier": 22.0,
+   "item_reach": 0.6428571428571429,
+   "food_per_step": 0.0031002876348793507,
+   "paid_per_step": 0.002247388008981943,
+   "frac_in_bout": 0.2191162109375,
+   "sec": 1607.8
+  },
+  {
+   "steps": 17858560,
+   "frontier": 22.0,
+   "item_reach": 0.5,
+   "food_per_step": 0.0031759091652929783,
+   "paid_per_step": 0.002280526328831911,
+   "frac_in_bout": 0.198486328125,
+   "sec": 1623.2
+  },
+  {
+   "steps": 18022400,
+   "frontier": 22.0,
+   "item_reach": 0.6615384615384615,
+   "food_per_step": 0.0034709367901086807,
+   "paid_per_step": 0.0026761533226817846,
+   "frac_in_bout": 0.196533203125,
+   "sec": 1638.6
+  },
+  {
+   "steps": 18186240,
+   "frontier": 22.0,
+   "item_reach": 0.6111111111111112,
+   "food_per_step": 0.0028685075230896473,
+   "paid_per_step": 0.0022294260561466217,
+   "frac_in_bout": 0.2813720703125,
+   "sec": 1654.1
+  },
+  {
+   "steps": 18350080,
+   "frontier": 22.0,
+   "item_reach": 0.782051282051282,
+   "food_per_step": 0.003130451776087284,
+   "paid_per_step": 0.0025878148153424263,
+   "frac_in_bout": 0.2330322265625,
+   "sec": 1669.1
+  },
+  {
+   "steps": 18513920,
+   "frontier": 22.0,
+   "item_reach": 0.72,
+   "food_per_step": 0.00290966616012156,
+   "paid_per_step": 0.0021650120615959167,
+   "frac_in_bout": 0.13427734375,
+   "sec": 1684.2
+  },
+  {
+   "steps": 18677760,
+   "frontier": 22.0,
+   "item_reach": 0.6666666666666666,
+   "food_per_step": 0.0033622856717556715,
+   "paid_per_step": 0.002546359319239855,
+   "frac_in_bout": 0.2359619140625,
+   "sec": 1699.2
+  },
+  {
+   "steps": 18841600,
+   "frontier": 22.0,
+   "item_reach": 0.6842105263157895,
+   "food_per_step": 0.0031009246595203876,
+   "paid_per_step": 0.0024557793512940407,
+   "frac_in_bout": 0.2391357421875,
+   "sec": 1714.3
+  },
+  {
+   "steps": 19005440,
+   "frontier": 22.0,
+   "item_reach": 0.6702127659574468,
+   "food_per_step": 0.003002448473125696,
+   "paid_per_step": 0.0023046652786433697,
+   "frac_in_bout": 0.2943115234375,
+   "sec": 1728.9
+  },
+  {
+   "steps": 19169280,
+   "frontier": 22.0,
+   "item_reach": 0.6941176470588235,
+   "food_per_step": 0.002919391030445695,
+   "paid_per_step": 0.002451938344165683,
+   "frac_in_bout": 0.2884521484375,
+   "sec": 1743.9
+  },
+  {
+   "steps": 19333120,
+   "frontier": 22.0,
+   "item_reach": 0.7733333333333333,
+   "food_per_step": 0.0031028855592012405,
+   "paid_per_step": 0.0020102551206946373,
+   "frac_in_bout": 0.203369140625,
+   "sec": 1759.8
+  },
+  {
+   "steps": 19496960,
+   "frontier": 22.0,
+   "item_reach": 0.6515151515151515,
+   "food_per_step": 0.0028249991592019796,
+   "paid_per_step": 0.002027057111263275,
+   "frac_in_bout": 0.2337646484375,
+   "sec": 1775.9
+  },
+  {
+   "steps": 19660800,
+   "frontier": 22.0,
+   "item_reach": 0.8378378378378378,
+   "food_per_step": 0.0030112662352621555,
+   "paid_per_step": 0.002216892782598734,
+   "frac_in_bout": 0.2239990234375,
+   "sec": 1790.6
+  },
+  {
+   "steps": 19824640,
+   "frontier": 22.0,
+   "item_reach": 0.6590909090909091,
+   "food_per_step": 0.003093360923230648,
+   "paid_per_step": 0.002192582469433546,
+   "frac_in_bout": 0.1136474609375,
+   "sec": 1805.4
+  },
+  {
+   "steps": 19988480,
+   "frontier": 22.0,
+   "item_reach": 0.782608695652174,
+   "food_per_step": 0.0029753190465271473,
+   "paid_per_step": 0.002189132384955883,
+   "frac_in_bout": 0.180419921875,
+   "sec": 1820.3
+  },
+  {
+   "steps": 20152320,
+   "frontier": 22.0,
+   "item_reach": 0.7708333333333334,
+   "food_per_step": 0.003060614690184593,
+   "paid_per_step": 0.0022621452808380127,
+   "frac_in_bout": 0.15478515625,
+   "sec": 1835.4
+  },
+  {
+   "steps": 20316160,
+   "frontier": 22.0,
+   "item_reach": 0.8269230769230769,
+   "food_per_step": 0.0029021031223237514,
+   "paid_per_step": 0.0021215383894741535,
+   "frac_in_bout": 0.1439208984375,
+   "sec": 1850.4
+  },
+  {
+   "steps": 20480000,
+   "frontier": 22.0,
+   "item_reach": 0.7301587301587301,
+   "food_per_step": 0.0028400281444191933,
+   "paid_per_step": 0.002169871237128973,
+   "frac_in_bout": 0.219482421875,
+   "sec": 1865.0
+  },
+  {
+   "steps": 20643840,
+   "frontier": 22.0,
+   "item_reach": 0.7872340425531915,
+   "food_per_step": 0.002912181429564953,
+   "paid_per_step": 0.002167078200727701,
+   "frac_in_bout": 0.1510009765625,
+   "sec": 1879.4
+  },
+  {
+   "steps": 20807680,
+   "frontier": 22.0,
+   "item_reach": 0.6896551724137931,
+   "food_per_step": 0.0031159836798906326,
+   "paid_per_step": 0.0023481042589992285,
+   "frac_in_bout": 0.1983642578125,
+   "sec": 1893.8
+  },
+  {
+   "steps": 20971520,
+   "frontier": 22.0,
+   "item_reach": 0.72,
+   "food_per_step": 0.003049667691811919,
+   "paid_per_step": 0.002339914906769991,
+   "frac_in_bout": 0.1534423828125,
+   "sec": 1908.3
+  },
+  {
+   "steps": 21135360,
+   "frontier": 22.0,
+   "item_reach": 0.7540983606557377,
+   "food_per_step": 0.0029684847686439753,
+   "paid_per_step": 0.0021310728043317795,
+   "frac_in_bout": 0.1646728515625,
+   "sec": 1922.8
+  },
+  {
+   "steps": 21299200,
+   "frontier": 22.0,
+   "item_reach": 0.7105263157894737,
+   "food_per_step": 0.002987729851156473,
+   "paid_per_step": 0.001775923534296453,
+   "frac_in_bout": 0.1197509765625,
+   "sec": 1937.3
+  },
+  {
+   "steps": 21463040,
+   "frontier": 22.0,
+   "item_reach": 0.6909090909090909,
+   "food_per_step": 0.003181041684001684,
+   "paid_per_step": 0.0023662569001317024,
+   "frac_in_bout": 0.17822265625,
+   "sec": 1952.0
+  },
+  {
+   "steps": 21626880,
+   "frontier": 22.0,
+   "item_reach": 0.8070175438596491,
+   "food_per_step": 0.0029276004061102867,
+   "paid_per_step": 0.002372684655711055,
+   "frac_in_bout": 0.1845703125,
+   "sec": 1966.7
+  },
+  {
+   "steps": 21790720,
+   "frontier": 22.0,
+   "item_reach": 0.7647058823529411,
+   "food_per_step": 0.003194508608430624,
+   "paid_per_step": 0.0021412326022982597,
+   "frac_in_bout": 0.132568359375,
+   "sec": 1981.4
+  },
+  {
+   "steps": 21954560,
+   "frontier": 22.0,
+   "item_reach": 0.6842105263157895,
+   "food_per_step": 0.0031324648298323154,
+   "paid_per_step": 0.00221176166087389,
+   "frac_in_bout": 0.18896484375,
+   "sec": 1996.2
+  },
+  {
+   "steps": 22118400,
+   "frontier": 22.0,
+   "item_reach": 0.7959183673469388,
+   "food_per_step": 0.002781178569421172,
+   "paid_per_step": 0.001961363013833761,
+   "frac_in_bout": 0.1585693359375,
+   "sec": 2010.7
+  },
+  {
+   "steps": 22282240,
+   "frontier": 22.0,
+   "item_reach": 0.7692307692307693,
+   "food_per_step": 0.00305706518702209,
+   "paid_per_step": 0.002074944321066141,
+   "frac_in_bout": 0.1732177734375,
+   "sec": 2025.0
+  },
+  {
+   "steps": 22446080,
+   "frontier": 22.0,
+   "item_reach": 0.8181818181818182,
+   "food_per_step": 0.0027800370007753372,
+   "paid_per_step": 0.0019267393508926034,
+   "frac_in_bout": 0.1595458984375,
+   "sec": 2039.9
+  },
+  {
+   "steps": 22609920,
+   "frontier": 22.0,
+   "item_reach": 0.5882352941176471,
+   "food_per_step": 0.0029120980761945248,
+   "paid_per_step": 0.001979430206120014,
+   "frac_in_bout": 0.254638671875,
+   "sec": 2055.5
+  },
+  {
+   "steps": 22773760,
+   "frontier": 22.0,
+   "item_reach": 0.675,
+   "food_per_step": 0.002890785923227668,
+   "paid_per_step": 0.0019519729539752007,
+   "frac_in_bout": 0.131103515625,
+   "sec": 2071.1
+  },
+  {
+   "steps": 22937600,
+   "frontier": 22.0,
+   "item_reach": 0.7142857142857143,
+   "food_per_step": 0.0031655672937631607,
+   "paid_per_step": 0.002115162555128336,
+   "frac_in_bout": 0.2230224609375,
+   "sec": 2086.3
+  },
+  {
+   "steps": 23101440,
+   "frontier": 22.0,
+   "item_reach": 0.7741935483870968,
+   "food_per_step": 0.0031630252487957478,
+   "paid_per_step": 0.00240769749507308,
+   "frac_in_bout": 0.1871337890625,
+   "sec": 2101.2
+  },
+  {
+   "steps": 23265280,
+   "frontier": 22.0,
+   "item_reach": 0.75,
+   "food_per_step": 0.003209446556866169,
+   "paid_per_step": 0.002397021045908332,
+   "frac_in_bout": 0.17529296875,
+   "sec": 2116.9
+  },
+  {
+   "steps": 23429120,
+   "frontier": 22.0,
+   "item_reach": 0.58,
+   "food_per_step": 0.0032370160333812237,
+   "paid_per_step": 0.0022018258459866047,
+   "frac_in_bout": 0.194580078125,
+   "sec": 2132.6
+  },
+  {
+   "steps": 23592960,
+   "frontier": 22.0,
+   "item_reach": 0.6595744680851063,
+   "food_per_step": 0.0031726411543786526,
+   "paid_per_step": 0.001969980774447322,
+   "frac_in_bout": 0.1728515625,
+   "sec": 2147.8
+  },
+  {
+   "steps": 23756800,
+   "frontier": 22.0,
+   "item_reach": 0.6346153846153846,
+   "food_per_step": 0.003096718806773424,
+   "paid_per_step": 0.00253321323543787,
+   "frac_in_bout": 0.1783447265625,
+   "sec": 2163.1
+  },
+  {
+   "steps": 23920640,
+   "frontier": 22.0,
+   "item_reach": 0.7049180327868853,
+   "food_per_step": 0.0034903509076684713,
+   "paid_per_step": 0.0027908068150281906,
+   "frac_in_bout": 0.2025146484375,
+   "sec": 2178.2
+  },
+  {
+   "steps": 24084480,
+   "frontier": 22.0,
+   "item_reach": 0.72,
+   "food_per_step": 0.003152224002406001,
+   "paid_per_step": 0.0022006395738571882,
+   "frac_in_bout": 0.2066650390625,
+   "sec": 2193.4
+  },
+  {
+   "steps": 24248320,
+   "frontier": 22.0,
+   "item_reach": 0.6170212765957447,
+   "food_per_step": 0.0029888623394072056,
+   "paid_per_step": 0.0021413499489426613,
+   "frac_in_bout": 0.1632080078125,
+   "sec": 2208.8
+  },
+  {
+   "steps": 24412160,
+   "frontier": 22.0,
+   "item_reach": 0.5972222222222222,
+   "food_per_step": 0.00277191074565053,
+   "paid_per_step": 0.002034003147855401,
+   "frac_in_bout": 0.211669921875,
+   "sec": 2223.7
+  },
+  {
+   "steps": 24576000,
+   "frontier": 22.0,
+   "item_reach": 0.7,
+   "food_per_step": 0.002991245361045003,
+   "paid_per_step": 0.0022899024188518524,
+   "frac_in_bout": 0.2210693359375,
+   "sec": 2238.4
+  },
+  {
+   "steps": 24739840,
+   "frontier": 22.0,
+   "item_reach": 0.7213114754098361,
+   "food_per_step": 0.002999733667820692,
+   "paid_per_step": 0.002677076729014516,
+   "frac_in_bout": 0.22021484375,
+   "sec": 2253.1
+  },
+  {
+   "steps": 24903680,
+   "frontier": 22.0,
+   "item_reach": 0.5942028985507246,
+   "food_per_step": 0.002743961289525032,
+   "paid_per_step": 0.0022231226321309805,
+   "frac_in_bout": 0.2667236328125,
+   "sec": 2269.0
+  },
+  {
+   "steps": 25067520,
+   "frontier": 22.0,
+   "item_reach": 0.7941176470588235,
+   "food_per_step": 0.0027550035156309605,
+   "paid_per_step": 0.0017733005806803703,
+   "frac_in_bout": 0.155517578125,
+   "sec": 2284.7
+  },
+  {
+   "steps": 25231360,
+   "frontier": 22.0,
+   "item_reach": 0.8153846153846154,
+   "food_per_step": 0.0029321229085326195,
+   "paid_per_step": 0.0020087510347366333,
+   "frac_in_bout": 0.1827392578125,
+   "sec": 2300.1
+  },
+  {
+   "steps": 25395200,
+   "frontier": 22.0,
+   "item_reach": 0.7288135593220338,
+   "food_per_step": 0.0027146954089403152,
+   "paid_per_step": 0.002030080882832408,
+   "frac_in_bout": 0.1856689453125,
+   "sec": 2315.5
+  },
+  {
+   "steps": 25559040,
+   "frontier": 22.0,
+   "item_reach": 0.5862068965517241,
+   "food_per_step": 0.0031036511063575745,
+   "paid_per_step": 0.002661490347236395,
+   "frac_in_bout": 0.1905517578125,
+   "sec": 2331.3
+  },
+  {
+   "steps": 25722880,
+   "frontier": 22.0,
+   "item_reach": 0.7727272727272727,
+   "food_per_step": 0.002676093950867653,
+   "paid_per_step": 0.002309247385710478,
+   "frac_in_bout": 0.2015380859375,
+   "sec": 2347.1
+  },
+  {
+   "steps": 25886720,
+   "frontier": 22.0,
+   "item_reach": 0.6885245901639344,
+   "food_per_step": 0.0028494009748101234,
+   "paid_per_step": 0.002416307106614113,
+   "frac_in_bout": 0.2392578125,
+   "sec": 2362.3
+  },
+  {
+   "steps": 26050560,
+   "frontier": 22.0,
+   "item_reach": 0.6612903225806451,
+   "food_per_step": 0.003176299389451742,
+   "paid_per_step": 0.0021485458128154278,
+   "frac_in_bout": 0.2474365234375,
+   "sec": 2378.1
+  },
+  {
+   "steps": 26214400,
+   "frontier": 22.0,
+   "item_reach": 0.6351351351351351,
+   "food_per_step": 0.0032231614459306,
+   "paid_per_step": 0.002154373098164797,
+   "frac_in_bout": 0.2030029296875,
+   "sec": 2393.6
+  },
+  {
+   "steps": 26378240,
+   "frontier": 22.0,
+   "item_reach": 0.6451612903225806,
+   "food_per_step": 0.0029179321136325598,
+   "paid_per_step": 0.002003883942961693,
+   "frac_in_bout": 0.221923828125,
+   "sec": 2410.0
+  },
+  {
+   "steps": 26542080,
+   "frontier": 22.0,
+   "item_reach": 0.673469387755102,
+   "food_per_step": 0.0027984303887933493,
+   "paid_per_step": 0.0018838808173313737,
+   "frac_in_bout": 0.164794921875,
+   "sec": 2426.0
+  },
+  {
+   "steps": 26705920,
+   "frontier": 22.0,
+   "item_reach": 0.7236842105263158,
+   "food_per_step": 0.0027675877790898085,
+   "paid_per_step": 0.002396846190094948,
+   "frac_in_bout": 0.277587890625,
+   "sec": 2442.1
+  },
+  {
+   "steps": 26869760,
+   "frontier": 22.0,
+   "item_reach": 0.5106382978723404,
+   "food_per_step": 0.002928345464169979,
+   "paid_per_step": 0.0018567522056400776,
+   "frac_in_bout": 0.171142578125,
+   "sec": 2458.0
+  },
+  {
+   "steps": 27033600,
+   "frontier": 22.0,
+   "item_reach": 0.5737704918032787,
+   "food_per_step": 0.002934951102361083,
+   "paid_per_step": 0.0016017162706702948,
+   "frac_in_bout": 0.190185546875,
+   "sec": 2473.9
+  },
+  {
+   "steps": 27197440,
+   "frontier": 22.0,
+   "item_reach": 0.6730769230769231,
+   "food_per_step": 0.0030929751228541136,
+   "paid_per_step": 0.0013816446298733354,
+   "frac_in_bout": 0.203857421875,
+   "sec": 2489.8
+  },
+  {
+   "steps": 27361280,
+   "frontier": 22.0,
+   "item_reach": 0.7123287671232876,
+   "food_per_step": 0.003205075627192855,
+   "paid_per_step": 0.0023306128568947315,
+   "frac_in_bout": 0.20751953125,
+   "sec": 2506.0
+  },
+  {
+   "steps": 27525120,
+   "frontier": 22.0,
+   "item_reach": 0.6901408450704225,
+   "food_per_step": 0.0029367790557444096,
+   "paid_per_step": 0.0017459490336477757,
+   "frac_in_bout": 0.2010498046875,
+   "sec": 2522.1
+  },
+  {
+   "steps": 27688960,
+   "frontier": 22.0,
+   "item_reach": 0.6307692307692307,
+   "food_per_step": 0.00285170366987586,
+   "paid_per_step": 0.0019138215575367212,
+   "frac_in_bout": 0.22900390625,
+   "sec": 2537.9
+  },
+  {
+   "steps": 27852800,
+   "frontier": 22.0,
+   "item_reach": 0.6363636363636364,
+   "food_per_step": 0.0032984926365315914,
+   "paid_per_step": 0.0024335640482604504,
+   "frac_in_bout": 0.2039794921875,
+   "sec": 2553.3
+  },
+  {
+   "steps": 28016640,
+   "frontier": 22.0,
+   "item_reach": 0.6447368421052632,
+   "food_per_step": 0.00300138583406806,
+   "paid_per_step": 0.0023364475928246975,
+   "frac_in_bout": 0.2491455078125,
+   "sec": 2568.9
+  },
+  {
+   "steps": 28180480,
+   "frontier": 22.0,
+   "item_reach": 0.7272727272727273,
+   "food_per_step": 0.002816655905917287,
+   "paid_per_step": 0.0020914217457175255,
+   "frac_in_bout": 0.2030029296875,
+   "sec": 2584.2
+  },
+  {
+   "steps": 28344320,
+   "frontier": 22.0,
+   "item_reach": 0.5957446808510638,
+   "food_per_step": 0.003188377246260643,
+   "paid_per_step": 0.0022551368456333876,
+   "frac_in_bout": 0.1531982421875,
+   "sec": 2599.9
+  },
+  {
+   "steps": 28508160,
+   "frontier": 22.0,
+   "item_reach": 0.5797101449275363,
+   "food_per_step": 0.0032922523096203804,
+   "paid_per_step": 0.002541106892749667,
+   "frac_in_bout": 0.2420654296875,
+   "sec": 2615.1
+  },
+  {
+   "steps": 28672000,
+   "frontier": 22.0,
+   "item_reach": 0.6851851851851852,
+   "food_per_step": 0.003124531824141741,
+   "paid_per_step": 0.002010539174079895,
+   "frac_in_bout": 0.195556640625,
+   "sec": 2630.6
+  },
+  {
+   "steps": 28835840,
+   "frontier": 22.0,
+   "item_reach": 0.6229508196721312,
+   "food_per_step": 0.0032212838996201754,
+   "paid_per_step": 0.0021540275774896145,
+   "frac_in_bout": 0.1900634765625,
+   "sec": 2646.1
+  },
+  {
+   "steps": 28999680,
+   "frontier": 22.0,
+   "item_reach": 0.8870967741935484,
+   "food_per_step": 0.003237853292375803,
+   "paid_per_step": 0.002692699432373047,
+   "frac_in_bout": 0.232177734375,
+   "sec": 2661.1
+  },
+  {
+   "steps": 29163520,
+   "frontier": 22.0,
+   "item_reach": 0.5918367346938775,
+   "food_per_step": 0.003017623908817768,
+   "paid_per_step": 0.002056752797216177,
+   "frac_in_bout": 0.2130126953125,
+   "sec": 2676.1
+  },
+  {
+   "steps": 29327360,
+   "frontier": 22.0,
+   "item_reach": 0.7101449275362319,
+   "food_per_step": 0.003073394298553467,
+   "paid_per_step": 0.0022750231437385082,
+   "frac_in_bout": 0.1634521484375,
+   "sec": 2690.5
+  },
+  {
+   "steps": 29491200,
+   "frontier": 22.0,
+   "item_reach": 0.5909090909090909,
+   "food_per_step": 0.002845931565389037,
+   "paid_per_step": 0.0016190205933526158,
+   "frac_in_bout": 0.255859375,
+   "sec": 2704.7
+  },
+  {
+   "steps": 29655040,
+   "frontier": 22.0,
+   "item_reach": 0.6818181818181818,
+   "food_per_step": 0.003451335011050105,
+   "paid_per_step": 0.0026096245273947716,
+   "frac_in_bout": 0.2362060546875,
+   "sec": 2719.0
+  },
+  {
+   "steps": 29818880,
+   "frontier": 22.0,
+   "item_reach": 0.5671641791044776,
+   "food_per_step": 0.002974279224872589,
+   "paid_per_step": 0.0014861652161926031,
+   "frac_in_bout": 0.2017822265625,
+   "sec": 2733.4
+  },
+  {
+   "steps": 29982720,
+   "frontier": 22.0,
+   "item_reach": 0.7428571428571429,
+   "food_per_step": 0.0028995811007916927,
+   "paid_per_step": 0.0025559519417583942,
+   "frac_in_bout": 0.2357177734375,
+   "sec": 2748.6
+  }
+ ],
+ "reach_by_start_energy": {
+  "E<0.6 d=1": {
+   "reach": 0.9802631735801697,
+   "bouts": 152
+  },
+  "E<0.6 all": {
+   "reach": 0.7110975384712219,
+   "bouts": 3271
+  },
+  "0.6<=E<H d=1": {
+   "reach": 0.9024389982223511,
+   "bouts": 410
+  },
+  "0.6<=E<H all": {
+   "reach": 0.6438743472099304,
+   "bouts": 8848
+  },
+  "H<=E<0.75 d=1": {
+   "reach": null,
+   "bouts": 0
+  },
+  "H<=E<0.75 all": {
+   "reach": null,
+   "bouts": 0
+  },
+  "E>=0.75 d=1": {
+   "reach": null,
+   "bouts": 0
+  },
+  "E>=0.75 all": {
+   "reach": null,
+   "bouts": 0
+  }
+ },
+ "train_seconds": 2751.4,
+ "throughput": 10905.999208646781
+}
