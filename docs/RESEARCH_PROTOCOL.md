@@ -7281,6 +7281,20 @@ more expensive, because it produces publishable-looking nulls.
   - Reading (Cam's): 5/5 -> joins the recipe; 4/5 -> report; <= 3/5 -> not fixed, the port learner stays on hold.
   - Prediction: 5/5 p 0.25; 4/5 p 0.3; <= 3/5 p 0.45.
 
+- **PREDICTION (Nov 15 ~03:55, before the oracle-arm result): the W2 ORACLE ARM will FAIL (p 0.85).**
+  - At 14.4M of 30M steps its frontier is still 1 and item reach about 10%.
+  - Suspected design flaw (mine, in port_w2's spec mapping):
+    - the reward is the homeostatic drive (E_set 0.8). For E >= 0.75 the +0.1 item gives zero or negative reward;
+    - under the navigator-initialised policy the agent spends 47% of steps at E >= 0.75 (laptop probe, 150k steps);
+    - the frontier rule (>= 80% reach over all bouts) therefore counts bouts in which ignoring the item is the
+      reward-optimal choice. A homeostatic learner may never clear it.
+  - Effect: the policy only ever trained at d = 1, where the item is already visible and the oracle input is
+    redundant. It cannot show a premium on the necessity evaluation (d up to 12).
+  - The necessity check used food and a follower that eats regardless of hunger, so the two instruments disagree
+    on what the item is worth.
+  - Test once the weights arrive: item reach split by energy at bout start (< 0.6 vs >= 0.75). The prediction is
+    hungry-bout reach well above sated-bout reach.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
