@@ -1,0 +1,80 @@
+{
+ "cfg": {
+  "d": 12,
+  "hidden": true,
+  "lam": 0.95,
+  "gamma": 0.99,
+  "tier": "T3",
+  "learner": "L2e",
+  "kl": 0.3,
+  "steps": 1000000.0,
+  "B": 256,
+  "T": 32,
+  "seed": 0,
+  "episodes_per_life": 64,
+  "epochs": 4,
+  "minibatches": 8,
+  "lr": 0.0003,
+  "evo_pop": 32,
+  "evo_elite": 8,
+  "evo_eps": 64,
+  "evo_sigma": 0.3,
+  "evo_sigma_body": 0.02,
+  "curriculum": true,
+  "curriculum_mix": true,
+  "d_max": 24,
+  "test_d": 5,
+  "save_params": "",
+  "skip_final_eval": false,
+  "eval_params": "/private/tmp/claude-501/-Users-overlord-CascadeProjects-throng/aad77c1d-d7ac-437e-bef4-aa525802ccc0/scratchpad/r3/diag/diag_s0.params.at1e+07",
+  "eval_modes": "0,4",
+  "life_credit": false,
+  "hindsight": 0.5,
+  "save_params_at": "",
+  "hind_at_start": true,
+  "head_control": false,
+  "demonstrator": true,
+  "ckpt": "",
+  "ckpt_every": 20,
+  "max_seconds": 0,
+  "move_cost": 0.003,
+  "eval_episodes": 9000,
+  "curve_every": 10,
+  "navs": "w2_out/nav_w13/*.msgpack",
+  "out": "/private/tmp/claude-501/-Users-overlord-CascadeProjects-throng/aad77c1d-d7ac-437e-bef4-aa525802ccc0/scratchpad/r3/diag/diag_s0_at1e+07.json"
+ },
+ "cap": 48,
+ "curve": [],
+ "eval_modes": {
+  "0": {
+   "overall": 0.9595584216854302,
+   "first_half": 0.9578713968957872,
+   "second_half": 0.9728419010669254,
+   "head_acc_by_hearing": {
+    "first": [
+     0.16148148148148148,
+     2025
+    ],
+    "later": [
+     0.9895223839978229,
+     7349
+    ]
+   }
+  },
+  "4": {
+   "overall": 0.21203772385291936,
+   "first_half": 0.2431640625,
+   "second_half": 0.007228915662650603,
+   "head_acc_by_hearing": {
+    "first": [
+     0.1257396449704142,
+     2028
+    ],
+    "later": [
+     0.13230688935281837,
+     7664
+    ]
+   }
+  }
+ }
+}

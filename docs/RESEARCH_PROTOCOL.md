@@ -7252,6 +7252,35 @@ more expensive, because it produces publishable-looking nulls.
   - So far: the episode-level memory + the first-hearing demonstrator are the working pair. (b) (GRU + head +
     demonstrator) runs after the robustness screen.
 
+- **RESULT (Nov 15 ~03:45): STALL DIAGNOSIS** (Cam item 3; seeds 0-2 re-run to 10M with the logging; **determinism
+  check: the frontier matches the original 20M runs on 122/122 logged points per seed**).
+
+  | seed | frontier 2M / 5M / 10M | head acc 2nd+ hearing (training) 2M / 5M / 10M | first-hearing meal rate | entropy | head at d = 5, 2nd+, at the frontier-5 moment | reach at d = 5 (final 10M): true 2nd half / wiped |
+  |---|---|---|---|---|---|---|
+  | 0 (took off) | 4 / 7 / 19 | 0.51 / 0.70 / 0.84 | 0.99 / 0.65 / 0.86 | ~0.25 | 0.25 | 0.97 / 0.01 |
+  | 1 (took off) | 4 / 7 / 15 | 0.46 / 0.73 / 0.84 | 0.99 / 0.67 / 0.82 | 0.13 -> 0.04 | 0.28 | 0.99 / 0.01 |
+  | **2 (stalled)** | 4 / **5 / 5** | 0.46 / **0.48 / 0.56** | 0.99 / 0.94 / 0.94 | 0.27-0.30 | **0.16** | **0.13** / 0.01 |
+
+  - **Seed 2 follows the parent fine** (first-hearing meal rate 0.94-0.99) and its **entropy has not collapsed**.
+    **Its memory read stays weak and flat** (head on 2nd+ hearings 0.46 -> 0.56 vs 0.84 for the take-off seeds).
+  - **The stall is visible by 5M:** frontier 5 vs 7, head 0.48 vs 0.70-0.73.
+  - **Why the read misleads:** when the frontier first reached 5, seed 2's head was at chance (0.16) while the
+    take-off seeds were already at 0.25-0.28. The curriculum moved to d = 5, where acting on an uninformative read
+    hurts; the read never caught up.
+  - **DEFECT (mine, disclosed):** the 2M / 5M / 10M weight snapshots were overwritten on every resumed chunk
+    (`--save-params-at` re-saved passed milestones), so reach at 2M / 5M is not available. Fixed in comm-toy. The
+    curve diagnostics (logged live), the frontier-5 snapshots (saved once) and the final 10M weights are valid. A
+    re-run for the 2M / 5M reach is possible if Cam wants it.
+- **REGISTERED (Nov 15 ~03:45, before launch): ROBUSTNESS SCREEN mitigation = HEAD LOSS WEIGHT 1.0** (from 0.5).
+  - Reason, by Cam's mapping: follows the parent fine (meal rate 0.94-0.99), entropy not collapsed (0.26-0.30), but
+    the head stays weak. Recorded tension: ablation (c) passed with the head off on seed 0, so the head is not
+    strictly needed there. A stronger head gradient is still the registered remedy for a weak read.
+  - Design: the full recipe (L2e + hindsight head at hearing + first-hearing demonstrator + mixed curriculum,
+    harness cost) with weight 1.0; fresh seeds 3-7; 20M each; no early stops; the T3 bar at d = 12 hidden; one job
+    at a time.
+  - Reading (Cam's): 5/5 -> joins the recipe; 4/5 -> report; <= 3/5 -> not fixed, the port learner stays on hold.
+  - Prediction: 5/5 p 0.25; 4/5 p 0.3; <= 3/5 p 0.45.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
