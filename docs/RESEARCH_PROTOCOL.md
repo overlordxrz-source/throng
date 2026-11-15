@@ -7238,6 +7238,20 @@ more expensive, because it produces publishable-looking nulls.
     - (Life-clustering approximated by world clusters: each world carries 4 slots of many lives; conservative.)
   - Prediction: PASS p 0.4.
 
+- **RESULT (Nov 15 ~03:05): ABLATIONS (a) and (c)** (toy T3, 20M, seed 0, the same bar at d = 12 hidden).
+
+| run | max d | eval d | true 1st->2nd | shuffled 2nd | wiped 2nd | head acc 1st / 2nd+ hearing | bar |
+|---|---|---|---|---|---|---|---|
+| abla_L2e_s0 | 5 | 12 | 0->0 | 0 | 0 | 13 / 12 | - |
+| ablc_L2e_s0 | 24 | 12 | 96->99 | 3 | 2 | - / - | PASS |
+
+  - **(a) L2e + head, NO demonstrator: FAIL** (frontier stalls at 5). By Cam's rule a FAIL keeps the component: **the
+    demonstrator stays in the port.**
+  - **(c) L2e + demonstrator, head OFF: PASS** (2nd half 99%, shuffled 3%). The hindsight head is not needed on this
+    seed. By Cam's rule it is confirmed on a 2nd seed only if it would be dropped from the port (Cam's call).
+  - So far: the episode-level memory + the first-hearing demonstrator are the working pair. (b) (GRU + head +
+    demonstrator) runs after the robustness screen.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
