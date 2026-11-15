@@ -153,6 +153,10 @@ def main():
         dem_mv, _ = NI.step_toward(c["dem_pos"], item["pos"], L)
         if a.parent_waits:                                                  # the parent waits: never more than 2 cells (Chebyshev) ahead of its young
             dem_mv = jnp.where((jnp.abs(NI.torus(dem_mv - s3.pos, L)).max(-1) <= 2)[:, None], dem_mv, c["dem_pos"])
+            # Cam Nov 15 ~13:30: and it steps BACK toward the young when the young is more than 2 cells away
+            back, _ = NI.step_toward(c["dem_pos"], s3.pos, L)
+            far = jnp.abs(NI.torus(c["dem_pos"] - s3.pos, L)).max(-1) > 2
+            dem_mv = jnp.where(far[:, None], back, dem_mv)
         dem_pos = jnp.where(opened[:, None], s3.pos, jnp.where(c["dem_on"][:, None], dem_mv, c["dem_pos"]))
         gen_now = c["gen"] | (item["act"] & (info["take"] > 0))               # generic (world) food eaten during this bout
         gen2 = jnp.where(opened | closed, False, gen_now)
