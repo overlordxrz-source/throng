@@ -1,0 +1,310 @@
+{
+ "cfg": {
+  "d": 12,
+  "hidden": true,
+  "lam": 0.95,
+  "gamma": 0.99,
+  "tier": "T1",
+  "learner": "L3",
+  "kl": 0.3,
+  "steps": 3000000.0,
+  "B": 256,
+  "T": 32,
+  "seed": 0,
+  "episodes_per_life": 8,
+  "epochs": 2,
+  "minibatches": 1,
+  "lr": 0.0003,
+  "evo_pop": 32,
+  "evo_elite": 8,
+  "evo_eps": 64,
+  "evo_sigma": 0.3,
+  "evo_sigma_body": 0.02,
+  "curriculum": false,
+  "d_max": 24,
+  "test_d": 12,
+  "move_cost": 0.003,
+  "eval_episodes": 512,
+  "curve_every": 10,
+  "navs": "w2_out/nav_w13/*.msgpack",
+  "out": "/private/tmp/claude-501/-Users-overlord-CascadeProjects-throng/aad77c1d-d7ac-437e-bef4-aa525802ccc0/scratchpad/r2/scan/L3_mc0.003_fixed_s0.json"
+ },
+ "cap": 48,
+ "curve": [
+  {
+   "gen": 0,
+   "steps": 98304,
+   "d": 12,
+   "best": 0.0,
+   "elite_mean": 0.0,
+   "mean": 0.0
+  },
+  {
+   "gen": 1,
+   "steps": 196591,
+   "d": 12,
+   "best": 0.015625,
+   "elite_mean": 0.001953125,
+   "mean": 0.00048828125
+  },
+  {
+   "gen": 2,
+   "steps": 294895,
+   "d": 12,
+   "best": 0.0,
+   "elite_mean": 0.0,
+   "mean": 0.0
+  },
+  {
+   "gen": 3,
+   "steps": 392688,
+   "d": 12,
+   "best": 0.09375,
+   "elite_mean": 0.048828125,
+   "mean": 0.01220703125
+  },
+  {
+   "gen": 4,
+   "steps": 489601,
+   "d": 12,
+   "best": 0.125,
+   "elite_mean": 0.080078125,
+   "mean": 0.0283203125
+  },
+  {
+   "gen": 5,
+   "steps": 586249,
+   "d": 12,
+   "best": 0.09375,
+   "elite_mean": 0.0703125,
+   "mean": 0.0322265625
+  },
+  {
+   "gen": 6,
+   "steps": 679406,
+   "d": 12,
+   "best": 0.1875,
+   "elite_mean": 0.166015625,
+   "mean": 0.0986328125
+  },
+  {
+   "gen": 7,
+   "steps": 773918,
+   "d": 12,
+   "best": 0.15625,
+   "elite_mean": 0.13671875,
+   "mean": 0.07568359375
+  },
+  {
+   "gen": 8,
+   "steps": 866432,
+   "d": 12,
+   "best": 0.15625,
+   "elite_mean": 0.142578125,
+   "mean": 0.10791015625
+  },
+  {
+   "gen": 9,
+   "steps": 962162,
+   "d": 12,
+   "best": 0.078125,
+   "elite_mean": 0.078125,
+   "mean": 0.04541015625
+  },
+  {
+   "gen": 10,
+   "steps": 1057208,
+   "d": 12,
+   "best": 0.09375,
+   "elite_mean": 0.09375,
+   "mean": 0.060546875
+  },
+  {
+   "gen": 11,
+   "steps": 1151412,
+   "d": 12,
+   "best": 0.109375,
+   "elite_mean": 0.109375,
+   "mean": 0.08154296875
+  },
+  {
+   "gen": 12,
+   "steps": 1248278,
+   "d": 12,
+   "best": 0.046875,
+   "elite_mean": 0.046875,
+   "mean": 0.0302734375
+  },
+  {
+   "gen": 13,
+   "steps": 1343066,
+   "d": 12,
+   "best": 0.140625,
+   "elite_mean": 0.12890625,
+   "mean": 0.078125
+  },
+  {
+   "gen": 14,
+   "steps": 1438309,
+   "d": 12,
+   "best": 0.109375,
+   "elite_mean": 0.103515625,
+   "mean": 0.05859375
+  },
+  {
+   "gen": 15,
+   "steps": 1534310,
+   "d": 12,
+   "best": 0.109375,
+   "elite_mean": 0.10546875,
+   "mean": 0.05810546875
+  },
+  {
+   "gen": 16,
+   "steps": 1628656,
+   "d": 12,
+   "best": 0.125,
+   "elite_mean": 0.125,
+   "mean": 0.083984375
+  },
+  {
+   "gen": 17,
+   "steps": 1722491,
+   "d": 12,
+   "best": 0.140625,
+   "elite_mean": 0.140625,
+   "mean": 0.095703125
+  },
+  {
+   "gen": 18,
+   "steps": 1817574,
+   "d": 12,
+   "best": 0.09375,
+   "elite_mean": 0.09375,
+   "mean": 0.06103515625
+  },
+  {
+   "gen": 19,
+   "steps": 1913670,
+   "d": 12,
+   "best": 0.0625,
+   "elite_mean": 0.0625,
+   "mean": 0.04248046875
+  },
+  {
+   "gen": 20,
+   "steps": 2006380,
+   "d": 12,
+   "best": 0.140625,
+   "elite_mean": 0.140625,
+   "mean": 0.10205078125
+  },
+  {
+   "gen": 21,
+   "steps": 2097293,
+   "d": 12,
+   "best": 0.1875,
+   "elite_mean": 0.1875,
+   "mean": 0.13427734375
+  },
+  {
+   "gen": 22,
+   "steps": 2191101,
+   "d": 12,
+   "best": 0.125,
+   "elite_mean": 0.125,
+   "mean": 0.08544921875
+  },
+  {
+   "gen": 23,
+   "steps": 2281176,
+   "d": 12,
+   "best": 0.1875,
+   "elite_mean": 0.1875,
+   "mean": 0.14306640625
+  },
+  {
+   "gen": 24,
+   "steps": 2375790,
+   "d": 12,
+   "best": 0.078125,
+   "elite_mean": 0.078125,
+   "mean": 0.064453125
+  },
+  {
+   "gen": 25,
+   "steps": 2469126,
+   "d": 12,
+   "best": 0.125,
+   "elite_mean": 0.125,
+   "mean": 0.0908203125
+  },
+  {
+   "gen": 26,
+   "steps": 2561146,
+   "d": 12,
+   "best": 0.15625,
+   "elite_mean": 0.15625,
+   "mean": 0.11181640625
+  },
+  {
+   "gen": 27,
+   "steps": 2655894,
+   "d": 12,
+   "best": 0.09375,
+   "elite_mean": 0.09375,
+   "mean": 0.064453125
+  },
+  {
+   "gen": 28,
+   "steps": 2748527,
+   "d": 12,
+   "best": 0.125,
+   "elite_mean": 0.125,
+   "mean": 0.0927734375
+  },
+  {
+   "gen": 29,
+   "steps": 2841477,
+   "d": 12,
+   "best": 0.125,
+   "elite_mean": 0.125,
+   "mean": 0.0849609375
+  },
+  {
+   "gen": 30,
+   "steps": 2934971,
+   "d": 12,
+   "best": 0.109375,
+   "elite_mean": 0.109375,
+   "mean": 0.076171875
+  },
+  {
+   "gen": 31,
+   "steps": 3028697,
+   "d": 12,
+   "best": 0.109375,
+   "elite_mean": 0.109375,
+   "mean": 0.07421875
+  }
+ ],
+ "eval_init": {
+  "true": 0.0,
+  "shuffled": 0.0,
+  "silence": 0.0
+ },
+ "eval": {
+  "true": 0.1420345489443378,
+  "shuffled": 0.138996138996139,
+  "silence": 0.12237093690248566
+ },
+ "train_seconds": 7.8,
+ "generations": 32,
+ "d_max_reached": 12,
+ "test": {
+  "true": 0.12284069097888675,
+  "shuffled": 0.11346153846153846
+ },
+ "test_pass": false,
+ "learns": false
+}

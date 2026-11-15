@@ -1,0 +1,917 @@
+{
+ "cfg": {
+  "d": 12,
+  "hidden": true,
+  "lam": 0.95,
+  "gamma": 0.99,
+  "tier": "T1",
+  "learner": "L2",
+  "kl": 0.3,
+  "steps": 3000000.0,
+  "B": 256,
+  "T": 32,
+  "seed": 0,
+  "episodes_per_life": 8,
+  "epochs": 4,
+  "minibatches": 8,
+  "lr": 0.0003,
+  "evo_pop": 32,
+  "evo_elite": 8,
+  "evo_eps": 64,
+  "evo_sigma": 0.3,
+  "evo_sigma_body": 0.02,
+  "curriculum": false,
+  "d_max": 24,
+  "test_d": 12,
+  "move_cost": 0.003,
+  "eval_episodes": 512,
+  "curve_every": 10,
+  "navs": "w2_out/nav_w13/*.msgpack",
+  "out": "/private/tmp/claude-501/-Users-overlord-CascadeProjects-throng/aad77c1d-d7ac-437e-bef4-aa525802ccc0/scratchpad/r2/scan/L2_mc0.003_fixed_s0.json"
+ },
+ "cap": 48,
+ "curve": [
+  {
+   "steps": 81920,
+   "d": 12,
+   "reach_train": 0.0,
+   "sec": 5.6,
+   "act_freq": [
+    0.48,
+    0.032,
+    0.053,
+    0.028,
+    0.048,
+    0.358
+   ],
+   "adv_by_act": [
+    -0.231,
+    -0.32,
+    -0.262,
+    -0.321,
+    -0.272,
+    -0.232
+   ],
+   "ret_mean": -1.325,
+   "r_eat": null
+  },
+  {
+   "steps": 163840,
+   "d": 12,
+   "reach_train": 0.0,
+   "sec": 6.8,
+   "act_freq": [
+    0.68,
+    0.004,
+    0.009,
+    0.002,
+    0.007,
+    0.297
+   ],
+   "adv_by_act": [
+    0.154,
+    0.165,
+    0.059,
+    0.164,
+    0.098,
+    0.141
+   ],
+   "ret_mean": -0.728,
+   "r_eat": null
+  },
+  {
+   "steps": 245760,
+   "d": 12,
+   "reach_train": 0.0,
+   "sec": 7.7,
+   "act_freq": [
+    0.701,
+    0.004,
+    0.017,
+    0.003,
+    0.01,
+    0.263
+   ],
+   "adv_by_act": [
+    0.052,
+    -0.011,
+    0.047,
+    -0.031,
+    0.04,
+    0.061
+   ],
+   "ret_mean": -0.577,
+   "r_eat": null
+  },
+  {
+   "steps": 327680,
+   "d": 12,
+   "reach_train": 0.0,
+   "sec": 8.5,
+   "act_freq": [
+    0.521,
+    0.002,
+    0.016,
+    0.001,
+    0.015,
+    0.445
+   ],
+   "adv_by_act": [
+    -0.152,
+    -0.138,
+    -0.085,
+    -0.109,
+    -0.092,
+    -0.15
+   ],
+   "ret_mean": -0.842,
+   "r_eat": null
+  },
+  {
+   "steps": 409600,
+   "d": 12,
+   "reach_train": 0.0,
+   "sec": 9.5,
+   "act_freq": [
+    0.276,
+    0.002,
+    0.032,
+    0.001,
+    0.025,
+    0.663
+   ],
+   "adv_by_act": [
+    0.104,
+    0.04,
+    0.106,
+    0.034,
+    0.105,
+    0.101
+   ],
+   "ret_mean": -0.706,
+   "r_eat": null
+  },
+  {
+   "steps": 491520,
+   "d": 12,
+   "reach_train": 0.0,
+   "sec": 10.4,
+   "act_freq": [
+    0.392,
+    0.001,
+    0.034,
+    0.001,
+    0.023,
+    0.549
+   ],
+   "adv_by_act": [
+    -0.012,
+    -0.099,
+    -0.002,
+    -0.119,
+    -0.017,
+    -0.012
+   ],
+   "ret_mean": -0.536,
+   "r_eat": null
+  },
+  {
+   "steps": 573440,
+   "d": 12,
+   "reach_train": 0.0,
+   "sec": 11.2,
+   "act_freq": [
+    0.687,
+    0.001,
+    0.075,
+    0.001,
+    0.036,
+    0.2
+   ],
+   "adv_by_act": [
+    -0.098,
+    -0.236,
+    -0.017,
+    -0.088,
+    -0.035,
+    -0.095
+   ],
+   "ret_mean": -0.844,
+   "r_eat": null
+  },
+  {
+   "steps": 655360,
+   "d": 12,
+   "reach_train": 0.0,
+   "sec": 12.0,
+   "act_freq": [
+    0.674,
+    0.0,
+    0.099,
+    0.0,
+    0.021,
+    0.205
+   ],
+   "adv_by_act": [
+    0.109,
+    -0.184,
+    0.016,
+    -0.121,
+    -0.017,
+    0.101
+   ],
+   "ret_mean": -0.665,
+   "r_eat": null
+  },
+  {
+   "steps": 737280,
+   "d": 12,
+   "reach_train": 0.0,
+   "sec": 12.9,
+   "act_freq": [
+    0.706,
+    0.0,
+    0.003,
+    0.0,
+    0.001,
+    0.29
+   ],
+   "adv_by_act": [
+    0.036,
+    null,
+    -0.037,
+    null,
+    -0.002,
+    0.031
+   ],
+   "ret_mean": -0.531,
+   "r_eat": null
+  },
+  {
+   "steps": 819200,
+   "d": 12,
+   "reach_train": 0.0,
+   "sec": 13.7,
+   "act_freq": [
+    0.748,
+    0.0,
+    0.097,
+    0.0,
+    0.001,
+    0.153
+   ],
+   "adv_by_act": [
+    -0.117,
+    null,
+    0.044,
+    null,
+    -0.007,
+    -0.109
+   ],
+   "ret_mean": -0.794,
+   "r_eat": null
+  },
+  {
+   "steps": 901120,
+   "d": 12,
+   "reach_train": 0.0,
+   "sec": 14.7,
+   "act_freq": [
+    0.606,
+    0.0,
+    0.098,
+    0.0,
+    0.001,
+    0.294
+   ],
+   "adv_by_act": [
+    0.097,
+    -0.191,
+    -0.035,
+    0.025,
+    -0.044,
+    0.1
+   ],
+   "ret_mean": -0.653,
+   "r_eat": null
+  },
+  {
+   "steps": 983040,
+   "d": 12,
+   "reach_train": 0.0,
+   "sec": 15.8,
+   "act_freq": [
+    0.501,
+    0.0,
+    0.003,
+    0.0,
+    0.0,
+    0.495
+   ],
+   "adv_by_act": [
+    0.008,
+    null,
+    -0.164,
+    null,
+    -0.074,
+    0.012
+   ],
+   "ret_mean": -0.491,
+   "r_eat": null
+  },
+  {
+   "steps": 1064960,
+   "d": 12,
+   "reach_train": 0.0,
+   "sec": 16.8,
+   "act_freq": [
+    0.3,
+    0.0,
+    0.095,
+    0.0,
+    0.001,
+    0.604
+   ],
+   "adv_by_act": [
+    -0.069,
+    -0.007,
+    0.126,
+    null,
+    0.002,
+    -0.081
+   ],
+   "ret_mean": -0.803,
+   "r_eat": null
+  },
+  {
+   "steps": 1146880,
+   "d": 12,
+   "reach_train": 0.0,
+   "sec": 17.9,
+   "act_freq": [
+    0.25,
+    0.0,
+    0.096,
+    0.0,
+    0.0,
+    0.654
+   ],
+   "adv_by_act": [
+    0.055,
+    null,
+    -0.007,
+    -0.318,
+    -0.023,
+    0.057
+   ],
+   "ret_mean": -0.636,
+   "r_eat": null
+  },
+  {
+   "steps": 1228800,
+   "d": 12,
+   "reach_train": 0.0,
+   "sec": 18.8,
+   "act_freq": [
+    0.445,
+    0.0,
+    0.002,
+    0.0,
+    0.0,
+    0.553
+   ],
+   "adv_by_act": [
+    0.005,
+    null,
+    -0.209,
+    null,
+    -0.066,
+    0.005
+   ],
+   "ret_mean": -0.459,
+   "r_eat": null
+  },
+  {
+   "steps": 1310720,
+   "d": 12,
+   "reach_train": 0.0,
+   "sec": 19.6,
+   "act_freq": [
+    0.401,
+    0.0,
+    0.094,
+    0.0,
+    0.0,
+    0.505
+   ],
+   "adv_by_act": [
+    -0.011,
+    null,
+    0.032,
+    null,
+    -0.092,
+    -0.014
+   ],
+   "ret_mean": -0.814,
+   "r_eat": null
+  },
+  {
+   "steps": 1392640,
+   "d": 12,
+   "reach_train": 0.0,
+   "sec": 20.4,
+   "act_freq": [
+    0.499,
+    0.0,
+    0.094,
+    0.0,
+    0.0,
+    0.408
+   ],
+   "adv_by_act": [
+    0.011,
+    null,
+    0.012,
+    null,
+    -0.081,
+    0.008
+   ],
+   "ret_mean": -0.616,
+   "r_eat": null
+  },
+  {
+   "steps": 1474560,
+   "d": 12,
+   "reach_train": 0.0,
+   "sec": 21.2,
+   "act_freq": [
+    0.557,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.443
+   ],
+   "adv_by_act": [
+    -0.001,
+    null,
+    -0.074,
+    null,
+    -0.052,
+    -0.004
+   ],
+   "ret_mean": -0.437,
+   "r_eat": null
+  },
+  {
+   "steps": 1556480,
+   "d": 12,
+   "reach_train": 0.0,
+   "sec": 22.1,
+   "act_freq": [
+    0.476,
+    0.0,
+    0.093,
+    0.0,
+    0.0,
+    0.43
+   ],
+   "adv_by_act": [
+    0.006,
+    -0.057,
+    0.03,
+    null,
+    -0.053,
+    0.001
+   ],
+   "ret_mean": -0.819,
+   "r_eat": null
+  },
+  {
+   "steps": 1638400,
+   "d": 12,
+   "reach_train": 0.0,
+   "sec": 23.0,
+   "act_freq": [
+    0.472,
+    0.0,
+    0.083,
+    0.0,
+    0.0,
+    0.445
+   ],
+   "adv_by_act": [
+    0.008,
+    null,
+    -0.005,
+    null,
+    -0.043,
+    0.007
+   ],
+   "ret_mean": -0.627,
+   "r_eat": null
+  },
+  {
+   "steps": 1720320,
+   "d": 12,
+   "reach_train": 0.0,
+   "sec": 24.0,
+   "act_freq": [
+    0.469,
+    0.0,
+    0.003,
+    0.0,
+    0.0,
+    0.528
+   ],
+   "adv_by_act": [
+    0.004,
+    -0.094,
+    -0.052,
+    null,
+    null,
+    -0.005
+   ],
+   "ret_mean": -0.435,
+   "r_eat": null
+  },
+  {
+   "steps": 1802240,
+   "d": 12,
+   "reach_train": 0.0,
+   "sec": 24.9,
+   "act_freq": [
+    0.601,
+    0.0,
+    0.027,
+    0.0,
+    0.0,
+    0.372
+   ],
+   "adv_by_act": [
+    -0.003,
+    null,
+    0.012,
+    null,
+    -0.01,
+    0.006
+   ],
+   "ret_mean": -0.786,
+   "r_eat": null
+  },
+  {
+   "steps": 1884160,
+   "d": 12,
+   "reach_train": 0.0,
+   "sec": 25.7,
+   "act_freq": [
+    0.687,
+    0.0,
+    0.009,
+    0.0,
+    0.0,
+    0.304
+   ],
+   "adv_by_act": [
+    0.015,
+    null,
+    -0.018,
+    null,
+    null,
+    0.012
+   ],
+   "ret_mean": -0.596,
+   "r_eat": null
+  },
+  {
+   "steps": 1966080,
+   "d": 12,
+   "reach_train": 0.0,
+   "sec": 26.5,
+   "act_freq": [
+    0.609,
+    0.0,
+    0.001,
+    0.0,
+    0.0,
+    0.39
+   ],
+   "adv_by_act": [
+    -0.007,
+    null,
+    -0.009,
+    null,
+    null,
+    -0.009
+   ],
+   "ret_mean": -0.428,
+   "r_eat": null
+  },
+  {
+   "steps": 2048000,
+   "d": 12,
+   "reach_train": 0.0,
+   "sec": 27.3,
+   "act_freq": [
+    0.634,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.366
+   ],
+   "adv_by_act": [
+    0.001,
+    null,
+    -0.006,
+    null,
+    null,
+    -0.002
+   ],
+   "ret_mean": -0.772,
+   "r_eat": null
+  },
+  {
+   "steps": 2129920,
+   "d": 12,
+   "reach_train": 0.0,
+   "sec": 28.4,
+   "act_freq": [
+    0.663,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.337
+   ],
+   "adv_by_act": [
+    0.013,
+    null,
+    null,
+    null,
+    null,
+    0.012
+   ],
+   "ret_mean": -0.59,
+   "r_eat": null
+  },
+  {
+   "steps": 2211840,
+   "d": 12,
+   "reach_train": 0.0,
+   "sec": 29.3,
+   "act_freq": [
+    0.696,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.304
+   ],
+   "adv_by_act": [
+    -0.008,
+    null,
+    null,
+    null,
+    null,
+    -0.006
+   ],
+   "ret_mean": -0.427,
+   "r_eat": null
+  },
+  {
+   "steps": 2293760,
+   "d": 12,
+   "reach_train": 0.0,
+   "sec": 30.1,
+   "act_freq": [
+    0.553,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.447
+   ],
+   "adv_by_act": [
+    0.003,
+    null,
+    null,
+    null,
+    null,
+    -0.001
+   ],
+   "ret_mean": -0.771,
+   "r_eat": null
+  },
+  {
+   "steps": 2375680,
+   "d": 12,
+   "reach_train": 0.0,
+   "sec": 30.9,
+   "act_freq": [
+    0.477,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.523
+   ],
+   "adv_by_act": [
+    0.01,
+    null,
+    null,
+    null,
+    null,
+    0.014
+   ],
+   "ret_mean": -0.591,
+   "r_eat": null
+  },
+  {
+   "steps": 2457600,
+   "d": 12,
+   "reach_train": 0.0,
+   "sec": 31.7,
+   "act_freq": [
+    0.511,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.489
+   ],
+   "adv_by_act": [
+    -0.01,
+    null,
+    null,
+    null,
+    null,
+    -0.007
+   ],
+   "ret_mean": -0.425,
+   "r_eat": null
+  },
+  {
+   "steps": 2539520,
+   "d": 12,
+   "reach_train": 0.0,
+   "sec": 32.5,
+   "act_freq": [
+    0.437,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.563
+   ],
+   "adv_by_act": [
+    0.007,
+    null,
+    null,
+    null,
+    null,
+    0.001
+   ],
+   "ret_mean": -0.772,
+   "r_eat": null
+  },
+  {
+   "steps": 2621440,
+   "d": 12,
+   "reach_train": 0.0,
+   "sec": 33.3,
+   "act_freq": [
+    0.503,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.497
+   ],
+   "adv_by_act": [
+    0.01,
+    null,
+    null,
+    null,
+    null,
+    0.012
+   ],
+   "ret_mean": -0.591,
+   "r_eat": null
+  },
+  {
+   "steps": 2703360,
+   "d": 12,
+   "reach_train": 0.0,
+   "sec": 34.1,
+   "act_freq": [
+    0.524,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.476
+   ],
+   "adv_by_act": [
+    -0.005,
+    null,
+    null,
+    null,
+    null,
+    -0.004
+   ],
+   "ret_mean": -0.428,
+   "r_eat": null
+  },
+  {
+   "steps": 2785280,
+   "d": 12,
+   "reach_train": 0.0,
+   "sec": 34.9,
+   "act_freq": [
+    0.573,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.427
+   ],
+   "adv_by_act": [
+    0.004,
+    null,
+    null,
+    null,
+    null,
+    0.004
+   ],
+   "ret_mean": -0.773,
+   "r_eat": null
+  },
+  {
+   "steps": 2867200,
+   "d": 12,
+   "reach_train": 0.0,
+   "sec": 35.7,
+   "act_freq": [
+    0.547,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.453
+   ],
+   "adv_by_act": [
+    0.011,
+    null,
+    null,
+    null,
+    null,
+    0.011
+   ],
+   "ret_mean": -0.591,
+   "r_eat": null
+  },
+  {
+   "steps": 2949120,
+   "d": 12,
+   "reach_train": 0.0,
+   "sec": 36.5,
+   "act_freq": [
+    0.582,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.418
+   ],
+   "adv_by_act": [
+    -0.006,
+    null,
+    null,
+    null,
+    null,
+    -0.005
+   ],
+   "ret_mean": -0.427,
+   "r_eat": null
+  }
+ ],
+ "eval_init": {
+  "true": 0.0,
+  "shuffled": 0.001953125,
+  "silence": 0.0
+ },
+ "eval": {
+  "true": 0.0,
+  "shuffled": 0.0,
+  "silence": 0.0
+ },
+ "train_seconds": 37.2,
+ "d_max_reached": 12,
+ "test": {
+  "true": 0.0,
+  "shuffled": 0.0
+ },
+ "test_pass": false,
+ "learns": false
+}

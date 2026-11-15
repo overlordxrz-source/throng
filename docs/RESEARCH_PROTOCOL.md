@@ -6852,6 +6852,39 @@ more expensive, because it produces publishable-looking nulls.
   - **Will's operationalisation for L3's curriculum** (evolution has no rolling episodes): d advances when the 8
     elites' own episodes in that generation (8 x 64 = 512) reach >= 80%.
 
+- **RESULT (Nov 14 ~22:15): TOY ROUND 2 scan, seed 0** (T1, hidden food, oracle input; 3M agent-steps; L2 / L1u
+  minibatched PPO 8 x 4, entropy 0.01; L1u KL 0; files `docs/data/toy_grid/round2/`).
+
+| learner | move cost | distance | seed | max d | d=12 true | d=12 shuffled | pass | train s |
+|---|---|---|---|---|---|---|---|---|
+| L1u | 0.003 | curriculum | 0 | 24 | 47 | 0 | - | 150.2 |
+| L1u | 0.003 | fixed 12 | 0 | 12 | 0 | 0 | - | 150.5 |
+| L1u | 0.0 | curriculum | 0 | 24 | 84 | 0 | PASS | 130.9 |
+| L1u | 0.0 | fixed 12 | 0 | 12 | 100 | 0 | PASS | 135.5 |
+| L2 | 0.003 | curriculum | 0 | 24 | 58 | 0 | - | 35.0 |
+| L2 | 0.003 | fixed 12 | 0 | 12 | 0 | 0 | - | 37.2 |
+| L2 | 0.0 | curriculum | 0 | 24 | 57 | 0 | - | 35.2 |
+| L2 | 0.0 | fixed 12 | 0 | 12 | 0 | 0 | - | 35.4 |
+| L3 | 0.003 | curriculum | 0 | 3 | 15 | 0 | - | 16.0 |
+| L3 | 0.003 | fixed 12 | 0 | 12 | 12 | 11 | - | 7.8 |
+| L3 | 0.0 | curriculum | 0 | 3 | 0 | 0 | - | 16.1 |
+| L3 | 0.0 | fixed 12 | 0 | 12 | 13 | 12 | - | 8.2 |
+
+  - **The auto curriculum is the breakthrough under the HARNESS move cost:** L2 and L1u climb from d = 1 to the cap
+    d = 24, following the true input (shuffled 0%). Fixed d = 12 learns nothing under the harness cost (0%).
+  - **But no recipe passes the registered bar under the harness cost:** the d = 12 test gives 58% (L2) and 47% (L1u).
+    - Why (curves): L2 reached d = 24 by 0.49M steps, then trained ONLY at d = 24 for 2.5M steps at ~100% reach.
+      Tested at d = 12 it gets 58-63%.
+    - The policy most likely learned the d = 24 route (e.g. a staircase ending next to the far cell) rather than
+      "follow the ray", so its path misses nearer hidden food. L1u's own d = 24 reach fell to ~0.4 after arriving
+      there.
+  - At move cost 0: L1u PASSES at fixed 12 (100/0) and with the curriculum (84/0). L2 at move cost 0 fails fixed
+    (exploration) and gives 57/0 with the curriculum.
+  - L3 (evolution) is far behind: its curriculum stalls at d = 3, and fixed 12 gives 12-13% with true ~ shuffled.
+  - **Running:** (A) registered seeds 1-2 on the move-cost-0 passes; (B) EXPLORATORY (mine): a mixed curriculum (each
+    episode's d ~ uniform{1..current d}) for L2 / L1u under the harness cost, to test the over-specialisation
+    explanation.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
