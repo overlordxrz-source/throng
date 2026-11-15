@@ -7784,6 +7784,21 @@ more expensive, because it produces publishable-looking nulls.
   - **(d) Oracle #2 at the same steps:** frontier 3 at 2.5M, 11 at 4.9M, 17 at 7.4M, 20 at 12.3M (reach 0.63-0.74);
     final reach at d = 1 / 2 / 3: 0.96 / 0.98 / 0.70. No per-distance snapshots exist for oracle #2.
 
+- **RESULT (Nov 15 ~10:00): THE STAGE-2 COST LEVER WORKS** (dev copy `w2/learner_w2_kv.py` + `w2/ep_agent_dev.py`; the
+  running seeds are untouched). `docs/data/learner_w2/kv_lever/`.
+  - The replay computes keys / values once per sequence: for the start-of-sequence memory (96 slots) plus the
+    records written during the sequence (<= 64). A (T, 96 + 64) validity mask is rebuilt from write times, slots and
+    death resets. The agent was rewritten in setup style with the SAME parameter tree (outputs identical: max |d| 0).
+  - **Exactness:**
+    - the rebuilt memory equals the stored memory at every replay step over 64 iterations (14,980 writes, 35
+      deaths): record-count mismatch 0, content max |d| 4.8e-7 (summation order);
+    - on the same batches, loss is equal to 7 significant digits and gradient max |d| <= 3e-8 (max |grad| 0.02-0.4).
+    - Float32 rounding only; trajectories drift apart later, as with any reordering.
+  - **Laptop speed: 1.90x** (2,653 -> 5,052 steps/s, back-to-back, seed 0 paused). The memory is no longer
+    stored per step, so host / device traffic drops too.
+  - Caveat: the laptop throughput varies by run (the same original measured 5,452 an hour earlier), so the ratio is
+    the robust number. It is not yet measured on Modal (no probe before the readout).
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
