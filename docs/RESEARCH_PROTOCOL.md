@@ -6964,6 +6964,24 @@ more expensive, because it produces publishable-looking nulls.
   - **Ops:** the first T3 launch was stopped by Will at its start (no results) to add the controls and final-weight
     saving, then relaunched.
 
+- **RESULT (Nov 14 ~23:20): T3 interpretation tools (Cam's 3a-3c), before any memory is scored** (laptop, toy, d = 12
+  hidden, 64 episodes per life, evaluation over 9,000 episodes so every environment passes mid-life).
+  - **(a) Ideal in-context learner (scripted):**
+    - a known token -> walks to its sector point;
+    - an unknown token -> searches the sector points at the episode's distance, resuming where that token's last
+      search stopped and skipping sectors already mapped (the code is a permutation);
+    - it is TOLD d (never the direction), a generous ceiling.
+    - **First half of life 85%, SECOND HALF 100%** (overall 87.5%).
+    - **Correction (on the record):** the first version restarted every search at sector 0 and reached only ~4 sector
+      points within the cap, so tokens in sectors 4-7 were never learned (second half 44%). That was a design error of
+      mine, caught by tracing one environment; it was replaced before any memory was scored.
+  - **(b) Controls on the ideal:** within-life shuffled code 34% -> 37%; memory wiped per episode 38% -> 41%. The
+    instrument separates memory use from search.
+  - **(c) The bar for a memory** therefore = second-half reach >= 90% (0.9 x the ideal's 100%) AND >= within-life
+    shuffled + 30 points AND >= 2x it, on 3/3 seeds, with the first -> second-half rise reported. Reachable.
+  - Running: T3 seed 0 for L2 (GRU), L1u and L2t (transformer). Mixed curriculum, harness cost, 3M steps; training
+    saves weights, then modes 0 / 3 / 4 are evaluated in separate processes.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
