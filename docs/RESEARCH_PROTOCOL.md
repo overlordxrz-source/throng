@@ -7896,6 +7896,36 @@ more expensive, because it produces publishable-looking nulls.
       pass p 0.4;
     - **learner PASS p 0.35**; early stop of at least one seed p 0.3.
 
+- **NEW STANDING RULE (Cam, Nov 15 ~11:15): A5, a PRIVILEGED-INFORMATION AUDIT, before ANY learn arm.**
+  - List every input and every loss target / mask, with its source.
+  - Anything taken from world state the agent did not perceive in its own life is flagged and needs Cam's ruling.
+  - Oracle arms are exempt by design.
+  - Approved scaffolds: the scripted parent and its first-hearing gate; hunger-gated calls; the record's close
+    triggers (item eaten, T_max, death; M-approved for stage 1).
+- **RESULT (Nov 15 ~11:25): A5 on `learner_w2_kv.py --head-own-meal` (comm-toy 8e9f88e; the exact seed 1-3 command).
+  NO FLAGS beyond the approved scaffolds.**
+
+  | item | source in the code | perceived in its own life? |
+  |---|---|---|
+  | x[0:49] food view, 7x7 | `env.observe` window around the agent; the named item added ONLY when adjacent and a bout is open (`NI.observe`) | yes (own view) |
+  | x[49:98] agent view, 7x7 | occupancy window; + the demonstrator when inside the 7x7 view (`NI.mark_demo`) | yes (own view); the parent = scaffold |
+  | x[98:100] energy, age / A_max | own state | yes (interoception) |
+  | x[100:108] heard token | `code[sector]` of the open bout's call; all zero between bouts (`NI.hear`) | yes (the sound) |
+  | x[108] call flag | 1 while a bout is open | yes (the sound is on) |
+  | x[109:111] offset to the hearing place / 9 | `torus(start - pos)`; start = own position when the bout opened | yes, exact path integration: positions change only by the agent's own moves (`env.step`: pos + MOVES[act]; respawn closes the bout) |
+  | x[111:117] previous action | own | yes |
+  | x[117] previous reward | own drive change (item energy included) | yes |
+  | x[118:126] oracle slot | `NI.oracle(item, a.oracle)`; `--oracle` absent, so ZERO | n/a (zero) |
+  | memory records | written by the world at bout close: [heard token, own displacement since hearing / 24, ate flag]; wiped at death | yes (own experience); close triggers = scaffold |
+  | PPO reward / value / GAE | 20x own drive reduction; own death ends the trace | yes |
+  | head target | `item["sec"]` at the hearing step, masked by `own_meal_mask` to bouts the agent ENDED BY EATING the item | yes: when labelled, the agent ate the item, so the item's sector equals the sector of its own displacement from the hearing place (item offset = round(d (cos, sin)) of that sector) |
+  | head mask (own meal) | `closed & ate` (own eat) in the replayed sequence | yes |
+  | curriculum frontier | world-side d sampler from population reach (not an input, not a target) | scaffold (the registered curriculum) |
+  | hunger gate / first-hearing demo gate | world-side | approved scaffolds |
+
+  - Flagged earlier and fixed: the unmasked head label (seed 0 = pilot).
+  - So seed 1 proceeds as queued.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
