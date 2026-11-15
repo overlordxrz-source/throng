@@ -7784,7 +7784,7 @@ more expensive, because it produces publishable-looking nulls.
   - **(d) Oracle #2 at the same steps:** frontier 3 at 2.5M, 11 at 4.9M, 17 at 7.4M, 20 at 12.3M (reach 0.63-0.74);
     final reach at d = 1 / 2 / 3: 0.96 / 0.98 / 0.70. No per-distance snapshots exist for oracle #2.
 
-- **RESULT (Nov 15 ~10:00): THE STAGE-2 COST LEVER WORKS** (dev copy `w2/learner_w2_kv.py` + `w2/ep_agent_dev.py`; the
+- **RESULT (Nov 15 ~09:54): THE STAGE-2 COST LEVER WORKS** (dev copy `w2/learner_w2_kv.py` + `w2/ep_agent_dev.py`; the
   running seeds are untouched). `docs/data/learner_w2/kv_lever/`.
   - The replay computes keys / values once per sequence: for the start-of-sequence memory (96 slots) plus the
     records written during the sequence (<= 64). A (T, 96 + 64) validity mask is rebuilt from write times, slots and
