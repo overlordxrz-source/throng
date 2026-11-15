@@ -8052,6 +8052,15 @@ more expensive, because it produces publishable-looking nulls.
     - ORACLE REDO: mastered frontier **D >= 6 p 0.5; D = 12 (cap) p 0.15; D < 6 (stop) p 0.5**;
     - steps to reach D <= 1.5e7: p 0.6.
 
+- **RESULT (Nov 15 ~12:45): HONEST-GATE CONTROLS: BOTH PASS** (port_w2 `--gate honest`, gated, size 0.1, W 32,
+  1.5e7 steps; `docs/data/port_w2/honest_gate/`).
+  - POSITIVE (scripted follower): 23 advances, **frontier 24 (cap)**; all 47 windows 1.000.
+  - NEGATIVE (follower giving up on 30% of bouts): **0 advances, frontier stays 1**; 49 windows, mean 0.703, max
+    0.723.
+  - Predictions HIT (p 0.9 / 0.95).
+- **LAUNCH (Nov 15 ~12:46): ORACLE REDO** on the laptop: `port_w2.py --oracle --hunger-gate --item-size 0.1 --W 32
+  --steps 3e7 --gate honest` (comm-toy, seed 0), chunked with exact resume.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
