@@ -62,12 +62,14 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--d", type=int, required=True); ap.add_argument("--hidden", action="store_true")
     ap.add_argument("--lam", type=float, default=0.95); ap.add_argument("--gamma", type=float, default=0.99)
-    ap.add_argument("--tier", choices=["T1", "T2", "T3"], default="T1"); ap.add_argument("--learner", choices=["L1", "L2", "scripted"], default="L1")
+    ap.add_argument("--tier", choices=["T1", "T2", "T3"], default="T1"); ap.add_argument("--learner", choices=["L1", "L2", "L3", "scripted"], default="L1")
     ap.add_argument("--kl", type=float, default=0.3); ap.add_argument("--steps", type=float, default=1e6)
     ap.add_argument("--B", type=int, default=256); ap.add_argument("--T", type=int, default=32); ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--episodes-per-life", type=int, default=8, help="T3: episodes sharing one random code (memory carried within a life)")
     ap.add_argument("--epochs", type=int, default=2); ap.add_argument("--minibatches", type=int, default=1, help="harness default: 2 full-batch epochs")
     ap.add_argument("--lr", type=float, default=3e-4)
+    ap.add_argument("--evo-pop", type=int, default=32); ap.add_argument("--evo-elite", type=int, default=8); ap.add_argument("--evo-eps", type=int, default=64)
+    ap.add_argument("--evo-sigma", type=float, default=0.3); ap.add_argument("--evo-sigma-body", type=float, default=0.02)
     ap.add_argument("--move-cost", type=float, default=DMOVE, help="audit only: the per-move energy cost (harness 0.003)")
     ap.add_argument("--eval-episodes", type=int, default=512); ap.add_argument("--curve-every", type=int, default=10)
     ap.add_argument("--navs", default="w2_out/nav_w13/*.msgpack"); ap.add_argument("--out", required=True)
@@ -76,7 +78,7 @@ def main():
     rng = np.random.default_rng(a.seed); FIXED = jnp.asarray(rng.permutation(8))     # T2: one code for all lives
     Dx = 100 + 11 + 6 + 1 + (8 if a.tier == "T1" else 0)
     # ---- learner
-    if a.learner == "L1":
+    if a.learner in ("L1", "L3"):            # L3 = evolution of L1's side_enc + GRU + side head (v2's machinery); trunk frozen
         net = RecAgent(128); Hd = 128
         p = net.init(jax.random.PRNGKey(a.seed), jnp.zeros((Hd,)), jnp.zeros((Dx,)))
         nav = flax.serialization.from_bytes(Net().init(jax.random.PRNGKey(1), jnp.zeros((1, 100))), open(sorted(glob.glob(a.navs))[0], "rb").read())["params"]
@@ -204,7 +206,41 @@ def main():
         return n_ok / max(n_ep, 1)
 
     out = dict(cfg=vars(a), cap=cap, curve=[])
-    if net is None:                                             # the scripted positive control: evaluation only
+    if a.learner == "L3":
+        GR = ("side_enc", "gru", "side_head"); P_, E_, er = a.evo_pop, a.evo_eps, np.random.default_rng(a.seed + 7)
+        SIGG = {g: (a.evo_sigma if g == "side_head" else a.evo_sigma_body) for g in GR}
+        base = {g: p["params"][g] for g in GR}
+        def mut(m):
+            return {g: jax.tree_util.tree_map(lambda w: w + jnp.asarray(er.normal(0, SIGG[g], w.shape), jnp.float32), m[g]) for g in GR}
+        pop = [base] + [mut(base) for _ in range(P_ - 1)]
+        def member_eps(mp, key):
+            """one member's E_ episodes in parallel (shared keys across members = common random numbers); reach rate"""
+            pp_ = {"params": {**p["params"], **mp}}
+            st = env_reset(key, E_, None); h = jnp.zeros((E_, Hd)); code = jnp.tile(FIXED[None], (E_, 1)); done = jnp.zeros(E_, bool); ok = jnp.zeros(E_, bool)
+            def body(c, k):
+                st, h, done, ok = c
+                base_, hear, _ = obs(st["pos"], st["fpos"], st["alive_f"], st["E"], st["t"], st["sec"], code, jnp.zeros(E_, jnp.int32))
+                x = build_x(base_, hear, st["sec"], st["pa"], st["pr"], jnp.zeros(E_, jnp.int32))
+                h2, lg, _, _ = jax.vmap(lambda hh, xx: net.apply(pp_, hh, xx))(h, x); act = jax.random.categorical(k, lg)
+                st2, r, dn, ate = env_step(st, act)
+                keep = done[:, None]
+                st3 = jax.tree_util.tree_map(lambda u, w: jnp.where(done.reshape((-1,) + (1,) * (u.ndim - 1)), u, w), st, st2)
+                return (st3, jnp.where(keep, h, h2), done | dn, ok | (ate & ~done)), (~done).sum()
+            (_, _, _, ok), live = jax.lax.scan(body, (st, h, done, ok), jax.random.split(jax.random.fold_in(key, 1), cap))
+            return ok.mean(), live.sum()
+        score = jax.jit(jax.vmap(member_eps, in_axes=(0, None)))
+        steps, gen, t0 = 0, 0, time.time()
+        out["eval_init"] = {m_: evaluate(p, i, 777) for i, m_ in enumerate(("true", "shuffled", "silence"))}
+        while steps < a.steps:
+            stk = jax.tree_util.tree_map(lambda *ls: jnp.stack(ls), *pop)
+            fit, live = score(stk, jax.random.PRNGKey(10_000 + gen)); fit = np.asarray(fit); steps += int(np.asarray(live).sum())
+            order = np.argsort(-fit); elites = [pop[i] for i in order[:a.evo_elite]]
+            out["curve"].append(dict(gen=gen, steps=steps, best=float(fit.max()), elite_mean=float(fit[order[:a.evo_elite]].mean()), mean=float(fit.mean())))
+            pop = elites + [mut(elites[er.integers(a.evo_elite)]) for _ in range(P_ - a.evo_elite)]; gen += 1
+        p = {"params": {**p["params"], **elites[0]}}
+        out["eval"] = {m_: evaluate(p, i, 777) for i, m_ in enumerate(("true", "shuffled", "silence"))}
+        out["train_seconds"] = round(time.time() - t0, 1); out["generations"] = gen
+    elif net is None:                                             # the scripted positive control: evaluation only
         out["eval"] = {m_: evaluate(None, i, 777) for i, m_ in enumerate(("true", "shuffled", "silence"))}
     else:
         key = jax.random.PRNGKey(a.seed + 1); st = env_reset(key, B, None)
