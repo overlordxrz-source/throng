@@ -7805,7 +7805,7 @@ more expensive, because it produces publishable-looking nulls.
   - Check the generic-food suspect.
   - If seed 0 passes the check, **seeds 1-2 may run on learner_w2_kv.py** (registered before seed 1). Seed 0
     stays on learner_w2.py. The KV replay is accepted as the stage-2 implementation.
-- **RESULT (Nov 15 ~10:15): THE GENERIC-FOOD SUSPECT: NOT THE CAUSE.**
+- **RESULT (Nov 15 ~10:05): THE GENERIC-FOOD SUSPECT: NOT THE CAUSE.**
   - Seed 0 snapshot at 19.5M steps, **frontier 6**: it has passed 5, and the frontier never drops, so the
     early-stop check will pass.
   - **Design fact, a disclosed deviation from the spec's "next meal" wording:** in the W2 world a bout's record
@@ -7832,7 +7832,7 @@ more expensive, because it produces publishable-looking nulls.
     discarded.
   - The readout names the implementation per seed.
 
-- **RESULT (Nov 15 ~10:45): THE READ vs CUMULATIVE HEARINGS** (Cam's item 2). Head accuracy on 2nd+ hearings at
+- **RESULT (Nov 15 ~10:26): THE READ vs CUMULATIVE HEARINGS** (Cam's item 2). Head accuracy on 2nd+ hearings at
   d = 3, where the item is unseen in both worlds (toy hidden: visible only when adjacent).
   `docs/data/learner_w2/readcurve/`.
   - **Toy seeds 8-12** (bit-identical replays with weight snapshots; snapshot labels corrected for a file-name
