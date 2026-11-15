@@ -8076,6 +8076,24 @@ more expensive, because it produces publishable-looking nulls.
     - The gate's hungry flag (own energy vs H) is used only by the world-side curriculum and the evaluator.
     - **No flags.**
 
+- **RESULT (Nov 15 13:01): ORACLE REDO (honest gate, laptop, 3e7 steps): MASTERS frontier 22, so D = 12 (cap).
+  It reached D = 12 at 18.1M steps (> 1.5e7), so per Cam the learner's step budget needs his ruling.**
+  `docs/data/port_w2/oracle3/`.
+  - Advances: 1 -> 2 at 5.4M; 3 at 10.8M; 4-9 between 13.2M and 15.6M; 10-16 between 17.3M and 19.9M; 17-22 between
+    20.4M and 23.2M. Each advance needed two consecutive 2000-hungry-bout windows >= 0.80 (window pairs printed in
+    the log).
+  - At frontier 22, the last 7M steps' windows are 0.65-0.78, so 23 was never mastered.
+  - **Evaluation (learner_w2_kv evaluator, necessity keys):**
+    - d = 12: reach 0.803, 2nd half 0.810; **hungry-bout reach 0.861, 2nd half 0.863** (n 1679); mean life 3000.
+    - d 1-22 reach by d: 0.98 / 0.97 / 0.87 (d 1-3), 0.79-0.82 (d 4-10), 0.72-0.79 (d 11-22); hungry reach
+      overall 0.857.
+  - Far better than oracle #2 (0.65 at d = 12): the honest gate held the curriculum until mastery.
+  - **Learner bar at D = 12:** 2nd-half hungry-bout reach >= 0.9 x 0.863 = **0.777**, AND >= shuffled + 0.30, AND
+    >= 2x shuffled; life >= 1.3x the new twin's. Early stop: frontier not past 6 by 2.5e7.
+  - Predictions scored: D >= 6 (p 0.5) HIT; D = 12 (p 0.15) HIT; <= 1.5e7 steps to D (p 0.6) MISSED (18.1M).
+- **LAUNCH (13:03): TWIN REDO** (laptop): port_w2 without `--oracle`, frontier replayed from the oracle redo's log,
+  3e7 steps; evaluations at d = 12 and d 1-22 follow.
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
