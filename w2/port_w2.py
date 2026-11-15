@@ -96,7 +96,7 @@ def main():
             item2, closed, opened = NI.close_and_open(item, on_item, dead, s3, k3, dfn_of(dfront), L, gated, H)
             ncode = jax.vmap(lambda kk: jax.random.permutation(kk, 8))(jax.random.split(k4, N))
             code2 = jnp.where(dead[:, None], ncode, code); h3 = jnp.where(dead[:, None], 0.0, h2)
-            return (s3, item2, h3, act, r, code2), (x, act, lp, v, r, dead.astype(jnp.float32), h, on_item, closed & ~dead, gain, pd, item["es"], item["d"], item["act"])
+            return (s3, item2, h3, act, r, code2), (x, act, lp, v, r, dead.astype(jnp.float32), h, on_item & ~dead, closed & ~dead, gain, pd, item["es"], item["d"], item["act"])
         return jax.lax.scan(body, c, jax.random.split(key, T))
     roll = jax.jit(jax.vmap(rollout_world, in_axes=(None, 0, 0, None)))
 

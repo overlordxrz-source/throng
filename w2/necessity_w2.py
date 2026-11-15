@@ -90,17 +90,17 @@ def main():
             item2, closed, opened = NI.close_and_open(item, on_item, dead, s3, k3, dfn, L, gated, H)
             ncode = jax.vmap(lambda kk: jax.random.permutation(kk, 8))(jax.random.split(k4, a.N))
             code2 = jnp.where(dead[:, None], ncode, code); h3 = jnp.where(dead[:, None], 0.0, h2)
-            fullpaid = on_item & (s.energy + S <= cfg.E_set + 1e-6)
-            return (s3, item2, h3, act, r * 20.0, code2), (gain * s.alive, on_item, closed & ~dead, s.alive, dead, pd * s.alive, opened, fullpaid, item["act"])
+            fullpaid = on_item & ~(~s2.alive) & (s.energy + S <= cfg.E_set + 1e-6)
+            return (s3, item2, h3, act, r * 20.0, code2), (gain * s.alive, on_item & ~dead, closed & ~dead, s.alive, dead, pd * s.alive, opened, fullpaid, item["act"])
         _, Z = jax.lax.scan(body, (s, item, h, pa, pr, code), jax.random.split(jax.random.fold_in(key, 2), a.steps))
-        return tuple(z.sum() for z in Z)
+        return tuple(z.sum() for z in Z) + (Z[4][-1].sum(),)      # last: deaths on the final step (they start no counted life)
 
     runj = jax.jit(run, static_argnums=(0,))
     res = {}; PER = {}
     for pol in ("navigator", "v2best", "follower") + (("trained",) if trp is not None else ()):
         Zs = np.array([[float(q) for q in runj(pol, a.seed * 1000 + w)] for w in range(a.W)])     # (W, 9)
-        g, ate_i, ren, alv, dd, pd, opn, fp, inb = Zs.sum(0); lives = a.W * a.N + dd
-        PER[pol] = (Zs[:, 5], a.N + Zs[:, 4], Zs[:, 0], Zs[:, 3])     # per world: paid, lives, food, agent-steps
+        g, ate_i, ren, alv, dd, pd, opn, fp, inb, dl = Zs.sum(0); lives = a.W * a.N + dd - dl    # lives with >= 1 step
+        PER[pol] = (Zs[:, 5], a.N + Zs[:, 4] - Zs[:, 9], Zs[:, 0], Zs[:, 3])     # per world: paid, lives, food, agent-steps
         res[pol] = dict(food_per_step=g / alv, paid_per_life=pd / lives, paid_per_step=pd / alv, lives=int(lives), deaths=int(dd),
                         mean_life_steps=alv / lives, items_eaten=int(ate_i), bouts_opened=int(opn), item_reach_rate=ate_i / max(ren, 1),
                         item_meals_fully_paid=fp / max(ate_i, 1), frac_steps_in_bout=inb / alv, agent_steps=int(alv))   # ren counts every closed bout
