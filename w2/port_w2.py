@@ -48,14 +48,16 @@ def main():
     ap.add_argument("--lookahead", type=float, default=0.0, help="Cam Nov 16 ~01:00: with this probability a bout's d is drawn from frontier+1 .. --la-max; the gate scores only d <= frontier")
     ap.add_argument("--la-max", type=int, default=12)
     ap.add_argument("--giveup", type=float, default=0.0, help="NEGATIVE gate control (with --policy follower): give up at random on this fraction of bouts")
+    ap.add_argument("--ent-bout", type=float, default=None, help="Cam Nov 16 ~17:25Z O-X: the entropy coefficient on in-bout steps (x[108] = the bout flag); off-bout stays 0.01")
+    ap.add_argument("--topo", action="store_true", help="Cam Nov 16 ~17:25Z O-T: the topographic tie in RecAgent (move logits += g P s, g learned, init 0)")
     ap.add_argument("--out", required=True)
     a = ap.parse_args()
     S = a.item_size; gated = a.hunger_gate; nupd = a.eval_only or a.policy == "follower"
     cfg = env.Cfg(L=96, N=a.N, patch_sigma=1.0, reproduce=False, A_max=3000, **world_kw(a.world)); L, W, N, T = cfg.L, a.W, a.N, a.T
     nav = flax.serialization.from_bytes(Net().init(jax.random.PRNGKey(1), jnp.zeros((1, 100))), open(sorted(glob.glob(a.navs))[0], "rb").read())
-    rnet = RecAgent(128); Dx = 100 + 11 + 6 + 1 + 8                 # the harness layout (oracle slot always present; zero when off)
+    rnet = RecAgent(128, topo=a.topo); Dx = 100 + 11 + 6 + 1 + 8                 # the harness layout (oracle slot always present; zero when off)
     rp = rnet.init(jax.random.PRNGKey(a.seed), jnp.zeros((128,)), jnp.zeros((Dx,)))
-    pp = {k: dict(v) for k, v in rp["params"].items()}
+    pp = {k: (dict(v) if hasattr(v, "items") else v) for k, v in rp["params"].items()}
     for k in ("Dense_0", "Dense_1", "Dense_2", "Dense_3"):
         pp[k] = dict(nav["params"][k])
     p = {"params": pp}                                                # trunk UNFROZEN (nothing zeroed in the gradient)
@@ -122,7 +124,10 @@ def main():
         ls = jax.nn.log_softmax(lg); lp = jnp.take_along_axis(ls, bt["act"][:, None], 1)[:, 0]
         ratio = jnp.exp(jnp.clip(lp - bt["lp"], -20.0, 20.0)); adv = bt["adv"]
         pg = -jnp.minimum(ratio * adv, jnp.clip(ratio, 0.8, 1.2) * adv)
-        return (pg + 0.5 * (v - bt["ret"]) ** 2 + 0.01 * (jnp.exp(ls) * ls).sum(-1)).mean()
+        if a.ent_bout is None:
+            return (pg + 0.5 * (v - bt["ret"]) ** 2 + 0.01 * (jnp.exp(ls) * ls).sum(-1)).mean()
+        ec = jnp.where(bt["x"][..., 108] > 0, a.ent_bout, 0.01)              # O-X: in-bout entropy coefficient
+        return (pg + 0.5 * (v - bt["ret"]) ** 2 + ec * (jnp.exp(ls) * ls).sum(-1)).mean()
 
     @jax.jit
     def upd(pp_, os_, bt):

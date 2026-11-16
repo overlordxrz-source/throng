@@ -85,6 +85,7 @@ def main():
     ap.add_argument("--early-stop-frontier", type=float, default=0.0, help="stop (counted FAIL) if the frontier has not passed this by half the steps")
     ap.add_argument("--eval-necessity", default="", help="EVAL: comma list of modes (0,3,4) on the necessity keys; no training")
     ap.add_argument("--eval-W", type=int, default=32); ap.add_argument("--eval-steps", type=int, default=3000)
+    ap.add_argument("--topo", action="store_true", help="TRAJ: evaluate a RecAgent with the topographic tie (O-T)")
     ap.add_argument("--logits", action="store_true", help="TRAJ: also record the total, trunk (current params) and pretrained-navigator logits")
     ap.add_argument("--traj-out", default=""); ap.add_argument("--eval-mix-la", type=float, default=0.0)
     ap.add_argument("--d-fixed", type=int, default=0); ap.add_argument("--eval-d-max", type=int, default=12)
@@ -99,9 +100,9 @@ def main():
     if ep:
         rnet = EpAgentDev(S=a.slots, use_hind=a.hindsight > 0, shared_tok=a.shared_tok); Hd = 128 + a.slots * 11 + 1   # same params as EpAgent
     else:
-        rnet = RecAgent(128); Hd = 128
+        rnet = RecAgent(128, topo=a.topo); Hd = 128
     rp = rnet.init(jax.random.PRNGKey(a.seed), jnp.zeros((Hd,)), jnp.zeros((Dx,)))
-    pp = {k: dict(v) for k, v in rp["params"].items()}
+    pp = {k: (dict(v) if hasattr(v, "items") else v) for k, v in rp["params"].items()}
     for k in ("Dense_0", "Dense_1", "Dense_2", "Dense_3"):
         pp[k] = dict(nav["params"][k])
     p = {"params": pp}

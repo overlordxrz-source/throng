@@ -52,6 +52,11 @@ class NetP(nn.Module):
         return nn.Dense(6, name="Dense_2")(h), nn.Dense(1, name="Dense_3")(h)[..., 0], nn.Dense(100, name="pred")(h)
 
 
+# P[m, k] = max(0, cos(angle of move m - k * 45 deg)); moves 1..4 = -x, +x, +y, -y (env.MOVES); sector k at k * 45 deg (x = cos, y = sin)
+_MV_ANG = jnp.array([jnp.pi, 0.0, jnp.pi / 2, -jnp.pi / 2])
+TOPO_P = jnp.maximum(0.0, jnp.cos(_MV_ANG[:, None] - jnp.arange(8)[None, :] * (jnp.pi / 4)))
+
+
 class RecAgent(nn.Module):
     """Stage 1 (Cam Nov 12): the navigator trunk (frozen; loaded from navigator 0) + a GRU memory that reads the heard
     token, the trunk's view features, the previous action and reward. A zero-initialised head adds to the policy and the
@@ -59,6 +64,8 @@ class RecAgent(nn.Module):
     the next meal (hindsight label), the parent's next move, the next view."""
     hd: int = 128
     bound: float = 0.0          # > 0: the side head's logit contribution is bound * tanh(raw / bound)
+    topo: bool = False          # Cam Nov 16 ~17:25Z O-T: move logits += g * P @ s (s = x[topo_at: topo_at + 8]); g learned, init 0
+    topo_at: int = 118          # the oracle one-hot's slot in the harness layout (100 view + 11 heard + 6 act + 1 reward)
 
     @nn.compact
     def __call__(self, h, x):
@@ -70,6 +77,9 @@ class RecAgent(nn.Module):
         zi = nn.initializers.zeros
         sh = nn.Dense(6, name="side_head", kernel_init=zi, bias_init=zi)(y)
         lg = lg_nav + (self.bound * jnp.tanh(sh / self.bound) if self.bound > 0 else sh)
+        if self.topo:                                                       # the TOPOGRAPHIC TIE (off: no parameter, no change)
+            g = self.param("topo_g", nn.initializers.zeros, ())
+            lg = lg + g * jnp.concatenate([jnp.zeros(x.shape[:-1] + (1,)), x[..., self.topo_at: self.topo_at + 8] @ TOPO_P.T, jnp.zeros(x.shape[:-1] + (1,))], -1)
         v = v_nav + nn.Dense(1, name="side_value", kernel_init=zi, bias_init=zi)(y)[..., 0]
         meal = nn.Dense(9, name="aux_meal")(y); other = nn.Dense(5, name="aux_other")(y)
         view = nn.Dense(49, name="aux_view")(jnp.concatenate([t, y], -1))
