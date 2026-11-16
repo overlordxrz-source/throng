@@ -8,7 +8,8 @@ Sectors: angle = sec * 45 deg, x = cos, y = sin (placement convention); sector_o
 A move (a in 1..4, MOVES) "points into" sector k if the angle between the move and sector k's direction is <= 45 deg
 (one move for a cardinal sector, two for a diagonal one).
 
-D1  per bout step k = 0..12, at each d: head accuracy against the TRUE sector from the young's CURRENT position, against
+D1  per bout step k = 0..12, at each d: head accuracy against the TRUE sector from the young's CURRENT position (over
+    steps NOT on the item: "cur / ncur"; "onitem" counts the excluded steps), against
     the start sector, and the share of moves pointing into the head's argmax sector (and into the true current sector).
 D3  right-head later bouts that time out, flags (overlapping) and an exclusive class in Cam's order:
     (i) never toward: the projection of (pos - start) on the sector direction never reaches 1 cell;
@@ -86,10 +87,12 @@ def analyse(f, oracle=False):
         if hr and not oracle:                                               # D1
             for k in range(0, min(13, s1 - s0 + 1)):
                 s = s0 + k; pos = g("pos", s).astype(int); rel = torus(ipos - pos)
-                e = D1.setdefault(f"d{d}", {}).setdefault(k, dict(n=0, cur=0, start=0, nmove=0, into_head=0, into_cur=0))
+                e = D1.setdefault(f"d{d}", {}).setdefault(k, dict(n=0, ncur=0, cur=0, onitem=0, start=0, nmove=0, into_head=0, into_cur=0))
                 hk = int(g("hl", s)); e["n"] += 1
-                if rel.any():
-                    e["cur"] += int(hk == sector_of(rel))
+                if rel.any():                                               # the current sector is undefined ON the item: excluded (fix, Nov 16)
+                    e["ncur"] += 1; e["cur"] += int(hk == sector_of(rel))
+                else:
+                    e["onitem"] += 1
                 e["start"] += int(hk == sec)
                 a = int(g("a", s))
                 if 1 <= a <= 4:
