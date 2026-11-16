@@ -145,6 +145,7 @@ def main():
     ap.add_argument("--move-cost", type=float, default=DMOVE, help="audit only: the per-move energy cost (harness 0.003)")
     ap.add_argument("--eval-episodes", type=int, default=512); ap.add_argument("--curve-every", type=int, default=10)
     ap.add_argument("--navs", default="w2_out/nav_w13/*.msgpack"); ap.add_argument("--out", required=True)
+    ap.add_argument("--count-labels", action="store_true", help="LOGGING ONLY (Cam Nov 16 ~10:15Z, bisection step 0): per curve interval, hearings, later hearings, MEMORY-ONLY hearings (later, d >= 3, food not in view), the head labels on them, and the head's training-batch accuracy on later hearings")
     a = ap.parse_args()
     d, cap, B, T = a.d, 4 * a.d, a.B, a.T
     rng = np.random.default_rng(a.seed); FIXED = jnp.asarray(rng.permutation(8))     # T2: one code for all lives
@@ -316,7 +317,8 @@ def main():
             reset = (newlife if a.tier == "T3" else done).astype(jnp.float32)      # when the rollout wiped the memory
             first_now = ~jnp.take_along_axis(st["seen"], tok_now[:, None], 1)[:, 0]
             return (st3, h3, code2, ep3), (x, act, lp, v, r, done.astype(jnp.float32), ate, h, reset, ep_in_life,
-                                           st["sec"], hl, first_now, (st["t"] == 0), ent)
+                                           st["sec"], hl, first_now, (st["t"] == 0), ent,
+                                           st["dd"], jnp.all(jnp.abs(torus(st["fpos"] - st["pos"])) <= 1, -1) & st["alive_f"])
         return jax.lax.scan(body, carry, jax.random.split(key, T))
     roll = jax.jit(rollout, static_argnums=(3, 5))
 
@@ -437,7 +439,7 @@ def main():
         else:
             out["eval_init"] = ({m_: evaluate(p, i, 777) for i, m_ in enumerate(("true", "shuffled", "silence"))} if a.tier != "T3" else None)
         t_start = time.time(); SAVE_AT = [float(z) for z in a.save_params_at.split(",") if float(z) > steps] if a.save_params_at else []   # (fix: skip milestones already passed before this chunk)
-        ep_first = np.zeros(B, bool); fm = [0, 0]; saved_d5 = any(c_.get("d", 0) >= 5 for c_ in out["curve"])
+        CNT = {}; ep_first = np.zeros(B, bool); fm = [0, 0]; saved_d5 = any(c_.get("d", 0) >= 5 for c_ in out["curve"])
         while steps < a.steps:
             if a.ckpt and it % a.ckpt_every == 0 and it > 0:
                 _ck.save(a.ckpt, dict(p=p, ost=ost, c=c, key=key, steps=steps, it=it, d_cur=d_cur, recent=recent, curve=out["curve"],
@@ -481,6 +483,13 @@ def main():
                     open(f"{a.save_params}.at{SAVE_AT[0]:.0e}", "wb").write(flax.serialization.to_bytes(p)); SAVE_AT.pop(0)
                 if not saved_d5 and d_cur >= 5:
                     open(f"{a.save_params}.d5", "wb").write(flax.serialization.to_bytes(p)); saved_d5 = True; out["d5_at_steps"] = steps
+            if a.count_labels:                                       # logging only: no effect on the rollout, the update or the curriculum
+                t0c, fnc, ddc, vsc = np.asarray(R_[13]), np.asarray(R_[12]), np.asarray(R_[15]), np.asarray(R_[16])
+                latc = t0c & ~fnc; moc = latc & (ddc >= 3) & ~vsc; mkc = (mk > 0) if a.hindsight > 0 else np.zeros_like(t0c)
+                okc = np.asarray(R_[11]).argmax(-1) == secs
+                for k_, v_ in (("n_hear", t0c.sum()), ("n_later", latc.sum()), ("n_memonly", moc.sum()), ("n_memonly_lab", (moc & mkc).sum()),
+                               ("n_lab_hear", (t0c & mkc).sum()), ("head_ok_later", (okc & latc).sum())):
+                    CNT[k_] = CNT.get(k_, 0) + int(v_)
             if a.curriculum:                                                        # episodes that ended this rollout, at the current d
                 recent.extend((ate[dn > 0]).astype(int).tolist()); recent = recent[-500:]
                 if len(recent) >= 500 and np.mean(recent) >= 0.8 and d_cur < a.d_max:
@@ -496,7 +505,8 @@ def main():
                 out["curve"].append(dict(steps=steps, d=d_cur, reach_train=float(ate.sum() / max(dn.sum(), 1)), sec=round(time.time() - t0, 1), **diag,
                                          act_freq=[round(float(q), 3) for q in actf], adv_by_act=[round(float(adv[at == k].mean()), 3) if (at == k).any() else None for k in range(6)],
                                          ret_mean=round(float(ret.mean()), 3), r_eat=round(float(r[ate].mean()), 3) if ate.any() else None,
-                                         **({"dem_frac": float(np.asarray(c[0]["dem_on"]).mean())} if a.demonstrator else {})))
+                                         **({"dem_frac": float(np.asarray(c[0]["dem_on"]).mean())} if a.demonstrator else {}), **({"counts": CNT} if a.count_labels else {})))
+                CNT = {}
         out["train_seconds"] = round(time.time() - t0, 1)
         if a.save_params:
             open(a.save_params, "wb").write(flax.serialization.to_bytes(p))
