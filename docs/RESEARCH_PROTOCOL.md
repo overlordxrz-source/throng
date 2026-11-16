@@ -8762,6 +8762,67 @@ more expensive, because it produces publishable-looking nulls.
       true.
     - D5: COMPOSITION explains the gap (p 0.65): on the training mix the eval head on later hearings is >= 0.90, with
       d <= 2 / item-visible hearings near 1.0 and unseen d = 3 near 0.8.
+- **RESULT (entry stamped Nov 16 12:08:53 EST): THE POLICY-SIDE DIAGNOSIS D1-D5 on seed 6's 3e7 weights**
+  (`docs/data/learner_w2/relabel_screen/policy_diag/`; tools comm-toy b58fa93).
+  - **Identity PASS:** the trajectory tool equals the registered evals on every shared field (learner d = 3 modes
+    0/3/4, 27 fields each; oracle d = 12 vs `eval_d12_repro.json`, 26 fields; and at 5e7, d = 3 vs `diag_rl5`).
+  - **D1, THE HEAD HOLDS** (later bouts, head right at the hearing):
+    - Against the START sector it stays at 0.88-0.99 over steps 0-12 (d = 3, 8, 12).
+    - Against the sector from the CURRENT position: d = 3: 1.00 / 0.99 / 0.90 / **0.63** at steps 0-3, then
+      0.65-0.74. d = 8: >= 0.85 through step 7, 0.61-0.70 after. d = 12: >= 0.78 through step 11.
+    - Of the MOVES made at steps 0-3, 0.75-0.88 point into the head's sector. But only about half the steps are moves.
+    - Cam's first-branch condition (< 0.5 by step 3) is NOT met.
+  - **D3, RIGHT-HEAD TIMEOUTS** (flags overlap; exclusive class in Cam's order; min = minimum Chebyshev distance to the item):
+
+    | | n | (i) never toward | (ii) arc | (iii) generic food | (iv) dithers | exclusive: i / ii / iii / iv / other | mean min |
+    |---|---|---|---|---|---|---|---|
+    | learner d = 3 | 2,556 | 0.78 | 0.03 | 0.28 | 0.69 | 0.78 / 0.03 / 0.07 / 0.03 / 0.10 | 2.4 |
+    | learner d = 8 | 1,220 | 0.50 | 0.10 | 0.45 | 0.51 | 0.50 / 0.10 / 0.22 / 0.06 / 0.12 | 6.2 |
+    | learner d = 12 | 798 | 0.40 | 0.09 | 0.55 | 0.46 | 0.40 / 0.09 / 0.32 / 0.08 / 0.11 | 8.6 |
+    | oracle d = 3 | 845 | 0.85 | 0.09 | 0.26 | 0.87 | 0.85 / 0.09 / 0.05 / 0.01 / 0.01 | 1.9 |
+    | oracle d = 8 | 807 | 0.72 | 0.12 | 0.35 | 0.82 | 0.72 / 0.12 / 0.14 / 0.02 / 0.00 | 5.3 |
+    | oracle d = 12 | 813 | 0.66 | 0.15 | 0.44 | 0.75 | 0.66 / 0.15 / 0.19 / 0.01 / 0.00 | 6.9 |
+
+  - **THE MECHANISM: a direction-specific FREEZE** (follow-up split, not registered; `reach_by_sector.txt`,
+    `actions_by_sector.txt`).
+    - Reach given a right head, learner at d = 3, by item sector 0-7 (sector k at k x 45 deg; 0 = +x, 2 = +y):
+      **0.96 0.75 0.93 | 0.01 0.01 0.00 0.02 0.05**. Same shape at d = 12: 0.81 0.29 0.73 | 0.00 x 5.
+    - In sectors 3-7 the young does not walk: on those bouts it stays or eats about 95% of the time and steps -x or
+      -y 1-2% of the time. Outside bouts it steps -x 9% and -y 14% of the time; following the parent it steps
+      -x 42% (sector 4) and -y 51% (sector 6). So it CAN make these moves; it does not make them from its own read.
+    - **The oracle has the same failure in ONE sector:** reach by sector at d = 3 is 0.97 0.95 0.96 **0.01** 0.97
+      0.81 0.97 0.97 (d = 12: sector 3 0.00). In sector 3 it stays 92% of the time. **Its 0.861 reference is
+      therefore ~7/8 of a policy that reaches ~0.95 in each of its other sectors.**
+    - **The learner acquires directions one at a time.** At 5e7 (eval at d = 3; identity checked) right-head reach by
+      sector is 0.95 0.70 0.92 | 0.00 0.00 0.00 | **0.89 0.69**: the -y sectors (6, 7) were learned between 3e7 and
+      5e7. Every sector that needs a -x step (3, 4, 5) is still 0.00, with 52-76% stay.
+    - Parent-led (first-hearing) bouts have their own hole at 3e7 (sector 5: 0.06 at d = 3, 0.00 at d = 12; gone by
+      5e7: 0.85).
+  - **D4, the wiped oddity is SECTOR selection.** With the memory wiped the head defaults to sector 0, so 795 of the
+    869 chance-right bouts are sector-0 bouts, where reach is high. By sector, wiped is not above true (sector 0:
+    0.69 vs 0.96). My registered version (selection by previous HEADING) MISSED: within the heading strata wiped
+    is still above true (match 0.70 vs 0.57; no match 0.51 vs 0.27).
+  - **D5, the head gap is MEMORY CONTENT, not the d mix.**
+    - On the training mix (frontier 3, lookahead 0.25) the eval head on later hearings is 0.972 (batch ~0.95). By
+      d it is >= 0.92 everywhere, with unseen d = 3 at **0.954** inside the mix, against 0.802 in the fixed d = 3
+      eval. So composition by d does not explain the gap: my prediction MISSED.
+    - What does: head accuracy given that this life's previous bout of the same sector was SOLVED is 0.99, against
+      0.67 after an UNSOLVED one (d = 3 eval). 59% of the fixed d = 3 eval's later hearings follow an unsolved bout,
+      against 35% on the mix (where the unsolved case is still 0.93).
+    - The freeze leaves unsolved latest records in 5 sectors, and those degrade the read: a knock-on of the policy
+      failure.
+  - **Predictions:**
+    - D1: all HIT (start >= 0.7: 0.88; current >= 0.5 at d = 3: 0.63; >= 0.6 at d = 8: 0.99; branch condition did
+      not occur, p 0.3; into-head >= 0.6 of moves: 0.75-0.88).
+    - D3: (i) <= 0.2 MISSED (0.40-0.78); (iii) >= 0.3 hit at d = 8/12, missed at d = 3 (0.28); (ii) >= 0.3 MISSED
+      (0.03-0.10); dominant class (i) (I gave it 0.15); oracle (ii) >= 0.5 MISSED (0.09-0.15).
+    - D4 MISSED as registered; D5 MISSED.
+  - **None of Cam's three pre-registered branches fits.** The head holds and the oracle has no current-position
+    signal (D2); (ii) is rare; (iii) is a flag in 28-55% of timeouts but the exclusive class in only 7-32%. Class (i)
+    dominates, and it is a FREEZE: in sectors whose move direction the policy has not learned to take from its read,
+    the young stays put until T_max. The oracle shows the same failure in one sector.
+  - Not established: why -x is the last direction (the navigator prior, the zero-initialised side head, or reward
+    timing); whether more steps would add it. One seed.
 - **RESULT (Nov 16 ~01:40): THE LABEL COUNT** (`docs/data/learner_w2/label_count/`; each row is 100 rollout
   iterations, 819k steps, with that checkpoint's weights, world state and frontier, no updates).
   - Definitions: MEMORY-ONLY bout = a later hearing (not the token's first in this life) at d >= 3. By construction

@@ -1,0 +1,106 @@
+[
+ {
+  "file": "/private/tmp/claude-501/-Users-overlord-CascadeProjects-throng/aad77c1d-d7ac-437e-bef4-aa525802ccc0/scratchpad/traj/o_d3_m0.npz",
+  "D1": {},
+  "D3": {
+   "d3": {
+    "n": 845,
+    "i": 716,
+    "ii": 74,
+    "iii": 222,
+    "iv": 735,
+    "vis": 72,
+    "excl": {
+     "i": 716,
+     "iii": 44,
+     "ii": 74,
+     "iv": 6,
+     "other": 5
+    },
+    "mind_hist": {
+     "0": 19,
+     "1": 53,
+     "2": 752,
+     "3": 21
+    },
+    "mind_mean": 1.9171597633136095
+   }
+  },
+  "D4": null,
+  "D5": null
+ },
+ {
+  "file": "/private/tmp/claude-501/-Users-overlord-CascadeProjects-throng/aad77c1d-d7ac-437e-bef4-aa525802ccc0/scratchpad/traj/o_d8_m0.npz",
+  "D1": {},
+  "D3": {
+   "d8": {
+    "n": 807,
+    "i": 584,
+    "ii": 99,
+    "iii": 285,
+    "iv": 665,
+    "vis": 45,
+    "excl": {
+     "i": 584,
+     "ii": 99,
+     "iii": 109,
+     "iv": 14,
+     "other": 1
+    },
+    "mind_hist": {
+     "0": 14,
+     "1": 31,
+     "2": 36,
+     "3": 28,
+     "4": 28,
+     "5": 40,
+     "6": 608,
+     "7": 13,
+     "8": 9
+    },
+    "mind_mean": 5.340768277571252
+   }
+  },
+  "D4": null,
+  "D5": null
+ },
+ {
+  "file": "/private/tmp/claude-501/-Users-overlord-CascadeProjects-throng/aad77c1d-d7ac-437e-bef4-aa525802ccc0/scratchpad/traj/o_d12_m0.npz",
+  "D1": {},
+  "D3": {
+   "d12": {
+    "n": 813,
+    "i": 533,
+    "ii": 120,
+    "iii": 355,
+    "iv": 608,
+    "vis": 38,
+    "excl": {
+     "i": 533,
+     "ii": 120,
+     "iii": 150,
+     "iv": 7,
+     "other": 3
+    },
+    "mind_hist": {
+     "0": 13,
+     "1": 25,
+     "2": 63,
+     "3": 38,
+     "4": 16,
+     "5": 14,
+     "6": 24,
+     "7": 22,
+     "8": 546,
+     "9": 14,
+     "10": 14,
+     "11": 8,
+     "12": 16
+    },
+    "mind_mean": 6.9015990159901595
+   }
+  },
+  "D4": null,
+  "D5": null
+ }
+]
