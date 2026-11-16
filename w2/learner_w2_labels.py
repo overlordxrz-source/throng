@@ -302,6 +302,10 @@ def main():
     if a.count_iters:
         if "gen" not in c:
             c = dict(c, gen=jnp.zeros((W, N), bool))
+        ni = NI.new_item(N); miss = [k_ for k_ in ni if k_ not in c["item"]]  # older (pilot) carries lack later item fields
+        if miss:                                                            # defaults (sat / gu False): label counts do not use them
+            c = dict(c, item=dict(c["item"], **{k_: jnp.broadcast_to(jnp.asarray(ni[k_]), (W,) + jnp.asarray(ni[k_]).shape) for k_ in miss}))
+            print("filled missing item fields with defaults:", miss, flush=True)
         D = 25; Z = lambda: np.zeros(D, np.int64)  # noqa: E731
         cnt = {k_: Z() for k_ in ("hear", "first", "later", "later_seen", "later_unseen", "own", "own_first", "own_later", "own_later_seen", "own_later_unseen")}
         for _i in range(a.count_iters):
