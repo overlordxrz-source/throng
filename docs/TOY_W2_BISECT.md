@@ -1,6 +1,7 @@
 # Toy → W2 bisection plan (Cam Nov 16 ~08:30Z stop-loss)
 
-Status: **plan only, no runs.** It applies only if both last single-tweak screens fail: the lookahead screen
+Status: **plan only, no runs. ACCEPTED by Cam (Nov 16 ~08:40Z) as the plan if the stop-loss fires; step order as
+proposed.** It applies only if both last single-tweak screens fail: the lookahead screen
 (seed 4) and the K-screen. Written by Will, Nov 16 ~03:25 EST, from the code (comm-toy `w2/toy_grid.py`,
 `w2/learner_w2_kv.py` / `_la.py`, `w2/named_item.py`, `w2/env.py`, `w2/ep_agent_dev.py`) and the record
 (`docs/RESEARCH_PROTOCOL.md`).
@@ -94,6 +95,16 @@ curriculum's speed (#3), the budget doubles to 2e7 once, and that is recorded.
 Expected length: 5-8 screens. The build per step is trivial to moderate (new flags, each with a flag-off
 bit-identity check against screen 2's curve, as for every flag so far). Each step's prediction is written before
 it runs.
+
+## Cam's requirements (Nov 16 ~08:40Z)
+
+- Step 0 is toy screen 2 EXACTLY as it was (the same command, flags and seed), so the reference is exact.
+- Every step: 1 seed at screen 2's step budget, the read-forms test above, shuffled and wiped controls reported.
+- A 2-seed confirm only at the step where the read flips.
+- **The "hearings per life" step must reproduce W2's DISTRIBUTION, not just its mean**: ~5-45 hearings per life,
+  memory wiped at death. Build: draw each life's length from W2's measured life-length distribution (from the
+  seed 1 / seed 2 evaluations' per-life records), or end lives by the toy's own energy (`--die-ends-life`) and check
+  the resulting histogram against W2's before the screen counts.
 
 ## What this plan does not do
 
