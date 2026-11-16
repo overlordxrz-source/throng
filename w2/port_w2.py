@@ -49,6 +49,9 @@ def main():
     ap.add_argument("--la-max", type=int, default=12)
     ap.add_argument("--giveup", type=float, default=0.0, help="NEGATIVE gate control (with --policy follower): give up at random on this fraction of bouts")
     ap.add_argument("--ent-bout", type=float, default=None, help="Cam Nov 16 ~17:25Z O-X: the entropy coefficient on in-bout steps (x[108] = the bout flag); off-bout stays 0.01")
+    ap.add_argument("--ent-anneal", type=float, default=0.0, help="Cam Nov 16 ~19:00Z O-X': with --ent-bout E, the in-bout coefficient goes linearly E -> 0.01 over this many steps, then 0.01")
+    ap.add_argument("--reinit-out", action="store_true", help="Cam Nov 16 ~17:55Z (a'): Dense_2 (kernel + bias) keeps its fresh init (the navigator's own init scale); Dense_0/1/3 from the navigator")
+    ap.add_argument("--no-nav", action="store_true", help="Cam Nov 16 ~17:55Z (b'): no navigator init; the whole trunk trains from its fresh init")
     ap.add_argument("--topo", action="store_true", help="Cam Nov 16 ~17:25Z O-T: the topographic tie in RecAgent (move logits += g P s, g learned, init 0)")
     ap.add_argument("--out", required=True)
     a = ap.parse_args()
@@ -59,6 +62,8 @@ def main():
     rp = rnet.init(jax.random.PRNGKey(a.seed), jnp.zeros((128,)), jnp.zeros((Dx,)))
     pp = {k: (dict(v) if hasattr(v, "items") else v) for k, v in rp["params"].items()}
     for k in ("Dense_0", "Dense_1", "Dense_2", "Dense_3"):
+        if a.no_nav or (a.reinit_out and k == "Dense_2"):              # (b') / (a'): keep the fresh init (flax Dense default = the navigator's own init)
+            continue
         pp[k] = dict(nav["params"][k])
     p = {"params": pp}                                                # trunk UNFROZEN (nothing zeroed in the gradient)
     if a.init_params:
@@ -126,7 +131,7 @@ def main():
         pg = -jnp.minimum(ratio * adv, jnp.clip(ratio, 0.8, 1.2) * adv)
         if a.ent_bout is None:
             return (pg + 0.5 * (v - bt["ret"]) ** 2 + 0.01 * (jnp.exp(ls) * ls).sum(-1)).mean()
-        ec = jnp.where(bt["x"][..., 108] > 0, a.ent_bout, 0.01)              # O-X: in-bout entropy coefficient
+        ec = jnp.where(bt["x"][..., 108] > 0, bt["ecb"] if a.ent_anneal else a.ent_bout, 0.01)   # O-X / O-X': in-bout entropy coefficient
         return (pg + 0.5 * (v - bt["ret"]) ** 2 + ec * (jnp.exp(ls) * ls).sum(-1)).mean()
 
     @jax.jit
@@ -169,7 +174,9 @@ def main():
         r_, v_, d_ = sq(r), sq(v), sq(dead)
         adv = gae(r_, v_, d_, 0.99, 0.95); ret = adv + v_; A_ = (adv - adv.mean()) / (adv.std() + 1e-8)
         first = np.concatenate([np.zeros((W * N, 1)), d_[:, :-1]], 1)
-        bt = dict(x=jnp.asarray(sq(x)), h0=jnp.asarray(hin[:, 0].reshape(W * N, 128)), act=jnp.asarray(sq(act)), lp=jnp.asarray(sq(lp)),
+        if a.ent_anneal:                                                    # O-X': the current in-bout coefficient, one per sequence
+            ECB = 0.01 + (a.ent_bout - 0.01) * max(0.0, 1.0 - steps / a.ent_anneal)
+        bt = dict(**(dict(ecb=jnp.full((W * N,), ECB, jnp.float32)) if a.ent_anneal else {}), x=jnp.asarray(sq(x)), h0=jnp.asarray(hin[:, 0].reshape(W * N, 128)), act=jnp.asarray(sq(act)), lp=jnp.asarray(sq(lp)),
                   adv=jnp.asarray(A_.astype(np.float32)), ret=jnp.asarray(ret.astype(np.float32)), first=jnp.asarray(first.astype(np.float32)))
         p_prev, o_prev = p, ost
         for _ in range(0 if nupd else a.epochs):

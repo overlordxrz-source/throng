@@ -44,7 +44,7 @@ def run(f, oracle):
 
 
 if __name__ == "__main__":
-    ap = argparse.ArgumentParser(); ap.add_argument("files", nargs="+"); ap.add_argument("--oracle-files", nargs="*", default=[]); ap.add_argument("--out", required=True)
+    ap = argparse.ArgumentParser(); ap.add_argument("files", nargs="*"); ap.add_argument("--oracle-files", nargs="*", default=[]); ap.add_argument("--out", required=True)
     a = ap.parse_args()
     res = [run(f, False) for f in a.files] + [run(f, True) for f in a.oracle_files]
     json.dump(res, open(a.out, "w"), indent=1, default=float); print("WROTE", a.out)

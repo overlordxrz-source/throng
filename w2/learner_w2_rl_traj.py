@@ -85,6 +85,7 @@ def main():
     ap.add_argument("--early-stop-frontier", type=float, default=0.0, help="stop (counted FAIL) if the frontier has not passed this by half the steps")
     ap.add_argument("--eval-necessity", default="", help="EVAL: comma list of modes (0,3,4) on the necessity keys; no training")
     ap.add_argument("--eval-W", type=int, default=32); ap.add_argument("--eval-steps", type=int, default=3000)
+    ap.add_argument("--greedy-bout", action="store_true", help="TRAJ (Cam Nov 16 ~19:00Z): argmax actions during bouts, sampled outside")
     ap.add_argument("--topo", action="store_true", help="TRAJ: evaluate a RecAgent with the topographic tie (O-T)")
     ap.add_argument("--logits", action="store_true", help="TRAJ: also record the total, trunk (current params) and pretrained-navigator logits")
     ap.add_argument("--traj-out", default=""); ap.add_argument("--eval-mix-la", type=float, default=0.0)
@@ -146,6 +147,8 @@ def main():
         lgn = trunk(pp_["params"], x[:, :100]) if a.logits else jnp.zeros_like(lg); lgp = trunk(nav["params"], x[:, :100]) if a.logits else jnp.zeros_like(lg)
         hl = aux[0] if ep else jnp.zeros((N, 8))
         samp = jax.random.categorical(k1, lg)
+        if a.greedy_bout:                                                   # GREEDY in bouts (diagnostic)
+            samp = jnp.where(item["act"], jnp.argmax(lg, -1), samp)
         if a.policy == "follower":
             act = NI.follower(s, item, L, samp)
         elif a.policy == "copyparent":
