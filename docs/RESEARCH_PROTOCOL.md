@@ -8227,6 +8227,51 @@ more expensive, because it produces publishable-looking nulls.
   - **RESULT (Nov 16 01:32): POSITIVE CONTROL at 3e7: frontier 24 (cap)**; all 107 windows 1.000. Prediction
     (p 0.95) HIT. **Both lookahead gate controls PASS**; `controls_pass` written, so the lookahead screen will run
     if the registered learner is decided FAIL.
+
+- **CAM (Nov 16 ~07:30Z = 02:30 EST): rulings on the overnight report.**
+  - Label analysis ACCEPTED: two causes, (1) frontier, (2) masking (~20x fewer memory-only labels). The lookahead
+    targets (1) only. The positive-control deviation is ACCEPTED as recorded.
+  - Queue unchanged: seed 2's 5e7 check decides (frontier <= 6 -> registered learner FAIL, seed 4 lookahead starts
+    automatically; > 6 -> seed 2 continues to 1e8).
+  - The lookahead's 3e7 pause report adds memory-only own-meal labels per 100k hearings by distance, next to seed 1's
+    and the pilot's. **Registered reading: head < 0.25 at d = 3 AND memory-only labels < 10k / 100k -> masking is
+    the live cause**, and the lookahead stops at its 3e7 early stop as planned.
+  - **M APPROVED the observed-meal label, stage 1 only (07:27Z).** Build now (code + tests, no run): flag
+    `--head-observed-meal` (default off). A hearing record also closes when the young SEES the parent eat the called
+    item, if it has not eaten it first. The label = the young's own-frame displacement to that cell at that moment.
+    The own meal wins if it comes later in the bout; never two labels per record. Own observation only.
+    - Checks before any run: (a) unit tests (closes on a seen parent meal; not when unseen; own meal wins; flag off
+      bit-identical to learner_w2_kv / learner_w2_la); (b) A5: every new label traceable to a frame where the
+      parent's eating is in the young's obs; (c) label yield: memory-only labels per 100k hearings, own-meal vs
+      own + observed, by distance. **Registered: if own + observed is still < 10k / 100k at d >= 3 under the
+      lookahead curriculum, the flag alone cannot close the gap: report, don't run.**
+    - Runs only if the lookahead screen fails, and only on Cam's go: then a 1-seed explore, lookahead + flag, same
+      bar, caps and early stops. The flag is dropped at stage 2.
+  - Nothing on Modal; guard $41.
+- **FOUND IN THE CODE before building (Nov 16 02:30; for Cam):**
+  1. **The parent never eats.** It walks to the item and stays on its cell (`NI.step_toward`, then still); the item
+     stays for the young. The young sees the parent only as +1 in its 7x7 agent window (`NI.mark_demo`), with no
+     eat signal. With the waiting rule, a parent that has stopped looks the same as one standing on the item. The
+     item itself is visible only when adjacent.
+     - So "sees the parent eat" has no event in the world. The closest event fully in the young's own obs is
+       STRICT: the parent stands on the called item's cell AND that cell is adjacent to the young, so the item
+       (food channel) and the parent (agent channel) are both in view.
+     - A LOOSE reading (the parent on the item cell anywhere in the 7x7 view) uses a fact the young does not
+       perceive (that the parent's cell holds the item). A5 would flag it as unperceived world state.
+  2. **The parent appears only on a token's FIRST hearing in a life** (`--demo-hearings 1`, registered). A
+     memory-only bout is a later hearing by definition, so under the registered recipe the flag adds ZERO
+     memory-only labels, at any curriculum. It adds labels only to first-hearing bouts, where the head cannot use
+     memory (no record of that token yet). It would also put correct displacements into those first records.
+     - The existing `--demo-hearings K` (K > 1) would put the parent on later hearings too. The head is labelled at
+       the hearing step, before the parent has moved, so those bouts still need memory for the head. That is a
+       scaffold change for Cam to rule on.
+  - **PREDICTIONS (before counting)** for the yield count (`learner_w2_labels.py`, extended additively; seed 1 and
+    seed 2 final checkpoints; K = 1 and K = 3; lookahead 0 and 0.25):
+    - K = 1: observed-only memory-only bouts = 0 exactly (structural, p 0.99). The positive control for the
+      counter: observed-only FIRST-hearing bouts > 0 (p 0.95).
+    - K = 3, lookahead 0.25, STRICT: own + observed memory-only < 10k / 100k (p 0.7). A strict event needs the young
+      adjacent to the item, where it mostly eats it itself.
+    - K = 3, LOOSE: > 10k / 100k (p 0.5).
 - **RESULT (Nov 16 ~01:40): THE LABEL COUNT** (`docs/data/learner_w2/label_count/`; each row is 100 rollout
   iterations, 819k steps, with that checkpoint's weights, world state and frontier, no updates).
   - Definitions: MEMORY-ONLY bout = a later hearing (not the token's first in this life) at d >= 3. By construction
