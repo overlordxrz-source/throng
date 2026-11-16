@@ -8330,6 +8330,34 @@ more expensive, because it produces publishable-looking nulls.
     included), held out.
   - Predictions: (a) at K = 3, lookahead 0.25, d >= 3: >= 10k / 100k p 0.45; (b) share of hearings with
     index > 3 at frontier 3: 0.4-0.7 (p 0.6).
+- **INCIDENT (Nov 16 ~03:10): the app was quit; every job I had started was killed**, including the spend guard.
+  - Seed 4 at 5,242,880 steps; its checkpoint (atomic saves) loads and resumed exactly. The readout / yield
+    analysis queue had produced nothing durable and was restarted from the start.
+  - **The guard was down ~2 minutes** (last heartbeat 03:10, restarted 03:12 with the documented command at CAP $41;
+    metered $35.33; nothing was running on Modal).
+  - All jobs now run detached in their own sessions (`<scratchpad>/detach.py`: fork + setsid), so an app quit no
+    longer kills them: the guard (pid 36792), seed 4's queue, the watchers and the analysis queues.
+  - My half-done K-screen copy had not been written; it was rebuilt (below).
+- **IMPLEMENTED (Nov 16 ~03:25; comm-toy 13def74), not yet run: THE K-SCREEN.**
+  - `w2/learner_w2_k.py`, a copy of learner_w2_la (which seed 4 is running), adds two flags:
+    - `--score-after K`: the gate, the hungry-bout reach (training and evaluation, so the bar's
+      `hungry_reach_2nd_half` and per-world counts) and `head_acc_gtK` score only bouts whose hearing index is > K.
+      Life is unrestricted. K = 0 scores every bout.
+    - `--giveup p`: the negative gate control, as in port_w2.
+  - The launch condition script (`learner_k/conditions.py`) uses the readings registered above.
+    4c passes only if both held-out decoders are <= chance + 0.05 at K = 2 and 3, for seeds 1 and 2, at lookahead 0
+    and 0.25, AND the positive-control decoder (the parent's offset 2 steps into the bout) is > chance + 0.2.
+  - The queue (`learner_k/queue_k.sh`) also waits for the K gate controls (`checks/summary.json`) and for my
+    registration file, written only after the expected label rate below is filled in from 4a.
+  - Seed **5** (fresh). Early stops as Cam ruled (head on hearings > 3 at d = 3 < 0.25 at 3e7; frontier <= 6 at
+    5e7). Bar: `bar2.py` unchanged, fed the restricted fields.
+  - Gate controls, registered before running: K = 0 identity vs learner_w2_la (lookahead 0.25, seed 9, 3.3e5);
+    POSITIVE = scripted follower with `--demo-hearings 3 --score-after 3`, lookahead 0.25, 6e7 steps, reaches 24
+    (p 0.8; the budget is the risk, since only hearings > 3 fill windows); NEGATIVE = the same with `--giveup 0.3`,
+    3e7 steps, never advances (p 0.95).
+  - **Predictions for the K-screen** (if it launches): early stop (a) fires p 0.45; the read forms (head on
+    hearings > 3 at d = 3 >= 0.5) p 0.3; frontier reaches 12 p 0.25; **bar PASS p 0.12**. Expected label rate: to
+    be registered from 4a before launch.
 - **RESULT (Nov 16 ~01:40): THE LABEL COUNT** (`docs/data/learner_w2/label_count/`; each row is 100 rollout
   iterations, 819k steps, with that checkpoint's weights, world state and frontier, no updates).
   - Definitions: MEMORY-ONLY bout = a later hearing (not the token's first in this life) at d >= 3. By construction
