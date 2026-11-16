@@ -8610,6 +8610,55 @@ more expensive, because it produces publishable-looking nulls.
 - **LAUNCH (Nov 16 06:18:01 from `queue_rl.out`): THE RELABEL SCREEN, seed 6, from step 0** (one process group,
   checked). Registered as at 06:01, with the bar now computed by bar3.py against the lengthened oracle reference
   (need 0.775).
+- **CAM RULINGS (received Nov 16 07:31:35 EST, stamped by `scripts/stamp.sh`; Cam's own message time ~12:30Z) on Will's report of
+  the step 0 / relabel results.**
+  - Bisection step 0: PASS; the diagnosis is CONFIRMED by the separating test. Cam's 100x: holds up to take-off
+    (258x), MISSES in the frontier 3-4 band (94x), recorded as a partial miss. Onset-metric disclosure accepted, not
+    redefined. Further bisection steps ON HOLD; the relabel screen decides.
+  - Oracle reference 0.861 over 2,818 bouts (learner reach bar 0.775) and bar3.py accepted. run_k.sh: fix or retire.
+  - Relabel (a)/(b)/(c) PASS accepted; seed 6 (restarted from 0) is the registered screen. Incident accepted; the
+    process-group lesson goes into the handoff; the moved-aside files are never used.
+  - At the 3e7 pause: head split by hearing index (1 / later) at d = 3 and 12, frontier, reach by d, relabel yield on
+    its own training mix. Registered decision (head = later hearings at d = 3): >= 0.5 continue to 5e7 then the 1e8
+    bar (fresh-seed confirm needs Cam's go); 0.25-0.5 continue to the 5e7 early stop; < 0.25 STOP and report. Read
+    forms but frontier <= 6 at 5e7: report reach given head right vs wrong at d = 4/6/8/12 (the pilot table).
+  - Protocol times are written only by a helper that inserts `date` itself. Modal nothing; guard $41.
+- **DONE on those rulings (Nov 16 07:31:35 EST).**
+  - `scripts/stamp.sh FILE ANCHOR_REGEX [--log-times] < entry`: replaces @NOW (with a trailing @) by `date` at
+    insertion; the anchor must match exactly one line; an entry without the placeholder, or with a typed hh:mm, is
+    refused (--log-times allows times copied from a named log or message). Tested: one insert, one append, and the
+    three refusals (typed time, no placeholder, two-line anchor) each refused with nothing written.
+  - `learner_k/run_k.sh` and `queue_k.sh` RETIRED: renamed `*.RETIRED`, and line 2 of each exits 3 with a message
+    (checked: rc 3). No K-screen process exists.
+  - The protocol entries of the step 0 / relabel report are all present: the separating test (registration and
+    result), step 0 result, oracle lengthening, the life-count defect, the incident, the seed 6 launch.
+- **RESULT (entry stamped Nov 16 07:31:51 EST): THE RELABEL SCREEN, seed 6, 3e7 PAUSE** (PAUSE_AT 30,007,296 steps; frontier
+  **3**). `learner_rl/s6_3e7_d3.json`, `s6_3e7_d12.json`, `s6_3e7_labels.json`.
+  - **Head, split by hearing index** (the registered evals, true mode):
+    - d = 3: first hearing 0.134 (n 997, chance 0.125); **later hearings 0.802** (n 5,331).
+    - d = 12: first 0.130 (n 1,315); **later 0.726** (n 1,594).
+  - Reach (hungry bouts, all / second half of life): d = 3 **0.409 / 0.360** (n 2,527 in the second half);
+    d = 12 0.469 / 0.258 (n 453). Demonstrated bouts: d = 3 0.786, d = 12 0.619. Training-mix hungry reach ~0.65,
+    gate window 0.70 (< 0.8).
+  - Relabel yield on its own training mix (100 iterations at the 3e7 checkpoint, lookahead 0.25, the check (c)
+    metric): **34,990 memory-only relabel labels per 100k hearings**; 89% of all hearings get a label; 0
+    disagreements. The own-meal mask on the same checkpoint: 14,371 per 100k (seed 4 at 3e7: 109).
+  - **Registered decision: head 0.802 >= 0.5, so THE READ FORMED; continue to 5e7** (the frontier > 6 early stop),
+    then the 1e8 bar. Prediction p(read forms) 0.6: HIT. p(early stop (a)) 0.3: did not happen.
+  - **But the policy does not use it yet:** the head is right on 80% of later d = 3 hearings while hungry reach is
+    0.41, and the frontier is still 3. This is the situation Cam's 5e7 branch anticipates (read forms, frontier
+    stuck): the policy side.
+- **REGISTERED (Nov 16 07:31:51 EST, before running): the 3e7 controls and an EARLY pilot table** (light eval beside the
+  training; the registered 5e7 report is unchanged).
+  - Tool: `w2/learner_w2_rl_diag.py`, an eval-only copy of learner_w2_rl with the pilot diagnosis's splits (parent
+    kept / lost; later hearings with the head right / wrong; all bouts and hungry bouts).
+  - (i) Identity: its d = 3 true-mode output equals `s6_3e7_d3.json` on every shared field (p 0.95). Fails -> the
+    tool is wrong; nothing from it is used.
+  - (ii) Memory controls at d = 3: head on later hearings with the memory WIPED <= 0.20 (p 0.85), SHUFFLED code
+    <= 0.20 (p 0.8). **Wiped >= 0.40 -> the head is not reading memory: stop and report as a possible leak.**
+  - (iii) Hungry reach at d = 3, true minus wiped: < 0.10 (p 0.55), i.e. the policy barely acts on the read yet.
+  - (iv) Pilot table at d = 4/6/8/12: head right on 0.65-0.85 of later hearings (p 0.7); reach given head right
+    <= 0.55 at d = 12 (p 0.75); reach given right minus given wrong >= 0.15 at d = 4 (p 0.5).
 - **RESULT (Nov 16 ~01:40): THE LABEL COUNT** (`docs/data/learner_w2/label_count/`; each row is 100 rollout
   iterations, 819k steps, with that checkpoint's weights, world state and frontier, no updates).
   - Definitions: MEMORY-ONLY bout = a later hearing (not the token's first in this life) at d >= 3. By construction
