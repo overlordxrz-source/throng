@@ -1,0 +1,5 @@
+A train start 13:59:04 flags: --reinit-out
+A train done 17:15:44
+{"arm": "A", "frontier": 24.0, "d3": [0.956, 0.935, 0.931, 0.913, 0.929, 0.828, 0.904, 0.128], "d12": [0.91, 0.824, 0.885, 0.85, 0.863, 0.735, 0.748, 0.011], "n3": [495, 464, 508, 485, 496, 487, 489, 507], "n12": [432, 425, 418, 407, 422, 446, 440, 439], "min3": 0.128, "min12": 0.011, "dead_lt030": [7], "dead_le010": [7], "PASS": false, "SECONDARY": false, "QUALIFIES": false}
+A ARMDONE 17:17:22
+XP train start 17:17:22 flags: --ent-bout 0.05 --ent-anneal 2e7

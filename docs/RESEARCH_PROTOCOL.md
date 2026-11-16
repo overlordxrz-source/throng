@@ -9149,6 +9149,26 @@ more expensive, because it produces publishable-looking nulls.
   CHUNK_STOP / resumed at 27,688,960). The curve point spanning the sleep logs 5,276 s. No data is affected; only
   the timetable moved. Also seen: heavy swap use (7.7 of 9.2 GB) from other apps on the machine, which slows the
   runs but does not change them.
+- **RESULT (entry stamped Nov 16 17:18:23 EST): CHAIN ARM (a') (`--reinit-out`, Dense_2 re-init): FAIL; does not qualify (one dead
+  sector). The chain moved on to O-X'.** `docs/data/port_w2/chain/`.
+
+  | (a') | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | min |
+  |---|---|---|---|---|---|---|---|---|---|
+  | d = 3 | 0.96 | 0.94 | 0.93 | 0.91 | 0.93 | 0.83 | 0.90 | **0.13** | 0.13 |
+  | d = 12 | 0.91 | 0.82 | 0.89 | 0.85 | 0.86 | 0.74 | 0.75 | **0.01** | 0.01 |
+
+  - Frontier **24** (the cap) at 16.1M steps; 22 at 14.6M (o3: 22 at 23.2M). Overall d = 3 reach 0.814 (hungry
+    0.860); d = 12 0.731 (hungry 0.818, 2nd half 0.762).
+  - The best oracle so far: 7 of 8 sectors at 0.83-0.96 (d = 3), and sector 3 (o3's dead one) at 0.91. But sector 7
+    (+x -y) is dead (< 0.30 at both d; 0.01 at d = 12). PASS: fail (min 0.13 / 0.01). Secondary: fails (dead
+    sector 7).
+  - **Logit split (d = 3, hearing step):** the re-init removed most of the stay default from the trunk (+1.1 to +1.7,
+    against +4 to +8 for the pretrained output layer). In the working sectors the side head pushes -1.5 to -5.6
+    toward walking. **In sector 7 it does NOT add stay** (side -0.82; the logit eval scored sector 7 at 0.128, just
+    over the 0.10 "frozen" line, so it is classed "mid"). It simply pushes too weakly: D_stay +0.25, p(stay / eat
+    / toward) 0.27 / 0.41 / 0.29.
+    - Unlike o3, O-T and the learner, this is a sector that was never fully learned, not an active lock.
+  - Predictions: p(PASS) 0.15 FAIL; p(qualifies) 0.3, did not; p(>= 1 dead sector) 0.55 HIT.
 - **RESULT (Nov 16 ~01:40): THE LABEL COUNT** (`docs/data/learner_w2/label_count/`; each row is 100 rollout
   iterations, 819k steps, with that checkpoint's weights, world state and frontier, no updates).
   - Definitions: MEMORY-ONLY bout = a later hearing (not the token's first in this life) at d >= 3. By construction
