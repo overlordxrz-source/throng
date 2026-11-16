@@ -8688,6 +8688,80 @@ more expensive, because it produces publishable-looking nulls.
     (n 869). Unexplained; a guess is that a chance-right head coincides with the policy's default search direction.
   - The run continues to 5e7 as registered. My odds of frontier > 6 at 5e7: **~0.05** (flat gate for 1.7e7 steps).
     At 5e7 the registered pilot table is rerun on the 5e7 weights.
+- **CAM RULINGS (received Nov 16 12:02:06 EST; Cam's message time ~17:05Z) on seed 6's 3e7 report.**
+  - RECORDED, MILESTONE: the first W2 in-life word learning from the young's own experience (later-hearing head d = 3
+    0.802, d = 12 0.726; wiped 0.115, shuffled 0.124; the read is used, +0.17 reach at d = 3). Caveat: 1 seed, the
+    stage-1 relabel scaffold; a confirm comes later. Will's p(read forms) hit; the < 0.10 miss is recorded.
+  - Seed 6 continues to 5e7 as registered; the automatic pilot table on early stop stays.
+  - POLICY-SIDE DIAGNOSIS, free, eval only, on the 3e7 weights, predictions first via stamp.sh: D1 head along the
+    bout (accuracy vs the TRUE sector from the CURRENT position, steps 0-12, d = 3 and 8; share of moves into the head's
+    sector); D2 code fact (what the oracle's policy gets, and what the learner's policy gets from the head after the
+    hearing step); D3 right-head timeouts at d = 3/8/12: (i) never toward, (ii) within 1 cell of the item's arc but
+    misses, (iii) diverted to generic food, (iv) dithers; minimum distance; the oracle's own (ii) rate; D4 the wiped
+    oddity by item sector and previous heading, true vs wiped; D5 training-batch head (~0.94) vs eval (0.80).
+    Note: reach <= h x reach|right; the 0.8 gate needs h >~ 0.93 plus oracle-level navigation.
+  - PRE-REGISTERED BRANCHES (no runs until Cam has seen D1-D3): head decays (D1 < 0.5 by step 3 with a right step-0
+    head) AND the oracle gets a per-step current-position signal -> PER-STEP RELABEL (target at every step of a
+    labelled bout = sector from the CURRENT position to where the young ate; own record + own path integration).
+    Head holds but (ii) dominates -> search-on-the-arc skill vs the oracle's (ii). (iii) dominates -> item value vs
+    generic food (bisection #2). Report D1-D5 with the 5e7 result. Modal nothing; guard $41.
+- **RESULT (entry stamped Nov 16 12:02:06 EST): THE RELABEL SCREEN, seed 6: EARLY STOP at 5e7, FRONTIER 4 -> FAIL as registered.**
+  (`EARLY_STOP frontier 4.0 at 50,003,968`; the gate rose 3 -> 4 at 39,632,896.) My p(frontier > 6 at 5e7) was 0.05.
+  - **The registered 5e7 pilot table** (ran automatically on the early stop; `learner_rl/s6.params`):
+
+    | d | head right (later) | reach, head right | reach, head wrong | right-head bouts timing out | demonstrated reach |
+    |---|---|---|---|---|---|
+    | 3 | 0.885 | 0.53 | 0.03 | 0.47 | 0.87 |
+    | 4 | 0.873 | 0.54 | 0.03 | 0.46 | 0.84 |
+    | 6 | 0.910 | 0.48 | 0.04 | 0.51 | 0.85 |
+    | 8 | 0.896 | 0.46 | 0.04 | 0.52 | 0.82 |
+    | 12 | 0.888 | 0.43 | 0.03 | 0.53 | 0.78 |
+
+  - d = 3 controls: head wiped 0.118, shuffled 0.127; hungry reach true 0.557 / wiped 0.305 / shuffled 0.292.
+  - From 3e7 to 5e7 the head rose (0.73-0.81 -> 0.87-0.91) and reach given a right head rose (0.27-0.40 -> 0.43-0.54),
+    but about half of the right-head bouts still time out. Hungry 2nd-half reach at d = 3 is 0.48 against the gate's
+    0.8.
+  - The wiped oddity does not recur at 5e7: reach given a chance-right head, wiped 0.43 < true 0.53.
+- **D2, CODE FACT (entry stamped Nov 16 12:02:06 EST; `w2/named_item.py`, `w2/ep_agent.py`, `w2/learner_w2_rl.py` step()).**
+  - Both policies get the same input vector x each step: the 7x7 view (100), then `NI.hear` = [token one-hot (8),
+    bout flag (1), offset to the HEARING PLACE clip(torus(start - pos) / 9, +-1) (2)] on EVERY step of an open bout
+    (all zero between bouts), the previous action (6), the previous reward (1), then `NI.oracle` = one-hot of the
+    item's sector (8).
+  - **The oracle's signal is the SECTOR as seen from the bout start, fixed for the whole bout, given on every bout
+    step.** It is not a position and is NOT recomputed from the current position. To head for the item from where
+    it is, the oracle's policy must combine it with the hearing-place offset (which saturates at 9 cells).
+  - **The learner after the hearing step:** the token stays in the input every bout step, so the memory query, the
+    read and the head are recomputed every step; softmax(head) feeds the zero-initialised side head every step. The
+    head is trained only at hearing steps, with the start-frame sector as target; at later steps it is computed but
+    never trained.
+  - So for Cam's first branch: the oracle gets a PER-STEP signal, but a fixed start-frame one, not a current-position
+    one. A per-step relabel with the START-frame sector would copy the oracle's input exactly; the current-position
+    version is a different signal from the oracle's.
+- **REGISTERED (Nov 16 12:02:25 EST, before running): D1, D3, D4, D5 on the 3e7 weights** (eval only).
+  - D2 addendum: at the later bout steps the head gets no hindsight label, but the PPO gradient reaches it through
+    the policy (its softmax is a policy input), as at every step.
+  - Tools: `w2/learner_w2_rl_traj.py` (eval-only copy of the diag tool that saves every agent's per-step record;
+    `--eval-mix-la F` draws d from the training sampler) and `w2/traj_analysis.py` (the definitions are in its
+    docstring: bouts, "later", "head right", sectors, "move into a sector" = within 45 deg, the D3 flags and the
+    exclusive class in Cam's order (i) > (ii) > (iii) > (iv) > other). Smoke-tested on a 200-step run (not data).
+  - Runs: learner d = 3 (modes 0/3/4), d = 8, d = 12; the training mix (frontier 3, lookahead 0.25); the oracle
+    (`oracle3/o3.params`, `--learner rec --oracle`) at d = 3, 8, 12.
+  - Identity first: the learner's d = 3 output equals `diag_rl/d3.json` in modes 0, 3 and 4 on every shared field;
+    the oracle's d = 12 output equals `oracle3/eval_d12_repro.json` on every shared field. A failure -> nothing from
+    that tool is used.
+  - **Predictions:**
+    - D1: the head's accuracy against the START sector stays >= 0.7 through step 3 at d = 3 (p 0.65): the token, and so
+      the read, persist. Against the CURRENT-position sector, at step 3: >= 0.5 at d = 3 (p 0.55), >= 0.6 at d = 8
+      (p 0.65). Cam's branch condition (current-position accuracy < 0.5 by step 3 at d = 3): p 0.3. Moves into the
+      head's sector at steps 1-3: >= 0.6 of moves (p 0.5).
+    - D3 (right-head timeouts): flag (i) never-toward <= 0.2 (p 0.7); flag (iii) generic food >= 0.3 (p 0.6); flag (ii)
+      arc >= 0.3 (p 0.5). Dominant exclusive class: (ii) 0.4, (iii) 0.25, (iv) 0.2, (i) 0.15. The oracle's (ii) rate
+      among its own timeouts >= 0.5 (p 0.6).
+    - D4: SELECTION explains the 3e7 wiped oddity (p 0.6): the wiped mode's right-head bouts are richer in a previous
+      heading within 45 deg of the item sector, and within the match / no-match strata wiped reach is no longer above
+      true.
+    - D5: COMPOSITION explains the gap (p 0.65): on the training mix the eval head on later hearings is >= 0.90, with
+      d <= 2 / item-visible hearings near 1.0 and unseen d = 3 near 0.8.
 - **RESULT (Nov 16 ~01:40): THE LABEL COUNT** (`docs/data/learner_w2/label_count/`; each row is 100 rollout
   iterations, 819k steps, with that checkpoint's weights, world state and frontier, no updates).
   - Definitions: MEMORY-ONLY bout = a later hearing (not the token's first in this life) at d >= 3. By construction
