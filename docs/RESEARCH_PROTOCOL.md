@@ -8933,6 +8933,20 @@ more expensive, because it produces publishable-looking nulls.
     must also reach frontier 22 in 3e7 (o3 did at 23.2M), and the d = 3 minimum >= 0.85 is strict (o3's sector 5:
     0.815).
   - p(at least one dead sector): O-X 0.6; O-T 0.25.
+- **BUILT + CHECKED (Nov 16 12:25:57 EST): the oracle-screen levers** (comm-toy, `w2/learnability.py` RecAgent `topo`,
+  `w2/port_w2.py --topo / --ent-bout`, `w2/test_topo.py`).
+  - Tie tests 4/4: P equals max(0, move . sector unit) for all 32 entries; the flag-off param tree has no g; g = 0
+    gives identical logits and value; g = 0.7 adds exactly 0.7 x P x s to the four move logits only (stay, eat and
+    the value unchanged); no sector input, no change. A mutant (P without the clip at 0) is caught.
+  - **Flag-off identity: port_w2 with neither flag reproduces o3's committed curve, 3/3 points, every shared field**
+    (wall time excluded). The run adds one key that o3's code predates (`n_hungry_lookahead`, 0).
+  - Found and fixed in the smoke run: the scalar g broke the per-module copy of the parameter dict (port_w2 and the
+    trajectory tool). After the fix: identity rechecked (3/3); a 3-update O-T smoke run trains g (0.0147); the eval
+    tool loads O-T params.
+  - `scripts/laptop_jobs.sh` now also lists / stops the new queues (`queue_os.sh`, `run_os.sh`), and the seed 6 /
+    diagnosis script names that its pattern had missed.
+- **LAUNCH (Nov 16 12:25:57 EST): THE ORACLE SCREEN** (`<scratchpad>/oscreen/queue_os.sh`, detached): O-X then O-T, sequential,
+  each 3e7 steps at seed 0, then evals at d = 3 and 12 and the per-sector table. Registered as above.
 - **RESULT (Nov 16 ~01:40): THE LABEL COUNT** (`docs/data/learner_w2/label_count/`; each row is 100 rollout
   iterations, 819k steps, with that checkpoint's weights, world state and frontier, no updates).
   - Definitions: MEMORY-ONLY bout = a later hearing (not the token's first in this life) at d >= 3. By construction
