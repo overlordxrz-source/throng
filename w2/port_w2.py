@@ -24,6 +24,7 @@ from w2.worlds import world_kw  # noqa: E402
 from w2.gae import gae  # noqa: E402
 from w2 import named_item as NI  # noqa: E402
 from w2.gate import HonestGate  # noqa: E402
+from w2 import lookahead as LA  # noqa: E402
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "scripts"))
 import ckpt as _ck  # noqa: E402
 
@@ -44,6 +45,8 @@ def main():
     ap.add_argument("--eval-only", action="store_true", help="no updates (readouts)"); ap.add_argument("--frontier0", type=float, default=1.0)
     ap.add_argument("--frontier-schedule", default="", help="DEAF TWIN: replay another run's frontier from its train JSON curve (latest logged value at or before the current step); the gate is off")
     ap.add_argument("--gate", default="old", choices=["old", "honest"], help="Cam Nov 15 ~12:20: honest = hungry-bout reach, two consecutive 2000-bout windows >= 0.8")
+    ap.add_argument("--lookahead", type=float, default=0.0, help="Cam Nov 16 ~01:00: with this probability a bout's d is drawn from frontier+1 .. --la-max; the gate scores only d <= frontier")
+    ap.add_argument("--la-max", type=int, default=12)
     ap.add_argument("--giveup", type=float, default=0.0, help="NEGATIVE gate control (with --policy follower): give up at random on this fraction of bouts")
     ap.add_argument("--out", required=True)
     a = ap.parse_args()
@@ -68,7 +71,7 @@ def main():
         return jnp.abs(cfg.E_set - E) ** cfg.drive_n
 
     def dfn_of(dfront):
-        return lambda k: jnp.floor(jax.random.uniform(k, (N,)) * dfront) + 1.0      # mixed curriculum: uniform{1..frontier}
+        return LA.sampler(dfront, N, a.lookahead, a.la_max)                   # mixed curriculum: uniform{1..frontier} (+ lookahead bouts)
 
     def obs_x(s, item, code, pa, pr):
         o = NI.observe(cfg, s, item); hr = NI.hear(s, item, code, L)
@@ -176,14 +179,16 @@ def main():
         steps += W * N * T; it += 1
         n_close = int(closed.sum()); n_eat = int(ate_i.sum())
         recent.extend([1] * n_eat + [0] * max(n_close - n_eat, 0)); recent = recent[-500:]
+        n_la = int((hung * (dd_ > dfront)).sum())                          # hungry lookahead bouts this iteration (before any advance)
         if a.gate == "honest":
-            if SCHED is None and GATE.add(int(hate.sum()), int(hung.sum())) and dfront < a.d_max:
+            inr = LA.in_range(dd_, dfront)                                  # lookahead bouts are not scored
+            if SCHED is None and GATE.add(int((hate * inr).sum()), int((hung * inr).sum())) and dfront < a.d_max:
                 dfront += 1; print(f"GATE_UP frontier -> {dfront:.0f} at {steps:,} (last windows {GATE.scores[-2:]})", flush=True)
         elif SCHED is None and len(recent) >= 500 and np.mean(recent) >= 0.8 and dfront < a.d_max:
             dfront += 1; recent = []
         if it % a.curve_every == 0:
             curve.append(dict(steps=steps, frontier=dfront, item_reach=n_eat / max(n_close, 1), food_per_step=float(gain.mean()), paid_per_step=float(pd.mean()), frac_in_bout=float(inb.mean()),
-                              hungry_reach=float(hate.sum() / max(hung.sum(), 1)), n_hungry=int(hung.sum()), gate_last=(GATE.scores[-1] if GATE.scores else None), sec=round(time.time() - t0, 1)))
+                              hungry_reach=float(hate.sum() / max(hung.sum(), 1)), n_hungry=int(hung.sum()), n_hungry_lookahead=n_la, gate_last=(GATE.scores[-1] if GATE.scores else None), sec=round(time.time() - t0, 1)))
             print("CURVE", json.dumps(curve[-1]), flush=True)
     if a.save_params:
         open(a.save_params, "wb").write(flax.serialization.to_bytes(p))
