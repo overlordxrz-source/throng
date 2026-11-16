@@ -8990,6 +8990,25 @@ more expensive, because it produces publishable-looking nulls.
     - (b') no navigator init: the trunk trains from scratch (toy L2 beat L1u on T2: 100/0 vs 84-93).
     - NOT allowed: a designed output offset (e.g. -3 on stay / eat). That designs behaviour.
   - O-X slower on the curriculum: noted, no action; the screen continues as registered. Modal nothing; guard $41.
+- **RESULT (entry stamped Nov 16 13:16:26 EST): ORACLE SCREEN ARM O-X (in-bout entropy 0.05): FAIL; does not qualify under the
+  secondary rule.** `docs/data/port_w2/oracle_screen/`.
+  - Reach by sector (all bouts, necessity keys, true mode):
+
+    | | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | min | dead (<= 0.10) |
+    |---|---|---|---|---|---|---|---|---|---|---|
+    | O-X d = 3 | 0.78 | 0.35 | 0.84 | 0.54 | 0.81 | 0.67 | 0.87 | 0.58 | **0.35** | 0 |
+    | O-X d = 12 | 0.79 | 0.37 | 0.80 | 0.32 | 0.75 | 0.48 | 0.81 | 0.58 | **0.32** | 0 |
+    | o3 d = 3 (reference) | 0.97 | 0.95 | 0.96 | 0.01 | 0.97 | 0.81 | 0.97 | 0.97 | 0.01 | 1 |
+    | o3 d = 12 (reference) | 0.91 | 0.91 | 0.93 | 0.00 | 0.94 | 0.84 | 0.90 | 0.91 | 0.00 | 1 |
+
+  - Final frontier **20** (< 22). Gate: 2 at 6.9M, 7 at 14.2M, 12 at 18.7M, 20 at 23.2M; no advance in the last
+    6.8M steps.
+  - Overall: d = 3 reach 0.679 (hungry 0.706); d = 12 reach 0.623 (hungry 0.745; 2nd half 0.696, n 1,163).
+  - PASS (min >= 0.85 / 0.75, frontier >= 22): FAIL on all three. Secondary (0 dead sectors, min >= 0.75 at d = 3,
+    frontier >= 22): 0 dead sectors holds, but min 0.35 and frontier 20 fail -> **does not qualify**.
+  - Reading: the extra entropy removed the dead sector (no sector below 0.32), but reach is weaker everywhere. Its
+    weakest sectors are now diagonals (1, 7) and -x ones (3, 5). Trading the freeze for spread, not for skill.
+  - Predictions: p(PASS) 0.2 -> FAIL as expected. p(>= 1 dead sector) 0.6 -> MISSED (0 dead).
 - **RESULT (Nov 16 ~01:40): THE LABEL COUNT** (`docs/data/learner_w2/label_count/`; each row is 100 rollout
   iterations, 819k steps, with that checkpoint's weights, world state and frontier, no updates).
   - Definitions: MEMORY-ONLY bout = a later hearing (not the token's first in this life) at d >= 3. By construction
