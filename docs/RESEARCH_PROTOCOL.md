@@ -8563,6 +8563,27 @@ more expensive, because it produces publishable-looking nulls.
   - Toy eval at d = 3, modes 0 (true) / 4 (memory wiped) / 3 (shuffled), 9000 episodes.
   - If true ~ wiped (within 0.05), the young solves memory-only bouts by SEARCH, not by a read.
   - Prediction: true ~ wiped within 0.05, with reach >= 0.15 (p 0.7); head on 2nd+ hearings at d = 3 < 0.3 (p 0.7).
+- **RESULT (Nov 16 06:09 from `date`): BISECTION STEP 0 = POSITIVE CONTROL PASS, EXACT REPRODUCTION.**
+  `docs/data/toy_grid/bisect/step0/`.
+  - The training curve is identical to the committed screen 2 seed 8 run: **244/244 points**; frontier 24 (take-off).
+    The d = 12 evaluation is identical to the committed one, number for number.
+  - **READ FORMS: PASS** (head on 2nd+ hearings at d = 3 = 0.900; d = 12 0.972).
+    - d = 3 second half true / shuffled / wiped: 0.844 / 0.031 / 0.134.
+    - d = 12: 0.999 / 0.020 / 0.053.
+  - Label counts as in the 06:03 entry (final): frontier 3-4 band 10,264 / 100k (94x W2's 109); up to take-off
+    28,169 (258x). Prediction "reproduces exactly" (p 0.85) HIT; READ FORMS (p 0.95) HIT.
+- **RESULT (Nov 16 06:09): THE SEPARATING TEST** (the same run to 2.5e5 steps, frontier 3; identical curve 3/3).
+  - d = 3, 9000 episodes: reach **true 0.324 / memory wiped 0.321 / shuffled 0.314**. Head on 2nd+ hearings
+    **0.114** (chance), first 0.110.
+  - **So the toy young solves ~32% of d = 3 bouts by SEARCH, with no read**: wiping the memory changes nothing, and
+    the head is at chance. Those solved bouts give the own-meal labels (own-meal share of memory-only bouts
+    0.19-0.32 at frontier 3) that bootstrap the read.
+  - W2 at the same frontier: seed 1 solves 6-10% of memory-only bouts, seed 4 0.2%.
+  - Predictions: true ~ wiped within 0.05 with reach >= 0.15 (p 0.7) HIT; head < 0.3 (p 0.7) HIT.
+  - **Cam's bootstrap-loop diagnosis is supported (MEASURED):** the loop closes in the toy because search alone
+    solves memory-only bouts often enough. In W2 it does not.
+    - Which W2 difference cuts the search yield is exactly what bisection steps 1+ would locate. From the ranking
+      (CONJECTURED): the hearing structure (#1), the item's worth (#2) and generic food (#6).
 - **RESULT (Nov 16 ~01:40): THE LABEL COUNT** (`docs/data/learner_w2/label_count/`; each row is 100 rollout
   iterations, 819k steps, with that checkpoint's weights, world state and frontier, no updates).
   - Definitions: MEMORY-ONLY bout = a later hearing (not the token's first in this life) at d >= 3. By construction
