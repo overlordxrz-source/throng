@@ -1,0 +1,872 @@
+[
+ {
+  "file": "/private/tmp/claude-501/-Users-overlord-CascadeProjects-throng/aad77c1d-d7ac-437e-bef4-aa525802ccc0/scratchpad/traj/l_d3_m0.npz",
+  "D1": {
+   "d3": {
+    "0": {
+     "n": 4277,
+     "ncur": 4277,
+     "cur": 4277,
+     "onitem": 0,
+     "start": 4277,
+     "nmove": 2085,
+     "into_head": 1819,
+     "into_cur": 1819
+    },
+    "1": {
+     "n": 4276,
+     "ncur": 4276,
+     "cur": 4225,
+     "onitem": 0,
+     "start": 4225,
+     "nmove": 2115,
+     "into_head": 1820,
+     "into_cur": 1818
+    },
+    "2": {
+     "n": 4276,
+     "ncur": 4276,
+     "cur": 3858,
+     "onitem": 0,
+     "start": 4223,
+     "nmove": 2204,
+     "into_head": 1936,
+     "into_cur": 1778
+    },
+    "3": {
+     "n": 4275,
+     "ncur": 3220,
+     "cur": 2681,
+     "onitem": 1055,
+     "start": 3746,
+     "nmove": 1141,
+     "into_head": 852,
+     "into_cur": 679
+    },
+    "4": {
+     "n": 3227,
+     "ncur": 2881,
+     "cur": 2341,
+     "onitem": 346,
+     "start": 3018,
+     "nmove": 834,
+     "into_head": 578,
+     "into_cur": 418
+    },
+    "5": {
+     "n": 2882,
+     "ncur": 2735,
+     "cur": 2122,
+     "onitem": 147,
+     "start": 2736,
+     "nmove": 699,
+     "into_head": 443,
+     "into_cur": 269
+    },
+    "6": {
+     "n": 2737,
+     "ncur": 2663,
+     "cur": 1998,
+     "onitem": 74,
+     "start": 2629,
+     "nmove": 668,
+     "into_head": 409,
+     "into_cur": 223
+    },
+    "7": {
+     "n": 2664,
+     "ncur": 2613,
+     "cur": 1897,
+     "onitem": 51,
+     "start": 2574,
+     "nmove": 600,
+     "into_head": 329,
+     "into_cur": 143
+    },
+    "8": {
+     "n": 2620,
+     "ncur": 2592,
+     "cur": 1817,
+     "onitem": 28,
+     "start": 2533,
+     "nmove": 607,
+     "into_head": 366,
+     "into_cur": 129
+    },
+    "9": {
+     "n": 2596,
+     "ncur": 2577,
+     "cur": 1787,
+     "onitem": 19,
+     "start": 2507,
+     "nmove": 590,
+     "into_head": 348,
+     "into_cur": 103
+    },
+    "10": {
+     "n": 2577,
+     "ncur": 2563,
+     "cur": 1728,
+     "onitem": 14,
+     "start": 2498,
+     "nmove": 590,
+     "into_head": 323,
+     "into_cur": 89
+    },
+    "11": {
+     "n": 2565,
+     "ncur": 2553,
+     "cur": 1675,
+     "onitem": 12,
+     "start": 2471,
+     "nmove": 615,
+     "into_head": 344,
+     "into_cur": 99
+    }
+   }
+  },
+  "D3": {
+   "d3": {
+    "n": 2556,
+    "i": 1990,
+    "ii": 66,
+    "iii": 714,
+    "iv": 1756,
+    "vis": 59,
+    "excl": {
+     "i": 1990,
+     "iii": 165,
+     "other": 254,
+     "iv": 81,
+     "ii": 66
+    },
+    "mind_hist": {
+     "0": 24,
+     "1": 35,
+     "2": 1430,
+     "3": 1067
+    },
+    "mind_mean": 2.384976525821596
+   }
+  },
+  "D4": {
+   "by_sec": {
+    "0": [
+     622,
+     648
+    ],
+    "7": [
+     35,
+     662
+    ],
+    "2": [
+     577,
+     618
+    ],
+    "6": [
+     13,
+     617
+    ],
+    "3": [
+     6,
+     515
+    ],
+    "4": [
+     5,
+     559
+    ],
+    "1": [
+     454,
+     608
+    ],
+    "5": [
+     0,
+     50
+    ]
+   },
+   "head_match": [
+    2512,
+    5331
+   ],
+   "match": [
+    1070,
+    1864
+   ],
+   "nomatch": [
+    642,
+    2413
+   ],
+   "unknown": [
+    0,
+    0
+   ]
+  },
+  "D5": {
+   "d3_unseen": [
+    4277,
+    5331
+   ]
+  }
+ },
+ {
+  "file": "/private/tmp/claude-501/-Users-overlord-CascadeProjects-throng/aad77c1d-d7ac-437e-bef4-aa525802ccc0/scratchpad/traj/l_d8_m0.npz",
+  "D1": {
+   "d8": {
+    "0": {
+     "n": 1850,
+     "ncur": 1850,
+     "cur": 1850,
+     "onitem": 0,
+     "start": 1850,
+     "nmove": 1059,
+     "into_head": 841,
+     "into_cur": 841
+    },
+    "1": {
+     "n": 1849,
+     "ncur": 1849,
+     "cur": 1822,
+     "onitem": 0,
+     "start": 1822,
+     "nmove": 1040,
+     "into_head": 847,
+     "into_cur": 841
+    },
+    "2": {
+     "n": 1847,
+     "ncur": 1847,
+     "cur": 1825,
+     "onitem": 0,
+     "start": 1825,
+     "nmove": 1058,
+     "into_head": 843,
+     "into_cur": 834
+    },
+    "3": {
+     "n": 1845,
+     "ncur": 1845,
+     "cur": 1823,
+     "onitem": 0,
+     "start": 1823,
+     "nmove": 1055,
+     "into_head": 850,
+     "into_cur": 844
+    },
+    "4": {
+     "n": 1845,
+     "ncur": 1845,
+     "cur": 1771,
+     "onitem": 0,
+     "start": 1821,
+     "nmove": 1042,
+     "into_head": 824,
+     "into_cur": 799
+    },
+    "5": {
+     "n": 1842,
+     "ncur": 1842,
+     "cur": 1689,
+     "onitem": 0,
+     "start": 1809,
+     "nmove": 1080,
+     "into_head": 844,
+     "into_cur": 781
+    },
+    "6": {
+     "n": 1840,
+     "ncur": 1840,
+     "cur": 1655,
+     "onitem": 0,
+     "start": 1811,
+     "nmove": 1018,
+     "into_head": 806,
+     "into_cur": 736
+    },
+    "7": {
+     "n": 1837,
+     "ncur": 1837,
+     "cur": 1561,
+     "onitem": 0,
+     "start": 1807,
+     "nmove": 1072,
+     "into_head": 857,
+     "into_cur": 764
+    },
+    "8": {
+     "n": 1834,
+     "ncur": 1447,
+     "cur": 1110,
+     "onitem": 387,
+     "start": 1785,
+     "nmove": 685,
+     "into_head": 448,
+     "into_cur": 314
+    },
+    "9": {
+     "n": 1452,
+     "ncur": 1414,
+     "cur": 1012,
+     "onitem": 38,
+     "start": 1398,
+     "nmove": 643,
+     "into_head": 426,
+     "into_cur": 277
+    },
+    "10": {
+     "n": 1413,
+     "ncur": 1386,
+     "cur": 946,
+     "onitem": 27,
+     "start": 1358,
+     "nmove": 625,
+     "into_head": 403,
+     "into_cur": 239
+    },
+    "11": {
+     "n": 1385,
+     "ncur": 1378,
+     "cur": 907,
+     "onitem": 7,
+     "start": 1329,
+     "nmove": 605,
+     "into_head": 391,
+     "into_cur": 234
+    },
+    "12": {
+     "n": 1377,
+     "ncur": 1345,
+     "cur": 864,
+     "onitem": 32,
+     "start": 1308,
+     "nmove": 581,
+     "into_head": 377,
+     "into_cur": 202
+    }
+   }
+  },
+  "D3": {
+   "d8": {
+    "n": 1220,
+    "i": 611,
+    "ii": 121,
+    "iii": 546,
+    "iv": 619,
+    "vis": 15,
+    "excl": {
+     "ii": 121,
+     "i": 611,
+     "other": 144,
+     "iii": 268,
+     "iv": 76
+    },
+    "mind_hist": {
+     "0": 7,
+     "1": 8,
+     "2": 60,
+     "3": 49,
+     "4": 51,
+     "5": 67,
+     "6": 511,
+     "7": 58,
+     "8": 409
+    },
+    "mind_mean": 6.195081967213115
+   }
+  },
+  "D4": {
+   "by_sec": {
+    "0": [
+     237,
+     288
+    ],
+    "1": [
+     113,
+     254
+    ],
+    "2": [
+     232,
+     281
+    ],
+    "6": [
+     1,
+     248
+    ],
+    "4": [
+     3,
+     269
+    ],
+    "7": [
+     1,
+     236
+    ],
+    "3": [
+     1,
+     255
+    ],
+    "5": [
+     0,
+     19
+    ]
+   },
+   "head_match": [
+    1097,
+    2400
+   ],
+   "match": [
+    326,
+    819
+   ],
+   "nomatch": [
+    262,
+    1031
+   ],
+   "unknown": [
+    0,
+    0
+   ]
+  },
+  "D5": {
+   "d8_unseen": [
+    1850,
+    2400
+   ]
+  }
+ },
+ {
+  "file": "/private/tmp/claude-501/-Users-overlord-CascadeProjects-throng/aad77c1d-d7ac-437e-bef4-aa525802ccc0/scratchpad/traj/l_d12_m0.npz",
+  "D1": {
+   "d12": {
+    "0": {
+     "n": 1154,
+     "ncur": 1154,
+     "cur": 1154,
+     "onitem": 0,
+     "start": 1154,
+     "nmove": 654,
+     "into_head": 477,
+     "into_cur": 477
+    },
+    "1": {
+     "n": 1154,
+     "ncur": 1154,
+     "cur": 1109,
+     "onitem": 0,
+     "start": 1109,
+     "nmove": 642,
+     "into_head": 498,
+     "into_cur": 493
+    },
+    "2": {
+     "n": 1154,
+     "ncur": 1154,
+     "cur": 1120,
+     "onitem": 0,
+     "start": 1120,
+     "nmove": 651,
+     "into_head": 497,
+     "into_cur": 493
+    },
+    "3": {
+     "n": 1152,
+     "ncur": 1152,
+     "cur": 1116,
+     "onitem": 0,
+     "start": 1116,
+     "nmove": 653,
+     "into_head": 505,
+     "into_cur": 499
+    },
+    "4": {
+     "n": 1151,
+     "ncur": 1151,
+     "cur": 1109,
+     "onitem": 0,
+     "start": 1109,
+     "nmove": 672,
+     "into_head": 505,
+     "into_cur": 501
+    },
+    "5": {
+     "n": 1147,
+     "ncur": 1147,
+     "cur": 1087,
+     "onitem": 0,
+     "start": 1094,
+     "nmove": 653,
+     "into_head": 504,
+     "into_cur": 501
+    },
+    "6": {
+     "n": 1146,
+     "ncur": 1146,
+     "cur": 1068,
+     "onitem": 0,
+     "start": 1094,
+     "nmove": 671,
+     "into_head": 507,
+     "into_cur": 486
+    },
+    "7": {
+     "n": 1144,
+     "ncur": 1144,
+     "cur": 1045,
+     "onitem": 0,
+     "start": 1091,
+     "nmove": 672,
+     "into_head": 508,
+     "into_cur": 470
+    },
+    "8": {
+     "n": 1142,
+     "ncur": 1142,
+     "cur": 1016,
+     "onitem": 0,
+     "start": 1090,
+     "nmove": 675,
+     "into_head": 504,
+     "into_cur": 443
+    },
+    "9": {
+     "n": 1141,
+     "ncur": 1141,
+     "cur": 972,
+     "onitem": 0,
+     "start": 1078,
+     "nmove": 651,
+     "into_head": 481,
+     "into_cur": 415
+    },
+    "10": {
+     "n": 1141,
+     "ncur": 1141,
+     "cur": 941,
+     "onitem": 0,
+     "start": 1079,
+     "nmove": 658,
+     "into_head": 496,
+     "into_cur": 420
+    },
+    "11": {
+     "n": 1139,
+     "ncur": 1139,
+     "cur": 891,
+     "onitem": 0,
+     "start": 1077,
+     "nmove": 656,
+     "into_head": 480,
+     "into_cur": 409
+    },
+    "12": {
+     "n": 1139,
+     "ncur": 937,
+     "cur": 674,
+     "onitem": 202,
+     "start": 1064,
+     "nmove": 472,
+     "into_head": 299,
+     "into_cur": 212
+    }
+   }
+  },
+  "D3": {
+   "d12": {
+    "n": 798,
+    "i": 317,
+    "ii": 74,
+    "iii": 437,
+    "iv": 370,
+    "vis": 10,
+    "excl": {
+     "i": 317,
+     "ii": 74,
+     "iii": 252,
+     "iv": 67,
+     "other": 88
+    },
+    "mind_hist": {
+     "0": 3,
+     "1": 7,
+     "2": 37,
+     "3": 19,
+     "4": 21,
+     "5": 11,
+     "6": 25,
+     "7": 49,
+     "8": 319,
+     "9": 23,
+     "10": 23,
+     "11": 62,
+     "12": 199
+    },
+    "mind_mean": 8.557644110275689
+   }
+  },
+  "D4": {
+   "by_sec": {
+    "2": [
+     142,
+     195
+    ],
+    "6": [
+     0,
+     155
+    ],
+    "1": [
+     40,
+     137
+    ],
+    "0": [
+     128,
+     158
+    ],
+    "4": [
+     0,
+     146
+    ],
+    "3": [
+     0,
+     206
+    ],
+    "7": [
+     0,
+     139
+    ],
+    "5": [
+     0,
+     18
+    ]
+   },
+   "head_match": [
+    705,
+    1589
+   ],
+   "match": [
+    148,
+    493
+   ],
+   "nomatch": [
+    162,
+    661
+   ],
+   "unknown": [
+    0,
+    0
+   ]
+  },
+  "D5": {
+   "d12_unseen": [
+    1154,
+    1589
+   ]
+  }
+ },
+ {
+  "file": "/private/tmp/claude-501/-Users-overlord-CascadeProjects-throng/aad77c1d-d7ac-437e-bef4-aa525802ccc0/scratchpad/traj/l5_d3_m0.npz",
+  "D1": {
+   "d3": {
+    "0": {
+     "n": 3961,
+     "ncur": 3961,
+     "cur": 3961,
+     "onitem": 0,
+     "start": 3961,
+     "nmove": 2247,
+     "into_head": 2129,
+     "into_cur": 2129
+    },
+    "1": {
+     "n": 3960,
+     "ncur": 3960,
+     "cur": 3927,
+     "onitem": 0,
+     "start": 3927,
+     "nmove": 2241,
+     "into_head": 2130,
+     "into_cur": 2127
+    },
+    "2": {
+     "n": 3957,
+     "ncur": 3957,
+     "cur": 3534,
+     "onitem": 0,
+     "start": 3926,
+     "nmove": 2228,
+     "into_head": 2122,
+     "into_cur": 1951
+    },
+    "3": {
+     "n": 3956,
+     "ncur": 2768,
+     "cur": 2378,
+     "onitem": 1188,
+     "start": 3036,
+     "nmove": 1149,
+     "into_head": 1044,
+     "into_cur": 886
+    },
+    "4": {
+     "n": 2769,
+     "ncur": 2242,
+     "cur": 1918,
+     "onitem": 527,
+     "start": 2529,
+     "nmove": 629,
+     "into_head": 528,
+     "into_cur": 427
+    },
+    "5": {
+     "n": 2243,
+     "ncur": 2111,
+     "cur": 1771,
+     "onitem": 132,
+     "start": 2080,
+     "nmove": 531,
+     "into_head": 434,
+     "into_cur": 338
+    },
+    "6": {
+     "n": 2110,
+     "ncur": 1997,
+     "cur": 1654,
+     "onitem": 113,
+     "start": 2016,
+     "nmove": 425,
+     "into_head": 317,
+     "into_cur": 218
+    },
+    "7": {
+     "n": 1998,
+     "ncur": 1942,
+     "cur": 1580,
+     "onitem": 56,
+     "start": 1917,
+     "nmove": 389,
+     "into_head": 306,
+     "into_cur": 172
+    },
+    "8": {
+     "n": 1942,
+     "ncur": 1906,
+     "cur": 1526,
+     "onitem": 36,
+     "start": 1884,
+     "nmove": 377,
+     "into_head": 278,
+     "into_cur": 144
+    },
+    "9": {
+     "n": 1905,
+     "ncur": 1877,
+     "cur": 1464,
+     "onitem": 28,
+     "start": 1848,
+     "nmove": 384,
+     "into_head": 292,
+     "into_cur": 133
+    },
+    "10": {
+     "n": 1878,
+     "ncur": 1861,
+     "cur": 1411,
+     "onitem": 17,
+     "start": 1823,
+     "nmove": 366,
+     "into_head": 268,
+     "into_cur": 119
+    },
+    "11": {
+     "n": 1860,
+     "ncur": 1852,
+     "cur": 1380,
+     "onitem": 8,
+     "start": 1814,
+     "nmove": 354,
+     "into_head": 253,
+     "into_cur": 115
+    }
+   }
+  },
+  "D3": {
+   "d3": {
+    "n": 1851,
+    "i": 1398,
+    "ii": 54,
+    "iii": 498,
+    "iv": 1506,
+    "vis": 49,
+    "excl": {
+     "i": 1398,
+     "iii": 107,
+     "iv": 120,
+     "other": 172,
+     "ii": 54
+    },
+    "mind_hist": {
+     "0": 18,
+     "1": 31,
+     "2": 1272,
+     "3": 530
+    },
+    "mind_mean": 2.250135062128579
+   }
+  },
+  "D4": {
+   "by_sec": {
+    "4": [
+     1,
+     500
+    ],
+    "5": [
+     2,
+     436
+    ],
+    "3": [
+     0,
+     502
+    ],
+    "6": [
+     390,
+     440
+    ],
+    "1": [
+     351,
+     501
+    ],
+    "7": [
+     347,
+     505
+    ],
+    "0": [
+     499,
+     525
+    ],
+    "2": [
+     507,
+     552
+    ]
+   },
+   "head_match": [
+    1791,
+    4477
+   ],
+   "match": [
+    1013,
+    1539
+   ],
+   "nomatch": [
+    1084,
+    2422
+   ],
+   "unknown": [
+    0,
+    0
+   ]
+  },
+  "D5": {
+   "d3_unseen": [
+    3961,
+    4477
+   ]
+  }
+ }
+]

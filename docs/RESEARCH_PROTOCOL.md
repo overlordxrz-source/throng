@@ -8823,6 +8823,22 @@ more expensive, because it produces publishable-looking nulls.
     the young stays put until T_max. The oracle shows the same failure in one sector.
   - Not established: why -x is the last direction (the navigator prior, the zero-initialised side head, or reward
     timing); whether more steps would add it. One seed.
+- **CORRECTION (entry stamped Nov 16 12:10:54 EST) to the D1 line of "THE POLICY-SIDE DIAGNOSIS" above (found by review before
+  reporting; the original line stands above, marked wrong here).**
+  - The defect: in `traj_analysis.py` a step where the young stands ON the item counted in the denominator of the
+    current-sector accuracy but could never count as right, so every arrival was scored as a wrong head. The dips
+    sat exactly at step k = d, where walkers along cardinal sectors arrive.
+  - Fixed (comm-toy, on-item steps excluded and reported separately) and rerun on the saved trajectories
+    (`an_learner_d1fix.json`). Corrected current-sector accuracy:
+    - d = 3, steps 0-3: 1.00 / 0.99 / 0.90 / **0.83** (was 0.63; 25% of step-3 bouts are on the item), then
+      0.66-0.81;
+    - d = 8: >= 0.85 through step 7, **0.77** at step 8 (was 0.61), 0.64-0.72 after;
+    - d = 12: >= 0.78 through step 11, **0.72** at step 12 (was 0.59);
+    - 5e7 weights, d = 3: 0.86 at step 3 (was 0.60).
+  - Beyond k = d only the still-open bouts remain, mostly non-arrivers; the tail describes those bouts, not the
+    whole set.
+  - The verdict is unchanged (the head holds; Cam's < 0.5 by step 3 condition is not met), and my D1 prediction
+    (current >= 0.5 at step 3, d = 3) remains a hit. Nothing else in the entry used this number.
 - **RESULT (Nov 16 ~01:40): THE LABEL COUNT** (`docs/data/learner_w2/label_count/`; each row is 100 rollout
   iterations, 819k steps, with that checkpoint's weights, world state and frontier, no updates).
   - Definitions: MEMORY-ONLY bout = a later hearing (not the token's first in this life) at d >= 3. By construction
