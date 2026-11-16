@@ -8384,6 +8384,18 @@ more expensive, because it produces publishable-looking nulls.
       shaped by policy gradient at later steps, where a head that tracks the parent helps the policy follow.
     - This is the "report before launch" case. **I am holding the K-screen launch for Cam's ruling** (I don't
       write `k_registered`). Seed 4 is unaffected: K = 1 has no demo later hearings.
+- **CAM (Nov 16 ~08:30Z): STOP-LOSS, declared before any result.** The lookahead screen and the K-screen are the
+  LAST single-tweak screens on this recipe. If both fail: no third tweak; a TOY -> W2 BISECTION instead, starting
+  from toy screen 2. Plan written, no runs: **`docs/TOY_W2_BISECT.md`** (13 differences, each with a switch in the
+  toy and a read-cost guess; ranked; bisection order; a READ FORMS criterion registered there).
+  - Top of the ranking:
+    1. hearings per step and per life, with memory-wiping deaths: W2 has ~5-45 hearings per life vs 64 in the toy;
+    2. what one item is worth: ~0.4 reward in W2 vs 1.8 in the toy;
+    3. the honest gate;
+    4. terminal bout ends;
+    5. the network (navigator prior + zero-initialised side head).
+  - Also from the code: the toy's frontier reached 12 by 5-6M steps (screen 2, seeds 8 / 10 / 12); W2's seeds
+    reached 3 only at 31.6M and 41.8M.
 - **RESULT (Nov 16 ~01:40): THE LABEL COUNT** (`docs/data/learner_w2/label_count/`; each row is 100 rollout
   iterations, 819k steps, with that checkpoint's weights, world state and frontier, no updates).
   - Definitions: MEMORY-ONLY bout = a later hearing (not the token's first in this life) at d >= 3. By construction
