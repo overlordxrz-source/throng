@@ -9169,6 +9169,22 @@ more expensive, because it produces publishable-looking nulls.
     / toward) 0.27 / 0.41 / 0.29.
     - Unlike o3, O-T and the learner, this is a sector that was never fully learned, not an active lock.
   - Predictions: p(PASS) 0.15 FAIL; p(qualifies) 0.3, did not; p(>= 1 dead sector) 0.55 HIT.
+- **RESULT (entry stamped Nov 16 17:45:50 EST): CHAIN ARM O-X' (in-bout entropy annealed 0.05 -> 0.01 over 2e7): FAIL; does not
+  qualify (min sector 0.49 < 0.75 at d = 3). NO DEAD SECTOR. The chain moved on to (b'), its last arm.**
+
+  | O-X' | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | min |
+  |---|---|---|---|---|---|---|---|---|---|
+  | d = 3 | 0.93 | 0.64 | 0.95 | 0.92 | 0.98 | 0.95 | 0.98 | **0.49** | 0.49 |
+  | d = 12 | 0.91 | 0.72 | 0.89 | 0.70 | 0.88 | 0.75 | 0.88 | **0.43** | 0.43 |
+
+  - Frontier **24** at 17.6M (22 at 16.3M). Overall d = 3 reach 0.859 (hungry 0.877); **d = 12 reach 0.779, hungry
+    0.871, 2nd half 0.873** (already above o3's 0.861).
+  - PASS: fail (min 0.49 / 0.43). Secondary: 0 dead sectors and frontier 24 hold, but min 0.49 < 0.75 -> fails.
+  - The closest arm yet: 6 sectors at 0.92-0.98 (d = 3), the two +x diagonals weak (sector 1 0.64, sector 7 0.49)
+    but alive. No logit split (no sector < 0.30).
+  - Compared with constant entropy (O-X: frontier 20, min 0.35), annealing kept the early exploration and let
+    precision come back.
+  - Predictions: p(PASS) 0.1 FAIL; p(qualifies) 0.2, did not; p(>= 1 dead sector) 0.5 -> none (miss).
 - **RESULT (Nov 16 ~01:40): THE LABEL COUNT** (`docs/data/learner_w2/label_count/`; each row is 100 rollout
   iterations, 819k steps, with that checkpoint's weights, world state and frontier, no updates).
   - Definitions: MEMORY-ONLY bout = a later hearing (not the token's first in this life) at d >= 3. By construction
