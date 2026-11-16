@@ -8400,6 +8400,76 @@ more expensive, because it produces publishable-looking nulls.
   check, and the handoff's pause test). They are fixed above against the git commit times (13def74 03:15, 486eac3
   03:22). The same error class as Nov 15 and Nov 16 00:57. From now on I take every time I write from `date`, not
   from memory.
+
+- **CAM (Nov 16 ~08:40Z): rulings.** The head path is NOT a leak (the parent's position is in the young's own obs; A5
+  clean); the K-screen may launch once its other conditions hold. If it runs: head accuracy at d = 3 and 12 split
+  by hearing index (1 / 2..K / > K) at every pause; only > K counts; report if 2..K beats > K by more than 0.3 at
+  3e7; no stop-gradient change. TOY_W2_BISECT.md accepted. Timestamps from `date`. laptop_jobs.sh accepted.
+
+- **RESULT (Nov 16 04:24): LOOKAHEAD SCREEN (seed 4): EARLY STOP (a) at 3e7 -> STOP.** `docs/data/learner_w2/lookahead/seed4/`.
+  - Frontier 1 -> 2 at 1.7M, 3 at 28.0M; paused at 30,007,296.
+  - Head on 2nd+ hearings at d = 3: **0.120** (< 0.25); at d = 12: 0.106. First hearings 0.13-0.14.
+  - Hungry reach 0.106 (d = 3), 0.258 (d = 12).
+  - Predictions: early stop (a) p 0.55 HIT; read forms p 0.3 (no).
+  - **The 3e7 label count (Cam 07:30Z item 4). Disclosed defect:** `run_la.sh` called the counter without
+    `--lookahead 0.25` (the flag did not exist when I wrote it), so its pause count measured the in-range
+    curriculum only (`s4_3e7_labels.json`: 115 per 100k). Rerun with the training mix at 05:00
+    (`s4_3e7_labels_la25.json`):
+
+    | run | frontier | memory-only bouts (d >= 3) / 100k hearings | memory-only OWN-MEAL labels / 100k | own-meal share |
+    |---|---|---|---|---|
+    | pilot (privileged), 16-50M | 5-8 | 51-60k | (privileged: all of them) | 0.36-0.53 |
+    | seed 1, 40-50M | 3 | 26-28k | 1,667-2,705 | 0.06-0.10 |
+    | **seed 4 (lookahead), 30M** | 3 | **44.5k** (d 4-12 ~500 each) | **109** | **0.002** |
+
+  - **Registered reading (Cam 07:30Z): head < 0.25 at d = 3 AND memory-only labels < 10k / 100k -> MASKING is
+    the live cause.** Both hold (0.120; 109).
+    - Lookahead did raise the supply of memory-only bouts (44.5k vs 26-28k: cause (1) addressed).
+    - But the young solves almost none of them without the parent, so own-meal masking leaves ~0.2%.
+
+- **RESULT (Nov 16 ~05:00): Cam 08:05Z free counts (a) / (b) / (c)** (`docs/data/learner_w2/k_counts/`; seed 1 and
+  seed 2 final checkpoints, 100 iterations each; the training mask).
+  - **(a) memory-only own-meal labels per 100k hearings (d >= 3):**
+
+    | K | lookahead | seed 1 | seed 2 |
+    |---|---|---|---|
+    | 1 | 0 | 2,705 | 3,023 |
+    | 1 | 0.25 | 2,172 | 3,224 |
+    | 2 | 0 | 6,108 | 5,379 |
+    | 2 | 0.25 | 5,642 | 5,362 |
+    | 3 | 0 | 8,622 | 6,763 |
+    | **3** | **0.25** | **8,596** | **7,586** |
+
+    - **K = 3, lookahead 0.25: mean 8,091 < 10k, and neither seed reaches 10k. 4a MISSES** (Cam 08:25Z: the
+      average AND at least one seed). Prediction (>= 10k p 0.45): no.
+    - Where K helps, it is almost all on DEMO hearings 2..K (following earns the label). For example seed 1, K = 3,
+      lookahead 0.25: d = 3 568 labels, 458 of them on demo hearings; at d >= 4 nearly all are demo.
+  - **(b) share of hearings with index > K:** K = 1 0.78-0.81; K = 2 0.55-0.64; K = 3 0.40-0.48. Prediction
+    (0.4-0.7 at K = 3, p 0.6): HIT.
+  - **(c) leak check: PASS.** At every demo hearing 2..K the parent's offset is (0, 0) (all-zero True in all 8
+    runs). Held-out decoders: offset 0.107-0.128 and agent window 0.112-0.126, against chance 0.132-0.143 (none
+    above chance). The positive control (offset 2 steps in) reaches 0.61-0.74 against chance 0.14-0.16.
+    Prediction HIT.
+  - The observed-meal yield (STRICT, bout level): 0 at K = 1 (structural); 72-536 per 100k at K = 2-3. LOOSE (an A5
+    violation, never built): 804-2,639.
+- **RESULT (Nov 16 ~04:50): K-screen gate controls: PASS** (`docs/data/learner_w2/k_screen_checks/`). Identity
+  (`--score-after 0` = learner_w2_la, 8/8). POSITIVE (follower, K = 3, scoring index > 3, lookahead 0.25, 6e7):
+  frontier **24**, all 142 windows 1.000 (normal pass; prediction p 0.8 HIT). NEGATIVE (give-up 0.3, 3e7): **0
+  advances**, 98 windows, mean 0.699, max 0.722 (prediction HIT).
+- **DECISION (Nov 16 05:01, by Cam's 08:05Z item 5): THE K-SCREEN DOES NOT LAUNCH.** `conditions.json`: seed 4
+  stopped yes; 4a no (8,091 mean; 8,596 / 7,586); 4c yes; controls yes. "If 4a misses 10k at K = 3: report and
+  stop; I rethink." `learner_k/stop` written; `k_registered` was never written. The bisection does NOT start: it
+  needs both screens to have FAILED, and the K-screen did not run. That is for Cam.
+- **RESULT: seed 2 readout** (`docs/data/learner_w2/final_seed2/`). Same picture as seed 1: head on 2nd+ hearings
+  0.120-0.125 (d = 3) and 0.115-0.141 (d = 12) from 10M to 50M (344k -> 881k hearings). Final weights, d = 3:
+  true / shuffled / wiped hungry reach 0.177 / 0.173 / 0.165. First-hearing reach 0.80 (d 2), 0.41 (d 3), 0.34
+  (d 4), 0.17 (d 12), with the parent kept in view in 100% of demonstrated bouts.
+- **RESULT: the oracle-redo table** (Cam 14:25: the 2-of-3 failed) (`docs/data/learner_w2/oracle_redo_table/`).
+  Hungry reach 0.852 / 0.859 / 0.855 / 0.861 at d = 4 / 6 / 8 / 12 (2nd half 0.871 / 0.863 / 0.862 / 0.863); life
+  3000 at every d. The oracle does not fall with distance. The learners' first-hearing reach falls 0.41 -> 0.17
+  from d 3 to 12 (seed 2).
+  - **Note for the eval-power rule:** the oracle's own d = 12 reference has only 1,679 2nd-half hungry bouts at the
+    default eval length, below the 2,000 now required of the learner.
 - **RESULT (Nov 16 ~01:40): THE LABEL COUNT** (`docs/data/learner_w2/label_count/`; each row is 100 rollout
   iterations, 819k steps, with that checkpoint's weights, world state and frontier, no updates).
   - Definitions: MEMORY-ONLY bout = a later hearing (not the token's first in this life) at d >= 3. By construction

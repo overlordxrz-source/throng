@@ -1,0 +1,13 @@
+frontier curve: [(0, 1.0), (6, 1.0), (13, 1.0), (19, 1.0), (26, 2.0), (32, 2.0), (39, 2.0), (46, 3.0)]
+steps | hearings | head 2nd+ d3 | hungry reach d3 | head 2nd+ d12 | hungry reach d12
+ 10321920 |  343785 | 0.120 | 0.022 | 0.115 | 0.008
+ 20152320 |  509041 | 0.121 | 0.013 | 0.123 | 0.027
+ 30146560 |  656359 | 0.121 | 0.048 | 0.141 | 0.031
+ 40632320 |  774803 | 0.125 | 0.075 | 0.132 | 0.087
+ 49971200 |  881429 | 0.122 | 0.177 | 0.126 | 0.145
+final d= 2 true: first reach 0.80 (kept 1.00 of bouts -> 0.80; lost -> 0.00) | later reach 0.63 (head right 0.61 of bouts -> 0.96; wrong -> 0.12) | hungry reach 0.683
+final d= 3 true: first reach 0.41 (kept 1.00 of bouts -> 0.41; lost -> 0.00) | later reach 0.13 (head right 0.12 of bouts -> 0.30; wrong -> 0.10) | hungry reach 0.177
+final d= 4 true: first reach 0.34 (kept 1.00 of bouts -> 0.34; lost -> 0.00) | later reach 0.08 (head right 0.12 of bouts -> 0.19; wrong -> 0.07) | hungry reach 0.155
+final d=12 true: first reach 0.17 (kept 1.00 of bouts -> 0.17; lost -> 0.00) | later reach 0.03 (head right 0.13 of bouts -> 0.05; wrong -> 0.03) | hungry reach 0.145
+final d=3 shuffled: first reach 0.40 (kept 1.00 of bouts -> 0.40; lost -> 0.00) | later reach 0.12 (head right 0.13 of bouts -> 0.31; wrong -> 0.10) | hungry reach 0.173
+final d=3 wiped:    first reach 0.39 (kept 1.00 of bouts -> 0.39; lost -> 0.00) | later reach 0.12 (head right 0.13 of bouts -> 0.26; wrong -> 0.10) | hungry reach 0.165

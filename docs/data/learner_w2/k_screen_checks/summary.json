@@ -1,0 +1,12 @@
+{
+ "identity_k0_vs_la": true,
+ "n_curve": 8,
+ "pos_frontier": 24.0,
+ "pos_windows": 142,
+ "pos_min_window": 1.0,
+ "neg_frontier": 1.0,
+ "neg_windows": 98,
+ "neg_mean": 0.6993418367346939,
+ "neg_max": 0.7215,
+ "PASS": true
+}
