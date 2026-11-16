@@ -8275,6 +8275,28 @@ more expensive, because it produces publishable-looking nulls.
 - **RESULT (Nov 16 02:42): W2 LEARNER SEED 2: EARLY-STOPPED, so FAIL** (frontier 1 -> 2 at 26.1M, 3 at 41.8M; 3 at
   5e7). **THE REGISTERED W2 LEARNER IS DECIDED FAIL (0 pass, 2 fail; seed 3 not run).** My prediction (learner PASS
   p 0.15) did not come true. The queue then started the LOOKAHEAD screen (seed 4) at 02:42:52, as registered.
+- **BUILT + CHECKED (Nov 16 ~03:00): the observed-meal flag** (comm-toy 5571918; `docs/data/learner_w2/observed_meal/`;
+  no training run).
+  - `w2/observed_meal.py` + `w2/learner_w2_obs.py` (a copy of learner_w2_la, which seed 4 is running), flag
+    `--head-observed-meal`. Event = STRICT (see the finding above). Displacement = the young's inborn path
+    integration from the hearing place (the same source as an own-meal record) + the parent's offset in its view.
+    The choice is made at the bout close; own meal wins; one record and one label per bout; the observed record's
+    bit = 1 (for Cam to confirm).
+  - (a) **Unit tests: 18/18 PASS** (`w2/test_observed_meal.py`): sector of the observed displacement = the named
+    sector in 12,288 placements (d 1-24); closes on a seen parent meal; not when the parent is on the item 2 cells
+    away (in the 7x7 view, item not visible), not adjacent-but-off-item, not unshown; own meal wins; T_max and
+    death unlabelled; with no observed closes the mask equals own_meal_mask exactly. Negative control: two
+    deliberately broken versions (LOOSE event; own meal not winning) each fail their test.
+  - **Flag off = bit-identical:** learner_w2_obs vs learner_w2_la at lookahead 0 and 0.25 (8/8 curve points and
+    all gate windows each; 997 lookahead bouts exercised), and vs learner_w2_kv at lookahead 0.
+  - (b) **A5 audit: PASS** (`w2/a5_audit_observed_meal.py`; a flag-on run, lookahead 0.25, seed 1's weights,
+    3.3e5 steps). In all 1,073 event frames the parent is on the item's cell, adjacent to the young, with its mark
+    in the young's agent window and the item in its food channel: all four in the young's own obs. All 15 observed
+    records have displacement = item - hearing place and sector = the named sector; 0 target mismatches. The
+    labels' other input, the displacement from the hearing place, is the inborn path integration the own-meal
+    record already uses (an approved scaffold), not a new input.
+  - Early yield signal (this short run at frontier 1): 15 observed labels vs ~2,600 own-meal labels. A young next to
+    the item mostly eats it itself, so the STRICT event rarely adds a label. The yield count (c) follows.
 - **RESULT (Nov 16 ~01:40): THE LABEL COUNT** (`docs/data/learner_w2/label_count/`; each row is 100 rollout
   iterations, 819k steps, with that checkpoint's weights, world state and frontier, no updates).
   - Definitions: MEMORY-ONLY bout = a later hearing (not the token's first in this life) at d >= 3. By construction

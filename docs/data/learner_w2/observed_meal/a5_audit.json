@@ -1,0 +1,14 @@
+{
+ "events": 1073,
+ "event_parent_on_item_cell": 1073,
+ "event_cell_adjacent_to_young": 1073,
+ "event_parent_mark_in_agent_window": 1073,
+ "event_item_in_food_channel": 1073,
+ "event_all_four": 1073,
+ "observed_records": 15,
+ "record_disp_equals_item_minus_start": 15,
+ "record_sector_equals_named_sector": 15,
+ "observed_head_labels": 15,
+ "target_mismatches": 0,
+ "PASS": true
+}
