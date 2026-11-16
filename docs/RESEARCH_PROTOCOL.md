@@ -8167,6 +8167,31 @@ more expensive, because it produces publishable-looking nulls.
       predicts the sector.
   - My predictions: early stop p 0.3 (it happened); learner PASS p 0.15 (pending).
 
+- **CAM (Nov 16 ~01:00): seed 1 FAIL recorded; the overnight plan.**
+  - Noted: ~11.7k steps/s, so 1e8 steps is ~2.4 h, not 4.
+  - **The registered 2-of-3 continues:** seed 2 now (same recipe, same early stop). A second FAIL means the
+    registered learner FAILS: stop the queue there. If seed 2 passes its early stop, carry on as registered (seed 2
+    to 1e8, then seed 3 if needed).
+  - **Free analysis while seed 2 runs** (seed 1's and the pilot's snapshots; the running job untouched): own-meal
+    labels per distance; MEMORY-ONLY labels = later hearings at d >= 3 with the item not in view at the hearing,
+    per 100k hearings; compared with the pilot's privileged labels at d >= 3.
+  - **Pre-registered next variant, LOOKAHEAD CURRICULUM** (runs only if the registered learner FAILS; queued
+    behind seed 2): each bout, with p = 0.25, d is drawn from frontier+1 .. 12, otherwise from 1 .. frontier. The
+    gate scores only in-range bouts (d <= frontier). Everything else unchanged. First both gate controls with
+    lookahead on. Early stops: (a) head on 2nd+ hearings at d = 3 < 0.25 at 3e7; (b) frontier <= 6 at 5e7. A 1-seed
+    EXPLORE screen; a confirm on fresh seeds needs Cam's go. Predictions first.
+  - If the lookahead also fails, Cam will put an observed-meal label to M; not to be built yet. Nothing on Modal.
+- **LAUNCH (Nov 16 00:55): W2 LEARNER SEED 2** (the registered recipe, `learner3/run.sh 2`; queue
+  `learner3/queue2.sh` starts from 0 pass / 1 fail; a 1e7-step snapshot watcher `snap2.py` from step 0).
+- **PREDICTIONS (Nov 16 ~01:20, before counting): the label count** (`w2/learner_w2_labels.py`, a copy of the
+  final learner that loads a training checkpoint and runs 100 rollout iterations, 819k steps, with its weights,
+  world state and frontier, no updates; the exact own-meal mask on the same 64-step sequences).
+  - By construction a d = 3 item is never in view at the hearing (smoke test: 0 of 121), so at frontier 2 seed 1 has
+    NO memory-only bouts at all.
+  - Seed 1 (frontier 2-3): memory-only OWN-MEAL labels < 2,000 per 100k hearings (p 0.8).
+  - Pilot (frontier 5-8): memory-only PRIVILEGED labels > 20,000 per 100k hearings (p 0.8).
+  - The pilot / seed 1 ratio >= 10x (p 0.75). **The hypothesis is wrong if the ratio is < 3x.**
+
 ## Part 3 — Fossils
 
 **A fossil is state carried forward through grafts and resumes that was trained under
