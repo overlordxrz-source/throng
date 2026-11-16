@@ -8542,6 +8542,27 @@ more expensive, because it produces publishable-looking nulls.
     = 0.35; p(bar PASS) = 0.2.**
     - Why the bar stays low: the pilot, with a working read, still lost reach with distance (0.33 at d = 12), and
       the bar needs 0.777.
+- **RESULT, partial (Nov 16 06:05 from `date`): BISECTION STEP 0 label counts** (the run is still going; the
+  early intervals are final; identical to the committed run 152/152 through 12.5M; take-off, i.e. frontier 24, as
+  in the original).
+  - **My registered PRIMARY "before take-off" window FAILS AS DEFINED.** The onset (training-batch head accuracy on
+    later hearings > 0.25) fires at the FIRST interval (0.407 at frontier 1). The reason: at d 1-2 the item is in
+    view at the hearing, so that accuracy measures the view, not the read. The window before the onset is empty.
+    A flaw in my definition; not redefined after the data.
+  - The registered secondary measures (memory-only own-meal labels per 100k hearings, the training mask):
+    - frontier band 3-4: **10,264 (94x W2's 109)**; 5-8: 29,177; 9-12: 36,289; 13-24: 33,098;
+    - **up to take-off (frontier < 24): 28,169 (258x)**;
+    - the first intervals at frontier 3 (0.16-0.41M steps): 1,167 -> 9,441.
+  - **The direct comparison: the young SOLVES memory-only bouts.** Own-meal share of memory-only bouts at frontier
+    3: toy **0.19-0.32** (from its first interval); W2 seed 1 0.06-0.10; W2 seed 4 0.002.
+  - Cam's falsification line (< 10x -> the diagnosis is wrong) is not met on any working measure. His 100x holds up
+    to take-off, and narrowly misses (94x) in the frontier 3-4 band.
+  - **Caveat:** these counts cannot separate "search without a read" from "an early read".
+- **REGISTERED (Nov 16 06:05, before running): the separating test** (light, after step 0 finishes).
+  - Rerun step 0 (it reproduces exactly) to 2.5e5 steps (frontier 3 was reached at 0.2M) and save the weights.
+  - Toy eval at d = 3, modes 0 (true) / 4 (memory wiped) / 3 (shuffled), 9000 episodes.
+  - If true ~ wiped (within 0.05), the young solves memory-only bouts by SEARCH, not by a read.
+  - Prediction: true ~ wiped within 0.05, with reach >= 0.15 (p 0.7); head on 2nd+ hearings at d = 3 < 0.3 (p 0.7).
 - **RESULT (Nov 16 ~01:40): THE LABEL COUNT** (`docs/data/learner_w2/label_count/`; each row is 100 rollout
   iterations, 819k steps, with that checkpoint's weights, world state and frontier, no updates).
   - Definitions: MEMORY-ONLY bout = a later hearing (not the token's first in this life) at d >= 3. By construction
