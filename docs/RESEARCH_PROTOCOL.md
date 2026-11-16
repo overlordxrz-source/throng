@@ -9209,6 +9209,26 @@ more expensive, because it produces publishable-looking nulls.
   relabel + `--no-nav`** (registered earlier with p: read forms 0.75; 0 dead later right-head sectors at 3e7 0.35;
   frontier > 6 at 5e7 0.3; bar PASS 0.1). Training is running (frontier 2 at 0.66M; no errors). The twin with the
   lever (`--no-nav`, replaying (b')'s schedule) runs before the bar, if the screen reaches it.
+- **RESULT (entry stamped Nov 16 18:50:20 EST): THE LEARNER SCREEN, seed 7 (relabel + `--no-nav`), 3e7 PAUSE: THE READ FORMED AND
+  THE CURRICULUM MOVES. FRONTIER 15** (PAUSE_AT 30,007,296; seed 6 was at 3). `docs/data/learner_w2/relabel_screen/s7_3e7/`.
+  - **Head, by hearing index** (registered evals; chance 0.125):
+    - d = 3: first 0.152 (n 978), **later 0.933** (n 3,673); wiped **0.119**, shuffled **0.127**.
+    - d = 12: first 0.125 (n 1,108), **later 0.911** (n 2,751).
+  - Hungry reach: d = 3 **0.855** true (2nd half 0.834, n 1,778) / 0.309 wiped / 0.331 shuffled; d = 12 0.792 (2nd
+    half **0.761**, n 1,090). Demonstrated bouts 0.905 (d = 3) / 0.818 (d = 12).
+  - **Per-sector table** (later bouts, head right; reach by sector 0-7):
+    - d = 3: 0.91 0.89 0.95 0.84 0.94 0.64 0.92 0.75 (min 0.64, sector 5);
+    - d = 12: 0.79 0.59 0.86 0.45 0.85 0.41 0.83 0.30 (the -x sectors 3, 5 and the diagonal 7 are weakest);
+    - head wrong: 0.00-0.25. **No dead sector** (none <= 0.10; d = 12 sector 7 is at 0.30).
+  - Head after a solved vs an unsolved same-sector bout: 0.997 / 0.610 (d = 3). 83% of later hearings now follow a
+    solved bout (seed 6 at 3e7: 41%).
+  - Relabel yield on its own mix: **51,835 memory-only labels / 100k hearings**; 76% of hearings labelled. The
+    own-meal mask now gives 31,499.
+  - **Registered decision: head 0.933 >= 0.5 -> continue** (automatic; training resumed). Frontier 15 > 6, so early
+    stop (b) cannot fire at 5e7; the run goes to 1e8, then the evals, the lever twin and bar3 against 0.8772.
+  - Predictions: p(read forms) 0.75 HIT; p(0 dead later sectors at 3e7) 0.35 HIT; p(frontier > 6 at 5e7) 0.3 ->
+    already 15 at 3e7.
+  - What remains for the bar: d = 12 2nd-half hungry reach 0.761 against 0.877, and life against the new twin.
 - **RESULT (Nov 16 ~01:40): THE LABEL COUNT** (`docs/data/learner_w2/label_count/`; each row is 100 rollout
   iterations, 819k steps, with that checkpoint's weights, world state and frontier, no updates).
   - Definitions: MEMORY-ONLY bout = a later hearing (not the token's first in this life) at d >= 3. By construction
