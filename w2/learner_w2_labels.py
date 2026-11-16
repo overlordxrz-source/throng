@@ -35,6 +35,7 @@ from w2.worlds import world_kw  # noqa: E402
 from w2.gae import gae  # noqa: E402
 from w2 import named_item as NI  # noqa: E402
 from w2.gate import HonestGate  # noqa: E402
+from w2 import lookahead as LA  # noqa: E402
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "scripts"))
 import ckpt as _ck  # noqa: E402
 
@@ -71,6 +72,7 @@ def main():
     ap.add_argument("--eval-W", type=int, default=32); ap.add_argument("--eval-steps", type=int, default=3000)
     ap.add_argument("--d-fixed", type=int, default=0); ap.add_argument("--eval-d-max", type=int, default=12)
     ap.add_argument("--out", required=True); ap.add_argument("--count-iters", type=int, default=0)
+    ap.add_argument("--lookahead", type=float, default=0.0); ap.add_argument("--la-max", type=int, default=12)
     a = ap.parse_args()
     S = a.item_size; gated = a.hunger_gate; ep = a.learner == "ep"; KV = not os.environ.get("KV_OFF")
     cfg = env.Cfg(L=96, N=a.N, patch_sigma=1.0, reproduce=False, A_max=3000, **world_kw(a.world)); L, W, N, T = cfg.L, a.W, a.N, a.T
@@ -98,7 +100,7 @@ def main():
             return lambda k: jnp.full((N,), float(a.d_fixed))
         if a.eval_necessity:                                                # the necessity check's own sampler (same lives / keys)
             return lambda k: jax.random.randint(k, (N,), 1, a.eval_d_max + 1).astype(jnp.float32)
-        return lambda k: jnp.floor(jax.random.uniform(k, (N,)) * dfront) + 1.0
+        return LA.sampler(dfront, N, a.lookahead, a.la_max)
 
     def world_reset(key, dfront):
         s = env.reset(cfg, key)
@@ -107,7 +109,7 @@ def main():
         tok = code[jnp.arange(N), item["sec"]]; oh = jax.nn.one_hot(tok, 8).astype(jnp.int32) * opened[:, None]
         dem_on = opened & a.demonstrator & (jnp.zeros(N, jnp.int32) < K)
         return dict(s=s, item=item, h=jnp.zeros((N, Hd)), pa=jnp.zeros(N, jnp.int32), pr=jnp.zeros(N), code=code,
-                    dem_pos=s.pos, dem_on=dem_on, hcnt=oh, gen=jnp.zeros(N, bool))
+                    dem_pos=s.pos, dem_on=dem_on, hcnt=oh, gen=jnp.zeros(N, bool), evs=jnp.zeros(N, bool), evl=jnp.zeros(N, bool), bfirst=jnp.zeros(N, bool))
 
     def step(pp_, c, k, dfront, mode):
         s, item, h, pa, pr, code = c["s"], c["item"], c["h"], c["pa"], c["pr"], c["code"]
@@ -163,14 +165,20 @@ def main():
             far = jnp.abs(NI.torus(c["dem_pos"] - s3.pos, L)).max(-1) > 2
             dem_mv = jnp.where(far[:, None], back, dem_mv)
         dem_pos = jnp.where(opened[:, None], s3.pos, jnp.where(c["dem_on"][:, None], dem_mv, c["dem_pos"]))
+        pon = c["dem_on"] & item["act"] & jnp.all(c["dem_pos"] == item["pos"], -1)      # parent on the called item's cell (as shown in this step's obs)
+        ev_s = c["evs"] | (pon & (jnp.abs(NI.torus(item["pos"] - s.pos, L)).max(-1) <= 1))   # STRICT: that cell adjacent (item + parent both in view)
+        ev_l = c["evl"] | (pon & (jnp.abs(NI.torus(c["dem_pos"] - s.pos, L)).max(-1) <= NI.R))  # LOOSE: parent anywhere in the 7x7 view
+        bf = jnp.where(hear_now, first_hear, c["bfirst"])
         gen_now = c["gen"] | (item["act"] & (info["take"] > 0))               # generic (world) food eaten during this bout
         gen2 = jnp.where(opened | closed, False, gen_now)
-        c2 = dict(s=s3, item=item2, h=h3, pa=act, pr=r, code=code2, dem_pos=dem_pos, dem_on=dem_on, hcnt=hcnt, gen=gen2)
+        c2 = dict(s=s3, item=item2, h=h3, pa=act, pr=r, code=code2, dem_pos=dem_pos, dem_on=dem_on, hcnt=hcnt, gen=gen2,
+                  evs=jnp.where(opened | closed, False, ev_s), evl=jnp.where(opened | closed, False, ev_l), bfirst=jnp.where(opened | closed, False, bf))
         info_ = dict(x=x, act=act, lp=lp, v=v, r=r, dead=dead.astype(jnp.float32), h=h, ate=on_item & ~dead, closed=closed & ~dead, gain=gain, pd=pd,
                      es=item["es"], d=item["d"], inb=item["act"], dem=c["dem_on"] & item["act"], hear=hear_now, first=first_hear, sec=item["sec"], hl=hl, age=age_close, alive=s.alive,
                      wflag=wflag, wslot=wslot, wrec=wrec, hung=closed & ~dead & ~item["sat"], hate=on_item & ~dead & ~item["sat"],
                      demstep=c["dem_on"] & item["act"], demfar=c["dem_on"] & item["act"] & (jnp.abs(NI.torus(c["dem_pos"] - s.pos, L)).max(-1) > 2), cl_item=closed & on_item, cl_death=closed & dead, cl_tmax=closed & ~on_item & ~dead, gen=gen_now,
-                     seen=item["act"] & (jnp.abs(NI.torus(item["pos"] - s.pos, L)).max(-1) <= 1))
+                     seen=item["act"] & (jnp.abs(NI.torus(item["pos"] - s.pos, L)).max(-1) <= 1),
+                     bclose=closed, bfirst=bf, bate=on_item, bevs=ev_s, bevl=ev_l)
         return c2, info_
 
     def rollout_world(pp_, c, key, dfront):
@@ -300,14 +308,16 @@ def main():
             GATE.load(Ck["gate"])
         print(f"resumed at {steps:,} steps, frontier {dfront}", flush=True)
     if a.count_iters:
-        if "gen" not in c:
-            c = dict(c, gen=jnp.zeros((W, N), bool))
+        for k_ in ("gen", "evs", "evl", "bfirst"):
+            if k_ not in c:
+                c = dict(c, **{k_: jnp.zeros((W, N), bool)})
         ni = NI.new_item(N); miss = [k_ for k_ in ni if k_ not in c["item"]]  # older (pilot) carries lack later item fields
         if miss:                                                            # defaults (sat / gu False): label counts do not use them
             c = dict(c, item=dict(c["item"], **{k_: jnp.broadcast_to(jnp.asarray(ni[k_]), (W,) + jnp.asarray(ni[k_]).shape) for k_ in miss}))
             print("filled missing item fields with defaults:", miss, flush=True)
         D = 25; Z = lambda: np.zeros(D, np.int64)  # noqa: E731
-        cnt = {k_: Z() for k_ in ("hear", "first", "later", "later_seen", "later_unseen", "own", "own_first", "own_later", "own_later_seen", "own_later_unseen")}
+        cnt = {k_: Z() for k_ in ("hear", "first", "later", "later_seen", "later_unseen", "own", "own_first", "own_later", "own_later_seen", "own_later_unseen",
+                                     "b_first", "b_later", "b_first_ate", "b_later_ate", "b_first_obs_s", "b_later_obs_s", "b_first_obs_l", "b_later_obs_l")}
         for _i in range(a.count_iters):
             key, k = jax.random.split(key); c, R_ = roll(p, c, jax.random.split(k, W), jnp.float32(dfront))
             R_ = {k_: np.asarray(v_) for k_, v_ in R_.items()}
@@ -316,6 +326,10 @@ def main():
             fi = sq(R_["first"]); se = sq(R_["seen"]); dd = sq(R_["d"]).astype(int); la = hr & ~fi
             for k_, m_ in (("hear", hr), ("first", hr & fi), ("later", la), ("later_seen", la & se), ("later_unseen", la & ~se), ("own", own), ("own_first", own & fi),
                            ("own_later", own & ~fi), ("own_later_seen", own & ~fi & se), ("own_later_unseen", own & ~fi & ~se)):
+                cnt[k_] += np.bincount(dd[m_], minlength=D)[:D]
+            bc = sq(R_["bclose"]); bfi = sq(R_["bfirst"]); ba = sq(R_["bate"]); es_ = sq(R_["bevs"]) & ~ba; el_ = sq(R_["bevl"]) & ~ba   # bout-level, at the close
+            for k_, m_ in (("b_first", bc & bfi), ("b_later", bc & ~bfi), ("b_first_ate", bc & bfi & ba), ("b_later_ate", bc & ~bfi & ba), ("b_first_obs_s", bc & bfi & es_),
+                           ("b_later_obs_s", bc & ~bfi & es_), ("b_first_obs_l", bc & bfi & el_), ("b_later_obs_l", bc & ~bfi & el_)):
                 cnt[k_] += np.bincount(dd[m_], minlength=D)[:D]
         out = dict(ckpt=a.ckpt, steps_at_ckpt=steps, frontier=dfront, count_iters=a.count_iters, rollout_steps=a.count_iters * W * N * T, by_d={k_: v_.tolist() for k_, v_ in cnt.items()})
         json.dump(out, open(a.out, "w"), indent=1); print("COUNTED", a.out, flush=True); return
