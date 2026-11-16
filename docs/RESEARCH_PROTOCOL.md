@@ -8254,7 +8254,8 @@ more expensive, because it produces publishable-looking nulls.
        after the read formed, and that was trained by privileged labels.
   - What the head actually trained on: seed 1 got <= 2.7k memory-only labels per 100k hearings, and only after
     31.6M steps. The pilot got 51-60k from 16M on (its privileged labels). The rate ratio is ~20x; the cumulative
-    ratio is larger still (an ESTIMATE from the rates: roughly 5k vs 100k+ labels by 5e7).
+    ratio is larger still (an ESTIMATE from the rates x hearings: seed 1 ~6k (18.4M steps x ~14k hearings per 1e6 x
+    ~2.2%); pilot ~200k (34M x ~11k per 1e6 x ~55%), so ~35x by 5e7).
   - Predictions: seed 1 own-meal < 2,000 per 100k: HIT at 3 of 4 checkpoints, MISS at 5e7 (2,705). Pilot
     privileged > 20,000: HIT (51-60k at frontier >= 5). Ratio >= 10x: HIT (~20x). **The hypothesis survives:** the
     head got almost no memory-only signal.
