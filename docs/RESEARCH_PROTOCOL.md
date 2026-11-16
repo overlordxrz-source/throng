@@ -8213,6 +8213,17 @@ more expensive, because it produces publishable-looking nulls.
     - Why low: lookahead bouts at d >= 4 are demonstrated only on a token's first hearing in a life. A later-hearing
       own-meal label at d >= 4 needs the young to find the item without the parent and without a working read, so
       the labels the read needs stay rare at the start (the chicken-and-egg Cam names in item 5).
+- **RESULT (Nov 16 01:20): p = 0 IDENTITY + LOOKAHEAD GATE CONTROLS** (`docs/data/learner_w2/lookahead/checks/`).
+  - Identity: port_w2 `--lookahead 0` reproduces the committed `ctl_gu0.json` exactly (18/18 curve points, all gate
+    windows); learner_w2_la `--lookahead 0` reproduces learner_w2_kv exactly (8/8 curve points, short run, seed 9).
+  - NEGATIVE (follower giving up on 30%, lookahead 0.25, 1.5e7): **0 advances, frontier 1**; 39 windows, mean
+    0.705, max 0.739; 23% of hungry bouts were lookahead (unscored). PASS (prediction p 0.95 HIT).
+  - POSITIVE (scripted follower, lookahead 0.25, 1.5e7): **frontier 20, not 24.** Prediction (reaches 24, p 0.9)
+    MISSED. All 38 windows scored 1.000: no window ever failed. The run had 38 windows where the old one had 47,
+    because the unscored lookahead bouts (15% of hungry bouts) slow the windows, and each advance needs 2 windows.
+    So the shortfall is the step budget (MEASURED: 19 advances = 38 windows / 2), not a gate defect.
+  - **Deviation, registered before running:** the positive control is rerun with 3e7 steps (the only change).
+    Prediction: reaches 24 (p 0.95). The lookahead queue's `controls_pass` waits for it.
 
 ## Part 3 — Fossils
 

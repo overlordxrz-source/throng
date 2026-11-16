@@ -1,0 +1,17 @@
+{
+ "identity_port_vs_committed_ctl_gu0": true,
+ "n_curve_port": 18,
+ "identity_la0_vs_kv": true,
+ "n_curve_kv": 8,
+ "pos_frontier": 20.0,
+ "pos_windows": 38,
+ "pos_min_window": 1.0,
+ "pos_la_share_logged": 0.15450643776824036,
+ "neg_frontier": 1.0,
+ "neg_windows": 39,
+ "neg_mean": 0.7046410256410256,
+ "neg_max": 0.739,
+ "neg_la_share_logged": 0.23308270676691728,
+ "controls_pass": false,
+ "all_pass": false
+}
