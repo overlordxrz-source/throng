@@ -8659,6 +8659,35 @@ more expensive, because it produces publishable-looking nulls.
   - (iii) Hungry reach at d = 3, true minus wiped: < 0.10 (p 0.55), i.e. the policy barely acts on the read yet.
   - (iv) Pilot table at d = 4/6/8/12: head right on 0.65-0.85 of later hearings (p 0.7); reach given head right
     <= 0.55 at d = 12 (p 0.75); reach given right minus given wrong >= 0.15 at d = 4 (p 0.5).
+- **RESULT (entry stamped Nov 16 07:36:26 EST): seed 6 at 3e7, the CONTROLS and an EARLY PILOT TABLE** (eval only, the 3e7
+  weights, the necessity keys, fixed d; `docs/data/learner_w2/relabel_screen/s6_3e7_diag/`).
+  - (i) **Identity PASS:** the diag tool's d = 3 true-mode output equals `s6_3e7_d3.json` on all 26 shared fields.
+  - (ii) **Memory controls at d = 3 PASS:** head on later hearings: true 0.802 / **wiped 0.115 / shuffled 0.124**
+    (chance 0.125). The read comes from the memory.
+  - (iii) Hungry reach at d = 3: true **0.409** / wiped 0.242 / shuffled 0.264. True minus wiped = 0.167, so the
+    policy DOES act on the read. My prediction (< 0.10, p 0.55) MISSED.
+  - (iv) **The pilot table (later = non-demonstrated bouts; reach = item eaten / bouts closed; hungry in brackets):**
+
+    | d | head right: share | reach, head right | reach, head wrong | head right: share of bouts ending at T_max | demonstrated reach (parent kept in view: share) |
+    |---|---|---|---|---|---|
+    | 3 | 0.80 | **0.40** (0.41) | 0.02 (0.02) | 0.60 | 0.79 (1.00) |
+    | 4 | 0.81 | **0.37** (0.39) | 0.02 (0.02) | 0.63 | 0.78 (1.00) |
+    | 6 | 0.76 | 0.32 (0.35) | 0.01 (0.02) | 0.67 | 0.72 (1.00) |
+    | 8 | 0.77 | 0.32 (0.36) | 0.01 (0.01) | 0.66 | 0.68 (1.00) |
+    | 12 | 0.73 | **0.27** (0.33) | 0.03 (0.04) | 0.69 | 0.61 (1.00) |
+
+    Predictions: head right on 0.65-0.85 HIT; reach given right <= 0.55 at d = 12 HIT; right minus wrong >= 0.15 at
+    d = 4 HIT.
+  - **Reading:** the read forms and the policy follows it: a wrong read gives ~2% reach, so the young goes where the
+    head points. But on a RIGHT read it reaches the item only 0.27-0.40 of the time, timing out in 60-69% of those
+    bouts, even at d = 3 (T_max 12 steps for a 3-cell walk). The privileged-label pilot (Nov 15) had 0.77 at d = 4
+    and 0.44 at d = 12; here d = 4 is 0.37. With the parent the same young reaches 0.61-0.79.
+  - **Not lag:** the training-batch head on later hearings has been 0.93-0.95 since ~6e6 steps, while the gate
+    window has sat at 0.68-0.73 at frontier 3 from ~1.5e7 to 3.2e7. A plateau, as in the pilot.
+  - Odd, not used: with the memory wiped, the ~12% of later bouts where the head is right by chance reach 0.64
+    (n 869). Unexplained; a guess is that a chance-right head coincides with the policy's default search direction.
+  - The run continues to 5e7 as registered. My odds of frontier > 6 at 5e7: **~0.05** (flat gate for 1.7e7 steps).
+    At 5e7 the registered pilot table is rerun on the 5e7 weights.
 - **RESULT (Nov 16 ~01:40): THE LABEL COUNT** (`docs/data/learner_w2/label_count/`; each row is 100 rollout
   iterations, 819k steps, with that checkpoint's weights, world state and frontier, no updates).
   - Definitions: MEMORY-ONLY bout = a later hearing (not the token's first in this life) at d >= 3. By construction
