@@ -8272,6 +8272,9 @@ more expensive, because it produces publishable-looking nulls.
     - K = 3, lookahead 0.25, STRICT: own + observed memory-only < 10k / 100k (p 0.7). A strict event needs the young
       adjacent to the item, where it mostly eats it itself.
     - K = 3, LOOSE: > 10k / 100k (p 0.5).
+- **RESULT (Nov 16 02:42): W2 LEARNER SEED 2: EARLY-STOPPED, so FAIL** (frontier 1 -> 2 at 26.1M, 3 at 41.8M; 3 at
+  5e7). **THE REGISTERED W2 LEARNER IS DECIDED FAIL (0 pass, 2 fail; seed 3 not run).** My prediction (learner PASS
+  p 0.15) did not come true. The queue then started the LOOKAHEAD screen (seed 4) at 02:42:52, as registered.
 - **RESULT (Nov 16 ~01:40): THE LABEL COUNT** (`docs/data/learner_w2/label_count/`; each row is 100 rollout
   iterations, 819k steps, with that checkpoint's weights, world state and frontier, no updates).
   - Definitions: MEMORY-ONLY bout = a later hearing (not the token's first in this life) at d >= 3. By construction
