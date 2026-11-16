@@ -33,5 +33,12 @@ for ES in 6000 12000 24000; do
   NB=$(python3 -c "import json;m=json.load(open('$L/s${S}_eval_d12_long.json'))['modes'];print(int(min(m['0']['hungry_bouts_2nd_half'], m['3']['hungry_bouts_2nd_half'])))"); [ $NB -ge 2000 ] && break
   $PY w2/learner_w2_rl2.py ${=X} --seed $S --init-params $L/s$S.params --d-fixed 12 --eval-necessity 0,3,4 --eval-steps $ES --out $L/s${S}_eval_d12_long.json >> $L/s$S.log 2>&1
 done
-python3 $SP/bar/bar3.py $L/s${S}_eval_d12.json $L/s${S}_eval_d12_long.json $REF $SP/twin3/eval_d12.json > $L/s${S}_bar.json
+# Cam Nov 16 ~19:15Z: the DEAF TWIN carries the lever: port_w2 without --oracle (input zeroed) + the same lever, replaying the
+# qualifying ORACLE ARM's frontier schedule, 3e7 steps; its default (3000-step) d = 12 eval gives the life reference. The bar waits for it.
+ARMTR=${REF%_ref_d12_long.json}_train.json
+echo "learner evals done; twin start $(date '+%H:%M:%S') schedule $ARMTR"
+for i in $(seq 1 100); do $PY w2/port_w2.py --hunger-gate --item-size 0.1 --W 32 --gate honest ${=LEV} --frontier-schedule $ARMTR --steps 3e7 --ckpt $L/twin.ckpt --max-seconds 480 --save-params $L/twin.params --out $L/twin_train.json >> $L/twin.log 2>&1
+  [ -f $L/twin_train.json ] && break; grep -q Traceback $L/twin.log && { echo "twin CRASH"; exit 0; }; done
+$PY w2/learner_w2_rl_traj.py --learner rec --hunger-gate --item-size 0.1 --W 32 --init-params $L/twin.params --d-fixed 12 --eval-necessity 0 --out $L/twin_eval_d12.json >> $L/twin.log 2>&1
+python3 $SP/bar/bar3.py $L/s${S}_eval_d12.json $L/s${S}_eval_d12_long.json $REF $L/twin_eval_d12.json > $L/s${S}_bar.json
 grep -q '"PASS": true' $L/s${S}_bar.json && echo "seed $S PASS" || echo "seed $S FAIL"

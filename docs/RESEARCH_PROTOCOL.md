@@ -9123,6 +9123,23 @@ more expensive, because it produces publishable-looking nulls.
     deaf-twin rule the twin should arguably carry the lever too; flagged for Cam, unchanged until he rules.
   - **Predictions, if it runs:** p(read forms: head later at d = 3 >= 0.5 at 3e7) 0.75 (seed 6 had 0.80);
     p(0 dead sectors among later right-head bouts at 3e7) 0.35; p(frontier > 6 at 5e7) 0.3; p(bar PASS at 1e8) 0.1.
+- **CAM RULINGS (received Nov 16 14:34:34 EST; Cam's message time ~19:15Z) on the chain launch.**
+  - Greedy diagnostic accepted -> (a') first; builds, identities and the disclosed learner identity run accepted.
+  - **THE DEAF TWIN MUST CARRY THE LEVER** (same-architecture rule): trained as before (input zeroed) with the
+    qualifying arm's lever, replaying THAT arm's frontier schedule, queued right after the learner screen; the
+    learner's bar verdict waits for it. Life bar = 1.3x the new twin, LB > 1.0. The old twin (486) stays on record,
+    not used.
+  - decide.py needs synthetic unit tests before it may auto-launch the learner: one PASS, one secondary-only, one
+    single-dead-sector fail.
+- **DONE (Nov 16 14:34:34 EST) on those rulings.**
+  - `chain/test_decide.py`: runs the UNCHANGED decide.py as a subprocess on fabricated trajectory files.
+    **5/5 as expected:** must-pass -> PASS; secondary-only -> SECONDARY only; one dead sector (3) -> fail; all
+    sectors fine but frontier 21 -> fail; dead only at d = 12 (sector 7 at 0.25) -> fail. **A mutant** (no d = 12
+    floor, no dead-sector check in the secondary rule) fails a case (4/5): the tests catch it.
+  - `learner_rl2/run_rl2.sh` (not yet started; checked) now trains the lever-carrying twin after the learner's
+    evals (port_w2 without --oracle + the lever, `--frontier-schedule` = the qualifying arm's train JSON, 3e7),
+    evaluates it at d = 12 (default 3000 steps) and only then runs bar3.py against it. bar3 already applies ratio
+    >= 1.3 and the bootstrap LB > 1.0.
 - **RESULT (Nov 16 ~01:40): THE LABEL COUNT** (`docs/data/learner_w2/label_count/`; each row is 100 rollout
   iterations, 819k steps, with that checkpoint's weights, world state and frontier, no updates).
   - Definitions: MEMORY-ONLY bout = a later hearing (not the token's first in this life) at d >= 3. By construction
