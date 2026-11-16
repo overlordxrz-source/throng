@@ -9143,6 +9143,12 @@ more expensive, because it produces publishable-looking nulls.
 - **TWIN PATH CHECKED (Nov 16 15:09:37 EST):** the eval tool on the old twin's weights reproduces `twin3/eval_d12.json` on all 26
   shared fields. A lever twin (port_w2 without --oracle, `--reinit-out`, `--frontier-schedule` from o3's train JSON)
   runs and saves params (smoke run, 2.5e4 steps, not data).
+- **INCIDENT (entry stamped Nov 16 17:12:15 EST): the laptop slept; the chain paused and resumed exactly.** From `pmset -g log`:
+  maintenance sleeps around 15:16, then a 'Low Power Sleep' (hibernate) from 15:44:32 until a power-button wake at
+  17:10:10. Nothing ran in between. Arm (a') resumed from its chunk checkpoint (exact resume; `A.log` shows
+  CHUNK_STOP / resumed at 27,688,960). The curve point spanning the sleep logs 5,276 s. No data is affected; only
+  the timetable moved. Also seen: heavy swap use (7.7 of 9.2 GB) from other apps on the machine, which slows the
+  runs but does not change them.
 - **RESULT (Nov 16 ~01:40): THE LABEL COUNT** (`docs/data/learner_w2/label_count/`; each row is 100 rollout
   iterations, 819k steps, with that checkpoint's weights, world state and frontier, no updates).
   - Definitions: MEMORY-ONLY bout = a later hearing (not the token's first in this life) at d >= 3. By construction
