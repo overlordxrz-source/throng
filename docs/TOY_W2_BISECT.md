@@ -1,7 +1,7 @@
 # Toy → W2 bisection plan (Cam Nov 16 ~08:30Z stop-loss)
 
 Status: **plan only, no runs.** It applies only if both last single-tweak screens fail: the lookahead screen
-(seed 4) and the K-screen. Written by Will, Nov 16 ~03:50 EST, from the code (comm-toy `w2/toy_grid.py`,
+(seed 4) and the K-screen. Written by Will, Nov 16 ~03:25 EST, from the code (comm-toy `w2/toy_grid.py`,
 `w2/learner_w2_kv.py` / `_la.py`, `w2/named_item.py`, `w2/env.py`, `w2/ep_agent_dev.py`) and the record
 (`docs/RESEARCH_PROTOCOL.md`).
 

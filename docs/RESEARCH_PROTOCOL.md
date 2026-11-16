@@ -8338,7 +8338,7 @@ more expensive, because it produces publishable-looking nulls.
   - All jobs now run detached in their own sessions (`<scratchpad>/detach.py`: fork + setsid), so an app quit no
     longer kills them: the guard (pid 36792), seed 4's queue, the watchers and the analysis queues.
   - My half-done K-screen copy had not been written; it was rebuilt (below).
-- **IMPLEMENTED (Nov 16 ~03:25; comm-toy 13def74), not yet run: THE K-SCREEN.**
+- **IMPLEMENTED (Nov 16 ~03:15; comm-toy 13def74; first written as "~03:25", corrected), not yet run: THE K-SCREEN.**
   - `w2/learner_w2_k.py`, a copy of learner_w2_la (which seed 4 is running), adds two flags:
     - `--score-after K`: the gate, the hungry-bout reach (training and evaluation, so the bar's
       `hungry_reach_2nd_half` and per-world counts) and `head_acc_gtK` score only bouts whose hearing index is > K.
@@ -8373,7 +8373,7 @@ more expensive, because it produces publishable-looking nulls.
   - Eval power: the D = 12 bar eval must have >= 2000 2nd-half hungry bouts with index > K for the learner AND the
     shuffled control. `run_k.sh` lengthens the eval (6000, 12000, 24000 steps per world) until both hold, and
     logs the count.
-- **RESULT (Nov 16 03:35): HEAD CHECK (Cam item 2), from the code.**
+- **RESULT (Nov 16 ~03:21; first written as "03:35", a clock error corrected here): HEAD CHECK (Cam item 2), from the code.**
   - LABEL: hearing step only. The cross-entropy is masked by `bt["hear"]` = the own-meal mask over
     `hear_now = item act & t == 0`. No head label ever comes from a later step.
   - APPLIED: at EVERY step. In `EpAgentDev._head` the head's softmax is a policy input (`feat = [y2,
@@ -8396,6 +8396,10 @@ more expensive, because it produces publishable-looking nulls.
     5. the network (navigator prior + zero-initialised side head).
   - Also from the code: the toy's frontier reached 12 by 5-6M steps (screen 2, seeds 8 / 10 / 12); W2's seeds
     reached 3 only at 31.6M and 41.8M.
+- **CORRECTION (Nov 16 03:27): three timestamps written ahead of the clock again** (the K-screen entry, the head
+  check, and the handoff's pause test). They are fixed above against the git commit times (13def74 03:15, 486eac3
+  03:22). The same error class as Nov 15 and Nov 16 00:57. From now on I take every time I write from `date`, not
+  from memory.
 - **RESULT (Nov 16 ~01:40): THE LABEL COUNT** (`docs/data/learner_w2/label_count/`; each row is 100 rollout
   iterations, 819k steps, with that checkpoint's weights, world state and frontier, no updates).
   - Definitions: MEMORY-ONLY bout = a later hearing (not the token's first in this life) at d >= 3. By construction
