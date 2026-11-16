@@ -178,7 +178,9 @@ def main():
                      wflag=wflag, wslot=wslot, wrec=wrec, hung=closed & ~dead & ~item["sat"], hate=on_item & ~dead & ~item["sat"],
                      demstep=c["dem_on"] & item["act"], demfar=c["dem_on"] & item["act"] & (jnp.abs(NI.torus(c["dem_pos"] - s.pos, L)).max(-1) > 2), cl_item=closed & on_item, cl_death=closed & dead, cl_tmax=closed & ~on_item & ~dead, gen=gen_now,
                      seen=item["act"] & (jnp.abs(NI.torus(item["pos"] - s.pos, L)).max(-1) <= 1),
-                     bclose=closed, bfirst=bf, bate=on_item, bevs=ev_s, bevl=ev_l)
+                     bclose=closed, bfirst=bf, bate=on_item, bevs=ev_s, bevl=ev_l,
+                     hidx=c["hcnt"][ar, tok_now], demh=c["dem_on"] & hear_now, doff=NI.torus(c["dem_pos"] - s.pos, L),
+                     dem2=c["dem_on"] & item["act"] & (item["t"] == 2) & ~c["bfirst"])
         return c2, info_
 
     def rollout_world(pp_, c, key, dfront):
@@ -317,7 +319,9 @@ def main():
             print("filled missing item fields with defaults:", miss, flush=True)
         D = 25; Z = lambda: np.zeros(D, np.int64)  # noqa: E731
         cnt = {k_: Z() for k_ in ("hear", "first", "later", "later_seen", "later_unseen", "own", "own_first", "own_later", "own_later_seen", "own_later_unseen",
-                                     "b_first", "b_later", "b_first_ate", "b_later_ate", "b_first_obs_s", "b_later_obs_s", "b_first_obs_l", "b_later_obs_l")}
+                                     "b_first", "b_later", "b_first_ate", "b_later_ate", "b_first_obs_s", "b_later_obs_s", "b_first_obs_l", "b_later_obs_l",
+                                     "hear_gtK", "later_unseen_demo", "later_unseen_nodemo", "own_later_unseen_demo", "own_later_unseen_nodemo")}
+        LEAK = []; LEAK2 = []                                                           # (sector, parent offset id, agent-window pattern, half) on demo hearings 2..K
         for _i in range(a.count_iters):
             key, k = jax.random.split(key); c, R_ = roll(p, c, jax.random.split(k, W), jnp.float32(dfront))
             R_ = {k_: np.asarray(v_) for k_, v_ in R_.items()}
@@ -327,11 +331,46 @@ def main():
             for k_, m_ in (("hear", hr), ("first", hr & fi), ("later", la), ("later_seen", la & se), ("later_unseen", la & ~se), ("own", own), ("own_first", own & fi),
                            ("own_later", own & ~fi), ("own_later_seen", own & ~fi & se), ("own_later_unseen", own & ~fi & ~se)):
                 cnt[k_] += np.bincount(dd[m_], minlength=D)[:D]
+            hx = sq(R_["hidx"]); dm = sq(R_["demh"]); own_lu = own & ~fi & ~se
+            for k_, m_ in (("hear_gtK", hr & (hx > a.demo_hearings)), ("later_unseen_demo", la & ~se & dm), ("later_unseen_nodemo", la & ~se & ~dm),
+                           ("own_later_unseen_demo", own_lu & dm), ("own_later_unseen_nodemo", own_lu & ~dm)):
+                cnt[k_] += np.bincount(dd[m_], minlength=D)[:D]
+            lk2 = sq(R_["dem2"])                                            # POSITIVE control: the parent's offset 2 steps into a demo bout 2..K
+            if lk2.any():
+                do2 = sq(R_["doff"])[lk2]; LEAK2.append((sq(R_["sec"])[lk2], (do2[:, 0] + 50) * 101 + (do2[:, 1] + 50), np.full(int(lk2.sum()), _i % 2)))
+            lk = la & dm
+            if lk.any():
+                do = sq(R_["doff"])[lk]; aw = sq(R_["x"])[..., 49:98][lk]
+                LEAK.append((sq(R_["sec"])[lk], (do[:, 0] + 50) * 101 + (do[:, 1] + 50), [hash(r.round(3).tobytes()) for r in aw], np.full(int(lk.sum()), _i % 2)))
             bc = sq(R_["bclose"]); bfi = sq(R_["bfirst"]); ba = sq(R_["bate"]); es_ = sq(R_["bevs"]) & ~ba; el_ = sq(R_["bevl"]) & ~ba   # bout-level, at the close
             for k_, m_ in (("b_first", bc & bfi), ("b_later", bc & ~bfi), ("b_first_ate", bc & bfi & ba), ("b_later_ate", bc & ~bfi & ba), ("b_first_obs_s", bc & bfi & es_),
                            ("b_later_obs_s", bc & ~bfi & es_), ("b_first_obs_l", bc & bfi & el_), ("b_later_obs_l", bc & ~bfi & el_)):
                 cnt[k_] += np.bincount(dd[m_], minlength=D)[:D]
-        out = dict(ckpt=a.ckpt, steps_at_ckpt=steps, frontier=dfront, count_iters=a.count_iters, rollout_steps=a.count_iters * W * N * T, by_d={k_: v_.tolist() for k_, v_ in cnt.items()})
+        leak = None
+        if LEAK:
+            sc = np.concatenate([l_[0] for l_ in LEAK]); po = np.concatenate([l_[1] for l_ in LEAK]); pw = np.concatenate([l_[2] for l_ in LEAK]); hf = np.concatenate([l_[3] for l_ in LEAK])
+            def decode(keys):                                               # counting decoder: majority sector per key, fit on half 0, tested on half 1
+                tab = {}
+                for k_, y_ in zip(keys[hf == 0], sc[hf == 0]):
+                    tab.setdefault(k_, np.zeros(8, int))[y_] += 1
+                glob_ = np.bincount(sc[hf == 0], minlength=8).argmax()
+                pred = np.array([tab[k_].argmax() if k_ in tab else glob_ for k_ in keys[hf == 1]])
+                ins = sum(v_.max() for v_ in tab.values()) / max((hf == 0).sum(), 1)
+                return float((pred == sc[hf == 1]).mean()) if (hf == 1).any() else None, float(ins), len(tab)
+            chance = float(np.bincount(sc[hf == 1], minlength=8).max() / max((hf == 1).sum(), 1)) if (hf == 1).any() else None
+            d1, i1, n1 = decode(po); d2, i2, n2 = decode(pw)
+            pos_ctl = None
+            if LEAK2:
+                sc2 = np.concatenate([l_[0] for l_ in LEAK2]); po2 = np.concatenate([l_[1] for l_ in LEAK2]); hf2 = np.concatenate([l_[2] for l_ in LEAK2])
+                tab = {}
+                for k_, y_ in zip(po2[hf2 == 0], sc2[hf2 == 0]):
+                    tab.setdefault(k_, np.zeros(8, int))[y_] += 1
+                g2 = np.bincount(sc2[hf2 == 0], minlength=8).argmax(); pr2 = np.array([tab[k_].argmax() if k_ in tab else g2 for k_ in po2[hf2 == 1]])
+                pos_ctl = dict(n=int(len(sc2)), heldout=float((pr2 == sc2[hf2 == 1]).mean()) if (hf2 == 1).any() else None,
+                               chance_majority_test=float(np.bincount(sc2[hf2 == 1], minlength=8).max() / max((hf2 == 1).sum(), 1)) if (hf2 == 1).any() else None)
+            leak = dict(positive_control_parent_offset_at_t2=pos_ctl, n=int(len(sc)), n_test=int((hf == 1).sum()), chance_majority_test=chance, parent_offset_heldout=d1, parent_offset_insample=i1, parent_offset_keys=n1,
+                        agent_window_heldout=d2, agent_window_insample=i2, agent_window_keys=n2, parent_offset_at_hearing_all_zero=bool((po == 50 * 101 + 50).all()))
+        out = dict(leak=leak, demo_hearings=a.demo_hearings, lookahead=a.lookahead, ckpt=a.ckpt, steps_at_ckpt=steps, frontier=dfront, count_iters=a.count_iters, rollout_steps=a.count_iters * W * N * T, by_d={k_: v_.tolist() for k_, v_ in cnt.items()})
         json.dump(out, open(a.out, "w"), indent=1); print("COUNTED", a.out, flush=True); return
     t0 = time.time(); nupd = a.policy != "learner" and not a.head_only
     while steps < a.steps:
