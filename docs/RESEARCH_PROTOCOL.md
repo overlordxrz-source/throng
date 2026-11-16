@@ -8470,6 +8470,41 @@ more expensive, because it produces publishable-looking nulls.
   from d 3 to 12 (seed 2).
   - **Note for the eval-power rule:** the oracle's own d = 12 reference has only 1,679 2nd-half hungry bouts at the
     default eval length, below the 2,000 now required of the learner.
+
+- **CAM (Nov 16 ~10:15Z): rulings.** Seed 4 FAIL; the K-screen FAIL by its precondition. **THE STOP-LOSS HAS FIRED.**
+  - Diagnosis accepted, a BOOTSTRAP LOOP: a label needs a solved memory-only bout, and solving one needs a read.
+    Supply is not the limit; yield is.
+  - Bisection starts, step 0 only: toy screen 2 exactly as it was, 1 seed, plus one free count: memory-only own-meal
+    labels per 100k hearings BEFORE take-off.
+    - Cam's registered prediction: toy yield >= 100x W2's 109 (toy search solves memory-only episodes without a
+      read).
+    - If the toy's pre-take-off yield is < 10x W2's, the diagnosis is wrong: report, and the order stands.
+  - CROSS-HEARING RELABEL `--head-relabel-token`: build as a flag (spec in the ruling), checks (a) unit tests +
+    flag-off identity, (b) A5, (c) yield >= 30k / 100k on the average AND >= 1 seed.
+  - Oracle d = 12 reference: lengthen to >= 2000 2nd-half hungry bouts (after step 0).
+- **CAM (Nov 16 ~10:50Z): M APPROVED the cross-hearing relabel, stage 1 only.** If (a)-(c) pass, the relabel
+  screen launches automatically after step 0: seed 4 config + relabel, new seed, 1-seed explore; early stops as
+  ruled; bar unchanged; head split by hearing index at every pause; p(pass) and p(read forms) registered first. If
+  (c) misses: report, don't run. The flag is dropped at stage 2.
+- **REGISTERED + PREDICTIONS (Nov 16 05:50 from `date`, before launch): BISECTION STEP 0.**
+  - Command = toy screen 2 seed 8 exactly (every flag from its committed cfg, chunked 480 s with exact resume),
+    plus `--count-labels`. That flag is logging only: two extra rollout outputs (the episode's d; food in view),
+    counted per curve interval, with no effect on the rollout, the update or the curriculum.
+    **Identity check:** every curve field other than wall time must equal the committed
+    `screen2_sharedtok/L2e_B_s8_train.json`, point by point.
+  - Then the toy evals at d = 3 and d = 12 (modes 0, 3, 4; 9000 episodes, as screen 2). READ FORMS (as in
+    TOY_W2_BISECT.md) = head on 2nd+ hearings at d = 3 >= 0.5.
+  - Count definitions:
+    - toy hearing = an episode's first step;
+    - MEMORY-ONLY = a later hearing of the token in this life, at d >= 3, food not in view;
+    - label = the head's own-meal, hearing-step mask, exactly as trained.
+  - "BEFORE TAKE-OFF", registered now: (i) PRIMARY = before the head's training-batch accuracy on later hearings
+    first exceeds 0.25 (2x chance, the read's onset), summed over curve intervals; (ii) also by frontier band, and
+    up to frontier 24 (the record's take-off definition).
+  - Predictions:
+    - step 0 reproduces the committed curve exactly (p 0.85; a JAX or BLAS difference is the risk);
+    - READ FORMS (p 0.95);
+    - pre-onset memory-only label yield >= 10.9k / 100k, Cam's 100x (p 0.45); >= 1.09k, 10x (p 0.9).
 - **RESULT (Nov 16 ~01:40): THE LABEL COUNT** (`docs/data/learner_w2/label_count/`; each row is 100 rollout
   iterations, 819k steps, with that checkpoint's weights, world state and frontier, no updates).
   - Definitions: MEMORY-ONLY bout = a later hearing (not the token's first in this life) at d >= 3. By construction
