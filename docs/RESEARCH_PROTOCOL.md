@@ -9140,6 +9140,9 @@ more expensive, because it produces publishable-looking nulls.
     evals (port_w2 without --oracle + the lever, `--frontier-schedule` = the qualifying arm's train JSON, 3e7),
     evaluates it at d = 12 (default 3000 steps) and only then runs bar3.py against it. bar3 already applies ratio
     >= 1.3 and the bootstrap LB > 1.0.
+- **TWIN PATH CHECKED (Nov 16 15:09:37 EST):** the eval tool on the old twin's weights reproduces `twin3/eval_d12.json` on all 26
+  shared fields. A lever twin (port_w2 without --oracle, `--reinit-out`, `--frontier-schedule` from o3's train JSON)
+  runs and saves params (smoke run, 2.5e4 steps, not data).
 - **RESULT (Nov 16 ~01:40): THE LABEL COUNT** (`docs/data/learner_w2/label_count/`; each row is 100 rollout
   iterations, 819k steps, with that checkpoint's weights, world state and frontier, no updates).
   - Definitions: MEMORY-ONLY bout = a later hearing (not the token's first in this life) at d >= 3. By construction
