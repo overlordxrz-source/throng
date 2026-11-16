@@ -8297,6 +8297,39 @@ more expensive, because it produces publishable-looking nulls.
     record already uses (an approved scaffold), not a new input.
   - Early yield signal (this short run at frontier 1): 15 observed labels vs ~2,600 own-meal labels. A young next to
     the item mostly eats it itself, so the STRICT event rarely adds a label. The yield count (c) follows.
+
+- **CAM (Nov 16 ~08:05Z = 03:05 EST): rulings.**
+  - Registered W2 learner FAIL recorded; seed 3 does not run.
+  - Seed 4 at the 3e7 pause, head on 2nd+ hearings at d = 3: >= 0.5 -> continue to the 5e7 check, then the 1e8 bar
+    (a confirm needs Cam's go); 0.25-0.5 -> continue to the 5e7 early stop; < 0.25 -> STOP.
+  - Observed-meal flag ACCEPTED; STRICT only (LOOSE is an A5 violation, never built). Ate bit = 1 CONFIRMED ("the
+    called item was located at this displacement"). The flag stays OFF; code kept; no run.
+  - **`--demo-hearings K > 1` is Cam's ruling** (a scaffold parameter under M's approved copying trait): the head is
+    labelled at the hearing step, before the parent moves, so on hearings 2..K the head needs memory while the young
+    can still solve the bout by following and earn an own-meal label.
+  - Free counts at K = 1/2/3 x lookahead 0/0.25: (a) own-meal labels per 100k hearings on hearings >= 2 with the
+    item unseen at the hearing step, by distance; (b) share of hearings with index > K (what the bar can score);
+    (c) LEAK CHECK: on demo hearings 2..K, a counting decoder of the item's sector from the parent's mark in the
+    young's view at the hearing step must be <= chance + 0.05, else K > 1 is void.
+  - **NEXT SCREEN** (lookahead 0.25 + `--demo-hearings 3`, observed flag off, 1 seed, explore) runs automatically
+    only if: seed 4 stops at 3e7 or 5e7; 4a >= 10k / 100k at K = 3, lookahead 0.25; 4c passes. The gate and bar score
+    ONLY hearings with index > K; both gate controls are rerun under that scoring first. Bar unchanged on those
+    hearings. Early stops: head on hearings > K at d = 3 < 0.25 at 3e7; frontier <= 6 at 5e7. p(pass) and the
+    expected label rate are registered before launch. If 4a misses or 4c fails: report and stop.
+  - Laptop: one job at a time (training) under M's overnight grant; the free analyses run one after another
+    beside it. Nothing on Modal.
+- **MY READING, registered before counting:**
+  - 4a's 10k threshold is applied to d >= 3 (the memory-only definition of Nov 16 01:00). The all-unseen sum
+    (d = 2 off-diagonal included) is also reported.
+  - The 4a decision uses the mean over the seed 1 and seed 2 final checkpoints. Caveat: these policies were trained
+    at K = 1, frontier 3. Seed 4's pause checkpoint is reported next to them.
+  - **4c by construction:** at the hearing step the parent stands on the young's own cell (it appears at the
+    hearing place, where the young is, and has not moved yet). Its mark is always at the centre of the young's
+    window, so a decoder from it can only reach chance. Predicted: 4c accuracy <= chance + 0.02 (p 0.95), both
+    for a decoder on the parent's offset and for one on the full 7x7 agent-window pattern (other agents
+    included), held out.
+  - Predictions: (a) at K = 3, lookahead 0.25, d >= 3: >= 10k / 100k p 0.45; (b) share of hearings with
+    index > 3 at frontier 3: 0.4-0.7 (p 0.6).
 - **RESULT (Nov 16 ~01:40): THE LABEL COUNT** (`docs/data/learner_w2/label_count/`; each row is 100 rollout
   iterations, 819k steps, with that checkpoint's weights, world state and frontier, no updates).
   - Definitions: MEMORY-ONLY bout = a later hearing (not the token's first in this life) at d >= 3. By construction
