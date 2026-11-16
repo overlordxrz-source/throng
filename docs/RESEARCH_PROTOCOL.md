@@ -8839,6 +8839,100 @@ more expensive, because it produces publishable-looking nulls.
     whole set.
   - The verdict is unchanged (the head holds; Cam's < 0.5 by step 3 condition is not met), and my D1 prediction
     (current >= 0.5 at step 3, d = 3) remains a hit. Nothing else in the entry used this number.
+- **CAM RULINGS (received Nov 16 12:17:20 EST; Cam's message time ~17:25Z) on seed 6 at 5e7 and D1-D5.**
+  - Recorded: seed 6 EARLY STOP at 5e7, frontier 4 = FAIL. D1 hit; misses as listed; the D1 correction accepted.
+    D2 accepted: **branch 1 is VOID**. D4 (sector selection) and D5 (knock-on of unsolved records) accepted.
+  - The per-sector split is EXPLORATORY but decisive enough to steer: a DIRECTION-SPECIFIC FREEZE. Cam reads it as
+    the toy-T1 move-cost freeze (stay is the safe default until a direction has paid once), now per direction, and
+    present in the oracle (sector 3).
+  - (2) APPROVED first, free, eval only: split the hearing-step move / stay / eat logits into the navigator part and
+    the side-head part, frozen vs working sectors, on the 3e7 and 5e7 learner weights and the oracle. Prediction
+    first.
+  - ORACLE SCREEN (oracle-first rule) after that: port_w2.py, honest gate, 3e7 steps each, laptop, sequential. Two
+    arms, one change each:
+    - O-X, exploration during bouts (entropy coefficient or an action floor; the single number registered before
+      launch);
+    - O-T, topographic tie: move logits += g x P x s (s = the 8-way sector input; P = fixed 4x8, cos of the angle
+      between sector and move clipped >= 0; g one learned scalar, init 0).
+    - PASS per arm: min over 8 sectors of reach (later bouts, oracle sector) >= 0.85 at d = 3 and >= 0.75 at d = 12,
+      AND frontier mastered >= 22 under the honest gate.
+    - Pick: both pass -> X; only T -> T, which goes to M before any learner uses it; neither -> report with the logit
+      split, Cam rules. Report the per-sector table and the dead-sector count per arm; p(pass) per arm first.
+  - ORACLE REFERENCE re-derived: the bar's oracle must use the same architecture and levers as the learner it judges.
+    After the screen: new reference = 0.9 x the winning arm's d = 12 reach (>= 2000 bouts, bar3.py). **The 0.861 /
+    0.775 bar is RETIRED** (kept on record).
+  - NEXT LEARNER SCREEN registered now, runs only after the pick: relabel + the winning lever, new seed, same early
+    stops, bar from the re-derived reference, per-sector table at every pause.
+  - Laptop: ~2 h of runs this afternoon; M may say pause (scripts/laptop_jobs.sh). Modal nothing; guard $41.
+- **REGISTERED (Nov 16 12:18:12 EST, before running): THE LOGIT SPLIT** (Cam item 2; eval only).
+  - Tool: `learner_w2_rl_traj.py --logits` records, every step, the total logits, the TRUNK's logits (Dense_0-2 on
+    the 100-dim view, current params) and the PRETRAINED navigator's logits on the same view. Side-head part = total
+    minus trunk.
+    - Control PASSED: with fresh parameters (side head zero) total = trunk = pretrained exactly (max difference 0.0),
+      for the learner and the oracle agent; with seed 6's 3e7 weights the side part is non-zero (mean |.| 1.5) and
+      the trunk has moved from the pretrained navigator (max 13 nats). The trunk is NOT frozen in training.
+  - Runs: d = 3, true mode, the full eval: learner 3e7, learner 5e7, oracle (o3). Identity vs the earlier evals first.
+  - Bouts: later (non-demonstrated) right-head bouts for the learner; all bouts for the oracle. Sector classes from the
+    same eval's reach: FROZEN <= 0.10, WORKING >= 0.5.
+  - Measure at the hearing step: D = logit(stay) - logit(best toward move), where the toward move is the move within
+    45 deg of the item sector with the highest TOTAL logit. D is split into trunk + side (and the pretrained trunk
+    for reference). The same for eat. Positive = stay beats walking.
+  - **Predictions:**
+    - P1: total D > 0 in frozen sectors and < 0 in working ones (p 0.9).
+    - P2: the frozen-minus-working difference in D comes mostly from the SIDE head (>= 2/3 of it) (p 0.6). The
+      alternative is a trunk bias against the -x / -y moves, which the trunk can carry although it cannot see the
+      sector (trunk >= 1/2 of the difference): p 0.35.
+    - P3: the side head actively ADDS stay in frozen sectors (side D > +0.5) (p 0.35); otherwise it is ~0 there and
+      the trunk's stay default wins.
+    - P4: the oracle's sector 3 shows the same pattern as the learner's frozen sectors (p 0.6).
+- **RESULT (entry stamped Nov 16 12:20:57 EST): THE LOGIT SPLIT** (`docs/data/learner_w2/relabel_screen/logit_split/`; comm-toy
+  logit tools). Identity: all three evals equal the earlier ones on every shared field (27 each).
+  - D = logit(stay) - logit(best toward move) at the hearing step; positive = stay wins. Mean D, frozen vs working
+    sectors (frozen: reach <= 0.10):
+
+    | weights | class (n) | D total | = trunk | + side head | pretrained navigator | p(stay) / p(eat) / p(toward) |
+    |---|---|---|---|---|---|---|
+    | learner 3e7 | frozen (2,403) | +2.74 | +1.62 | **+1.12** | +6.01 | 0.43 / 0.40 / 0.08 |
+    | learner 3e7 | working (1,874) | -4.66 | -0.72 | **-3.93** | +5.98 | 0.02 / 0.08 / 0.88 |
+    | learner 5e7 | frozen (1,438) | +4.59 | +2.18 | **+2.41** | +7.28 | 0.63 / 0.30 / 0.04 |
+    | learner 5e7 | working (2,523) | -3.93 | +0.14 | **-4.07** | +6.14 | 0.07 / 0.09 / 0.82 |
+    | oracle o3 | frozen = sector 3 (606) | +4.08 | +2.54 | **+1.53** | +8.06 | 0.62 / 0.27 / 0.07 |
+    | oracle o3 | working (4,413) | -3.31 | +2.26 | **-5.57** | +6.13 | 0.11 / 0.06 / 0.81 |
+
+  - **Reading:**
+    - **The starting default is STAY.** The pretrained navigator prefers stay over the right move by +4 to +8 nats
+      at the hearing step in EVERY sector. Every sector has to be overridden.
+    - **The side head does the overriding, sector by sector.** In working sectors it pushes 4-6 nats toward
+      walking. In frozen sectors it does not just fail: it pushes the OTHER way (+1.1 to +2.4 toward stay, +1.7 to
+      +3.3 toward eat). So the freeze is a LEARNED per-sector stay / eat, a stable local optimum. That fits Cam's
+      reading of the T1 move-cost freeze, per direction.
+    - Share of the frozen-minus-working difference: side head 68% (3e7) / 76% (5e7) / 96% (oracle); trunk 32% / 24% /
+      4%.
+    - **The learner's trunk (not the oracle's) also carries a direction bias against -x.** The trunk is
+      sector-blind, but its own move logits differ: D_trunk in sector 4 (pure -x) is +4.2 / +5.0 against about -1 in
+      sector 0 (+x). The trunk is trained (not frozen), and it learned this.
+  - Predictions: P1 HIT (all three); P2 HIT (side >= 2/3: 68% / 76% / 96%); P3 HIT (side actively adds stay, I gave
+    0.35); P4 HIT (the oracle's sector 3 shows the same pattern).
+- **REGISTERED (Nov 16 12:20:57 EST, before any build or run): THE ORACLE SCREEN** (Cam item 3).
+  - Base = the oracle o3 recipe exactly: `port_w2.py --oracle --hunger-gate --item-size 0.1 --W 32 --gate honest`,
+    seed 0, 3e7 steps. o3 itself is the no-change reference: dead sectors 1 (sector 3); frontier 22.
+  - **O-X: in-bout entropy coefficient 0.05** (the single number; outside bouts it stays 0.01). "In bout" = the bout
+    flag in the agent's own hearing input (x[108]).
+  - **O-T: the topographic tie.** Move logits (moves 1-4 = -x, +x, +y, -y) += g x P x s, with s = the oracle one-hot
+    (x[118:126]), P[m, k] = max(0, cos(angle of move m - k x 45 deg)), g one learned scalar initialised 0 (a parameter
+    of RecAgent, flag `topo`; off = the param tree is unchanged).
+  - Checks before launch: flag-off identity of port_w2 against o3's committed curve (first points); unit tests of
+    the tie (P values, g = 0 gives the same logits, g != 0 changes only the move logits by g x P x s).
+  - Eval per arm: the trajectory tool at d = 3 and d = 12 (necessity keys, true mode). Reach per sector = item eaten /
+    bouts closed, all bouts (the oracle has no demonstrator).
+  - PASS per arm (Cam): min over the 8 sectors >= 0.85 at d = 3 AND >= 0.75 at d = 12, AND final frontier >= 22.
+    Reported: per-sector table, dead-sector count (reach <= 0.10), frontier curve.
+  - o3 against the same PASS for reference: d = 3 minimum 0.007 (sector 3), and sector 5 is 0.815 < 0.85 too.
+  - **p(PASS): O-X 0.2; O-T 0.4.** Why: the frozen sectors carry a learned +1.5 to +2.5 nat stay bias that an
+    entropy bonus of 0.05 is unlikely to undo. The tie pushes every sector once g grows from the working ones. Both
+    must also reach frontier 22 in 3e7 (o3 did at 23.2M), and the d = 3 minimum >= 0.85 is strict (o3's sector 5:
+    0.815).
+  - p(at least one dead sector): O-X 0.6; O-T 0.25.
 - **RESULT (Nov 16 ~01:40): THE LABEL COUNT** (`docs/data/learner_w2/label_count/`; each row is 100 rollout
   iterations, 819k steps, with that checkpoint's weights, world state and frontier, no updates).
   - Definitions: MEMORY-ONLY bout = a later hearing (not the token's first in this life) at d >= 3. By construction
