@@ -8607,6 +8607,9 @@ more expensive, because it produces publishable-looking nulls.
     corrected `run_rl.sh` (bar3). Nothing had been read but the frontier (2 at ~2M).
   - Lesson: to stop a queue, stop its whole process group (`scripts/laptop_jobs.sh stop` does), and check that no
     child survives before editing what it runs.
+- **LAUNCH (Nov 16 06:18:01 from `queue_rl.out`): THE RELABEL SCREEN, seed 6, from step 0** (one process group,
+  checked). Registered as at 06:01, with the bar now computed by bar3.py against the lengthened oracle reference
+  (need 0.775).
 - **RESULT (Nov 16 ~01:40): THE LABEL COUNT** (`docs/data/learner_w2/label_count/`; each row is 100 rollout
   iterations, 819k steps, with that checkpoint's weights, world state and frontier, no updates).
   - Definitions: MEMORY-ONLY bout = a later hearing (not the token's first in this life) at d >= 3. By construction
