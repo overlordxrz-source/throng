@@ -8542,7 +8542,7 @@ more expensive, because it produces publishable-looking nulls.
     = 0.35; p(bar PASS) = 0.2.**
     - Why the bar stays low: the pilot, with a working read, still lost reach with distance (0.33 at d = 12), and
       the bar needs 0.777.
-- **RESULT, partial (Nov 16 06:05 from `date`): BISECTION STEP 0 label counts** (the run is still going; the
+- **RESULT, partial (Nov 16 06:03 from `date`; first typed 06:05, corrected): BISECTION STEP 0 label counts** (the run is still going; the
   early intervals are final; identical to the committed run 152/152 through 12.5M; take-off, i.e. frontier 24, as
   in the original).
   - **My registered PRIMARY "before take-off" window FAILS AS DEFINED.** The onset (training-batch head accuracy on
@@ -8558,7 +8558,7 @@ more expensive, because it produces publishable-looking nulls.
   - Cam's falsification line (< 10x -> the diagnosis is wrong) is not met on any working measure. His 100x holds up
     to take-off, and narrowly misses (94x) in the frontier 3-4 band.
   - **Caveat:** these counts cannot separate "search without a read" from "an early read".
-- **REGISTERED (Nov 16 06:05, before running): the separating test** (light, after step 0 finishes).
+- **REGISTERED (Nov 16 06:03 from `date`, before running): the separating test** (light, after step 0 finishes).
   - Rerun step 0 (it reproduces exactly) to 2.5e5 steps (frontier 3 was reached at 0.2M) and save the weights.
   - Toy eval at d = 3, modes 0 (true) / 4 (memory wiped) / 3 (shuffled), 9000 episodes.
   - If true ~ wiped (within 0.05), the young solves memory-only bouts by SEARCH, not by a read.
