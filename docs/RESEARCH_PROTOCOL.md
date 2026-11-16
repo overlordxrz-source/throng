@@ -9009,6 +9009,36 @@ more expensive, because it produces publishable-looking nulls.
   - Reading: the extra entropy removed the dead sector (no sector below 0.32), but reach is weaker everywhere. Its
     weakest sectors are now diagonals (1, 7) and -x ones (3, 5). Trading the freeze for spread, not for skill.
   - Predictions: p(PASS) 0.2 -> FAIL as expected. p(>= 1 dead sector) 0.6 -> MISSED (0 dead).
+- **RESULT (entry stamped Nov 16 13:51:07 EST): ORACLE SCREEN ARM O-T (topographic tie): FAIL; does not qualify under the
+  secondary rule. NEITHER ARM QUALIFIES.** `docs/data/port_w2/oracle_screen/`.
+  - Reach by sector (all bouts, necessity keys, true mode):
+
+    | | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | min | dead |
+    |---|---|---|---|---|---|---|---|---|---|---|
+    | O-T d = 3 | 0.99 | **0.01** | 0.99 | 0.98 | 0.99 | 0.93 | 0.99 | **0.01** | 0.01 | **2** |
+    | O-T d = 12 | 0.93 | 0.03 | 0.93 | 0.89 | 0.93 | 0.85 | 0.93 | 0.00 | 0.00 | **2** |
+    | O-X d = 3 | 0.78 | 0.35 | 0.84 | 0.54 | 0.81 | 0.67 | 0.87 | 0.58 | 0.35 | 0 |
+    | o3 d = 3 | 0.97 | 0.95 | 0.96 | 0.01 | 0.97 | 0.81 | 0.97 | 0.97 | 0.01 | 1 |
+
+  - **Frontier 24 (the cap) at 12.2M steps** (o3: 22 at 23.2M; O-X: 20). The gate rose 2 at 2.2M, 12 at 4.9M, 20 at
+    8.5M. The tie roughly halved the curriculum time.
+  - Overall: d = 3 reach 0.737; d = 12 0.698 (hungry 0.748, 2nd half 0.736, n 1,669). The 6 working sectors are at
+    0.93-0.99 (d = 3) and 0.85-0.93 (d = 12).
+  - **The dead sectors are the two +x diagonals (1 and 7).** There the oracle stays 70-79% of the time.
+  - **g trajectory:** 0.09 (0.3M), 0.49 (2.9M), 0.99 (4.3M), peak 1.30 (12.5M), then a slow decline to 1.04 (30M).
+  - **Trunk drift** (Dense_0 / Dense_1 / Dense_2 kernel; Dense_2 bias): O-T final 1.74 / 0.75 / 0.43; 0.70. O-X at
+    6.2M: 0.54 / 0.56 / 0.34; 0.34 (`snap_g.jsonl` has every checkpoint).
+  - **Logit split on O-T** (exploratory, d = 3, hearing step; identity vs the arm's eval; D = stay minus best
+    toward move, split trunk + tie + side head):
+    - dead sector 1: +3.87 = +2.68 + -0.74 + **+1.93**; dead sector 7: +4.02 = +2.47 + -0.74 + **+2.29**;
+    - working sectors: side head -0.81 to -7.12; the trunk +2.2 to +3.0 everywhere.
+    - **The same learned freeze, in two other sectors:** the side head actively adds stay where the policy never
+      learned to walk, and the tie's push (0.74 nats there, g x cos 45) is smaller than that habit.
+  - PASS: FAIL (min 0.01). Secondary: 2 dead sectors -> does not qualify.
+  - Predictions: p(PASS) 0.4 -> FAIL. p(>= 1 dead sector) 0.25 -> MISSED (2 dead).
+  - **By Cam's pre-declared order, the next candidate is (a') (output-layer re-init) as an oracle arm, then (b').**
+    Not built and not run. The afternoon's laptop budget (~2 h) is mostly spent: the screen ran 12:25:59-13:49:14
+    (from `queue_os.out`); each arm is ~35-50 min.
 - **RESULT (Nov 16 ~01:40): THE LABEL COUNT** (`docs/data/learner_w2/label_count/`; each row is 100 rollout
   iterations, 819k steps, with that checkpoint's weights, world state and frontier, no updates).
   - Definitions: MEMORY-ONLY bout = a later hearing (not the token's first in this life) at d >= 3. By construction
