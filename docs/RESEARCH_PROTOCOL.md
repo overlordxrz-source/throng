@@ -8358,6 +8358,32 @@ more expensive, because it produces publishable-looking nulls.
   - **Predictions for the K-screen** (if it launches): early stop (a) fires p 0.45; the read forms (head on
     hearings > 3 at d = 3 >= 0.5) p 0.3; frontier reaches 12 p 0.25; **bar PASS p 0.12**. Expected label rate: to
     be registered from 4a before launch.
+
+- **CAM (Nov 16 ~08:25Z = 03:25 EST): rulings.**
+  - Incident recovery accepted; the handoff must say how to list and stop every detached job, guard last. Done:
+    `scripts/laptop_jobs.sh`.
+  - 4c PASS by construction; decoder validated. Extra check: is the head trained AND read only at the hearing step?
+  - 4a: the 10k bar must hold on the AVERAGE and on at least ONE seed; per-seed values reported. Implemented in
+    `conditions.py`.
+  - K identity reference = seed 4's config (`--demo-hearings 1`, all bouts scored); already the queued check
+    (learner_w2_k `--score-after 0`, lookahead 0.25, vs learner_w2_la on the same short run).
+  - **Positive-control fallback, pre-registered:** 24 by 6e7 = normal pass; not 24 but mastered >= 13 = PASS as a
+    recorded deviation; mastered < 13 = gate defect, no launch. "Mastered" = the last frontier the gate passed
+    (final frontier - 1 below the cap). Implemented in `conditions.py`.
+  - Eval power: the D = 12 bar eval must have >= 2000 2nd-half hungry bouts with index > K for the learner AND the
+    shuffled control. `run_k.sh` lengthens the eval (6000, 12000, 24000 steps per world) until both hold, and
+    logs the count.
+- **RESULT (Nov 16 03:35): HEAD CHECK (Cam item 2), from the code.**
+  - LABEL: hearing step only. The cross-entropy is masked by `bt["hear"]` = the own-meal mask over
+    `hear_now = item act & t == 0`. No head label ever comes from a later step.
+  - APPLIED: at EVERY step. In `EpAgentDev._head` the head's softmax is a policy input (`feat = [y2,
+    softmax(hl)]`, no stop_gradient), as registered since Nov 15 ("whose softmax feeds the policy").
+    - So the head is read at later steps, including steps of demo bouts where the parent's offset is
+      informative, and PPO's gradient reaches the head layer and the memory read at every step.
+    - The hearing-step label cannot leak: the parent's offset there is (0, 0). But the head's weights are also
+      shaped by policy gradient at later steps, where a head that tracks the parent helps the policy follow.
+    - This is the "report before launch" case. **I am holding the K-screen launch for Cam's ruling** (I don't
+      write `k_registered`). Seed 4 is unaffected: K = 1 has no demo later hearings.
 - **RESULT (Nov 16 ~01:40): THE LABEL COUNT** (`docs/data/learner_w2/label_count/`; each row is 100 rollout
   iterations, 819k steps, with that checkpoint's weights, world state and frontier, no updates).
   - Definitions: MEMORY-ONLY bout = a later hearing (not the token's first in this life) at d >= 3. By construction
