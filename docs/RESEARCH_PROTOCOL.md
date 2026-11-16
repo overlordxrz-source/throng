@@ -8584,6 +8584,29 @@ more expensive, because it produces publishable-looking nulls.
     solves memory-only bouts often enough. In W2 it does not.
     - Which W2 difference cuts the search yield is exactly what bisection steps 1+ would locate. From the ranking
       (CONJECTURED): the hearing structure (#1), the item's worth (#2) and generic food (#6).
+- **RESULT (Nov 16 06:10): THE ORACLE'S d = 12 REFERENCE, LENGTHENED** (Cam 10:15Z item 5; `docs/data/learner_w2/oracle_redo_long/`).
+  - Reproduction at the default 3000 steps: identical to the committed eval (every field, every world).
+  - At 6000 steps: 2nd-half hungry reach **0.8612 over 2,818 bouts** (>= 2000; the committed 0.8630 over 1,679). The
+    learner's reach bar becomes 0.9 x 0.8612 = **0.775**.
+- **DEFECT FOUND AND FIXED BEFORE USE (Nov 16 06:12): lengthened evals corrupt the LIFE criterion.**
+  - The evaluator counts lives as N + deaths - old-age deaths. That assumes an old-age death can only fall on the
+    final step, which is false once eval_steps > A_max = 3000. The 6000-step oracle eval reports mean life 6000.
+  - Shown on seed 2's weights: bar2.py fed a 6000-step eval gives life 1,347 (ratio 2.77) against the correct
+    1,046 (2.15).
+  - Fix: `bar3.py` takes the REACH criteria (true, shuffled, 2x) from the lengthened eval and the LIFE criterion from
+    the default 3000-step eval (as registered, and as the twin's reference was made). Thresholds unchanged.
+    - Check: given the same default file for both, bar3 equals bar2 on every shared output (seed 2's weights).
+  - The K-screen's `run_k.sh` has the same lengthening loop, but it never ran; fix it before any use.
+- **INCIDENT (Nov 16 06:17 from `date`): TWO relabel trainings on one checkpoint, stopped; seed 6 restarts from 0.**
+  - The relabel queue launched at 06:10:44, seconds before I stopped it to fix `run_rl.sh`. Killing the queue did
+    not kill its child `run_rl.sh`, which kept training. My restarted queue launched a second copy at 06:16:15.
+  - Both were stopped at 06:17, at ~2.6M steps. They had computed the same trajectory (exact resume, identical
+    curve lines), but I don't build on a checkpoint two processes wrote to. The first copy was also executing a
+    script file I had just edited.
+  - The files were moved to `learner_rl/aborted_0610/` (no deletion). Seed 6 restarts from step 0 with the
+    corrected `run_rl.sh` (bar3). Nothing had been read but the frontier (2 at ~2M).
+  - Lesson: to stop a queue, stop its whole process group (`scripts/laptop_jobs.sh stop` does), and check that no
+    child survives before editing what it runs.
 - **RESULT (Nov 16 ~01:40): THE LABEL COUNT** (`docs/data/learner_w2/label_count/`; each row is 100 rollout
   iterations, 819k steps, with that checkpoint's weights, world state and frontier, no updates).
   - Definitions: MEMORY-ONLY bout = a later hearing (not the token's first in this life) at d >= 3. By construction
