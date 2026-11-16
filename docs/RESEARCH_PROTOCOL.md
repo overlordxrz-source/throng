@@ -8191,6 +8191,28 @@ more expensive, because it produces publishable-looking nulls.
   - Seed 1 (frontier 2-3): memory-only OWN-MEAL labels < 2,000 per 100k hearings (p 0.8).
   - Pilot (frontier 5-8): memory-only PRIVILEGED labels > 20,000 per 100k hearings (p 0.8).
   - The pilot / seed 1 ratio >= 10x (p 0.75). **The hypothesis is wrong if the ratio is < 3x.**
+- **IMPLEMENTED + PREDICTIONS (Nov 16 ~01:05, before any lookahead run): THE LOOKAHEAD SCREEN.**
+  - `w2/lookahead.py`: one shared sampler for port_w2 (the gate controls) and `w2/learner_w2_la.py` (a copy of
+    `learner_w2_kv.py`, which stays untouched while seed 2 runs). With p a bout's d is drawn uniformly from
+    frontier+1 .. 12, otherwise from 1 .. frontier with the same key as before. Above frontier 11 there are no
+    lookahead bouts. The gate gets only hungry bouts with d <= frontier.
+  - Unit test (20k draws x 4): p = 0 is bit-identical to the old sampler at frontiers 1, 3, 6, 11, 12, 15; with
+    p = 0.25 the lookahead share is 0.249 and uniform over frontier+1 .. 12, and none at frontier >= 12.
+  - `--stop-at 3e7` saves the checkpoint and weights at 3e7 and exits (PAUSE_AT). The queue then evaluates
+    d = 3 (head on 2nd+ hearings) and d = 12, counts labels at that checkpoint, and applies early stop (a). Early
+    stop (b) is the trainer's own (frontier <= 6 at 5e7).
+  - Seed **4** (fresh; outside the registered 1-3). Queue `learner_la/queue_la.sh`: waits for queue2's decision;
+    runs only on "DECIDED: FAIL" AND only if both lookahead gate controls passed. 1e7 snapshots by `snap_la.py`.
+  - Still to run before it (laptop, after the label count): p = 0 bit-identity (port_w2 against the committed
+    `ctl_gu0.json` curve; learner_w2_la against learner_w2_kv on a short run), then the two gate controls.
+  - Predictions:
+    - controls with lookahead 0.25: positive (scripted follower) reaches 24 (p 0.9); negative (gives up on 30%)
+      never advances (p 0.95);
+    - the screen: early stop (a) fires (head < 0.25 at d = 3 at 3e7) p 0.55; early stop (b) given it survives (a)
+      p 0.3; the read forms (head >= 0.5 at d = 3) p 0.3; frontier reaches 12 p 0.2; **bar PASS p 0.1**.
+    - Why low: lookahead bouts at d >= 4 are demonstrated only on a token's first hearing in a life. A later-hearing
+      own-meal label at d >= 4 needs the young to find the item without the parent and without a working read, so
+      the labels the read needs stay rare at the start (the chicken-and-egg Cam names in item 5).
 
 ## Part 3 — Fossils
 
