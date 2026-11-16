@@ -7,3 +7,7 @@ XP train done 17:44:41
 {"arm": "XP", "frontier": 24.0, "d3": [0.927, 0.638, 0.947, 0.916, 0.978, 0.954, 0.984, 0.487], "d12": [0.912, 0.716, 0.885, 0.697, 0.883, 0.754, 0.882, 0.428], "n3": [547, 539, 580, 561, 624, 586, 571, 558], "n12": [422, 408, 407, 403, 445, 431, 422, 435], "min3": 0.487, "min12": 0.428, "dead_lt030": [], "dead_le010": [], "PASS": false, "SECONDARY": false, "QUALIFIES": false}
 XP ARMDONE 17:45:06
 B train start 17:45:06 flags: --no-nav
+B train done 18:08:20
+{"arm": "B", "frontier": 24.0, "d3": [0.977, 0.968, 0.968, 0.961, 0.975, 0.94, 0.967, 0.973], "d12": [0.891, 0.84, 0.847, 0.822, 0.891, 0.811, 0.661, 0.874], "n3": [555, 557, 567, 568, 565, 567, 570, 552], "n12": [385, 375, 391, 388, 375, 391, 339, 372], "min3": 0.94, "min12": 0.661, "dead_lt030": [], "dead_le010": [], "PASS": false, "SECONDARY": true, "QUALIFIES": true}
+B ARMDONE 18:08:46
+QUALIFIED {"arm": "B", "ref_file": "/private/tmp/claude-501/-Users-overlord-CascadeProjects-throng/aad77c1d-d7ac-437e-bef4-aa525802ccc0/scratchpad/chain/B_ref_d12_long.json", "hungry_2nd_half": 0.9746777415275574, "n": 2172.0, "bar": 0.8772} 18:09:08

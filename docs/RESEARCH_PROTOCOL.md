@@ -9185,6 +9185,30 @@ more expensive, because it produces publishable-looking nulls.
   - Compared with constant entropy (O-X: frontier 20, min 0.35), annealing kept the early exploration and let
     precision come back.
   - Predictions: p(PASS) 0.1 FAIL; p(qualifies) 0.2, did not; p(>= 1 dead sector) 0.5 -> none (miss).
+- **RESULT (entry stamped Nov 16 18:11:03 EST): CHAIN ARM (b') (`--no-nav`, the trunk trained from scratch): QUALIFIES under the
+  SECONDARY rule** (headline PASS: fail, at d = 12 only). `docs/data/port_w2/chain/`.
+
+  | (b') | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | min |
+  |---|---|---|---|---|---|---|---|---|---|
+  | d = 3 | 0.98 | 0.97 | 0.97 | 0.96 | 0.98 | 0.94 | 0.97 | 0.97 | **0.94** |
+  | d = 12 | 0.89 | 0.84 | 0.85 | 0.82 | 0.89 | 0.81 | **0.66** | 0.87 | 0.66 |
+
+  - Frontier **24** at 12.4M (22 at 10.8M); the fastest curriculum of any oracle. d = 3 reach 0.967 (hungry 0.991,
+    2nd half 0.995); d = 12 reach 0.838 (hungry 0.953, 2nd half 0.983 at the default length).
+  - PASS: min at d = 3 0.94 >= 0.85 holds, frontier holds, **min at d = 12 0.66 < 0.75 fails** (sector 6, -y).
+    Secondary: 0 dead sectors, min at d = 3 0.94 >= 0.75, frontier 24 >= 22 -> **QUALIFIES**.
+  - No navigator prior gives no inborn stay default, and no sector locks. This matches the toy's L2 > L1u, as Cam
+    noted.
+  - Predictions: p(PASS) 0.15 FAIL (narrowly, at d = 12); p(qualifies) 0.3 -> QUALIFIED; p(>= 1 dead sector) 0.5 ->
+    none (miss).
+- **THE NEW ORACLE REFERENCE (entry stamped Nov 16 18:11:03 EST; chain step 4).** (b')'s d = 12 eval lengthened to 6000 steps
+  (`B_ref_d12_long.json`): **2nd-half hungry reach 0.9747 over 2,172 bouts (>= 2000) -> the learner's reach bar is
+  0.9 x 0.9747 = 0.8772** (bar3.py; the old 0.861 / 0.775 is retired and stays on record).
+  - Much higher than the old bar (0.775), because this oracle has no dead sector.
+- **LAUNCH (from `learner_rl2/queue_rl2.out`, automatic, entry stamped Nov 16 18:11:03 EST): THE LEARNER SCREEN, seed 7,
+  relabel + `--no-nav`** (registered earlier with p: read forms 0.75; 0 dead later right-head sectors at 3e7 0.35;
+  frontier > 6 at 5e7 0.3; bar PASS 0.1). Training is running (frontier 2 at 0.66M; no errors). The twin with the
+  lever (`--no-nav`, replaying (b')'s schedule) runs before the bar, if the screen reaches it.
 - **RESULT (Nov 16 ~01:40): THE LABEL COUNT** (`docs/data/learner_w2/label_count/`; each row is 100 rollout
   iterations, 819k steps, with that checkpoint's weights, world state and frontier, no updates).
   - Definitions: MEMORY-ONLY bout = a later hearing (not the token's first in this life) at d >= 3. By construction
