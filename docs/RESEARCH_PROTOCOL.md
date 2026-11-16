@@ -8224,6 +8224,9 @@ more expensive, because it produces publishable-looking nulls.
     So the shortfall is the step budget (MEASURED: 19 advances = 38 windows / 2), not a gate defect.
   - **Deviation, registered before running:** the positive control is rerun with 3e7 steps (the only change).
     Prediction: reaches 24 (p 0.95). The lookahead queue's `controls_pass` waits for it.
+  - **RESULT (Nov 16 01:32): POSITIVE CONTROL at 3e7: frontier 24 (cap)**; all 107 windows 1.000. Prediction
+    (p 0.95) HIT. **Both lookahead gate controls PASS**; `controls_pass` written, so the lookahead screen will run
+    if the registered learner is decided FAIL.
 - **RESULT (Nov 16 ~01:40): THE LABEL COUNT** (`docs/data/learner_w2/label_count/`; each row is 100 rollout
   iterations, 819k steps, with that checkpoint's weights, world state and frontier, no updates).
   - Definitions: MEMORY-ONLY bout = a later hearing (not the token's first in this life) at d >= 3. By construction
