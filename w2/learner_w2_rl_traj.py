@@ -85,6 +85,7 @@ def main():
     ap.add_argument("--early-stop-frontier", type=float, default=0.0, help="stop (counted FAIL) if the frontier has not passed this by half the steps")
     ap.add_argument("--eval-necessity", default="", help="EVAL: comma list of modes (0,3,4) on the necessity keys; no training")
     ap.add_argument("--eval-W", type=int, default=32); ap.add_argument("--eval-steps", type=int, default=3000)
+    ap.add_argument("--logits", action="store_true", help="TRAJ: also record the total, trunk (current params) and pretrained-navigator logits")
     ap.add_argument("--traj-out", default=""); ap.add_argument("--eval-mix-la", type=float, default=0.0)
     ap.add_argument("--d-fixed", type=int, default=0); ap.add_argument("--eval-d-max", type=int, default=12)
     ap.add_argument("--out", required=True)
@@ -138,6 +139,10 @@ def main():
             o = NI.mark_demo(o, s, c["dem_pos"], c["dem_on"] & item["act"], L)
         x = jnp.concatenate([o, NI.hear(s, item, code, L), jax.nn.one_hot(pa, 6), pr[:, None], NI.oracle(item, a.oracle)], 1)
         h2, lg, v, aux = jax.vmap(lambda hh, xx: rnet.apply(pp_, hh, xx))(h, x)
+        def trunk(P, ob):                                                   # LOGIT SPLIT: the navigator trunk (Dense_0-2 on the 100-dim view)
+            t_ = jnp.tanh(ob @ P["Dense_0"]["kernel"] + P["Dense_0"]["bias"]); t_ = jnp.tanh(t_ @ P["Dense_1"]["kernel"] + P["Dense_1"]["bias"])
+            return t_ @ P["Dense_2"]["kernel"] + P["Dense_2"]["bias"]
+        lgn = trunk(pp_["params"], x[:, :100]) if a.logits else jnp.zeros_like(lg); lgp = trunk(nav["params"], x[:, :100]) if a.logits else jnp.zeros_like(lg)
         hl = aux[0] if ep else jnp.zeros((N, 8))
         samp = jax.random.categorical(k1, lg)
         if a.policy == "follower":
@@ -191,7 +196,7 @@ def main():
         hok_now = jnp.where(hear_now, hl.argmax(-1) == item["sec"], c["hok"])  # DIAG: the head's top sector at the hearing was right
         c2 = dict(s=s3, item=item2, h=h3, pa=act, pr=r, code=code2, dem_pos=dem_pos, dem_on=dem_on, hcnt=hcnt, gen=gen2,
                   lost=jnp.where(opened | closed, False, lost_now), hok=jnp.where(opened | closed, False, hok_now))
-        info_ = dict(x=x, act=act, lp=lp, v=v, r=r, dead=dead.astype(jnp.float32), h=h, ate=on_item & ~dead, closed=closed & ~dead, gain=gain, pd=pd,
+        info_ = dict(lg=lg, lgn=lgn, lgp=lgp, x=x, act=act, lp=lp, v=v, r=r, dead=dead.astype(jnp.float32), h=h, ate=on_item & ~dead, closed=closed & ~dead, gain=gain, pd=pd,
                      es=item["es"], d=item["d"], inb=item["act"], dem=c["dem_on"] & item["act"], hear=hear_now, first=first_hear, sec=item["sec"], hl=hl, age=age_close, alive=s.alive,
                      wflag=wflag, wslot=wslot, wrec=wrec, hung=closed & ~dead & ~item["sat"], hate=on_item & ~dead & ~item["sat"],
                      demstep=c["dem_on"] & item["act"], demfar=c["dem_on"] & item["act"] & (jnp.abs(NI.torus(c["dem_pos"] - s.pos, L)).max(-1) > 2), cl_item=closed & on_item, cl_death=closed & dead, cl_tmax=closed & ~on_item & ~dead, gen=gen_now, lost=lost_now, hok=hok_now)
@@ -290,7 +295,8 @@ def main():
                           t=c["item"]["t"].astype(jnp.int16), inb=c["item"]["act"], sec=f["sec"].astype(jnp.int8), d=f["d"].astype(jnp.int8),
                           hear=f["hear"], first=f["first"], dem=f["dem"], hl=f["hl"].argmax(-1).astype(jnp.int8),
                           hp=jax.nn.softmax(f["hl"]).max(-1).astype(jnp.float16), a=f["act"].astype(jnp.int8), ate=f["ate"],
-                          cl_item=f["cl_item"], cl_tmax=f["cl_tmax"], cl_death=f["cl_death"], gen=f["gen"], hung=f["hung"], dead=f["dead"] > 0)
+                          cl_item=f["cl_item"], cl_tmax=f["cl_tmax"], cl_death=f["cl_death"], gen=f["gen"], hung=f["hung"], dead=f["dead"] > 0,
+                          **(dict(lg=f["lg"].astype(jnp.float16), lgn=f["lgn"].astype(jnp.float16), lgp=f["lgp"].astype(jnp.float16)) if a.logits else {}))
                 return (c2, A), tr
             z = jnp.float32(0.0)
             A0 = dict(**{f"{p_}_{n_}": z for p_ in ("n", "i", "t", "d", "hn", "hi") for n_ in ("dem_kept", "dem_lost", "late_hok", "late_hbad")}, ate2h=z, closed2h=z, ateh=z, closedh=z, demstep=z, demfar=z, **{f"{p_}_{n_}_{d_}": z for p_ in ("c", "g") for n_ in ("item", "tmax", "death") for d_ in ("all", "dem")}, alive=z, deaths=z, oldage=z, ateD=z, closedD=z, cnt=jnp.zeros(N), mx=z, ovf=z, over=z, recs=z, paid=z, ate=z, closed=z, ate2=z, closed2=z, h1=z, n1=z, hL=z, nL=z, cd=jnp.zeros(25), ad=jnp.zeros(25))
