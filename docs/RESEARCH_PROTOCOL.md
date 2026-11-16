@@ -8947,6 +8947,39 @@ more expensive, because it produces publishable-looking nulls.
     diagnosis script names that its pattern had missed.
 - **LAUNCH (Nov 16 12:25:57 EST): THE ORACLE SCREEN** (`<scratchpad>/oscreen/queue_os.sh`, detached): O-X then O-T, sequential,
   each 3e7 steps at seed 0, then evals at d = 3 and 12 and the per-sector table. Registered as above.
+- **CAM RULINGS (received Nov 16 12:34:42 EST; Cam's message time ~17:35Z) on the logit split and the screen launch.**
+  - Logit split ACCEPTED (P1-P4 hit). Recorded: the pretrained navigator's STAY default (+4..+8 nats) is the root of
+    the freeze; the side head learns per-sector overrides and, in frozen sectors, an active stay / eat habit; the
+    learner's trunk drifted (up to 13 nats) into a -x bias, the oracle's did not.
+  - The screen as launched; identity and the smoke fix accepted.
+  - **SECONDARY PICK RULE, declared before any arm result.** If neither arm meets the registered PASS: an arm with
+    0 dead sectors (every sector >= 0.30 at d = 3 and d = 12), min sector >= 0.75 at d = 3 and frontier >= 22 is
+    still picked for the learner screen; if both qualify, the higher min sector; T still needs M's card. The
+    registered PASS stays the headline verdict; the secondary pick only steers the next screen.
+  - If no arm qualifies, Cam's next candidates (not built): (a) the navigator init with its stay / eat bias reset;
+    (b) the learner trunk anchored to the pretrained navigator except the bias row. Report the arms' trunk drift and
+    O-T's g trajectory.
+  - Modal nothing; guard $41.
+- **FACT for Cam's candidates (a) / (b) (entry stamped Nov 16 12:35:42 EST; exploratory, read-only, on existing files).**
+  - **The navigator's stay default is NOT in its bias row.** Pretrained Dense_2 bias (stay, -x, +x, +y, -y, eat) =
+    (0.02, -0.07, -0.04, -0.03, -0.03, 0.06). Its mean logits on o3's eval views: hearing steps (3.33, -4.57, -1.57,
+    -4.70, -1.88, 3.05), i.e. stay minus mean move +6.51 nats, of which the bias is 0.06. In-bout +6.29, out of bout
+    +3.60. **The default comes from the view FEATURES** (hidden layers and kernel). It is strongest in bouts.
+  - The pretrained logits also favour +x / -y over -x / +y by ~3 nats at hearing steps: a direction preference in
+    the navigator itself.
+  - **Trunk drift** (relative L2 change from the pretrained navigator; Dense_0 / Dense_1 / Dense_2 kernels; Dense_2
+    bias):
+    - o3 final: 1.10 / 0.76 / 0.45; 0.42;
+    - seed 6 3e7: 1.08 / 0.90 / 0.77; 0.56;
+    - seed 6 5e7: 1.53 / 1.09 / 0.87; 1.03;
+    - O-X at 6.2M: 0.54 / 0.56 / 0.34; 0.34.
+    The output bias moved by <= 0.07 per action in all of them. The hidden layers were largely retrained.
+  - So, as written: (a) resetting the stay / eat BIAS removes ~0.06 of the ~6.5-nat default, almost nothing. A
+    working form would have to cancel it at the output (e.g. a bias offset of about -3 on stay and eat, or an
+    output-layer re-init). (b) anchoring the trunk "except the bias row" anchors exactly the features that carry
+    the default. Reported for Cam's choice; nothing built.
+  - A light read-only watcher (`<scratchpad>/oscreen/snap_g.py` -> `snap_g.jsonl`) records each arm's steps,
+    frontier, O-T's g and the trunk drift at every chunk checkpoint.
 - **RESULT (Nov 16 ~01:40): THE LABEL COUNT** (`docs/data/learner_w2/label_count/`; each row is 100 rollout
   iterations, 819k steps, with that checkpoint's weights, world state and frontier, no updates).
   - Definitions: MEMORY-ONLY bout = a later hearing (not the token's first in this life) at d >= 3. By construction
