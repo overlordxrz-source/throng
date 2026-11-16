@@ -8526,8 +8526,8 @@ more expensive, because it produces publishable-looking nulls.
     100k hearings (d >= 3) = **36,212 (seed 1), 34,335 (seed 2), 40,774 (seed 4); mean 37,107 >= 30k, and all three
     >= 30k. PASS.** The own-meal mask on the same checkpoints: 2,172 / 3,224 / 109. The relabel labels cover d 4-12
     evenly (~170-500 per d), close to the pilot's privileged 51-60k.
-- **REGISTERED + PREDICTIONS (Nov 16 06:02 from `date`, before launch): THE RELABEL SCREEN.**
-  - Seed **6** (fresh); seed 4's config + `--head-relabel-token`; `learner_relabel/run_rl.sh`. Same early stops:
+- **REGISTERED + PREDICTIONS (Nov 16 06:01 from `date`, before launch): THE RELABEL SCREEN.**
+  - Seed **6** (fresh); seed 4's config + `--head-relabel-token`; `learner_rl/run_rl.sh`. Same early stops:
     (a) head on 2nd+ hearings at d = 3 < 0.25 at 3e7; (b) frontier <= 6 at 5e7.
   - Bar unchanged (bar2.py at D = 12, 1e8), against the LENGTHENED oracle reference `oracle3/eval_d12_long.json`
     (>= 2000 2nd-half hungry bouts; it must first reproduce the committed eval exactly). The learner's eval is
