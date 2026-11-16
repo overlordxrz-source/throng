@@ -8486,7 +8486,7 @@ more expensive, because it produces publishable-looking nulls.
   screen launches automatically after step 0: seed 4 config + relabel, new seed, 1-seed explore; early stops as
   ruled; bar unchanged; head split by hearing index at every pause; p(pass) and p(read forms) registered first. If
   (c) misses: report, don't run. The flag is dropped at stage 2.
-- **REGISTERED + PREDICTIONS (Nov 16 05:50 from `date`, before launch): BISECTION STEP 0.**
+- **REGISTERED + PREDICTIONS (Nov 16 05:48 from `date`; first typed as 05:50, corrected; before launch): BISECTION STEP 0.**
   - Command = toy screen 2 seed 8 exactly (every flag from its committed cfg, chunked 480 s with exact resume),
     plus `--count-labels`. That flag is logging only: two extra rollout outputs (the episode's d; food in view),
     counted per curve interval, with no effect on the rollout, the update or the curriculum.
