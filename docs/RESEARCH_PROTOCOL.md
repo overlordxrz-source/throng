@@ -8181,9 +8181,9 @@ more expensive, because it produces publishable-looking nulls.
     lookahead on. Early stops: (a) head on 2nd+ hearings at d = 3 < 0.25 at 3e7; (b) frontier <= 6 at 5e7. A 1-seed
     EXPLORE screen; a confirm on fresh seeds needs Cam's go. Predictions first.
   - If the lookahead also fails, Cam will put an observed-meal label to M; not to be built yet. Nothing on Modal.
-- **LAUNCH (Nov 16 00:55): W2 LEARNER SEED 2** (the registered recipe, `learner3/run.sh 2`; queue
+- **LAUNCH (Nov 16 00:54): W2 LEARNER SEED 2** (the registered recipe, `learner3/run.sh 2`; queue
   `learner3/queue2.sh` starts from 0 pass / 1 fail; a 1e7-step snapshot watcher `snap2.py` from step 0).
-- **PREDICTIONS (Nov 16 ~01:20, before counting): the label count** (`w2/learner_w2_labels.py`, a copy of the
+- **PREDICTIONS (Nov 16 00:57, before counting; first written as "~01:20", a clock error corrected here): the label count** (`w2/learner_w2_labels.py`, a copy of the
   final learner that loads a training checkpoint and runs 100 rollout iterations, 819k steps, with its weights,
   world state and frontier, no updates; the exact own-meal mask on the same 64-step sequences).
   - By construction a d = 3 item is never in view at the hearing (smoke test: 0 of 121), so at frontier 2 seed 1 has
