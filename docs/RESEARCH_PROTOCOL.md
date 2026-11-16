@@ -8980,6 +8980,16 @@ more expensive, because it produces publishable-looking nulls.
     the default. Reported for Cam's choice; nothing built.
   - A light read-only watcher (`<scratchpad>/oscreen/snap_g.py` -> `snap_g.jsonl`) records each arm's steps,
     frontier, O-T's g and the trunk drift at every chunk checkpoint.
+- **CAM RULINGS (received Nov 16 12:50:34 EST; Cam's message time ~17:55Z) on the stay-default finding.**
+  - ACCEPTED: the stay default lives in the view features, not the bias row (0.06 of 6.51 nats). Cam records his
+    (a) / (b) as his error.
+  - **REVISED FALLBACKS** (not built; only if no arm qualifies under the PASS or the secondary rule), in this
+    order, each as an oracle arm first with the same PASS and secondary rules:
+    - (a') re-init the OUTPUT layer (Dense_2 kernel + bias) at the navigator's own init scale; hidden layers stay
+      pretrained. It removes the learned stay default and the +x / -y preference without designing a preference.
+    - (b') no navigator init: the trunk trains from scratch (toy L2 beat L1u on T2: 100/0 vs 84-93).
+    - NOT allowed: a designed output offset (e.g. -3 on stay / eat). That designs behaviour.
+  - O-X slower on the curriculum: noted, no action; the screen continues as registered. Modal nothing; guard $41.
 - **RESULT (Nov 16 ~01:40): THE LABEL COUNT** (`docs/data/learner_w2/label_count/`; each row is 100 rollout
   iterations, 819k steps, with that checkpoint's weights, world state and frontier, no updates).
   - Definitions: MEMORY-ONLY bout = a later hearing (not the token's first in this life) at d >= 3. By construction
