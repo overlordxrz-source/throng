@@ -36,6 +36,7 @@ from w2.gae import gae  # noqa: E402
 from w2 import named_item as NI  # noqa: E402
 from w2.gate import HonestGate  # noqa: E402
 from w2 import lookahead as LA  # noqa: E402
+from w2 import relabel as RL  # noqa: E402
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "scripts"))
 import ckpt as _ck  # noqa: E402
 
@@ -73,6 +74,7 @@ def main():
     ap.add_argument("--d-fixed", type=int, default=0); ap.add_argument("--eval-d-max", type=int, default=12)
     ap.add_argument("--out", required=True); ap.add_argument("--count-iters", type=int, default=0)
     ap.add_argument("--lookahead", type=float, default=0.0); ap.add_argument("--la-max", type=int, default=12)
+    ap.add_argument("--count-relabel", action="store_true", help="Cam Nov 16: also count the cross-hearing relabel (w2/relabel.py) labels; A5 agreement with the true sector")
     a = ap.parse_args()
     S = a.item_size; gated = a.hunger_gate; ep = a.learner == "ep"; KV = not os.environ.get("KV_OFF")
     cfg = env.Cfg(L=96, N=a.N, patch_sigma=1.0, reproduce=False, A_max=3000, **world_kw(a.world)); L, W, N, T = cfg.L, a.W, a.N, a.T
@@ -321,7 +323,7 @@ def main():
         cnt = {k_: Z() for k_ in ("hear", "first", "later", "later_seen", "later_unseen", "own", "own_first", "own_later", "own_later_seen", "own_later_unseen",
                                      "b_first", "b_later", "b_first_ate", "b_later_ate", "b_first_obs_s", "b_later_obs_s", "b_first_obs_l", "b_later_obs_l",
                                      "hear_gtK", "later_unseen_demo", "later_unseen_nodemo", "own_later_unseen_demo", "own_later_unseen_nodemo")}
-        LEAK = []; LEAK2 = []                                                           # (sector, parent offset id, agent-window pattern, half) on demo hearings 2..K
+        LEAK = []; LEAK2 = []; RLS = [0, 0]                                                           # (sector, parent offset id, agent-window pattern, half) on demo hearings 2..K
         for _i in range(a.count_iters):
             key, k = jax.random.split(key); c, R_ = roll(p, c, jax.random.split(k, W), jnp.float32(dfront))
             R_ = {k_: np.asarray(v_) for k_, v_ in R_.items()}
@@ -342,6 +344,13 @@ def main():
             if lk.any():
                 do = sq(R_["doff"])[lk]; aw = sq(R_["x"])[..., 49:98][lk]
                 LEAK.append((sq(R_["sec"])[lk], (do[:, 0] + 50) * 101 + (do[:, 1] + 50), [hash(r.round(3).tobytes()) for r in aw], np.full(int(lk.sum()), _i % 2)))
+            if a.count_relabel:                                             # the relabel exactly as learner_w2_rl computes it, on the same 64-step sequences
+                h0f = R_["h"][:, 0].reshape(W * N, Hd); RT, RM, RS, RST = RL.relabel(hr, sq(R_["x"])[..., 100:108], h0f[:, 128: 128 + a.slots * 11], h0f[:, 128 + a.slots * 11],
+                                                                                    sq(R_["wflag"]), sq(R_["wrec"]), sq(R_["dead"]) > 0, a.slots)
+                sct = sq(R_["sec"])
+                for k_, m_ in (("rl_lab", RM), ("rl_later_unseen", RM & la & ~se), ("rl_first", RM & fi), ("rl_agree", RM & (RT == sct)), ("rl_earlier", RS == 1), ("rl_later_src", RS == 2)):
+                    cnt.setdefault(k_, np.zeros(D, np.int64)); cnt[k_] += np.bincount(dd[m_], minlength=D)[:D]
+                RLS[0] += RST["n_disagree"]; RLS[1] += RST["n_earlier"]
             bc = sq(R_["bclose"]); bfi = sq(R_["bfirst"]); ba = sq(R_["bate"]); es_ = sq(R_["bevs"]) & ~ba; el_ = sq(R_["bevl"]) & ~ba   # bout-level, at the close
             for k_, m_ in (("b_first", bc & bfi), ("b_later", bc & ~bfi), ("b_first_ate", bc & bfi & ba), ("b_later_ate", bc & ~bfi & ba), ("b_first_obs_s", bc & bfi & es_),
                            ("b_later_obs_s", bc & ~bfi & es_), ("b_first_obs_l", bc & bfi & el_), ("b_later_obs_l", bc & ~bfi & el_)):
@@ -370,7 +379,7 @@ def main():
                                chance_majority_test=float(np.bincount(sc2[hf2 == 1], minlength=8).max() / max((hf2 == 1).sum(), 1)) if (hf2 == 1).any() else None)
             leak = dict(positive_control_parent_offset_at_t2=pos_ctl, n=int(len(sc)), n_test=int((hf == 1).sum()), chance_majority_test=chance, parent_offset_heldout=d1, parent_offset_insample=i1, parent_offset_keys=n1,
                         agent_window_heldout=d2, agent_window_insample=i2, agent_window_keys=n2, parent_offset_at_hearing_all_zero=bool((po == 50 * 101 + 50).all()))
-        out = dict(leak=leak, demo_hearings=a.demo_hearings, lookahead=a.lookahead, ckpt=a.ckpt, steps_at_ckpt=steps, frontier=dfront, count_iters=a.count_iters, rollout_steps=a.count_iters * W * N * T, by_d={k_: v_.tolist() for k_, v_ in cnt.items()})
+        out = dict(relabel_disagree=RLS[0], relabel_earlier=RLS[1], leak=leak, demo_hearings=a.demo_hearings, lookahead=a.lookahead, ckpt=a.ckpt, steps_at_ckpt=steps, frontier=dfront, count_iters=a.count_iters, rollout_steps=a.count_iters * W * N * T, by_d={k_: v_.tolist() for k_, v_ in cnt.items()})
         json.dump(out, open(a.out, "w"), indent=1); print("COUNTED", a.out, flush=True); return
     t0 = time.time(); nupd = a.policy != "learner" and not a.head_only
     while steps < a.steps:
