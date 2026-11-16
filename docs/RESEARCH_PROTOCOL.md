@@ -8224,6 +8224,46 @@ more expensive, because it produces publishable-looking nulls.
     So the shortfall is the step budget (MEASURED: 19 advances = 38 windows / 2), not a gate defect.
   - **Deviation, registered before running:** the positive control is rerun with 3e7 steps (the only change).
     Prediction: reaches 24 (p 0.95). The lookahead queue's `controls_pass` waits for it.
+- **RESULT (Nov 16 ~01:40): THE LABEL COUNT** (`docs/data/learner_w2/label_count/`; each row is 100 rollout
+  iterations, 819k steps, with that checkpoint's weights, world state and frontier, no updates).
+  - Definitions: MEMORY-ONLY bout = a later hearing (not the token's first in this life) at d >= 3. By construction
+    the item is never in view at such a hearing (checked: 0 in view). Own-meal label = the exact training mask (the
+    bout ends with the agent eating the item within the 64-step sequence). Privileged = every hearing (the pilot's
+    recipe). All counts are per 100k hearings.
+
+    | run | steps | frontier | share of hearings at d >= 3 | memory-only OWN-MEAL | memory-only PRIVILEGED | own-meal share of memory-only bouts |
+    |---|---|---|---|---|---|---|
+    | seed 1 | 24.4M | 2 | 0 | 0 | 0 | - |
+    | seed 1 | 30.8M | 2 | 0 | 0 | 0 | - |
+    | seed 1 | 40.3M | 3 | 0.34 | 1,667 | 27,972 | 0.06 |
+    | seed 1 | 50.0M | 3 | 0.33 | 2,705 | 26,158 | 0.10 |
+    | pilot | 12.6M | 3 | 0.34 | 1,689 | 30,387 | 0.06 |
+    | pilot | 16.4M | 5 | 0.60 | 18,406 | 50,860 | 0.36 |
+    | pilot | 19.7M | 6 | 0.66 | 20,475 | 54,318 | 0.38 |
+    | pilot | 24.9M | 6 | 0.68 | 25,318 | 52,926 | 0.48 |
+    | pilot | 30.3M | 7 | 0.72 | 27,691 | 54,619 | 0.51 |
+    | pilot | 43.3M | 8 | 0.75 | 31,642 | 59,910 | 0.53 |
+    | pilot | 50.0M | 8 | 0.75 | 29,822 | 56,980 | 0.52 |
+
+  - **Two causes, both MEASURED:**
+    1. FRONTIER. For its first 31.6M steps seed 1 was at frontier <= 2, where memory-only bouts do not exist: 0 of
+       them. The pilot had reached frontier 3 by 12.6M and 5 by 16.4M.
+    2. MASKING. At the same frontier 3 the two runs have the same privileged supply (~28k vs ~30k per 100k
+       hearings). The own-meal mask keeps only the bouts the young solved, 6-10% of them, so 1.7-2.7k remain. At
+       frontier 3, before its read formed, the pilot's own-meal share was the same 0.06. It rose to 0.53 only
+       after the read formed, and that was trained by privileged labels.
+  - What the head actually trained on: seed 1 got <= 2.7k memory-only labels per 100k hearings, and only after
+    31.6M steps. The pilot got 51-60k from 16M on (its privileged labels). The rate ratio is ~20x; the cumulative
+    ratio is larger still (an ESTIMATE from the rates: roughly 5k vs 100k+ labels by 5e7).
+  - Predictions: seed 1 own-meal < 2,000 per 100k: HIT at 3 of 4 checkpoints, MISS at 5e7 (2,705). Pilot
+    privileged > 20,000: HIT (51-60k at frontier >= 5). Ratio >= 10x: HIT (~20x). **The hypothesis survives:** the
+    head got almost no memory-only signal.
+  - **Implication for the lookahead screen (CONJECTURED):** lookahead adds memory-only bouts (25% of draws at
+    d >= frontier+1), but own-meal labels come only from bouts the young solves. Without a read, that is 6-10% at
+    d = 3 and probably less at d 4-12. The label count at the 3e7 pause (in `run_la.sh`) measures it directly.
+    This is Cam's item-5 scenario (label sparsity), and the predictions above already price it in.
+  - Method caveats: these are counts with a fixed policy at each checkpoint, not training-time logs. The pilot's
+    checkpoints lack the later `sat` / `gu` fields; they were filled with False, which the counts do not use.
 
 ## Part 3 — Fossils
 
