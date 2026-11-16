@@ -9108,6 +9108,21 @@ more expensive, because it produces publishable-looking nulls.
     - **(b') 0.15 / 0.3 / 0.5**: no prior at all, the toy's L2 result, but a slower curriculum (frontier >= 22 in 3e7
       is the risk).
   - p(at least one of the three qualifies): ~0.55.
+- **REGISTERED (Nov 16 14:01:52 EST, before it can start): THE POST-CHAIN LEARNER SCREEN** (`<scratchpad>/learner_rl2/queue_rl2.sh`,
+  waiting on the chain; runs only if an arm QUALIFIES).
+  - `w2/learner_w2_rl2.py` = learner_w2_rl + the chain's levers (default off). **Flag-off identity vs seed 6's curve:
+    3/3 points, every shared field** (a ~1-minute training check run beside the chain's arm, disclosed). The lever
+    flags run cleanly (smoke run).
+  - Seed **7** (new); seed 4's config + `--head-relabel-token` + the qualifying arm's lever ((a') `--reinit-out`;
+    O-X' `--ent-bout 0.05 --ent-anneal 2e7`; (b') `--no-nav`).
+  - Early stops as registered: (a) head on later hearings at d = 3 < 0.25 at 3e7; (b) frontier <= 6 at 5e7. Per-sector
+    table (dem / later right / later wrong, d = 3 and 12) at the 3e7 pause and at the end or early stop; the d = 3
+    pause eval also carries the wiped and shuffled controls; label count at 3e7.
+  - Bar: bar3.py, reach criteria against the arm's re-derived reference (0.9 x its d = 12 2nd-half hungry reach,
+    >= 2000 bouts). **The life criterion still uses the old twin (`twin3/eval_d12.json`, no lever).** Under Cam's
+    deaf-twin rule the twin should arguably carry the lever too; flagged for Cam, unchanged until he rules.
+  - **Predictions, if it runs:** p(read forms: head later at d = 3 >= 0.5 at 3e7) 0.75 (seed 6 had 0.80);
+    p(0 dead sectors among later right-head bouts at 3e7) 0.35; p(frontier > 6 at 5e7) 0.3; p(bar PASS at 1e8) 0.1.
 - **RESULT (Nov 16 ~01:40): THE LABEL COUNT** (`docs/data/learner_w2/label_count/`; each row is 100 rollout
   iterations, 819k steps, with that checkpoint's weights, world state and frontier, no updates).
   - Definitions: MEMORY-ONLY bout = a later hearing (not the token's first in this life) at d >= 3. By construction
