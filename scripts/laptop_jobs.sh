@@ -6,7 +6,7 @@
 #   scripts/laptop_jobs.sh resume   # kill -CONT them
 #   scripts/laptop_jobs.sh stop     # stop files, then queues + watchers, then the python jobs, then (last) the guard
 SP=/private/tmp/claude-501/-Users-overlord-CascadeProjects-throng/aad77c1d-d7ac-437e-bef4-aa525802ccc0/scratchpad
-QUEUES="queue_os.sh|run_os.sh|queue_rl.sh|run_rl.sh|run_diag.sh|after_5e7.sh|run_traj.sh|run_logit.sh|queue_la.sh|queue_k.sh|queue2.sh|run_la.sh|run_k.sh|post.sh|post2.sh|checks.sh|readout_s2.sh|pos3e7.sh|count_pilot.sh|snap_la.py|snap_k.py|snap2.py"
+QUEUES="chain.sh|queue_rl2.sh|run_rl2.sh|run_greedy.sh|queue_os.sh|run_os.sh|queue_rl.sh|run_rl.sh|run_diag.sh|after_5e7.sh|run_traj.sh|run_logit.sh|queue_la.sh|queue_k.sh|queue2.sh|run_la.sh|run_k.sh|post.sh|post2.sh|checks.sh|readout_s2.sh|pos3e7.sh|count_pilot.sh|snap_la.py|snap_k.py|snap2.py"
 PYJOBS="w2/learner_w2|w2/port_w2"
 case "$1" in
   list)   ps -axo pid,pgid,stat,etime,command | grep -E "cap_guard_r3|$QUEUES|$PYJOBS" | grep -v grep | cut -c1-160 ;;

@@ -9039,6 +9039,75 @@ more expensive, because it produces publishable-looking nulls.
   - **By Cam's pre-declared order, the next candidate is (a') (output-layer re-init) as an oracle arm, then (b').**
     Not built and not run. The afternoon's laptop budget (~2 h) is mostly spent: the screen ran 12:25:59-13:49:14
     (from `queue_os.out`); each arm is ~35-50 min.
+- **CAM RULINGS (received Nov 16 13:55:18 EST; Cam's message time ~19:00Z, two messages) on the oracle screen.**
+  - Recorded: O-X FAIL, O-T FAIL (neither PASS nor secondary); no new reference yet; misses recorded; the stamp.sh
+    refusal handling accepted.
+  - Reading (Cam): three oracles, three different dead-sector sets (o3: 3; O-T: 1, 7; learner: 3-5). The freeze is
+    not about a direction: it is an early per-sector LOCK-IN (move cost + the inborn stay default: stay pays early,
+    then exploration stops). The tie fixes speed and precision but its diagonal push (~0.74) is too weak to break a
+    lock.
+  - NOW (free, <= 10 min): a GREEDY bout eval of O-X, O-T and o3 (argmax in bouts, sampled outside), per-sector at
+    d = 3 and 12; diagnostic only.
+  - NEXT ARM: greedy O-X min sector >= 0.85 at d = 3 -> **O-X'** (in-bout entropy annealed 0.05 -> 0.01 linearly over
+    the first 2e7 steps, then 0.01; no tie). Else -> **(a')** (Dense_2 re-init at the navigator's init scale; no tie;
+    entropy as in o3). Same PASS and secondary rules; per-sector table, dead-sector count, logit split on any dead
+    sector; p first.
+  - The tie is PARKED (not dropped): tie + a qualifying arm may come later as its own arm, only via M's card.
+  - **M picked "Now, keep going"** (card at 18:54Z): laptop runs go back to back; pause on M's word.
+  - **THE CHAIN** (each step registered with p before launch): (1) the greedy diagnostic; (2) the pre-registered
+    arm; (3) if it does not qualify, the next untried fallback in the order O-X' / (a') / (b'); at most 3 oracle
+    arms; none qualifies -> stop and report. (4) An arm qualifies -> re-derive the oracle reference from it (bar3.py,
+    >= 2000 bouts, 0.9 x d = 12 reach), then launch the LEARNER SCREEN automatically: relabel + that lever, a new
+    seed, early stops as registered, a per-sector table at every pause. Exception: inborn wiring (the tie) waits for
+    M's card. Report at each arm's end and each learner pause. Modal nothing; guard $41.
+- **REGISTERED (Nov 16 13:55:40 EST, before running): THE GREEDY BOUT EVAL** (chain step 1; diagnostic only).
+  - `learner_w2_rl_traj.py --greedy-bout`: argmax actions while a bout is open, sampled outside; otherwise the
+    registered eval (necessity keys, true mode). On O-X, O-T and o3 final weights, d = 3 and d = 12; per-sector reach
+    over all bouts (`bysec_o.py`).
+  - Predictions: greedy O-X min sector >= 0.85 at d = 3 (the branch to O-X'): **p 0.15**. Its weak sectors already
+    put stay / eat first (sector 1: stay 0.29, eat 0.32, each move <= 0.15), so argmax should freeze them. Greedy
+    keeps O-T's sectors 1 and 7 and o3's sector 3 dead: p 0.9. Greedy raises the working sectors (mean of
+    sectors >= 0.5) in all three: p 0.7.
+- **RESULT (entry stamped Nov 16 13:59:02 EST): THE GREEDY BOUT EVAL** (chain step 1; `docs/data/port_w2/chain/greedy_bysec.txt`).
+  Argmax in bouts, sampled outside; reach by sector 0-7, all bouts:
+
+  | | d | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | min |
+  |---|---|---|---|---|---|---|---|---|---|---|
+  | O-X greedy | 3 | 0.77 | 0.18 | 0.95 | 0.24 | 0.87 | 0.70 | 0.92 | 0.35 | **0.18** |
+  | O-X greedy | 12 | 0.85 | 0.33 | 0.83 | 0.28 | 0.82 | 0.62 | 0.82 | 0.66 | 0.28 |
+  | O-T greedy | 3 | 0.98 | 0.00 | 0.99 | 0.98 | 0.99 | 0.96 | 0.98 | 0.00 | 0.00 |
+  | O-T greedy | 12 | 0.91 | 0.02 | 0.90 | 0.87 | 0.90 | 0.85 | 0.91 | 0.00 | 0.00 |
+  | o3 greedy | 3 | 0.98 | 0.94 | 0.96 | 0.01 | 0.98 | 0.65 | 0.99 | 0.98 | 0.01 |
+  | o3 greedy | 12 | 0.92 | 0.87 | 0.91 | 0.00 | 0.90 | 0.67 | 0.91 | 0.87 | 0.00 |
+
+  - **Greedy O-X min at d = 3 = 0.18 < 0.85 -> the pre-registered next arm is (a').**
+  - O-X's sampled spread (no dead sector) was partly sampling noise: under argmax its sectors 1, 3 and 7 fall to
+    0.18-0.35 (from 0.35-0.58). Dead sectors stay dead under argmax (O-T 1, 7; o3 3).
+  - Predictions: greedy O-X min >= 0.85 p 0.15 (did not happen); dead sectors persist p 0.9 HIT; greedy raises the
+    working sectors in all three p 0.7 MISSED (O-T flat 0.978 -> 0.980; o3 0.943 -> 0.926; O-X 0.727 -> 0.686).
+- **BUILT + CHECKED (Nov 16 13:59:02 EST): the chain's levers** (comm-toy 5d487f4): `port_w2 --ent-anneal S` (O-X': in-bout
+  coefficient 0.05 -> 0.01 linearly over S steps, then 0.01: 0.05 / 0.03 / 0.01 / 0.01 at 0 / 1e7 / 2e7 / 3e7);
+  `--reinit-out` (a'); `--no-nav` (b').
+  - Init check: with `--reinit-out`, Dense_0 / 1 / 3 are the navigator's and Dense_2 is the fresh flax-default init
+    (kernel std 0.087 = 1/sqrt(128), the scheme the navigator itself was initialised with; the trained navigator's
+    std is 0.138). With `--no-nav` all four are fresh.
+  - Flag-off identity vs o3's committed curve: 3/3 points, every shared field. O-X' smoke run clean.
+  - `chain/decide.py` (automatic verdict: per-sector reach, PASS, secondary, dead sectors) reproduces the hand
+    verdicts on O-X and O-T (both fail; dead O-T 1, 7). No positive control exists (no arm has passed); the logic
+    is 6 lines.
+- **REGISTERED (Nov 16 13:59:02 EST, before launch): THE CHAIN** (`<scratchpad>/chain/chain.sh`). Arms in order (a') -> O-X' ->
+  (b'), each o3's recipe + one change, seed 0, 3e7 steps; stop at the first that qualifies (PASS or secondary).
+  Then the oracle reference from it: d = 12 eval lengthened to >= 2000 2nd-half hungry bouts, bar = 0.9 x that
+  reach. Any dead sector gets a logit split. The learner screen is launched after a qualifying arm (registered
+  separately before it starts).
+  - **p(PASS) / p(qualifies, PASS or secondary) / p(>= 1 dead sector):**
+    - **(a') 0.15 / 0.3 / 0.55**: the stay default goes, but move cost still makes stay pay early, so per-sector
+      locks can still form;
+    - **O-X' 0.1 / 0.2 / 0.5**: annealing keeps the early exploration but greedy O-X showed it does not build skill
+      in the weak sectors;
+    - **(b') 0.15 / 0.3 / 0.5**: no prior at all, the toy's L2 result, but a slower curriculum (frontier >= 22 in 3e7
+      is the risk).
+  - p(at least one of the three qualifies): ~0.55.
 - **RESULT (Nov 16 ~01:40): THE LABEL COUNT** (`docs/data/learner_w2/label_count/`; each row is 100 rollout
   iterations, 819k steps, with that checkpoint's weights, world state and frontier, no updates).
   - Definitions: MEMORY-ONLY bout = a later hearing (not the token's first in this life) at d >= 3. By construction
