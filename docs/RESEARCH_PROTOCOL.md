@@ -8505,6 +8505,43 @@ more expensive, because it produces publishable-looking nulls.
     - step 0 reproduces the committed curve exactly (p 0.85; a JAX or BLAS difference is the risk);
     - READ FORMS (p 0.95);
     - pre-onset memory-only label yield >= 10.9k / 100k, Cam's 100x (p 0.45); >= 1.09k, 10x (p 0.9).
+  - LAUNCH 05:48 (detached, `<scratchpad>/bisect/step0/`). **Identity check, partial: 28/28 curve points identical
+    to the committed run through 2.3M steps.**
+- **BUILT + CHECKED (Nov 16 06:01 from `date`): `--head-relabel-token`** (comm-toy b3fffe8; `docs/data/learner_w2/relabel_checks/`).
+  - `w2/relabel.py` + `w2/learner_w2_rl.py` (a copy of learner_w2_la).
+    - Inputs: the hearing mask, the heard token from the young's own input (`x[100:108]`), its record buffer at
+      the sequence start, the records it writes, and its deaths.
+    - Target = the sector of the most recent solved record of that token before the hearing, else the earliest
+      solved one at or after it, before a death, within the 64-step sequence; masked otherwise.
+  - (a) **Unit tests 11/11** (`w2/test_relabel.py`): masked when unsolved; most recent wins; earliest later; both
+    death boundaries; start-of-sequence ring order and wrap; same-step write = 'later'; the signature has no code
+    table or item sector. Three broken versions (no death wipe; oldest instead of most recent; no solved check)
+    each fail a test.
+    - **Flag off = learner_w2_la on seed 4's config: 8/8 curve points identical.** Flag-on training smoke run:
+      clean, 0 disagreements.
+  - (b) **A5: PASS.** Label = true sector on 10,255/10,255 (seed 1), 8,348/8,348 (seed 2) and 18,402/18,402 (seed 4)
+    relabelled hearings (1.0000). 0 disagreements among 31,366 earlier-sourced labels. The label path cannot read
+    the code table (not an input).
+  - (c) **Yield** (lookahead 0.25, the training mix; 100 iterations per checkpoint): memory-only RELABEL labels per
+    100k hearings (d >= 3) = **36,212 (seed 1), 34,335 (seed 2), 40,774 (seed 4); mean 37,107 >= 30k, and all three
+    >= 30k. PASS.** The own-meal mask on the same checkpoints: 2,172 / 3,224 / 109. The relabel labels cover d 4-12
+    evenly (~170-500 per d), close to the pilot's privileged 51-60k.
+- **REGISTERED + PREDICTIONS (Nov 16 06:02 from `date`, before launch): THE RELABEL SCREEN.**
+  - Seed **6** (fresh); seed 4's config + `--head-relabel-token`; `learner_relabel/run_rl.sh`. Same early stops:
+    (a) head on 2nd+ hearings at d = 3 < 0.25 at 3e7; (b) frontier <= 6 at 5e7.
+  - Bar unchanged (bar2.py at D = 12, 1e8), against the LENGTHENED oracle reference `oracle3/eval_d12_long.json`
+    (>= 2000 2nd-half hungry bouts; it must first reproduce the committed eval exactly). The learner's eval is
+    lengthened until the true and shuffled modes each have >= 2000.
+  - At every pause: head at d = 3 and d = 12 split by hearing index. At K = 1 that is index 1 vs >= 2 (no 2..K
+    band).
+  - Launches automatically after bisection step 0 and the oracle eval (`queue_rl.sh`, `relabel/conditions.json`
+    LAUNCH true).
+  - Expected label rate: ~37k memory-only labels per 100k hearings once the young is at frontier 3 (the
+    checkpoints above); less before that.
+  - **p(read forms: head on 2nd+ hearings at d = 3 >= 0.5) = 0.6; p(early stop (a)) = 0.3; p(frontier reaches 12)
+    = 0.35; p(bar PASS) = 0.2.**
+    - Why the bar stays low: the pilot, with a working read, still lost reach with distance (0.33 at d = 12), and
+      the bar needs 0.777.
 - **RESULT (Nov 16 ~01:40): THE LABEL COUNT** (`docs/data/learner_w2/label_count/`; each row is 100 rollout
   iterations, 819k steps, with that checkpoint's weights, world state and frontier, no updates).
   - Definitions: MEMORY-ONLY bout = a later hearing (not the token's first in this life) at d >= 3. By construction

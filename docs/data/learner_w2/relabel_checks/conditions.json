@@ -1,0 +1,14 @@
+{
+ "unit_tests": "11/11 + 3 mutants caught",
+ "identity_flag_off_vs_la": true,
+ "A5_agreement_all_1": true,
+ "disagreements": 0,
+ "yield_per100k": {
+  "s1": 36212.05643437366,
+  "s2": 34334.76394849786,
+  "s4_3e7": 40773.898338804334
+ },
+ "yield_mean": 37106.90624055862,
+ "c_pass": true,
+ "LAUNCH": true
+}
