@@ -10121,6 +10121,57 @@ more expensive, because it produces publishable-looking nulls.
       dips to happen.
     - Across D1 the policy's in-bout entropy falls steadily while the per-update KL and clip fraction rise at a
       constant LR.
+- **REGISTERED (entry stamped Nov 17 11:46:46 EST): Cam Nov 17 ~16:40Z rulings; refined EVENT RULE + re-score; E1 (8-way + TARGET-KL
+  early stop) design, checks and predictions. Written before any E1 training data.**
+  - Recorded from Cam:
+    - C1 skipped; C2 missed (long-d trigger REFUTED); D1 = (c), closed with no extension; d_move 0 NOT adopted.
+    - The PPO trend is the main new fact.
+    - Working model: TRIGGER = optimization (the policy hardens while per-update change grows at a fixed LR); PERSISTENCE =
+      move cost.
+  - Refined event rule (`docs/data/port_w2/e1/events_v2.py`, d = 3 tables, consecutive):
+    - BROAD dip = mean drop >= .10, or >= 5 of 8 sectors drop >= .10 (logged).
+    - SECTOR EVENT = drop >= .3, or < .30 after >= .60, while the mean drops < .10 (counted). This is the literal reading; a
+      'strict' count that also excludes 5-of-8 broad transitions is reported beside it.
+    - DEAD = d = 3 sector < .30 in a table taken after the frontier reached 24.
+    - Positive control: the O8 s0 sector 2 lock is caught as 1 event + 1 dead.
+  - Re-score (`e1/rescore_v2.jsonl`; the 8-way 1e7 / 2e7 d = 3 values are the 2-decimal ones printed in `m8/run_m8.out`):
+
+    | arm | sector events | broad dips | dead |
+    |---|---|---|---|
+    | O8 s0 | 1 (sector 2, .79 -> .05) | 0 | 1 (sector 2 at 3e7) |
+    | O8 s1 | 0 | 1 (1e7 -> 2e7, mean -.25, 6/8 sectors) | 0 |
+    | D1 s0 | 0 | 0 | 0 (never reached 24) |
+    | D1 s1 | 0 | 1 (1e7 -> 2e7, mean -.18, 5/8 sectors) | 0 |
+
+    Under the refined rule the old (c) for D1 becomes 0 events, 0 dead. The controls have 1 event and 1 dead.
+  - E1 code (throng-toy `w2/port_w2.py`, `--target-kl`, default off):
+    - Before applying each minibatch step, the k3 approx KL (mean of (r - 1) - log r over that minibatch's steps, current
+      params vs the rollout policy; the SB3 estimator, computed in the same forward pass as the gradient) is compared with
+      .015. If above, that step is NOT applied and the batch's remaining epochs and minibatches are skipped. There is no
+      1.5x factor.
+    - It logs one `TKL` line per iteration (mb_done of 32, kl_stop, dparam).
+    - The flag-off path is untouched code: a separate `seq_loss_kl` / `upd_kl` is used only with the flag.
+  - E1 checks (running; `scratchpad/e1id/`):
+    - (1) flag-off identity vs `d1/identity_check/port_m8_log16` (HEAD 97cb49a, the same config, 60 iterations);
+    - (2) `--target-kl 1e9` vs the same (information: the upd_kl path; bitwise identity not required);
+    - (3) a synthetic high-KL batch (old log-probs shifted by -1; k3 is about .72) must give mb_done 0 and dparam 0 in every
+      iteration;
+    - (4) real `--target-kl .015` for 60 iterations: the fraction of steps cut and the time cost.
+  - E1 run (`e1/run_e1.sh`):
+    - oracle (b') + 8-way + target-KL .015 + `--ppo-log`, normal move cost;
+    - seeds 0 then 1, to 5e7 each, in legs of 1e7;
+    - tables at d = 3 / 12 / 21 every 1e7.
+    - Gate per seed (`e1/e1_outcome.py`): final frontier 24; QUALIFIES by decide3 on the 3e7 / 4e7 / 5e7 tables; 0 DEAD;
+      <= 1 sector event (literal).
+    - (a) both pass -> s0 to 1e8, then the reference (3-table rule), then the twin (8-way + target-KL, 3e7) + eval, then a
+      STOP. The learner merge (moves8-learner + target-KL in its script) is done by hand after.
+    - (c) any dead; (b) events and 0 dead, not (a); anything else 'unregistered'. All three -> stop and report.
+    - A d = 12 sector < .30 in the final table fails QUALIFIES (measurement rule); earlier d = 12 < .30 is reported.
+  - Predictions (mine): (a) .25, (b) .30, (c) .40, unregistered .05. Cam: (a) .35, (b) .35, (c) .30.
+    - Fraction of minibatch steps cut: < 10% over the first 1e7; 25-50% over 3e7-5e7.
+    - Wall time per leg within +10% of D1's.
+    - If < 5% of steps are cut over 3e7-5e7, the target never bound, and E1 says little about the trigger whatever its
+      outcome. I would flag that.
 - **RESULT (Nov 16 ~01:40): THE LABEL COUNT** (`docs/data/learner_w2/label_count/`; each row is 100 rollout
   iterations, 819k steps, with that checkpoint's weights, world state and frontier, no updates).
   - Definitions: MEMORY-ONLY bout = a later hearing (not the token's first in this life) at d >= 3. By construction
