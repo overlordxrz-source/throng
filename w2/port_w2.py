@@ -36,6 +36,10 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--navs", default="w2_out/nav_w13/*.msgpack"); ap.add_argument("--world", default="0.0013,8,0.001")
     ap.add_argument("--W", type=int, default=16); ap.add_argument("--N", type=int, default=4); ap.add_argument("--T", type=int, default=64)
+    ap.add_argument("--d-move", type=float, default=None, help="Cam Nov 17 ~14:10Z D1 (H-COST test): override the per-step move cost env.Cfg.d_move (default: the world's 0.003)")
+    ap.add_argument("--ppo-log", action="store_true", help="Cam Nov 17 ~14:10Z C1: after each iteration's updates, log approx KL / clip fraction / entropy on that iteration's batch (a separate forward pass; training unchanged)")
+    ap.add_argument("--target-kl", type=float, default=None, help="Cam Nov 17 ~16:40Z E1: before applying each minibatch step, the k3 approx KL (current vs rollout policy, that minibatch); if > this, skip the batch's remaining epochs / minibatches. Logs TKL lines")
+    ap.add_argument("--tkl-synthetic-shift", type=float, default=0.0, help="E1 CHECK ONLY: subtract this from the batch's old log-probs (a synthetic high-KL batch)")
     ap.add_argument("--moves8", action="store_true", help="Cam Nov 17 ~13:00Z L2: 8-way movement (actions 6..9 = diagonal steps, a cardinal step's energy cost); prev-action one-hot columns 6..9 appended at x[126:130]")
     ap.add_argument("--offset-wide", action="store_true", help="Cam Nov 17 L4: in-bout offset input clip(off, +-48) / 24 (w2/offset_wide.py) instead of clip(off / 9, +-1)")
     ap.add_argument("--steps", type=float, default=3e7); ap.add_argument("--oracle", action="store_true"); ap.add_argument("--seed", type=int, default=0)
@@ -59,7 +63,7 @@ def main():
     ap.add_argument("--out", required=True)
     a = ap.parse_args()
     S = a.item_size; gated = a.hunger_gate; nupd = a.eval_only or a.policy == "follower"
-    cfg = env.Cfg(L=96, N=a.N, patch_sigma=1.0, reproduce=False, A_max=3000, moves8=a.moves8, **world_kw(a.world)); L, W, N, T = cfg.L, a.W, a.N, a.T
+    cfg = env.Cfg(L=96, N=a.N, patch_sigma=1.0, reproduce=False, A_max=3000, moves8=a.moves8, **world_kw(a.world), **({} if a.d_move is None else dict(d_move=a.d_move))); L, W, N, T = cfg.L, a.W, a.N, a.T
     nav = flax.serialization.from_bytes(Net().init(jax.random.PRNGKey(1), jnp.zeros((1, 100))), open(sorted(glob.glob(a.navs))[0], "rb").read())
     rnet = RecAgent(128, topo=a.topo, n_act=10 if a.moves8 else 6); Dx = 100 + 11 + 6 + 1 + 8 + (4 if a.moves8 else 0)   # the harness layout (oracle slot always present; zero when off)
     assert not (a.moves8 and (a.policy == "follower" or not a.no_nav)), "--moves8 is built for the learner policy with --no-nav only"
@@ -139,6 +143,36 @@ def main():
         ec = jnp.where(bt["x"][..., 108] > 0, bt["ecb"] if a.ent_anneal else a.ent_bout, 0.01)   # O-X / O-X': in-bout entropy coefficient
         return (pg + 0.5 * (v - bt["ret"]) ** 2 + ec * (jnp.exp(ls) * ls).sum(-1)).mean()
 
+    def seq_loss_kl(pp_, bt):                                              # E1 (--target-kl only): seq_loss + the k3 approx KL, same forward pass
+        def body(h, xa):
+            xx, f = xa; h = jnp.where(f > 0, 0.0, h)
+            h2, lg, v, _ = rnet.apply(pp_, h, xx); return h2, (lg, v)
+        _, (lg, v) = jax.lax.scan(body, bt["h0"], (bt["x"], bt["first"]))
+        ls = jax.nn.log_softmax(lg); lp = jnp.take_along_axis(ls, bt["act"][:, None], 1)[:, 0]
+        lr_ = lp - bt["lp"]; kl = jax.lax.stop_gradient(((jnp.exp(lr_) - 1) - lr_).mean())   # k3 estimator (SB3), params BEFORE this step
+        ratio = jnp.exp(jnp.clip(lr_, -20.0, 20.0)); adv = bt["adv"]
+        pg = -jnp.minimum(ratio * adv, jnp.clip(ratio, 0.8, 1.2) * adv)
+        ec = 0.01 if a.ent_bout is None else jnp.where(bt["x"][..., 108] > 0, bt["ecb"] if a.ent_anneal else a.ent_bout, 0.01)
+        return (pg + 0.5 * (v - bt["ret"]) ** 2 + ec * (jnp.exp(ls) * ls).sum(-1)).mean(), kl
+
+    @jax.jit
+    def upd_kl(pp_, os_, bt):
+        (_, kl), g = jax.value_and_grad(lambda q: (lambda o: (o[0].mean(), o[1].mean()))(jax.vmap(seq_loss_kl, in_axes=(None, 0))(q, bt)), has_aux=True)(pp_)
+        u, os2 = opt.update(g, os_, pp_); return optax.apply_updates(pp_, u), os2, kl
+
+    @jax.jit
+    def ppo_stats(pp_, bt):                                                # C1: diagnostics only, never in the gradient
+        def one(b):
+            def body(h, xa):
+                xx, f = xa; h = jnp.where(f > 0, 0.0, h); h2, lg, v, _ = rnet.apply(pp_, h, xx); return h2, lg
+            _, lg = jax.lax.scan(body, b["h0"], (b["x"], b["first"]))
+            ls = jax.nn.log_softmax(lg); lp = jnp.take_along_axis(ls, b["act"][:, None], 1)[:, 0]; lr = lp - b["lp"]
+            ent = -(jnp.exp(ls) * ls).sum(-1); inb = b["x"][:, 108] > 0
+            return jnp.stack([(-lr).mean(), ((jnp.exp(lr) - 1) - lr).mean(), (jnp.abs(jnp.exp(lr) - 1) > 0.2).mean(), ent.mean(),
+                              (ent * inb).sum(), inb.sum().astype(jnp.float32)])
+        r = jax.vmap(one)({k_: bt[k_] for k_ in ("x", "h0", "act", "lp", "first")})
+        return jnp.array([r[:, 0].mean(), r[:, 1].mean(), r[:, 2].mean(), r[:, 3].mean(), r[:, 4].sum() / jnp.maximum(r[:, 5].sum(), 1.0)])
+
     @jax.jit
     def upd(pp_, os_, bt):
         g = jax.grad(lambda q: jax.vmap(seq_loss, in_axes=(None, 0))(q, bt).mean())(pp_)
@@ -184,15 +218,33 @@ def main():
         bt = dict(**(dict(ecb=jnp.full((W * N,), ECB, jnp.float32)) if a.ent_anneal else {}), x=jnp.asarray(sq(x)), h0=jnp.asarray(hin[:, 0].reshape(W * N, 128)), act=jnp.asarray(sq(act)), lp=jnp.asarray(sq(lp)),
                   adv=jnp.asarray(A_.astype(np.float32)), ret=jnp.asarray(ret.astype(np.float32)), first=jnp.asarray(first.astype(np.float32)))
         p_prev, o_prev = p, ost
+        if a.tkl_synthetic_shift:                                            # E1 check only: a synthetic high-KL batch (old log-probs shifted down)
+            bt["lp"] = bt["lp"] - a.tkl_synthetic_shift
+        n_mb = 0; kl_stop = None
         for _ in range(0 if nupd else a.epochs):
             for mb in np.array_split(rng.permutation(W * N), a.minibatches):
-                p, ost = upd(p, ost, {k_: v_[mb] for k_, v_ in bt.items()})
+                if a.target_kl is None:
+                    p, ost = upd(p, ost, {k_: v_[mb] for k_, v_ in bt.items()})
+                else:                                                       # E1: skip the batch's remaining epochs / minibatches once approx KL > target
+                    p2_, o2_, kl_ = upd_kl(p, ost, {k_: v_[mb] for k_, v_ in bt.items()})
+                    if float(kl_) > a.target_kl:
+                        kl_stop = float(kl_); break
+                    p, ost = p2_, o2_
+                n_mb += 1
+            if kl_stop is not None:
+                break
+        if a.target_kl is not None:
+            dpar = float(sum(jnp.abs(x1 - x0).sum() for x1, x0 in zip(jax.tree_util.tree_leaves(p), jax.tree_util.tree_leaves(p_prev))))
+            print("TKL", json.dumps(dict(it=it, mb_done=n_mb, mb_total=(0 if nupd else a.epochs * a.minibatches), kl_stop=kl_stop, dparam=dpar)), flush=True)
         if not all(bool(jnp.isfinite(l_).all()) for l_ in jax.tree_util.tree_leaves(p)):   # NaN guard
             p, ost = p_prev, o_prev; nan_run += 1; print(f"NAN_SKIP {it}", flush=True)
             if nan_run >= 10:
                 print("NAN_STOP", flush=True); break
         else:
             nan_run = 0
+        if a.ppo_log:
+            q_ = np.asarray(ppo_stats(p, {k_: v_[:16] for k_, v_ in bt.items() if k_ in ('x', 'h0', 'act', 'lp', 'first')}))   # 16 of the 128 sequences (cost)
+            print("PPO", json.dumps(dict(it=it, steps=steps + W * N * T, kl=float(q_[0]), kl3=float(q_[1]), clipfrac=float(q_[2]), ent=float(q_[3]), ent_bout=float(q_[4]), lr=a.lr)), flush=True)
         steps += W * N * T; it += 1
         n_close = int(closed.sum()); n_eat = int(ate_i.sum())
         recent.extend([1] * n_eat + [0] * max(n_close - n_eat, 0)); recent = recent[-500:]
