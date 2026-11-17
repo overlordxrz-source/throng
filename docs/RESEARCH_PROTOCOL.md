@@ -9568,6 +9568,12 @@ more expensive, because it produces publishable-looking nulls.
     "L4 hurts sector 7" from the oracle's known run-to-run fragility on the +x -y diagonal.
   - The sequence continues as registered: (i) trains to 1e8; (ii) and (iii) run only if 1e8 is not LOCK and
     qualifies. My odds that it qualifies at 1e8: .15 (a sector at 0.00 for 3e7 steps rarely comes back).
+- **LOG (entry stamped Nov 17 05:19:38 EST): L4 (i) at 5e7** (table 05:19:07 copied from `queue_l4.out`). This one is logged, not
+  reported: no sector dropped >= .3 from 3e7.
+  - d = 3: .933 / .812 / .927 / .916 / .943 / .925 / .945 / .005.
+  - d = 12: .921 / .719 / .803 / .894 / .892 / .862 / .890 / .000.
+  - d = 21: .80 / .55 / .72 / .57 / .80 / .77 / .85 / .00.
+  - Still does not qualify: sector 7 is dead (5e7 steps at 0.00). Sector 5 has recovered (.52 -> .93 at d = 3).
 - **RESULT (Nov 16 ~01:40): THE LABEL COUNT** (`docs/data/learner_w2/label_count/`; each row is 100 rollout
   iterations, 819k steps, with that checkpoint's weights, world state and frontier, no updates).
   - Definitions: MEMORY-ONLY bout = a later hearing (not the token's first in this life) at d >= 3. By construction
