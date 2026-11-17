@@ -10328,6 +10328,25 @@ more expensive, because it produces publishable-looking nulls.
   - Predictions:
     - Cam: G1 qualifies .5; (ii) with anneal, both qualify .55.
     - Mine: G1 qualifies .55; >= 1 v2 sector event in s1 over 6e7-1e8 .45; (ii) both qualify .50.
+- **RESULT (entry stamped Nov 17 14:35:34 EST): G1 = branch (i). E1 s1 QUALIFIES at 1e8 with a full PASS on the 3-table rule (8e7 / 9e7 /
+  1e8). 0 sector events, 0 broad dips, 0 dead across all ten tables. The script continues with the reference (s1 long
+  evals) and the twin.**
+  - Times copied from `e1/run_g1.out`: verdict 14:35:20.
+
+  | E1 s1 d = 3 | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 |
+  |---|---|---|---|---|---|---|---|---|
+  | 6e7 | .95 | .97 | .94 | .98 | .92 | .97 | .95 | .95 |
+  | 7e7 | .90 | .94 | .88 | .94 | .91 | .94 | .91 | .97 |
+  | 8e7 | .94 | .96 | .91 | .96 | .92 | .95 | .90 | .95 |
+  | 9e7 | .91 | .95 | .91 | .96 | .95 | .91 | .94 | .96 |
+  | 1e8 | .93 | .94 | .93 | .96 | .93 | .97 | .83 | .95 |
+  | mean 8e7-1e8, d = 12 | .83 | .88 | .85 | .91 | .87 | .93 | .82 | .85 |
+
+  - Mean d3 over 8e7-1e8: .93 / .95 / .92 / .96 / .94 / .94 / .89 / .96.
+  - Cut per leg .45-.54.
+  - Predictions: Cam .5, mine .55 -> qualifies (HIT for both). My ">= 1 v2 event over 6e7-1e8, p .45": none occurred.
+  - Reading: under target-KL, s1 is clean over 1e8. s0's late event looks seed-specific (its chronic sector 2), not
+    general. n = 1 vs 1.
 - **RESULT (Nov 16 ~01:40): THE LABEL COUNT** (`docs/data/learner_w2/label_count/`; each row is 100 rollout
   iterations, 819k steps, with that checkpoint's weights, world state and frontier, no updates).
   - Definitions: MEMORY-ONLY bout = a later hearing (not the token's first in this life) at d >= 3. By construction
