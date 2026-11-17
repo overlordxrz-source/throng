@@ -9961,6 +9961,15 @@ more expensive, because it produces publishable-looking nulls.
     - Cam's (lowest net payoff or d = 21 reach in >= 3 of 5 events) .45;
     - the dying sector has NEGATIVE mean net payoff in >= 2 events .2;
     - >= 300 hungry bouts per sector in every eval .8 (else the eval is lengthened and that is disclosed).
+- **DEVIATION (entry stamped Nov 17 09:28:35 EST): D1 restarted once, before any table.** The first launch (09:21:16, copied from
+  its `run_d1.out`) ran at ~11k steps/s against the control's ~19k: a 40% loss to D1.
+  - Two causes: the C2 evals running beside it, and `--ppo-log` doing a forward pass on all 128 sequences.
+  - It was stopped at 1.5M steps (frontier 2; no table, nothing read beyond the speed). The partial files are in
+    `scratchpad/d1_aborted1/`.
+  - `--ppo-log` now uses 16 of the 128 sequences. Alone, 3 rows: 34.1 s with the log vs 32.1 s without (+6%). The
+    training rows are still identical to the 8-way control (3 / 3).
+  - D1 was relaunched from scratch, unchanged otherwise. Evals beside D1 (C2, the fun pack) now run with XLA held to
+    one thread. The fun pack is paused if D1 slows by > 20%.
 - **RESULT (Nov 16 ~01:40): THE LABEL COUNT** (`docs/data/learner_w2/label_count/`; each row is 100 rollout
   iterations, 819k steps, with that checkpoint's weights, world state and frontier, no updates).
   - Definitions: MEMORY-ONLY bout = a later hearing (not the token's first in this life) at d >= 3. By construction

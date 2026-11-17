@@ -1,0 +1,140 @@
+{
+ "cfg": {
+  "navs": "w2_out/nav_w13/*.msgpack",
+  "world": "0.0013,8,0.001",
+  "W": 32,
+  "N": 4,
+  "T": 64,
+  "d_move": null,
+  "ppo_log": true,
+  "moves8": true,
+  "offset_wide": false,
+  "steps": 491520.0,
+  "oracle": true,
+  "seed": 0,
+  "epochs": 4,
+  "minibatches": 8,
+  "lr": 0.0003,
+  "d_max": 24,
+  "curve_every": 20,
+  "ckpt": "",
+  "max_seconds": 0,
+  "save_params": "",
+  "item_size": 0.1,
+  "hunger_gate": true,
+  "policy": "learner",
+  "v2": "/Users/overlord/throng-backup/evo2/evo2.ckpt",
+  "init_params": "",
+  "eval_only": false,
+  "frontier0": 1.0,
+  "frontier_schedule": "",
+  "gate": "honest",
+  "lookahead": 0.0,
+  "la_max": 12,
+  "giveup": 0.0,
+  "ent_bout": null,
+  "ent_anneal": 0.0,
+  "reinit_out": false,
+  "no_nav": true,
+  "topo": false,
+  "out": "/private/tmp/claude-501/-Users-overlord-CascadeProjects-throng/aad77c1d-d7ac-437e-bef4-aa525802ccc0/scratchpad/d1id2/port_m8_log16.json"
+ },
+ "steps": 491520,
+ "frontier": 2.0,
+ "curve": [
+  {
+   "steps": 163840,
+   "frontier": 1.0,
+   "item_reach": 0.6170731707317073,
+   "food_per_step": 0.003252956550568342,
+   "paid_per_step": 0.003203501459211111,
+   "frac_in_bout": 0.1551513671875,
+   "hungry_reach": 0.6231527093596059,
+   "n_hungry": 406,
+   "n_hungry_lookahead": 0,
+   "gate_last": 0.4485,
+   "sec": 23.3
+  },
+  {
+   "steps": 327680,
+   "frontier": 1.0,
+   "item_reach": 0.8161993769470405,
+   "food_per_step": 0.003294177819043398,
+   "paid_per_step": 0.003272193716838956,
+   "frac_in_bout": 0.1043701171875,
+   "hungry_reach": 0.81875,
+   "n_hungry": 320,
+   "n_hungry_lookahead": 0,
+   "gate_last": 0.7625,
+   "sec": 42.2
+  },
+  {
+   "steps": 491520,
+   "frontier": 2.0,
+   "item_reach": 0.8448844884488449,
+   "food_per_step": 0.003288774285465479,
+   "paid_per_step": 0.0031974236480891705,
+   "frac_in_bout": 0.1162109375,
+   "hungry_reach": 0.8471760797342193,
+   "n_hungry": 301,
+   "n_hungry_lookahead": 0,
+   "gate_last": 0.8165,
+   "sec": 62.8
+  }
+ ],
+ "reach_by_start_energy": {
+  "E<0.6 d=1": {
+   "reach": 0.08235369622707367,
+   "bouts": 15652
+  },
+  "E<0.6 all": {
+   "reach": 0.08282247930765152,
+   "bouts": 15660
+  },
+  "0.6<=E<H d=1": {
+   "reach": 0.6155450940132141,
+   "bouts": 18694
+  },
+  "0.6<=E<H all": {
+   "reach": 0.6249272227287292,
+   "bouts": 20612
+  },
+  "H<=E<0.75 d=1": {
+   "reach": null,
+   "bouts": 0
+  },
+  "H<=E<0.75 all": {
+   "reach": null,
+   "bouts": 0
+  },
+  "E>=0.75 d=1": {
+   "reach": null,
+   "bouts": 0
+  },
+  "E>=0.75 all": {
+   "reach": null,
+   "bouts": 0
+  }
+ },
+ "gate_scores": [
+  0.02,
+  0.0305,
+  0.036,
+  0.038,
+  0.058,
+  0.08,
+  0.1155,
+  0.183,
+  0.2815,
+  0.361,
+  0.4485,
+  0.592,
+  0.69,
+  0.7625,
+  0.8195,
+  0.869,
+  0.8165
+ ],
+ "train_seconds": 62.8,
+ "throughput": 7827.858454990264
+}
