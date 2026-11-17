@@ -9259,6 +9259,70 @@ more expensive, because it produces publishable-looking nulls.
   - So the learner survives far better than its deaf twin (5x), and it reads (0.92), but it reaches the named item
     at d = 12 only 56% of the time: the diagonal lock.
 - **STATE (entry stamped Nov 16 20:49:13 EST):** the registered chain is complete; nothing runs except the guard. Waiting for Cam.
+- **RULINGS (Cam, message headed "~07:35Z Nov 17", time copied from that header; entry stamped Nov 17 02:28:14 EST):**
+  - Recorded: (a') FAIL (sector 7 never learned, not locked); O-X' FAIL (min .49, 0 dead); (b') `--no-nav`
+    QUALIFIES (secondary), picked; new reference .9747 over 2,172 bouts -> bar .8772 (old .861 / .775 retired).
+    Seed 7 FAIL on reach (.564 vs .877, both shuffled criteria fail), LIFE PASS (5.19x the lever twin, LB 4.87).
+    On record: the read formed on a 2nd seed with a 2nd recipe (later-hearing head .92-.93); at 3e7 frontier 15,
+    d = 3 hungry .855 vs wiped .309, 0 dead sectors. Hibernate incident and memory pressure: no data effect.
+  - Reading: the weak spot across arms is the DIAGONALS (o3: 3; O-T: 1, 7; (a'): 7; O-X': 1, 7 weak; seed 7 at 1e8:
+    3, 5, 7 dead, 1 weak; cardinals .97-.99). Cam's suspect: with 4-way moves, diagonal bouts may be structurally
+    harder (two-action mix, longer Manhattan paths against a d-based timeout, adjacent-only visibility). The late
+    lock formed while the frontier sat at 21.
+  - FREE DIAGNOSIS G1 (world facts from code), G2 (fairness: ideal and sector-only scripted followers by sector at
+    d = 3, 12, 21; unfair if diagonals use >= 1.5x the cardinal steps-to-timeout ratio), G3 (seed 7's lock timing;
+    per-sector head accuracy and confidence at 1e8). Then ONE RUN: oracle (b') continued from 3e7 to 1e8, same
+    recipe, per-sector tables at 5e7 and 1e8.
+  - Candidate levers, not built: (L1) timeout by shortest-path length; (L2) 8-way movement; (L3) a held in-bout
+    entropy floor .02. Ruling after G1-G3 + the run. Laptop on AC; Modal nothing; guard $41.
+- **REGISTRATION (entry stamped Nov 17 02:28:14 EST): G1-G3 and the oracle continuation, before any of them is run.**
+  - **Disclosure.** Before writing this I read `named_item.py` (place / close_and_open / observe / follower) and
+    `port_w2.py`'s eat rule, so G1 below is a record, not a prediction. I also looked at seed 7's training curve
+    (overall hungry reach per 5M window): .79 at 45-50M, .66 at 50-55M, i.e. the drop coincides with the frontier
+    reaching 21 at 49.2M. No prediction is registered on that curve.
+  - **G1 (from the code).**
+    - d is the EUCLIDEAN radius: item cell = start + (round(d cos 45k deg), round(d sin 45k deg)), d an integer
+      (uniform 1..frontier in training; fixed in the evals).
+    - Placement: exactly on the sector's central ray, rounded to a cell. There is no spread inside the wedge.
+    - Timeout: the bout closes when its step count reaches 4d (Euclidean d), so a bout has 4d actions, the final
+      EAT included.
+    - Eating: the item counts only when the agent stands on its cell AND takes EAT.
+    - Visibility: 8-neighbour (Chebyshev <= 1), shown in the food channel of the 7x7 view.
+    - Moves: 4-way (+-x, +-y), plus stay and eat. No diagonal step.
+    - Arithmetic consequence (not data): shortest path = Manhattan + 1 actions, i.e. d + 1 on a cardinal and
+      2 round(d / sqrt2) + 1 on a diagonal. Steps / timeout, cardinal vs diagonal: d = 3 .333 vs .417 (1.25x);
+      d = 12 .271 vs .354 (1.31x); d = 21 .262 vs .369 (1.41x).
+  - **G2 predictions.** A pure-geometry simulation with the world's own placement, timeout, eat and visibility rules
+    (no food, energy or other agents, none of which depend on the sector).
+    - IDEAL follower (shortest path to the true cell, then EAT): reach 1.000 in every sector at d = 3, 12 and 21;
+      steps / timeout exactly as above. Any deviation means a simulation bug: stop and report.
+    - SECTOR-ONLY follower (the code's own scripted rule: walk the sector's ray from the start, step to the item when
+      it is adjacent, then EAT): reach 1.000 in all sectors, because the item lies on the ray; steps within +2 of
+      the ideal.
+    - Verdict: the diagonal / cardinal ratio is < 1.5 at every d, so the world is NOT unfair to diagonals by Cam's
+      criterion. P(>= 1.5x at any d) = 0.03.
+    - Positive control for the tool: the same followers with the timeout cut to 1.2 d must fail the diagonals at
+      every d while keeping the cardinals, i.e. the simulator can see an unfair world.
+  - **G3.** Only two checkpoints of seed 7 were kept (3e7 and 1e8; `s7.ckpt` is overwritten every chunk). Both
+    per-sector reach tables are already on record. So G3 = those two tables next to the frontier curve, plus NEW at
+    1e8 from the existing `s7_final_traj_*` records (eval-only, no new rollouts): per-sector head accuracy on later
+    hearings and mean head confidence (max softmax at the hearing), at d = 3 and 12.
+    - Predictions: head accuracy >= .88 in every sector at d = 3 (p .75); the diagonal-vs-cardinal gap in mean
+      confidence < .05 (p .65).
+    - Meaning: if both hold, the read is intact on the diagonals and the lock is on the action side (where the logit
+      split already points).
+  - **ONE RUN: oracle (b') continued, 3e7 -> 1e8.**
+    - Exactly the chain's arm B flags, resumed from a COPY of `chain/B.ckpt` (the original stays as evidence).
+    - Leg 1 to 5e7: params, then the chain's per-sector evals (d = 3 and 12, `decide.py`).
+    - Leg 2 to 1e8: from the same checkpoint copy. port_w2 saves no checkpoint at the end, so leg 2 replays <= 19
+      iterations from the last saved state and RNG. Then the same per-sector evals.
+    - ETA: (b') ran 3e7 in 23 min, so ~55 min of training plus ~5 min of evals.
+    - At 3e7: diagonal mean at d = 12 = .837 (.840 / .822 / .811 / .874); min d = 12 = .661 (sector 6, a cardinal).
+    - Outcome classes at 1e8, on the same tables:
+      - LOCK = >= 1 diagonal < .30 at d = 3 or d = 12, OR the diagonal mean at d = 12 <= .637 (a drop >= .20);
+      - KEEP = 0 sectors < .30, the diagonal mean at d = 12 >= .737, and min d = 3 >= .85;
+      - anything else = PARTIAL, reported as such for Cam.
+    - p(LOCK) .30, p(KEEP) .45, p(PARTIAL) .25. The same classes are reported at 5e7.
 - **RESULT (Nov 16 ~01:40): THE LABEL COUNT** (`docs/data/learner_w2/label_count/`; each row is 100 rollout
   iterations, 819k steps, with that checkpoint's weights, world state and frontier, no updates).
   - Definitions: MEMORY-ONLY bout = a later hearing (not the token's first in this life) at d >= 3. By construction
