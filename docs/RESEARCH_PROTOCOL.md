@@ -10389,6 +10389,15 @@ more expensive, because it produces publishable-looking nulls.
     - rl2 target-KL .015 cut .098 over 60 iterations;
     - rl2 anneal + stop at start + len (614,400 as expected);
     - traj ep 8-way eval == pre-merge.
+- **RESULT (entry stamped Nov 17 18:30:05 EST): checks run 2 ALL PASS 14/14 (`e1/g2_checks/RESULT_run2.txt`), including the bitwise
+  identity of the target-KL-only port path with the E1 check run. comm-toy was fast-forwarded to moves8-learner (393558d:
+  comm-toy + learner 8-way + rl2 target-KL + lr-anneal, with nothing running at the time) and pushed. Seed 8 LAUNCHED.**
+  - Launch time from `scratchpad/e1l/run_e1l.out`: 18:29:49.
+  - Recipe: relabel + no-nav + 8-way + target-KL .015, no anneal, to 1e8.
+  - Watch: cut + later-hearing head every 1e7; head < .50 at 3e7 -> report.
+  - Early stops A / B; bar3 vs reference .982 (bar .884) and the twin.
+  - The E1 reference and twin were trained with pre-merge code. The merged oracle / target-KL path is bitwise identical to
+    it (check 3), so they are the same levers.
 - **RESULT (Nov 16 ~01:40): THE LABEL COUNT** (`docs/data/learner_w2/label_count/`; each row is 100 rollout
   iterations, 819k steps, with that checkpoint's weights, world state and frontier, no updates).
   - Definitions: MEMORY-ONLY bout = a later hearing (not the token's first in this life) at d >= 3. By construction

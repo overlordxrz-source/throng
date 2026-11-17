@@ -1,0 +1,15 @@
+PASS unit test 
+PASS port flag-off == d1 port_m8_log16 (curve, PPO) 
+PASS port target-KL (sc = 1.0) == E1 check on (curve, PPO, TKL) 
+PASS port anneal: logged LR == schedule at every iteration t24 344064.0, lr first/last 3.00e-04/3.00e-05, n 60
+PASS port anneal: LR actually moved and reached lr_end 
+PASS port anneal resume (chunked) == continuous (TKL incl. LR, PPO, curve) resumes 2
+PASS port resume from an old (no-t24) E1 5e7 checkpoint: t24 from curve, LR 3e-4 at 5e7 ['LR_ANNEAL resume t24 15892480.0 (curve)'] n 4
+PASS rl2 flag-off (seed 7) == pre-merge m8 learner_identity rl2_off (curve) 
+PASS rl2 moves8 (seed 8) == pre-merge rl2_on (curve) 
+PASS rl2 target-KL 1e9 == rl2_on (curve; info) 
+PASS rl2 synthetic high-KL batch: 0 steps, dparam 0 kl_stop 0.7182815074920654
+PASS rl2 target-KL .015 runs (cut fraction reported) cut 0.088 n 60
+PASS rl2 anneal + --lr-anneal-stop: LR follows the schedule and the run ends at start + len t24 450560.0, stop expected at 614400.0, ['LR_ANNEAL_STOP at 614,400 (anneal start 450,560 + 163,840)']
+PASS traj ep moves8 eval == pre-merge traj_on_d3 (all keys but time/paths) keys 1
+ALL PASS 14/14
