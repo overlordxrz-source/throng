@@ -9446,6 +9446,67 @@ more expensive, because it produces publishable-looking nulls.
     unsaturated; Cam's "spread down" step is the untested link. The oracle continuation and an L4 arm test that.
   - The memory record stores the UNCLIPPED displacement (code fact, registered entry). The clip is only on the
     in-bout offset input.
+- **RULINGS (Cam, message headed "~07:55Z Nov 17", time copied from that header; entry stamped Nov 17 03:06:48 EST):**
+  - G2b CONFIRMED and accepted. The caveat is recorded: causation for seed 7's lock (incl. d = 3 / 12) is untested.
+  - **L4 ADOPTED as a world / sense fix**, whatever the oracle continuation shows. Spec: in-bout offset input =
+    clip(off, +-48) / 24 per axis, behind `--offset-wide`.
+  - SEQUENCE after the clipped continuation ends:
+    - (i) oracle (b') + L4 fresh to 1e8, tables at 3e7 / 5e7 / 1e8; reference from 1e8 if PASS or secondary;
+    - (ii) lever twin, `--no-nav` + L4, (i)'s schedule, 3e7;
+    - (iii) learner seed 8, relabel + `--no-nav` + L4, to 1e8, per-sector tables at every 1e7 at d = 3, 12, 21;
+      bar = 0.9 x (i)'s reference, life vs (ii).
+    - A late diagonal lock in (i) despite L4 -> STOP before (iii) and report (then L3).
+  - The clipped continuation is now a diagnostic only.
+- **BUILD (entry stamped Nov 17 03:06:48 EST): L4 `--offset-wide`** (throng-toy e91353f).
+  - `w2/offset_wide.py` `hear_wide`: token and flag as `NI.hear`; offset = clip(torus(start - pos), +-48) / 24.
+  - Flag in `learner_w2_rl2.py` (edited in place, not running). `port_w2.py` and `learner_w2_rl_traj.py` are re-read
+    by the running continuation, so they were built as copies (`*_ow.py`); the queue folds them into the
+    originals (mv) only after the continuation ends.
+  - Checks (`w2/test_offset_wide.py`, all pass):
+    - unit: 5,000 random states; token and flag identical; offset = exact torus offset / 24, and equal to `NI.hear`
+      x 9 / 24 within 9 cells.
+    - G2b follower (a) fed the WIDE input reaches 8 / 8 sectors at every d = 3..24.
+    - Fed the original input it fails every diagonal at d = 15..24 and no cardinal.
+    - A mutant (wide, but clipped at 9 cells) is caught.
+  - Flag-off identity:
+    - `port_w2_ow` vs (b')'s curve: 3 / 3 rows;
+    - `learner_w2_rl2` vs seed 7's curve: 3 / 3 rows;
+    - `learner_w2_rl_traj_ow` vs chain B's d = 3 eval: 27 / 27 keys.
+    - Flag-on changes the first curve row (reach .539 vs .602), so the flag does act.
+- **RESULT (entry stamped Nov 17 03:06:48 EST): clipped oracle continuation at 5e7** (`oc_5e7_verdict.json`; 02:51:39 / 02:52:38
+  copied from `oc/run_oc.out`).
+  - d = 3: .961 / .767 / .942 / .932 / .956 / .922 / .896 / .966.
+  - d = 12: .892 / .589 / .692 / .796 / .833 / .777 / .853 / .860.
+  - Still qualifies (secondary).
+  - Registered class at 5e7: **PARTIAL**: 0 dead; diagonal mean d = 12 .756 (>= .737); min d = 3 .767 (< .85).
+  - Sector 1 (a diagonal) slipped from 3e7 (d = 3 .968 -> .767, d = 12 .840 -> .589), and so did sector 2 at d = 12.
+- **REGISTRATION (entry stamped Nov 17 03:06:48 EST): the L4 sequence**, before it runs (`scratchpad/l4/run_l4.sh`, queued
+  behind the continuation by `queue_l4.sh`; both in `laptop_jobs.sh` QUEUES).
+  - Disclosure: the continuation's 5e7 table above was seen before these predictions.
+  - (i):
+    - legs of 1e7 (params + a checkpoint copy at every 1e7; port_w2 has no pause, so each leg replays <= 19
+      iterations from its last save);
+    - tables at 3e7 / 5e7 / 1e8 with the chain's evals + `decide.py`, plus d = 21 by sector (info);
+    - late-lock class at 1e8 vs (i)'s OWN 3e7 table, with the registered rules (`l4/lockcheck.py`, 5 synthetic
+      cases pass): LOCK = a diagonal < .30 at d = 3 or 12, or the diagonal d = 12 mean down >= .20; KEEP = 0 dead,
+      the diagonal mean within .10, min d = 3 >= .85; else PARTIAL.
+    - Proceed to (ii) and (iii) only if NOT LOCK and 1e8 QUALIFIES; otherwise stop and report.
+    - The reference = the 1e8 params, lengthened to >= 2000 2nd-half hungry bouts.
+  - (ii): exactly the seed 7 twin recipe + `--offset-wide`, `--frontier-schedule` = (i)'s curve, 3e7 (legs of 1e7).
+  - (iii): seed 7's recipe + `--offset-wide`, seed 8.
+    - Pauses at every 1e7 (exact checkpoint + params), each with a per-sector table at d = 3, 12, 21.
+    - Early stop A: head on later hearings at d = 3 < .25 at 3e7. Early stop B: frontier <= 6 at 5e7.
+    - Then the d = 12 evals, lengthened, and bar3.py vs (i)'s reference and (ii).
+  - Predictions:
+    - (i): frontier 24 by 2e7 (p .8); 3e7 qualifies (p .7); 1e8 class KEEP .45 / PARTIAL .30 / LOCK .25;
+      1e8 qualifies (p .6); the d = 21 diagonal reach within .10 of the cardinals at 1e8 (p .6).
+    - (ii): life 380-600 (p .7); d = 12 hungry reach <= .05 (p .9).
+    - (iii):
+      - no early stop A (p .8); head on later hearings at d = 3 >= .5 at 3e7 (p .7); no early stop B (p .85);
+      - frontier >= 22 at 1e8 (p .4);
+      - every diagonal later-right reach at d = 3 >= .30 at 1e8 (p .45);
+      - bar reach PASS (p .2); life PASS (p .85).
+  - ETA: the continuation ends ~40 min after this entry; (i) ~90 min; (ii) ~25 min; (iii) ~4 h.
 - **RESULT (Nov 16 ~01:40): THE LABEL COUNT** (`docs/data/learner_w2/label_count/`; each row is 100 rollout
   iterations, 819k steps, with that checkpoint's weights, world state and frontier, no updates).
   - Definitions: MEMORY-ONLY bout = a later hearing (not the token's first in this life) at d >= 3. By construction
