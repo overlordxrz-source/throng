@@ -9795,6 +9795,41 @@ more expensive, because it produces publishable-looking nulls.
       (p .4);
     - bar reach PASS (p .2); life PASS (p .85).
   - Reports: at the 3e7 and 5e7 pauses, and at any >= .3 drop between consecutive tables.
+- **RESULT (entry stamped Nov 17 08:28:20 EST): 8-way oracle, seed 0, at 3e7: does NOT qualify; sector 2 (+y, a CARDINAL) DEAD,
+  collapsed between 2e7 and 3e7** (times copied from `m8/run_m8.out`: frontier 17 at 1e7 08:09:58, 24 at 2e7
+  08:18:13, table 08:27:06; `docs/data/port_w2/m8/`).
+
+  | O8 s0 | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 |
+  |---|---|---|---|---|---|---|---|---|
+  | d = 3, 1e7 (log) | .77 | .87 | .84 | .88 | .85 | .93 | .79 | .88 |
+  | d = 3, 2e7 (log) | .78 | .85 | .79 | .80 | .76 | .69 | .71 | .80 |
+  | d = 3, 3e7 | .774 | .908 | **.052** | .893 | .907 | .902 | .896 | .923 |
+  | d = 12, 3e7 | .470 | .859 | **.000** | .857 | .844 | .846 | .780 | .892 |
+  | d = 21, 3e7 | .33 | .69 | **.00** | .75 | .74 | .71 | .59 | .69 |
+
+  - The >= .3 rule fired: sector 2 at d = 3, .79 -> .05 (2e7 -> 3e7).
+  - Diagonals are all >= .89 at d = 3; sector 7 is at .92 (.89 at d = 12). The weak sectors are now cardinals:
+    sector 2 dead, sector 0 .77 / .47.
+  - d = 21: diagonal mean .71 vs cardinal mean .42.
+  - Predictions (s0):
+    - frontier 24 (p .75): **hit** (at 2e7);
+    - qualifies (p .55): **miss**;
+    - >= 1 dead sector in either seed (p .4): **hit**;
+    - sector 7 dead (p .15): no;
+    - d = 21 diagonal >= cardinal - .10 (p .65): **hit**;
+    - diagonal > cardinal at d = 21 (p .5): **hit**.
+  - **Extra, eval only (the chain's standing rule: a logit split on any dead sector).** At 3e7, d = 3, hearing step,
+    toward = the 3 moves within 45 deg (an 8-way-aware copy, `logit_split8.py`; toward sets checked, e.g. sector 2
+    = +y, (+1, +1), (-1, +1)):
+    - sector 2: p(stay / eat / toward) .42 / .29 / .13; D_stay +1.76 (trunk +.23, side +1.53).
+    - every other sector: p(toward) .71-.92, D_stay -2.5 to -5.5, with the side pushing toward.
+  - **Reading (one seed; not established).**
+    - With 8-way moves every sector has 3 toward actions, yet one sector again collapsed into a learned stay
+      driven by the side path. The collapse is abrupt and late (after the frontier hit 24), the same kind as
+      sector 5 at 6e7 and sectors 1 / 2 at 1e8 in o4.
+    - This time it is a cardinal. So the "split toward vs one stay" asymmetry is not needed for a sector to die. It
+      may still raise the rate on diagonals.
+    - Seed 1 is running. The sequence stops after it, because seed 0 does not qualify.
 - **RESULT (Nov 16 ~01:40): THE LABEL COUNT** (`docs/data/learner_w2/label_count/`; each row is 100 rollout
   iterations, 819k steps, with that checkpoint's weights, world state and frontier, no updates).
   - Definitions: MEMORY-ONLY bout = a later hearing (not the token's first in this life) at d >= 3. By construction
