@@ -36,6 +36,8 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--navs", default="w2_out/nav_w13/*.msgpack"); ap.add_argument("--world", default="0.0013,8,0.001")
     ap.add_argument("--W", type=int, default=16); ap.add_argument("--N", type=int, default=4); ap.add_argument("--T", type=int, default=64)
+    ap.add_argument("--d-move", type=float, default=None, help="Cam Nov 17 ~14:10Z D1 (H-COST test): override the per-step move cost env.Cfg.d_move (default: the world's 0.003)")
+    ap.add_argument("--ppo-log", action="store_true", help="Cam Nov 17 ~14:10Z C1: after each iteration's updates, log approx KL / clip fraction / entropy on that iteration's batch (a separate forward pass; training unchanged)")
     ap.add_argument("--moves8", action="store_true", help="Cam Nov 17 ~13:00Z L2: 8-way movement (actions 6..9 = diagonal steps, a cardinal step's energy cost); prev-action one-hot columns 6..9 appended at x[126:130]")
     ap.add_argument("--offset-wide", action="store_true", help="Cam Nov 17 L4: in-bout offset input clip(off, +-48) / 24 (w2/offset_wide.py) instead of clip(off / 9, +-1)")
     ap.add_argument("--steps", type=float, default=3e7); ap.add_argument("--oracle", action="store_true"); ap.add_argument("--seed", type=int, default=0)
@@ -59,7 +61,7 @@ def main():
     ap.add_argument("--out", required=True)
     a = ap.parse_args()
     S = a.item_size; gated = a.hunger_gate; nupd = a.eval_only or a.policy == "follower"
-    cfg = env.Cfg(L=96, N=a.N, patch_sigma=1.0, reproduce=False, A_max=3000, moves8=a.moves8, **world_kw(a.world)); L, W, N, T = cfg.L, a.W, a.N, a.T
+    cfg = env.Cfg(L=96, N=a.N, patch_sigma=1.0, reproduce=False, A_max=3000, moves8=a.moves8, **world_kw(a.world), **({} if a.d_move is None else dict(d_move=a.d_move))); L, W, N, T = cfg.L, a.W, a.N, a.T
     nav = flax.serialization.from_bytes(Net().init(jax.random.PRNGKey(1), jnp.zeros((1, 100))), open(sorted(glob.glob(a.navs))[0], "rb").read())
     rnet = RecAgent(128, topo=a.topo, n_act=10 if a.moves8 else 6); Dx = 100 + 11 + 6 + 1 + 8 + (4 if a.moves8 else 0)   # the harness layout (oracle slot always present; zero when off)
     assert not (a.moves8 and (a.policy == "follower" or not a.no_nav)), "--moves8 is built for the learner policy with --no-nav only"
@@ -140,6 +142,19 @@ def main():
         return (pg + 0.5 * (v - bt["ret"]) ** 2 + ec * (jnp.exp(ls) * ls).sum(-1)).mean()
 
     @jax.jit
+    def ppo_stats(pp_, bt):                                                # C1: diagnostics only, never in the gradient
+        def one(b):
+            def body(h, xa):
+                xx, f = xa; h = jnp.where(f > 0, 0.0, h); h2, lg, v, _ = rnet.apply(pp_, h, xx); return h2, lg
+            _, lg = jax.lax.scan(body, b["h0"], (b["x"], b["first"]))
+            ls = jax.nn.log_softmax(lg); lp = jnp.take_along_axis(ls, b["act"][:, None], 1)[:, 0]; lr = lp - b["lp"]
+            ent = -(jnp.exp(ls) * ls).sum(-1); inb = b["x"][:, 108] > 0
+            return jnp.stack([(-lr).mean(), ((jnp.exp(lr) - 1) - lr).mean(), (jnp.abs(jnp.exp(lr) - 1) > 0.2).mean(), ent.mean(),
+                              (ent * inb).sum(), inb.sum().astype(jnp.float32)])
+        r = jax.vmap(one)({k_: bt[k_] for k_ in ("x", "h0", "act", "lp", "first")})
+        return jnp.array([r[:, 0].mean(), r[:, 1].mean(), r[:, 2].mean(), r[:, 3].mean(), r[:, 4].sum() / jnp.maximum(r[:, 5].sum(), 1.0)])
+
+    @jax.jit
     def upd(pp_, os_, bt):
         g = jax.grad(lambda q: jax.vmap(seq_loss, in_axes=(None, 0))(q, bt).mean())(pp_)
         u, os_ = opt.update(g, os_, pp_); return optax.apply_updates(pp_, u), os_
@@ -193,6 +208,9 @@ def main():
                 print("NAN_STOP", flush=True); break
         else:
             nan_run = 0
+        if a.ppo_log:
+            q_ = np.asarray(ppo_stats(p, bt))
+            print("PPO", json.dumps(dict(it=it, steps=steps + W * N * T, kl=float(q_[0]), kl3=float(q_[1]), clipfrac=float(q_[2]), ent=float(q_[3]), ent_bout=float(q_[4]), lr=a.lr)), flush=True)
         steps += W * N * T; it += 1
         n_close = int(closed.sum()); n_eat = int(ate_i.sum())
         recent.extend([1] * n_eat + [0] * max(n_close - n_eat, 0)); recent = recent[-500:]

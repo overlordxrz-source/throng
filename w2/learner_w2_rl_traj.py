@@ -94,11 +94,12 @@ def main():
     ap.add_argument("--d-fixed", type=int, default=0); ap.add_argument("--eval-d-max", type=int, default=12)
     ap.add_argument("--out", required=True)
     ap.add_argument("--moves8", action="store_true", help="Cam Nov 17 L2: 8-way movement (rec learner only); see port_w2.py")
+    ap.add_argument("--d-move", type=float, default=None, help="Cam Nov 17 D1: override env.Cfg.d_move")
     ap.add_argument("--lookahead", type=float, default=0.0); ap.add_argument("--la-max", type=int, default=12); ap.add_argument("--stop-at", type=float, default=0.0)
     ap.add_argument("--head-relabel-token", action="store_true", help="Cam/M Nov 16: cross-hearing relabel of the head (own record buffer only)")
     a = ap.parse_args()
     S = a.item_size; gated = a.hunger_gate; ep = a.learner == "ep"; KV = not os.environ.get("KV_OFF")
-    cfg = env.Cfg(L=96, N=a.N, patch_sigma=1.0, reproduce=False, A_max=3000, moves8=a.moves8, **world_kw(a.world)); L, W, N, T = cfg.L, a.W, a.N, a.T
+    cfg = env.Cfg(L=96, N=a.N, patch_sigma=1.0, reproduce=False, A_max=3000, moves8=a.moves8, **world_kw(a.world), **({} if a.d_move is None else dict(d_move=a.d_move))); L, W, N, T = cfg.L, a.W, a.N, a.T
     nav = flax.serialization.from_bytes(Net().init(jax.random.PRNGKey(1), jnp.zeros((1, 100))), open(sorted(glob.glob(a.navs))[0], "rb").read())
     Dx = 100 + 11 + 6 + 1 + 8 + (4 if a.moves8 else 0)
     assert not (a.moves8 and (ep or a.policy != "learner")), "--moves8: rec learner policy only"
