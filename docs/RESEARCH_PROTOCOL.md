@@ -10216,6 +10216,32 @@ more expensive, because it produces publishable-looking nulls.
 
     In-bout entropy did NOT collapse; in D1 s0 it went .72 -> .15 at constant per-update size. One seed; seed 1 is next.
   - Wall time per leg ~6.5-7 min (vs ~8.5 min in D1).
+- **RESULT (entry stamped Nov 17 12:57:31 EST): E1 OUTCOME = (a). Both seeds pass: 0 sector events (strict 0), 0 dead, 0 broad dips,
+  both frontier 24 and QUALIFY (SECONDARY) on the 3e7-5e7 mean. The script continues per the registered (a) branch: s0
+  to 1e8, then reference, then twin, then stop. Then the learner merge by hand.**
+  - Times copied from `e1/run_e1.out`: outcome 12:56:47. File: `e1/e1_outcome.json`.
+
+  | E1 s1, d = 3 | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | frontier |
+  |---|---|---|---|---|---|---|---|---|---|
+  | 1e7 | .78 | .85 | .80 | .79 | .77 | .82 | .79 | .77 | 18 |
+  | 2e7 | .84 | .90 | .81 | .87 | .81 | .84 | .80 | .88 | 24 |
+  | 3e7 | .85 | .88 | .86 | .90 | .87 | .87 | .87 | .85 | 24 |
+  | 4e7 | .84 | .92 | .83 | .86 | .84 | .87 | .79 | .85 | 24 |
+  | 5e7 | .89 | .96 | .89 | .96 | .91 | .96 | .90 | .95 | 24 |
+  | mean 3-5e7, d = 12 | .78 | .81 | .78 | .84 | .81 | .85 | .76 | .82 | |
+
+  - s1 had no d = 12 value < .30 after frontier 24. Its 1e7 -> 2e7 frontier jump (18 -> 24) came with NO broad dip (mean
+    d3 .79 -> .84). In the controls, O8 s1 dipped -.25 and D1 s1 dipped -.18 at their jumps.
+  - s1 cut by 1e7 window: .23 / .38 / .50 / .49 / .48; .49 over 3e7-5e7 (binds; at the top of my predicted 25-50%).
+  - s1 PPO medians by window: KL .0117 -> .0150; clip fraction .12 -> .15; in-bout entropy .91 / 1.14 / .95 / 1.05 / .99.
+    No collapse in either seed (D1: .70 -> .35 for s1, .72 -> .15 for s0).
+  - Prediction scoring: Cam (a) .35, mine (a) .25 -> (a). My first-1e7 cut < 10% MISSED on both seeds (.12, .23).
+  - Caveats:
+    - n = 2 seeds; the controls are n = 2 (one lock, on s0).
+    - E1 tables run to 5e7, the controls only to 3e7.
+    - s0 sector 6 wobbled hard at 4e7 (d21 .01), uncounted by the registered rule but real; it recovered by 5e7.
+    - The ~40-50% cut also lowers the effective number of updates. Part of the effect may be "fewer/smaller updates" in
+      general rather than KL control specifically (an LR-anneal arm would separate them).
 - **RESULT (Nov 16 ~01:40): THE LABEL COUNT** (`docs/data/learner_w2/label_count/`; each row is 100 rollout
   iterations, 819k steps, with that checkpoint's weights, world state and frontier, no updates).
   - Definitions: MEMORY-ONLY bout = a later hearing (not the token's first in this life) at d >= 3. By construction
