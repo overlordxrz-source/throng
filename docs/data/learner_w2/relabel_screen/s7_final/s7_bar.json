@@ -1,0 +1,26 @@
+{
+ "hungry_2nd_true": 0.5637342929840088,
+ "hungry_2nd_shuffled": 0.3354380428791046,
+ "hungry_2nd_wiped": 0.42486703395843506,
+ "bouts_2nd_half": {
+  "0": 6684.0,
+  "3": 3801.0,
+  "4": 3008.0
+ },
+ "reach_eval_steps": 24000,
+ "oracle_ref": 0.9746777415275574,
+ "oracle_ref_bouts": 2172.0,
+ "need": 0.8772099673748016,
+ "c_reach": false,
+ "c_shuf30": false,
+ "c_2x": false,
+ "life": 2509.8039215686276,
+ "twin_life": 483.6272040302267,
+ "life_ratio": 5.189542483660131,
+ "life_lb": 4.866058379899184,
+ "c_life": true,
+ "life_eval_steps": 3000,
+ "head_first": 0.13960395753383636,
+ "head_later": 0.918465256690979,
+ "PASS": false
+}

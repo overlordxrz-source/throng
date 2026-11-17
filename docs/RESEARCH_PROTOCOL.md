@@ -9250,6 +9250,15 @@ more expensive, because it produces publishable-looking nulls.
     - The oracle (b') kept its diagonals at d = 3 (0.94-0.97). The learner lost them. The difference is the
       learner's read and the relabel targets, the only things the two do not share (CONJECTURED).
   - Predictions: p(bar PASS) 0.1 -> FAIL (reach). "0 dead sectors at 3e7" held at 3e7 but not at 1e8.
+- **RESULT (entry stamped Nov 16 20:49:13 EST): THE LEARNER SCREEN seed 7, FORMAL VERDICT: FAIL** (bar3.py, `s7_bar.json`).
+  - Reach: 0.564 vs need 0.8772 FAIL; vs shuffled + 0.30 FAIL; vs 2x shuffled FAIL.
+  - **Life: PASS.** Learner 2,510 vs the lever twin 484 (ratio 5.19, bootstrap LB 4.87 > 1.0; need >= 1.3).
+  - The lever twin (`--no-nav`, input zeroed, (b')'s frontier schedule replayed to 24, 3e7 steps) lives 484, about
+    the old twin's 486. Its d = 12 2nd-half hungry reach is 0.0 (deaf, as it should be).
+  - Head on later hearings 0.918, first 0.140.
+  - So the learner survives far better than its deaf twin (5x), and it reads (0.92), but it reaches the named item
+    at d = 12 only 56% of the time: the diagonal lock.
+- **STATE (entry stamped Nov 16 20:49:13 EST):** the registered chain is complete; nothing runs except the guard. Waiting for Cam.
 - **RESULT (Nov 16 ~01:40): THE LABEL COUNT** (`docs/data/learner_w2/label_count/`; each row is 100 rollout
   iterations, 819k steps, with that checkpoint's weights, world state and frontier, no updates).
   - Definitions: MEMORY-ONLY bout = a later hearing (not the token's first in this life) at d >= 3. By construction
