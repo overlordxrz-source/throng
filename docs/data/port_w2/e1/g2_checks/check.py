@@ -2,7 +2,7 @@
 import json, sys
 sys.path.insert(0, "/private/tmp/claude-501/-Users-overlord-CascadeProjects-throng/aad77c1d-d7ac-437e-bef4-aa525802ccc0/scratchpad/m8wt/w2")
 import lr_anneal as LRA  # noqa: E402
-I = "/private/tmp/claude-501/-Users-overlord-CascadeProjects-throng/aad77c1d-d7ac-437e-bef4-aa525802ccc0/scratchpad/g2chk"
+I = "/private/tmp/claude-501/-Users-overlord-CascadeProjects-throng/aad77c1d-d7ac-437e-bef4-aa525802ccc0/scratchpad/g2chk2"  # rerun 2 (first run: g2chk)
 R = "/Users/overlord/CascadeProjects/throng/docs/data/port_w2"
 def lines(f, tag): return [json.loads(l[len(tag) + 1:]) for l in open(f) if l.startswith(tag + " ")]
 def curve(f): return [{k: v for k, v in c.items() if k != "sec"} for c in json.load(open(f))["curve"]]
@@ -13,7 +13,7 @@ rep("unit test", "ALL PASS" in open(f"{I}/unit.txt").read())
 rep("port flag-off == d1 port_m8_log16 (curve, PPO)", curve(f"{I}/p_off.json") == curve(f"{R}/d1/identity_check/port_m8_log16.json") and lines(f"{I}/p_off.log", "PPO") == lines(f"{R}/d1/identity_check/port_m8_log16.log", "PPO"))
 rep("port target-KL (sc = 1.0) == E1 check on (curve, PPO, TKL)", curve(f"{I}/p_tkl.json") == curve(f"{R}/e1/identity_check/on.json") and lines(f"{I}/p_tkl.log", "PPO") == lines(f"{R}/e1/identity_check/on.log", "PPO") and lines(f"{I}/p_tkl.log", "TKL") == lines(f"{R}/e1/identity_check/on.log", "TKL"))
 A = lines(f"{I}/p_anA.log", "TKL"); steps = [8192 * x["it"] for x in A]; t24 = next((x["t24"] for x in A if x["t24"] is not None), None)
-exp = [LRA.lr_at(s, (x["t24"] if x["t24"] is not None else None), 3e-4, 3e-5, 81920, 163840) for s, x in zip(steps, A)]
+exp = [LRA.lr_at(s, (x["t24"] if x["t24"] is not None else None), 3e-4, 3e-5, 81920, 81920) for s, x in zip(steps, A)]
 rep("port anneal: logged LR == schedule at every iteration", all(abs(x["lr"] - e) < 1e-12 for x, e in zip(A, exp)), f"t24 {t24}, lr first/last {A[0]['lr']:.2e}/{A[-1]['lr']:.2e}, n {len(A)}")
 rep("port anneal: LR actually moved and reached lr_end", A[0]["lr"] == 3e-4 and abs(A[-1]["lr"] - 3e-5) < 1e-12 and t24 is not None)
 Bl = lines(f"{I}/p_anB.log", "TKL"); nres = open(f"{I}/p_anB.log").read().count("LR_ANNEAL resume t24")

@@ -10366,6 +10366,29 @@ more expensive, because it produces publishable-looking nulls.
   - Next: the G2 + merged-learner run checks (`e1/g2_checks/`, running). If they pass, comm-toy is fast-forwarded to
     moves8-learner and seed 8 (`e1/run_e1l.sh`: relabel + no-nav + 8-way + target-KL, no anneal, Cam's head watch) goes
     to 1e8.
+- **CHECKS RUN 1 (entry stamped Nov 17 18:17:23 EST): G2 + merged-learner checks 12/14 (`e1/g2_checks/RESULT_run1.txt`). Two FAILs, one
+  real. Fixed; the rerun is in progress. Seed 8 is NOT launched until the rerun passes.**
+  - FAIL 1 (real; my design claim WITHDRAWN): "the scale is exactly 1.0 otherwise, so the target-KL-only path is
+    unchanged" is false at bit level. With the x1.0 scale inside the jitted update, XLA compiles a different graph:
+    - kl3 differed at 1e-9 at iteration 0;
+    - the 60-iteration run then diverged (item reach .599 vs .592).
+    - Fix: the target-KL-only path uses the ORIGINAL upd_kl; a separate upd_kl_sc is used only with --lr-anneal (both
+      port_w2 and rl2).
+    - Algorithmically the two are the same; the rule here is bitwise identity, so the fix is required.
+  - FAIL 2 (test design): the anneal check expected LR to reach lr_end within 60 iterations. t24 fired at 344,064, so the
+    anneal had not finished by the last iteration (LR 7.05e-5). The rerun uses len 81,920 for the port check.
+  - Passed in run 1:
+    - the unit test;
+    - port flag-off identity;
+    - logged LR == schedule at every iteration;
+    - chunked resume == continuous (2 resumes);
+    - resume from an old E1 5e7 checkpoint (t24 15,892,480 from its curve, LR 3e-4 at 5e7);
+    - rl2 flag-off and 8-way identity vs pre-merge;
+    - rl2 target-KL 1e9 == pre-merge;
+    - rl2 synthetic batch (0 steps);
+    - rl2 target-KL .015 cut .098 over 60 iterations;
+    - rl2 anneal + stop at start + len (614,400 as expected);
+    - traj ep 8-way eval == pre-merge.
 - **RESULT (Nov 16 ~01:40): THE LABEL COUNT** (`docs/data/learner_w2/label_count/`; each row is 100 rollout
   iterations, 819k steps, with that checkpoint's weights, world state and frontier, no updates).
   - Definitions: MEMORY-ONLY bout = a later hearing (not the token's first in this life) at d >= 3. By construction
