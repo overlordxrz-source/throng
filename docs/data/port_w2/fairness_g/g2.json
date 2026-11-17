@@ -1,0 +1,422 @@
+{
+ "TO4.0_ideal_d3": {
+  "reach": [
+   1,
+   1,
+   1,
+   1,
+   1,
+   1,
+   1,
+   1
+  ],
+  "steps": [
+   4,
+   5,
+   4,
+   5,
+   4,
+   5,
+   4,
+   5
+  ],
+  "manhattan": [
+   3,
+   4,
+   3,
+   4,
+   3,
+   4,
+   3,
+   4
+  ],
+  "steps_over_timeout_card": 0.333,
+  "steps_over_timeout_diag": 0.417,
+  "diag_over_card": 1.25
+ },
+ "TO4.0_ideal_d12": {
+  "reach": [
+   1,
+   1,
+   1,
+   1,
+   1,
+   1,
+   1,
+   1
+  ],
+  "steps": [
+   13,
+   17,
+   13,
+   17,
+   13,
+   17,
+   13,
+   17
+  ],
+  "manhattan": [
+   12,
+   16,
+   12,
+   16,
+   12,
+   16,
+   12,
+   16
+  ],
+  "steps_over_timeout_card": 0.271,
+  "steps_over_timeout_diag": 0.354,
+  "diag_over_card": 1.308
+ },
+ "TO4.0_ideal_d21": {
+  "reach": [
+   1,
+   1,
+   1,
+   1,
+   1,
+   1,
+   1,
+   1
+  ],
+  "steps": [
+   22,
+   31,
+   22,
+   31,
+   22,
+   31,
+   22,
+   31
+  ],
+  "manhattan": [
+   21,
+   30,
+   21,
+   30,
+   21,
+   30,
+   21,
+   30
+  ],
+  "steps_over_timeout_card": 0.262,
+  "steps_over_timeout_diag": 0.369,
+  "diag_over_card": 1.409
+ },
+ "TO4.0_sector_only_d3": {
+  "reach": [
+   1,
+   1,
+   1,
+   1,
+   1,
+   1,
+   1,
+   1
+  ],
+  "steps": [
+   4,
+   5,
+   4,
+   5,
+   4,
+   5,
+   4,
+   5
+  ],
+  "manhattan": [
+   3,
+   4,
+   3,
+   4,
+   3,
+   4,
+   3,
+   4
+  ],
+  "steps_over_timeout_card": 0.333,
+  "steps_over_timeout_diag": 0.417,
+  "diag_over_card": 1.25
+ },
+ "TO4.0_sector_only_d12": {
+  "reach": [
+   1,
+   1,
+   1,
+   1,
+   1,
+   1,
+   1,
+   1
+  ],
+  "steps": [
+   13,
+   17,
+   13,
+   17,
+   13,
+   17,
+   13,
+   17
+  ],
+  "manhattan": [
+   12,
+   16,
+   12,
+   16,
+   12,
+   16,
+   12,
+   16
+  ],
+  "steps_over_timeout_card": 0.271,
+  "steps_over_timeout_diag": 0.354,
+  "diag_over_card": 1.308
+ },
+ "TO4.0_sector_only_d21": {
+  "reach": [
+   1,
+   1,
+   1,
+   1,
+   1,
+   1,
+   1,
+   1
+  ],
+  "steps": [
+   22,
+   31,
+   22,
+   31,
+   22,
+   31,
+   22,
+   31
+  ],
+  "manhattan": [
+   21,
+   30,
+   21,
+   30,
+   21,
+   30,
+   21,
+   30
+  ],
+  "steps_over_timeout_card": 0.262,
+  "steps_over_timeout_diag": 0.369,
+  "diag_over_card": 1.409
+ },
+ "TO1.2_ideal_d3": {
+  "reach": [
+   1,
+   0,
+   1,
+   0,
+   1,
+   0,
+   1,
+   0
+  ],
+  "steps": [
+   4,
+   4,
+   4,
+   4,
+   4,
+   4,
+   4,
+   4
+  ],
+  "manhattan": [
+   3,
+   4,
+   3,
+   4,
+   3,
+   4,
+   3,
+   4
+  ],
+  "steps_over_timeout_card": 1.111,
+  "steps_over_timeout_diag": NaN,
+  "diag_over_card": NaN
+ },
+ "TO1.2_ideal_d12": {
+  "reach": [
+   1,
+   0,
+   1,
+   0,
+   1,
+   0,
+   1,
+   0
+  ],
+  "steps": [
+   13,
+   15,
+   13,
+   15,
+   13,
+   15,
+   13,
+   15
+  ],
+  "manhattan": [
+   12,
+   16,
+   12,
+   16,
+   12,
+   16,
+   12,
+   16
+  ],
+  "steps_over_timeout_card": 0.903,
+  "steps_over_timeout_diag": NaN,
+  "diag_over_card": NaN
+ },
+ "TO1.2_ideal_d21": {
+  "reach": [
+   1,
+   0,
+   1,
+   0,
+   1,
+   0,
+   1,
+   0
+  ],
+  "steps": [
+   22,
+   26,
+   22,
+   26,
+   22,
+   26,
+   22,
+   26
+  ],
+  "manhattan": [
+   21,
+   30,
+   21,
+   30,
+   21,
+   30,
+   21,
+   30
+  ],
+  "steps_over_timeout_card": 0.873,
+  "steps_over_timeout_diag": NaN,
+  "diag_over_card": NaN
+ },
+ "TO1.2_sector_only_d3": {
+  "reach": [
+   1,
+   0,
+   1,
+   0,
+   1,
+   0,
+   1,
+   0
+  ],
+  "steps": [
+   4,
+   4,
+   4,
+   4,
+   4,
+   4,
+   4,
+   4
+  ],
+  "manhattan": [
+   3,
+   4,
+   3,
+   4,
+   3,
+   4,
+   3,
+   4
+  ],
+  "steps_over_timeout_card": 1.111,
+  "steps_over_timeout_diag": NaN,
+  "diag_over_card": NaN
+ },
+ "TO1.2_sector_only_d12": {
+  "reach": [
+   1,
+   0,
+   1,
+   0,
+   1,
+   0,
+   1,
+   0
+  ],
+  "steps": [
+   13,
+   15,
+   13,
+   15,
+   13,
+   15,
+   13,
+   15
+  ],
+  "manhattan": [
+   12,
+   16,
+   12,
+   16,
+   12,
+   16,
+   12,
+   16
+  ],
+  "steps_over_timeout_card": 0.903,
+  "steps_over_timeout_diag": NaN,
+  "diag_over_card": NaN
+ },
+ "TO1.2_sector_only_d21": {
+  "reach": [
+   1,
+   0,
+   1,
+   0,
+   1,
+   0,
+   1,
+   0
+  ],
+  "steps": [
+   22,
+   26,
+   22,
+   26,
+   22,
+   26,
+   22,
+   26
+  ],
+  "manhattan": [
+   21,
+   30,
+   21,
+   30,
+   21,
+   30,
+   21,
+   30
+  ],
+  "steps_over_timeout_card": 0.873,
+  "steps_over_timeout_diag": NaN,
+  "diag_over_card": NaN
+ }
+}

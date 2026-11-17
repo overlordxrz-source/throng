@@ -1,0 +1,586 @@
+{
+ "/private/tmp/claude-501/-Users-overlord-CascadeProjects-throng/aad77c1d-d7ac-437e-bef4-aa525802ccc0/scratchpad/learner_rl2/s7_final_traj_d3_m0.npz": {
+  "by_sector": {
+   "0": {
+    "n": 615,
+    "acc": 0.95,
+    "conf": 0.963,
+    "conf_right": 0.991,
+    "conf_wrong": 0.422,
+    "wrong_to": [
+     0,
+     1,
+     1,
+     14,
+     2,
+     5,
+     2,
+     6
+    ]
+   },
+   "1": {
+    "n": 616,
+    "acc": 0.927,
+    "conf": 0.956,
+    "conf_right": 0.994,
+    "conf_wrong": 0.477,
+    "wrong_to": [
+     12,
+     0,
+     1,
+     17,
+     0,
+     7,
+     4,
+     4
+    ]
+   },
+   "2": {
+    "n": 614,
+    "acc": 0.945,
+    "conf": 0.957,
+    "conf_right": 0.983,
+    "conf_wrong": 0.508,
+    "wrong_to": [
+     5,
+     3,
+     0,
+     13,
+     1,
+     0,
+     0,
+     12
+    ]
+   },
+   "3": {
+    "n": 619,
+    "acc": 0.914,
+    "conf": 0.904,
+    "conf_right": 0.951,
+    "conf_wrong": 0.402,
+    "wrong_to": [
+     15,
+     0,
+     2,
+     0,
+     1,
+     14,
+     4,
+     17
+    ]
+   },
+   "4": {
+    "n": 655,
+    "acc": 0.957,
+    "conf": 0.971,
+    "conf_right": 0.993,
+    "conf_wrong": 0.487,
+    "wrong_to": [
+     4,
+     0,
+     2,
+     6,
+     0,
+     2,
+     0,
+     14
+    ]
+   },
+   "5": {
+    "n": 585,
+    "acc": 0.949,
+    "conf": 0.977,
+    "conf_right": 0.996,
+    "conf_wrong": 0.618,
+    "wrong_to": [
+     13,
+     3,
+     1,
+     10,
+     0,
+     0,
+     0,
+     3
+    ]
+   },
+   "6": {
+    "n": 628,
+    "acc": 0.914,
+    "conf": 0.947,
+    "conf_right": 0.993,
+    "conf_wrong": 0.459,
+    "wrong_to": [
+     10,
+     3,
+     1,
+     15,
+     0,
+     5,
+     0,
+     20
+    ]
+   },
+   "7": {
+    "n": 589,
+    "acc": 0.929,
+    "conf": 0.956,
+    "conf_right": 0.99,
+    "conf_wrong": 0.513,
+    "wrong_to": [
+     8,
+     1,
+     3,
+     18,
+     1,
+     10,
+     1,
+     0
+    ]
+   }
+  },
+  "summary": {
+   "acc_card": 0.942,
+   "acc_diag": 0.93,
+   "conf_card": 0.96,
+   "conf_diag": 0.948
+  }
+ },
+ "/private/tmp/claude-501/-Users-overlord-CascadeProjects-throng/aad77c1d-d7ac-437e-bef4-aa525802ccc0/scratchpad/learner_rl2/s7_final_traj_d12_m0.npz": {
+  "by_sector": {
+   "0": {
+    "n": 269,
+    "acc": 0.955,
+    "conf": 0.989,
+    "conf_right": 0.999,
+    "conf_wrong": 0.785,
+    "wrong_to": [
+     0,
+     7,
+     0,
+     0,
+     0,
+     0,
+     1,
+     4
+    ]
+   },
+   "1": {
+    "n": 221,
+    "acc": 0.9,
+    "conf": 0.961,
+    "conf_right": 0.985,
+    "conf_wrong": 0.746,
+    "wrong_to": [
+     11,
+     0,
+     6,
+     4,
+     0,
+     0,
+     0,
+     1
+    ]
+   },
+   "2": {
+    "n": 293,
+    "acc": 0.901,
+    "conf": 0.967,
+    "conf_right": 0.991,
+    "conf_wrong": 0.754,
+    "wrong_to": [
+     9,
+     2,
+     0,
+     11,
+     1,
+     1,
+     2,
+     3
+    ]
+   },
+   "3": {
+    "n": 232,
+    "acc": 0.927,
+    "conf": 0.97,
+    "conf_right": 0.989,
+    "conf_wrong": 0.735,
+    "wrong_to": [
+     4,
+     1,
+     4,
+     0,
+     1,
+     3,
+     1,
+     3
+    ]
+   },
+   "4": {
+    "n": 271,
+    "acc": 0.93,
+    "conf": 0.982,
+    "conf_right": 0.998,
+    "conf_wrong": 0.772,
+    "wrong_to": [
+     3,
+     0,
+     0,
+     9,
+     0,
+     5,
+     1,
+     1
+    ]
+   },
+   "5": {
+    "n": 252,
+    "acc": 0.952,
+    "conf": 0.986,
+    "conf_right": 0.997,
+    "conf_wrong": 0.778,
+    "wrong_to": [
+     3,
+     0,
+     0,
+     4,
+     0,
+     0,
+     2,
+     3
+    ]
+   },
+   "6": {
+    "n": 284,
+    "acc": 0.873,
+    "conf": 0.963,
+    "conf_right": 1.0,
+    "conf_wrong": 0.713,
+    "wrong_to": [
+     13,
+     2,
+     3,
+     4,
+     0,
+     5,
+     0,
+     9
+    ]
+   },
+   "7": {
+    "n": 263,
+    "acc": 0.913,
+    "conf": 0.972,
+    "conf_right": 0.998,
+    "conf_wrong": 0.699,
+    "wrong_to": [
+     7,
+     1,
+     5,
+     6,
+     0,
+     0,
+     4,
+     0
+    ]
+   }
+  },
+  "summary": {
+   "acc_card": 0.915,
+   "acc_diag": 0.923,
+   "conf_card": 0.975,
+   "conf_diag": 0.972
+  }
+ },
+ "/private/tmp/claude-501/-Users-overlord-CascadeProjects-throng/aad77c1d-d7ac-437e-bef4-aa525802ccc0/scratchpad/learner_rl2/s7_3e7_traj_d3_m0.npz": {
+  "by_sector": {
+   "0": {
+    "n": 472,
+    "acc": 0.966,
+    "conf": 0.955,
+    "conf_right": 0.97,
+    "conf_wrong": 0.53,
+    "wrong_to": [
+     0,
+     1,
+     2,
+     7,
+     0,
+     2,
+     1,
+     3
+    ]
+   },
+   "1": {
+    "n": 442,
+    "acc": 0.968,
+    "conf": 0.984,
+    "conf_right": 0.995,
+    "conf_wrong": 0.647,
+    "wrong_to": [
+     10,
+     0,
+     1,
+     3,
+     0,
+     0,
+     0,
+     0
+    ]
+   },
+   "2": {
+    "n": 440,
+    "acc": 0.939,
+    "conf": 0.968,
+    "conf_right": 0.981,
+    "conf_wrong": 0.765,
+    "wrong_to": [
+     21,
+     1,
+     0,
+     2,
+     0,
+     1,
+     1,
+     1
+    ]
+   },
+   "3": {
+    "n": 456,
+    "acc": 0.952,
+    "conf": 0.976,
+    "conf_right": 0.992,
+    "conf_wrong": 0.666,
+    "wrong_to": [
+     12,
+     3,
+     6,
+     0,
+     0,
+     0,
+     0,
+     1
+    ]
+   },
+   "4": {
+    "n": 494,
+    "acc": 0.933,
+    "conf": 0.958,
+    "conf_right": 0.986,
+    "conf_wrong": 0.572,
+    "wrong_to": [
+     16,
+     4,
+     1,
+     5,
+     0,
+     4,
+     3,
+     0
+    ]
+   },
+   "5": {
+    "n": 447,
+    "acc": 0.832,
+    "conf": 0.92,
+    "conf_right": 0.986,
+    "conf_wrong": 0.593,
+    "wrong_to": [
+     59,
+     0,
+     1,
+     9,
+     3,
+     0,
+     3,
+     0
+    ]
+   },
+   "6": {
+    "n": 438,
+    "acc": 0.932,
+    "conf": 0.963,
+    "conf_right": 0.982,
+    "conf_wrong": 0.703,
+    "wrong_to": [
+     23,
+     0,
+     1,
+     1,
+     0,
+     2,
+     0,
+     3
+    ]
+   },
+   "7": {
+    "n": 484,
+    "acc": 0.938,
+    "conf": 0.977,
+    "conf_right": 0.994,
+    "conf_wrong": 0.718,
+    "wrong_to": [
+     23,
+     7,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0
+    ]
+   }
+  },
+  "summary": {
+   "acc_card": 0.942,
+   "acc_diag": 0.922,
+   "conf_card": 0.961,
+   "conf_diag": 0.964
+  }
+ },
+ "/private/tmp/claude-501/-Users-overlord-CascadeProjects-throng/aad77c1d-d7ac-437e-bef4-aa525802ccc0/scratchpad/learner_rl2/s7_3e7_traj_d12_m0.npz": {
+  "by_sector": {
+   "0": {
+    "n": 352,
+    "acc": 0.949,
+    "conf": 0.976,
+    "conf_right": 0.991,
+    "conf_wrong": 0.7,
+    "wrong_to": [
+     0,
+     2,
+     2,
+     7,
+     5,
+     0,
+     0,
+     2
+    ]
+   },
+   "1": {
+    "n": 350,
+    "acc": 0.943,
+    "conf": 0.967,
+    "conf_right": 0.987,
+    "conf_wrong": 0.626,
+    "wrong_to": [
+     3,
+     0,
+     5,
+     10,
+     0,
+     0,
+     0,
+     2
+    ]
+   },
+   "2": {
+    "n": 348,
+    "acc": 0.957,
+    "conf": 0.985,
+    "conf_right": 0.993,
+    "conf_wrong": 0.807,
+    "wrong_to": [
+     6,
+     3,
+     0,
+     3,
+     1,
+     0,
+     0,
+     2
+    ]
+   },
+   "3": {
+    "n": 309,
+    "acc": 0.926,
+    "conf": 0.969,
+    "conf_right": 0.987,
+    "conf_wrong": 0.749,
+    "wrong_to": [
+     1,
+     0,
+     4,
+     0,
+     3,
+     8,
+     1,
+     6
+    ]
+   },
+   "4": {
+    "n": 381,
+    "acc": 0.911,
+    "conf": 0.981,
+    "conf_right": 0.998,
+    "conf_wrong": 0.805,
+    "wrong_to": [
+     2,
+     0,
+     3,
+     10,
+     0,
+     16,
+     1,
+     2
+    ]
+   },
+   "5": {
+    "n": 349,
+    "acc": 0.851,
+    "conf": 0.956,
+    "conf_right": 0.988,
+    "conf_wrong": 0.775,
+    "wrong_to": [
+     8,
+     3,
+     9,
+     18,
+     5,
+     0,
+     4,
+     5
+    ]
+   },
+   "6": {
+    "n": 343,
+    "acc": 0.918,
+    "conf": 0.969,
+    "conf_right": 0.996,
+    "conf_wrong": 0.671,
+    "wrong_to": [
+     3,
+     0,
+     1,
+     3,
+     1,
+     7,
+     0,
+     13
+    ]
+   },
+   "7": {
+    "n": 319,
+    "acc": 0.831,
+    "conf": 0.943,
+    "conf_right": 0.975,
+    "conf_wrong": 0.789,
+    "wrong_to": [
+     25,
+     8,
+     7,
+     2,
+     0,
+     4,
+     8,
+     0
+    ]
+   }
+  },
+  "summary": {
+   "acc_card": 0.934,
+   "acc_diag": 0.888,
+   "conf_card": 0.978,
+   "conf_diag": 0.959
+  }
+ }
+}

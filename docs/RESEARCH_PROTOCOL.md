@@ -9323,6 +9323,52 @@ more expensive, because it produces publishable-looking nulls.
       - KEEP = 0 sectors < .30, the diagonal mean at d = 12 >= .737, and min d = 3 >= .85;
       - anything else = PARTIAL, reported as such for Cam.
     - p(LOCK) .30, p(KEEP) .45, p(PARTIAL) .25. The same classes are reported at 5e7.
+- **RESULT (entry stamped Nov 17 02:31:30 EST): G1-G3** (`docs/data/port_w2/fairness_g/`: g2.py / g2.json, g3.py / g3.json).
+  - **G1** as registered (code facts), plus one fact added after registration:
+    - The in-bout position input is `clip(torus(start - pos) / 9, +-1)` per axis (`named_item.hear`).
+    - On a DIAGONAL both axes reach 9 at d = 13 (round(13 / sqrt2) = 9). Beyond that the input cannot tell an
+      x-heavy path from a y-heavy one; only adjacent visibility and the GRU's own count remain. On a CARDINAL only
+      the along-axis component saturates; the perpendicular one stays readable, so drift off the axis is always
+      visible.
+    - Seed 7 sat at frontier 21 from 49.2M: with d uniform on 1..21, 9 of the 21 values (13..21) are in the
+      saturated diagonal regime.
+    - The d = 3 / 12 tables never probe that regime: the d = 12 diagonal item is at (8, 8).
+    - This is code plus arithmetic, not a measured cause. Oracle (b') trained at frontier 24 from 12.4M and held
+      its diagonals at 3e7; the oracle continuation tests whether it does so late.
+  - **G2: all predictions hit.**
+    - Ideal and sector-only reach 1.000 in all 8 sectors at d = 3, 12 and 21.
+    - Steps, cardinal / diagonal: 4 / 5, 13 / 17, 22 / 31. Steps / timeout .333 / .417 (1.25x), .271 / .354
+      (1.31x), .262 / .369 (1.41x).
+    - Slack (timeout - shortest path), cardinal / diagonal: 8 / 7, 35 / 31, 62 / 53. The 4d timeout never binds
+      for a competent follower, which is evidence against L1.
+    - Positive control (timeout 1.2 d): every diagonal fails and every cardinal passes, at all three d. The tool sees
+      an unfair world.
+    - Honest limits:
+      - Under 4-way moves with a Euclidean d, the ratio tends to sqrt2 = 1.414, so Cam's 1.5x criterion cannot
+        fire in this geometry at any d; "not unfair by the criterion" is close to true by construction.
+      - Both followers are deterministic and know the exact ray. The sector-only follower is the code's own
+        ray-tracker, and its search branch never triggers because the item is placed exactly on the ray.
+      - So G2 cannot see what Cam actually suspects: noise in the two-action mix, and steering through a
+        saturated offset with adjacent-only visibility.
+    - Offered, NOT run: G2b. A noisy follower, and one that steers only through the clipped offset, by sector at
+      d = 3 / 12 / 21. Pure geometry, seconds. Predictions to be registered first if Cam wants it.
+  - **G3: both predictions hit.**
+    - Seed 7 at 1e8, later hearings: head accuracy >= .88 in every sector at d = 3 (min .914, sectors 3 and 6).
+    - Mean confidence: cardinals .960 vs diagonals .948, gap .012 < .05.
+    - The stronger point (not registered): from 3e7 to 1e8 at d = 12, diagonal head accuracy ROSE while reach fell:
+      - sector 5: head .851 -> .952, reach given right head .41 -> .00;
+      - sector 7: head .831 -> .913, reach given right head .30 -> .22.
+    - At d = 3 the right-head diagonals at 1e8 are .46 / .03 / .01 / .08 with head .93-.95 and confidence .90-.98.
+      So the read improved while reach collapsed: the lock is on the ACTION side, as the logit split showed.
+    - Observation, not registered: d = 12 sector 6 (a cardinal) has head .873.
+    - Timing: only the 3e7 and 1e8 checkpoints exist. At 3e7 the diagonals were already weaker at d = 12 (right-head
+      reach .59 / .45 / .41 / .30 vs cardinals .79-.86) and sectors 5, 7 at d = 3 (.64, .75). So the lock was
+      seeded by 3e7 and completed later.
+    - The training curve's overall hungry reach falls .79 -> .66 between the 45-50M and 50-55M windows, when the
+      frontier reached 21. That drop is confounded with the three new long distances (19-21) entering the mix, so
+      it does not time the lock.
+  - **The oracle continuation runs** (`oc/run_oc.sh`, detached, registered in `laptop_jobs.sh` QUEUES). It resumed
+    from the checkpoint copy at 29,982,720 steps (3 iterations before B's 3e7 end; within the registered <= 19).
 - **RESULT (Nov 16 ~01:40): THE LABEL COUNT** (`docs/data/learner_w2/label_count/`; each row is 100 rollout
   iterations, 819k steps, with that checkpoint's weights, world state and frontier, no updates).
   - Definitions: MEMORY-ONLY bout = a later hearing (not the token's first in this life) at d >= 3. By construction
