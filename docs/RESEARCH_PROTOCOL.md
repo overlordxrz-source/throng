@@ -9970,6 +9970,34 @@ more expensive, because it produces publishable-looking nulls.
     training rows are still identical to the 8-way control (3 / 3).
   - D1 was relaunched from scratch, unchanged otherwise. Evals beside D1 (C2, the fun pack) now run with XLA held to
     one thread. The fun pack is paused if D1 slows by > 20%.
+- **FUN PACK (Cam, message headed "~14:20Z Nov 17", time copied from that header; entry stamped Nov 17 09:31:13 EST): registration
+  of F2 / F3 before any run.** Eval only, lowest priority beside D1, run at macOS background QoS (`taskpolicy -c
+  background`); paused if D1 slows by > 20%. Files under `docs/fun/`. Tool: `scratchpad/fun/traj_fun.py`, a copy of
+  `learner_w2_rl_traj.py` with two flags:
+  - `--implant-rot R`: at every LATER, undemonstrated hearing, before that step's forward pass, rotate the stored
+    displacement of every record of the heard token by R degrees (R = 0 is the control: same path, no change).
+  - `--dump`: adds the GRU state, input, energy, parent position, head softmax and the top attended slot.
+  - **F2 false memory**, seed 7 at 3e7, d = 6 (long enough for a clear heading, short enough for many solved
+    records), conditions R = 0 / 90 / 180.
+    - Unit: hearings with at least one record of the heard token, >= 300 per condition. Implanted sector = true
+      sector + R / 45; the share of edited records that were solved is reported.
+    - Heading = sector of (position - start) at the first step with Chebyshev distance >= 3.
+    - Reported: heading to implanted / true / other, head argmax vs each, reach.
+    - Predictions: control head accuracy vs true >= .8 (p .7); at 90 deg the head points to the implanted sector
+      >= .5 (p .6); heading to the implanted sector >= .4 (p .5); reach drops by >= .3 vs control (p .6); 180 deg
+      behaves like 90 (heading to implanted >= .4, p .5).
+  - **F3 odometer probe.** Nets: oracle (b') at 1e8 (`oc_1e8.params`, clipped, 4-way) and learner seed 7 at 3e7.
+    - d = 21, 8 eval worlds, `--dump`.
+    - Steps: in-bout steps where the true displacement since the hearing exceeds 9 on an axis. Target = the
+      MAGNITUDE on that axis.
+    - Probe: ridge, fitted separately on each (axis, sign) subset, trained on worlds 0-5 and tested on worlds 6-7.
+      Held-out R^2, averaged with n weights. The sign alone is readable from the clipped input, so it is factored
+      out.
+    - Features: the GRU state after the step's input (h2_t) vs the displacement at t.
+    - Controls: the same inputs replayed through a random-init net of the same architecture; and the raw input x_t.
+    - Predictions: oracle R^2 >= .5 (p .55); learner s7 R^2 >= .5 (p .4); random-init R^2 < .2 (p .75); raw input
+      R^2 < .1 (p .85).
+  - F1 (video) has no prediction.
 - **RESULT (Nov 16 ~01:40): THE LABEL COUNT** (`docs/data/learner_w2/label_count/`; each row is 100 rollout
   iterations, 819k steps, with that checkpoint's weights, world state and frontier, no updates).
   - Definitions: MEMORY-ONLY bout = a later hearing (not the token's first in this life) at d >= 3. By construction
