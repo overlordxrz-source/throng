@@ -10085,6 +10085,42 @@ more expensive, because it produces publishable-looking nulls.
     - in-bout entropy .72 -> .47 -> .15.
     - As the in-bout policy becomes nearly deterministic, each update moves it more, at a constant LR of 3e-4.
   - Seed 1 is running. The outcome is decided after it; with s0 not qualifying it cannot be (a).
+- **RESULT (entry stamped Nov 17 10:29:03 EST): D1 OUTCOME = (c) by the registered rule: 2 d = 3 events (both in seed 1), no
+  dead sector; seed 0 does not qualify (frontier 17), seed 1 does. H-cost is NOT sufficient. STOPPED; waiting for
+  Cam.** Times copied from `d1/run_d1.out`: s1 frontier 10 at 1e7 10:10:05, 21 at 2e7 10:18:43, 24 at 3e7 10:27:21;
+  outcome 10:28:06. Files: `docs/data/port_w2/d1/` (incl. `d1s{0,1}_ppo.jsonl`).
+
+  | D1 s1 | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 |
+  |---|---|---|---|---|---|---|---|---|
+  | d = 3, 1e7 | .89 | .91 | .69 | .77 | .67 | .95 | .93 | .92 |
+  | d = 3, 2e7 | **.57** | .72 | .68 | .75 | .62 | **.61** | .64 | .70 |
+  | d = 3, 3e7 | .84 | .95 | .92 | .97 | .91 | .93 | .93 | .94 |
+  | d = 12, 3e7 | .50 | .89 | .75 | .94 | .82 | .95 | .94 | .88 |
+  | d = 21, 3e7 | .31 | .84 | .64 | .85 | .73 | .79 | .87 | .60 |
+
+  - Events (registered, d = 3): s1 sector 0, .89 -> .57, and sector 5, .95 -> .61, both 1e7 -> 2e7. Both recovered by
+    3e7. s0 had 0 d = 3 events (its d = 12 sector 7 drop is listed for information). The controls had 3 events in
+    2 seeds; D1 has 2.
+  - Kind of event: in s1 the 2e7 table is a BROAD dip (mean d = 3 .84 -> .66, every sector down) while the frontier
+    jumped 10 -> 21. The control s1 events (sectors 4 / 6) were also inside a broad dip while the frontier went
+    16 -> 23. The registered event rule does not separate broad dips from single-sector collapses; both arms are
+    counted the same way.
+  - Seed 1 qualifies at 3e7 (secondary: d = 3 .84-.97, min d = 12 .50 on sector 0), so with free moves seed 1
+    learned all eight sectors. Seed 0's curriculum (frontier 17) kept it from qualifying.
+  - PPO log, s1 per 1e7 window (median KL .009 -> .016 -> .020; max .064 / .058 / .062; clip fraction .11 -> .15 ->
+    .19; in-bout entropy .70 -> .51 -> .35). The event window (1e7 -> 2e7) has no larger KL maximum than the window
+    before it. "A spike > 2x the median within an event window" (p .35): **no** at window level. The KL maximum is
+    above 2x the median in EVERY window, events or not. Finer timing is not possible: the tables are 1e7 apart.
+  - Predictions: Cam (a) .35 / (b) .30 / (c) .35, mine .25 / .30 / .45. Outcome (c). s1 frontier 24 by 3e7 (p .6):
+    **hit**; s0 (p .6): **miss**.
+  - **Reading.**
+    - Making moves free removed the late single-sector lock seen in the 8-way controls (no dead sector, s0 sector 2's
+      learned stay did not recur).
+    - It did not remove the transient dips, and on seed 0 it slowed the curriculum (frontier 17).
+    - So the move cost plausibly contributes to a sector locking into stay, but a cheap stay is not needed for
+      dips to happen.
+    - Across D1 the policy's in-bout entropy falls steadily while the per-update KL and clip fraction rise at a
+      constant LR.
 - **RESULT (Nov 16 ~01:40): THE LABEL COUNT** (`docs/data/learner_w2/label_count/`; each row is 100 rollout
   iterations, 819k steps, with that checkpoint's weights, world state and frontier, no updates).
   - Definitions: MEMORY-ONLY bout = a later hearing (not the token's first in this life) at d >= 3. By construction
