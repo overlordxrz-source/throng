@@ -9726,6 +9726,50 @@ more expensive, because it produces publishable-looking nulls.
     - The slumped sectors 1 / 2 show the same pattern in a mild form: the side still pushes toward, but stay and eat
       take about half the mass.
   - A1 is clean, so Step B is **L2, 8-way movement**, as ruled.
+- **BUILD + REGISTRATION (entry stamped Nov 17 08:00:59 EST): L2, 8-way movement (`--moves8`), and Step B's oracle runs, before they
+  run.**
+  - Build (comm-toy, flag default off):
+    - `env.Cfg.moves8` + `env.MOVES8`: actions 6..9 = (+1, +1), (-1, +1), (-1, -1), (+1, -1), the diagonal steps
+      toward sectors 1 / 3 / 5 / 7. `env.step` charges `d_move` for any move, so a diagonal step costs exactly what
+      a cardinal step costs.
+    - `RecAgent(n_act=10)`: Dense_2 and side_head get 10 outputs; `--topo` refuses 8-way.
+    - The previous-action one-hot keeps its 6 columns in place; columns 6..9 are APPENDED at x[126:130], so the
+      oracle slot stays x[118:126].
+    - `port_w2.py` / `learner_w2_rl_traj.py --moves8` (rec learner, `--no-nav` only; asserted). Timeout, visibility,
+      the /9 offset, eat and placement are unchanged.
+  - Checks:
+    - Flag-off identity: `port_w2` (b') flags 3 / 3 curve rows identical to the earlier identity run
+      (`l4id/port_off.json`, itself identical to (b')'s); `learner_w2_rl_traj` on chain/B.params at d = 3, 27 / 27
+      keys identical.
+    - Flag-on acts: first curve row differs (hungry reach .623 vs .613); the trained net uses actions 6..9 (a 1.6e5
+      step net at d = 3: 31k / 15k / 23k / 14k of 384k actions); logits are (.., 10).
+    - `w2/test_moves8.py`, ALL PASS:
+      - env: actions 0..5 move as 4-way; 6..9 are the diagonals; per-step energy cardinal = diagonal (stay is
+        cheaper).
+      - The scripted sector + offset-only follower (no counter, the CLIPPED /9 input) with 8 moves reaches 8 / 8
+        sectors at every d = 3..24.
+      - Negative control: the same follower with 4 moves fails 40 (sector, d) cells, all diagonals at d >= 15.
+      - Mutant (action 9 = (+1, +1)) is caught: sector 7 fails.
+  - Geometry note (arithmetic): with 8 moves a diagonal item at d is m = round(d / sqrt2) steps away, a cardinal one
+    d steps. The follower used 3 / 9 / 16 actions on sector 7 vs 4 / 13 / 22 on sector 0 at d = 3 / 12 / 21. The
+    diagonals become the SHORTER paths. Also every sector now has exactly 3 moves within 45 deg of it (4-way:
+    diagonals 2, cardinals 1), against 1 stay and 1 eat.
+  - Run: `scratchpad/m8/run_m8.sh` (in `laptop_jobs.sh` QUEUES).
+    - Seeds 0 then 1, (b') flags + `--moves8`, legs of 1e7 (params + checkpoint copy every 1e7). d = 3 by-sector
+      tables at 1e7 / 2e7 are logged.
+    - At 3e7: the chain's evals (eval seed 0 for both), `decide.py`, d = 21 by sector.
+    - Both qualify -> the seed 0 reference (3e7 params, >= 2000 2nd-half bouts), then the lever twin (8-way,
+      `--no-nav`, seed 0's curve, 3e7) and its d = 12 eval. Otherwise STOP and report.
+    - The learner (seed 8, relabel + no-nav + 8-way, to 1e8) needs an 8-way build of the ep learner. It is built as
+      copies while the oracles run and queued only after its own checks pass.
+  - Predictions (each seed at 3e7):
+    - frontier 24: s0 .75, s1 .7;
+    - qualifies: s0 .55, s1 .5, both .35;
+    - >= 1 dead sector (< .30) in either seed: .4; sector 7 dead in seed 0: .15;
+    - d = 21 diagonal mean >= cardinal mean - .10: s0 .65; diagonal mean > cardinal mean at d = 21 (shorter paths):
+      .5 per seed.
+  - Report rule: report at each seed's 3e7 table and at a STOP. 1e7 / 2e7 tables are logged unless a sector drops
+    >= .3 between consecutive tables.
 - **RESULT (Nov 16 ~01:40): THE LABEL COUNT** (`docs/data/learner_w2/label_count/`; each row is 100 rollout
   iterations, 819k steps, with that checkpoint's weights, world state and frontier, no updates).
   - Definitions: MEMORY-ONLY bout = a later hearing (not the token's first in this life) at d >= 3. By construction
