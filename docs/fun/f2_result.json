@@ -1,0 +1,38 @@
+[
+ {
+  "R": 0,
+  "n": 907,
+  "heading_implanted": 0.609,
+  "heading_true": 0.609,
+  "heading_none": 0.092,
+  "head_vs_true": 0.903,
+  "head_vs_implanted": 0.903,
+  "reach": 0.709,
+  "edited_record_solved": 0.868,
+  "mean_records_edited": 1.0
+ },
+ {
+  "R": 90,
+  "n": 1310,
+  "heading_implanted": 0.611,
+  "heading_true": 0.012,
+  "heading_none": 0.094,
+  "head_vs_true": 0.016,
+  "head_vs_implanted": 0.915,
+  "reach": 0.004,
+  "edited_record_solved": 0.878,
+  "mean_records_edited": 1.0
+ },
+ {
+  "R": 180,
+  "n": 1187,
+  "heading_implanted": 0.618,
+  "heading_true": 0.009,
+  "heading_none": 0.067,
+  "head_vs_true": 0.009,
+  "head_vs_implanted": 0.907,
+  "reach": 0.002,
+  "edited_record_solved": 0.878,
+  "mean_records_edited": 1.0
+ }
+]

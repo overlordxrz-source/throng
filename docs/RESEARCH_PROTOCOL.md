@@ -10037,6 +10037,31 @@ more expensive, because it produces publishable-looking nulls.
     edited record set is exactly the record of the first, parent-led bout, edited once.
   - Bouts after it in that life are contaminated and are not used. The unit "hearings with >= 1 record" becomes
     "second hearings with >= 1 record". The predictions are unchanged.
+- **RESULT (entry stamped Nov 17 09:43:52 EST): FUN PACK** (`docs/fun/`, README there). Eval only, background QoS. D1's rows stayed
+  at ~7.9 s per 20 iterations while it ran (the control alone: ~8 s).
+  - Identity: the copy `traj_fun.py` with no new flag reproduces `learner_w2_rl_traj.py` (27 / 27 keys).
+  - **F1:** two clips. (1) Seed 7 at 3e7: first hearing with the parent, later hearing alone, guided by its own
+    record of that word. (2) Seed 7 at 1e8: a sector-3 bout where record and head say sector 3 with full
+    confidence and the young sits until timeout.
+  - **F2 false memory (causal):** at the second hearing, the head follows the implanted record (.92 / .91 at 90 /
+    180 deg vs .02 / .01 true). The heading follows it (.61 / .62, the same rate as the control's heading to the
+    true sector, .61). Reach .71 -> .00.
+    - Predictions: control head >= .8 (p .7) **hit** (.90); 90-deg head to implanted >= .5 (p .6) **hit**;
+      heading to implanted >= .4 (p .5) **hit**; reach drop >= .3 (p .6) **hit**; 180 like 90 (p .5) **hit**.
+    - The memory record is causal for both the head and the walk.
+  - **F3 odometer:** no net decodes distance past the clip (held-out R^2 <= .10 for every feature set).
+    - Predictions: oracle >= .5 (p .55) **miss**; learner >= .5 (p .4) **miss**; random-init < .2 (p .75) **hit**;
+      raw < .1 (p .85) **hit**.
+    - Disclosed changes after the first pass, which had broken numbers (R^2 down to -10514):
+      - the target is capped at |d| <= 30 (agents that time out wander past the torus wrap at 48);
+      - the ridge uses a std floor and alpha chosen by CV on the training worlds;
+      - added: a within-9 POSITIVE CONTROL (raw input R^2 1.00, so the probe works) and two post-hoc controls, raw
+        input without energy / age, and energy / age only.
+    - A reading I gave in chat after the first pass, "energy acts as a step counter", is WITHDRAWN: energy alone
+      decodes nothing (R^2 ~0).
+    - Also: the trained GRU state carries even the in-range offset poorly (R^2 .15-.28 vs .97 for a random GRU).
+      The policy reads the offset from the input directly, so there is no internal path-integration state to
+      extend past the clip.
 - **RESULT (Nov 16 ~01:40): THE LABEL COUNT** (`docs/data/learner_w2/label_count/`; each row is 100 rollout
   iterations, 819k steps, with that checkpoint's weights, world state and frontier, no updates).
   - Definitions: MEMORY-ONLY bout = a later hearing (not the token's first in this life) at d >= 3. By construction
