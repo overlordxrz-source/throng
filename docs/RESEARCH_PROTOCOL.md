@@ -9416,6 +9416,36 @@ more expensive, because it produces publishable-looking nulls.
   - Standing rule (checkpoints every 1e7) applied to the running oracle continuation: a light watcher
     (`oc/snap_oc.py`, in QUEUES) copies the atomic checkpoint at the first save >= each 1e7 from 5e7. 3e7 is
     chain/B.ckpt. 4e7 was missed: the watcher started at ~4.6e7.
+- **RESULT (entry stamped Nov 17 02:48:24 EST): G2b, OFFSET-CLIP BLINDNESS: every prediction hit; Cam's bar is met**
+  (`docs/data/port_w2/fairness_g/g2b.py`, `g2b.json`).
+  - Tool check: the numpy follower matched `NI.follower` on 4,000 random in-bout states (4000 / 4000), after one fix.
+    The first version computed in float64 and disagreed on 27 states. All 27 were exact diagonal ties, which the
+    JAX original breaks by float32 rounding. The fix computes in float32 with JAX's own u.
+  - Reach by sector (0..7), 200 bouts per cell; cardinals = 0, 2, 4, 6:
+
+    | arm | d = 3 | d = 9 | d = 13 | d = 17 | d = 21 |
+    |---|---|---|---|---|---|
+    | (a) offset-only (the agent's clipped input) | all 1.00 | all 1.00 | all 1.00 | card 1.00, diag 0.00 | card 1.00, diag 0.00 |
+    | (b) (a) + 10% random actions | all 1.00 | 0.99-1.00 | 0.99-1.00 | card 1.00, diag 0.00-0.01 | card 0.99-1.00, diag 0.00 |
+    | (c) CONTROL: unclipped | all 1.00 | all 1.00 | all 1.00 | all 1.00 | all 1.00 |
+    | (c') unclipped + 10% noise | all 1.00 | 0.99-1.00 | 0.99-1.00 | all 1.00 | 0.99-1.00 |
+    | (d) offset-only, random tie-break | all 1.00 | all 1.00 | all 1.00 | card 1.00, diag .78-.81 | card 1.00, diag .59-.64 |
+
+  - Scored: (a) hit exactly. (b) hit (d = 13 diagonals 1.00 against the predicted >= .5). (c) / (c') hit. (d) hit
+    (.79 in .5-.95; .62 in .3-.85).
+  - Reading:
+    - With the offset the agent actually has, a memoryless steerer reaches every cardinal at every d and every
+      diagonal up to d = 13 (the item at (9, 9) is where saturation starts).
+    - It loses ALL diagonals at d >= 17 when it resolves the blind tie systematically, and 20-40% when it resolves
+      it at random.
+    - The same steerer with the unclipped offset reaches everything, with or without noise. So the clip alone makes
+      long diagonal bouts unsolvable for a policy without a counter. Cam's bar is met: the hypothesis is CONFIRMED
+      at the input level.
+  - Limit: this shows the input cannot support blind diagonal steering. It does not show that seed 7's lock came
+    from it. A GRU can count, and the learner's diagonals also failed at d = 3 / 12, where the offset is
+    unsaturated; Cam's "spread down" step is the untested link. The oracle continuation and an L4 arm test that.
+  - The memory record stores the UNCLIPPED displacement (code fact, registered entry). The clip is only on the
+    in-bout offset input.
 - **RESULT (Nov 16 ~01:40): THE LABEL COUNT** (`docs/data/learner_w2/label_count/`; each row is 100 rollout
   iterations, 819k steps, with that checkpoint's weights, world state and frontier, no updates).
   - Definitions: MEMORY-ONLY bout = a later hearing (not the token's first in this life) at d >= 3. By construction
