@@ -9606,6 +9606,22 @@ more expensive, because it produces publishable-looking nulls.
       near-field resolution, and the slumps are at d = 3.
     - Neither is tested.
   - Nothing runs now except the guard. Waiting for Cam's ruling.
+- **CORRECTION AND ADDITIONS (entry stamped Nov 17 06:03:19 EST) to "L4 (i) at 1e8" above.**
+  - **Corrected (withdrawn wording):** "one cell from .111 to .042 of input range".
+    - In absolute input units one cell is .111 (clipped, /9) vs .042 (wide, /24): the 2.7x stands.
+    - The wide input spans +-2, not +-1. As a share of its range a cell is 1/18 vs 1/96, about 5x.
+    - The wide channel also feeds values up to 2 where the clipped one never exceeds 1. That is a second, untested,
+      possible cost.
+  - **Scored:** my added odds of .15 that (i) qualifies at 1e8: it did not.
+  - **Reworded:** "run-to-run fragility" is the wrong name for explanation (1).
+    - Sector 7 was dead in (a'), the weakest in O-X' (.49) and dead in L4 (i): 3 of 4 oracle arms. That is a
+      systematic +x -y deficit.
+    - Every oracle arm ran with `port_w2.py`'s default `--seed 0` (argparse default; no command passes one), and so
+      did every eval. The deficit may be tied to seed 0's init or world, or to a code-level asymmetry.
+    - A second-seed pair should be read for WHICH sector dies: sector 7 again on a new seed = structural (look for a
+      code asymmetry); a different sector = seed-tied.
+  - **Selection caveat:** the clipped (b') was continued BECAUSE it qualified at 3e7; L4 (i) is a fresh draw. That
+    biases "worse than clipped on every summary" against L4. A fresh pair removes it.
 - **RESULT (Nov 16 ~01:40): THE LABEL COUNT** (`docs/data/learner_w2/label_count/`; each row is 100 rollout
   iterations, 819k steps, with that checkpoint's weights, world state and frontier, no updates).
   - Definitions: MEMORY-ONLY bout = a later hearing (not the token's first in this life) at d >= 3. By construction
