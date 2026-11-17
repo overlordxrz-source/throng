@@ -10260,6 +10260,51 @@ more expensive, because it produces publishable-looking nulls.
     - later-hearing head d = 3 at 3e7 >= .50: p .80;
     - cut fraction over the run: 30-50%;
     - passes bar3 at 1e8: p .40.
+- **RESULT (entry stamped Nov 17 13:57:46 EST): E1 s0 at 1e8 does NOT qualify under the 3-table rule. The (a) branch STOPPED before
+  the reference: no reference, no twin, no learner. One late SECTOR EVENT: sector 2 at d = 3 went .89 -> .52 between 9e7
+  and 1e8 (mean d3 drop .03). The final-table d = 12 sector 2 is .275 < .30, so decide3 FAILs. Waiting for Cam.**
+  - Times copied from `e1/run_e1.out`: STOP 13:55:57.
+  - Files:
+    - `e1/` (verdicts 6e7-1e8, `e1s0_rule3.json`, `e1s0_1e8_events_v2.json`, `e1s0_ppo_tkl.jsonl`);
+    - `e1/diag_1e8/split.json`: the logit split of the 1e8 params. It is a light eval with nothing training; it reproduces
+      the table reach exactly.
+
+  | E1 s0 d = 3 | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | mean |
+  |---|---|---|---|---|---|---|---|---|---|
+  | 6e7 | .96 | .95 | .93 | .96 | .94 | .95 | .87 | .96 | .94 |
+  | 7e7 | .94 | .93 | .90 | .96 | .90 | .97 | .74 | .95 | .91 |
+  | 8e7 | .91 | .93 | .90 | .95 | .88 | .97 | .89 | .97 | .93 |
+  | 9e7 | .94 | .94 | .89 | .95 | .89 | .93 | .70 | .90 | .89 |
+  | 1e8 | .90 | .92 | **.52** | .92 | .91 | .90 | .89 | .95 | .86 |
+
+  - 3-table means 8e7-1e8:
+    - d3 .92 / .93 / .77 / .94 / .89 / .93 / .83 / .94;
+    - d12 .83 / .84 / .62 / .87 / .76 / .72 / .58 / .84;
+    - final dead [2] (d12) -> neither PASS nor SECONDARY.
+  - Across all ten tables (events_v2): 1 sector event (sector 2, 9e7 -> 1e8), 0 broad dips, 0 DEAD (d3).
+    - Sector 6 dipped below .75 at d = 3 three times (4e7 .61, 7e7 .74, 9e7 .70), each recovering.
+    - d = 12 dips: sector 5 .42 at 8e7; sector 6 .53-.62.
+  - What sector 2 is doing at 1e8 (logit split, hearing step, every bout):
+
+    | | p(toward) | p(stay) | p(eat) | p(other) | side D_stay |
+    |---|---|---|---|---|---|
+    | sector 2, d = 3 | .54 | .10 | .12 | ~.24 | -1.3 (side pushes AGAINST stay) |
+    | sector 2, d = 12 | .55 | .09 | .12 | ~.24 | |
+    | healthy sector 0 | .94 | .02 | .03 | | |
+
+    This is NOT the learned-stay lock of O8 s0 (there the side pushed stay, +1.53). It is a spread-out, uncertain policy
+    on one sector.
+  - PPO medians per 1e7:
+    - in-bout entropy .85 / 1.20 / 1.10 / .96 / 1.02 / .98 / .91 / .89 / .82 / .86: slow drift down late, no collapse;
+    - KL .014-.015;
+    - cut .45-.48 per leg.
+    - Leg 6 ran ~2x slower (machine load; noted).
+  - Reading:
+    - Target-KL removed the collapse-and-lock pattern within the registered 5e7 window.
+    - Over the longer horizon, seed 0 still shows recurrent single-sector wobbles (sector 6) and one late event (sector 2,
+      the same sector that was .22 at 1e7 here and locked in O8 s0).
+    - It is a softer failure than before (no stay lock, entropy kept), but it fails the measurement rule.
+  - Not done (needs Cam): any reference, the twin, the learner. Nothing is running but the guard.
 - **RESULT (Nov 16 ~01:40): THE LABEL COUNT** (`docs/data/learner_w2/label_count/`; each row is 100 rollout
   iterations, 819k steps, with that checkpoint's weights, world state and frontier, no updates).
   - Definitions: MEMORY-ONLY bout = a later hearing (not the token's first in this life) at d >= 3. By construction
