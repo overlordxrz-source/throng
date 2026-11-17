@@ -10242,6 +10242,24 @@ more expensive, because it produces publishable-looking nulls.
     - s0 sector 6 wobbled hard at 4e7 (d21 .01), uncounted by the registered rule but real; it recovered by 5e7.
     - The ~40-50% cut also lowers the effective number of updates. Part of the effect may be "fewer/smaller updates" in
       general rather than KL control specifically (an LR-anneal arm would separate them).
+- **RULING RECORDED + REGISTERED (entry stamped Nov 17 13:30:39 EST): Cam Nov 17 ~18:35Z. E1 (a) accepted; the trigger model is
+  SUPPORTED; target-KL .015 is STANDARD for every PPO run (oracle, twin, learner). KL-control-vs-smaller-updates is PARKED
+  (an LR-matched arm only if the mechanism claim is needed, or on a regression). Seed-8 watch registered before launch.**
+  - Seed 8 (`e1/run_e1l.sh`): relabel + --no-nav + 8-way + target-KL .015, to 1e8, launched after the twin and the merged
+    learner checks.
+  - Added watch: every 1e7 the script logs the target-KL cut fraction for that leg (TKL lines; a chunk restart replays
+    <= 20 iterations) and the later-hearing head accuracy at d = 3 / 12 / 21.
+    - The accuracy comes from `e1/head_later.py` on the traj npz files. Positive control: seed 7 3e7 d = 3 gives .933, the
+      same as rl2's head_acc_later. Negative control: a 163840-step 8-way net gives .123, near chance (1/8).
+  - At 3e7, if rl2's head_acc_later at d = 3 is < .50 (seed 7: .93), the script prints WATCH_REPORT and I report at once.
+    The recipe is NOT changed mid-run.
+  - Early stops (A: head < .25 at 3e7; B: frontier <= 6 at 5e7) and the bar3 verdict are unchanged.
+    - The bar compares against the E1 reference (`e1_ref_mean.json`) and the E1 twin (`tw_eval_d12.json`).
+  - Reports at 3e7, 5e7 and the 1e8 verdict.
+  - My prediction for seed 8, registered now:
+    - later-hearing head d = 3 at 3e7 >= .50: p .80;
+    - cut fraction over the run: 30-50%;
+    - passes bar3 at 1e8: p .40.
 - **RESULT (Nov 16 ~01:40): THE LABEL COUNT** (`docs/data/learner_w2/label_count/`; each row is 100 rollout
   iterations, 819k steps, with that checkpoint's weights, world state and frontier, no updates).
   - Definitions: MEMORY-ONLY bout = a later hearing (not the token's first in this life) at d >= 3. By construction
