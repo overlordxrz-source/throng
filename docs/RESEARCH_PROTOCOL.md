@@ -10062,6 +10062,29 @@ more expensive, because it produces publishable-looking nulls.
     - Also: the trained GRU state carries even the in-range offset poorly (R^2 .15-.28 vs .97 for a random GRU).
       The policy reads the offset from the input directly, so there is no internal path-integration state to
       extend past the clip.
+- **RESULT (entry stamped Nov 17 10:02:42 EST): D1 seed 0 (8-way + d_move 0) at 3e7: frontier only 17, so it cannot qualify
+  (decide.py needs >= 22). No d = 3 event.** Times copied from `d1/run_d1.out`: frontier 5 at 1e7 09:43:11, 12 at
+  2e7 09:52:38, 17 at 3e7 10:01:20.
+
+  | D1 s0 | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 |
+  |---|---|---|---|---|---|---|---|---|
+  | d = 3, 1e7 | .68 | .75 | .65 | .61 | .44 | .68 | .83 | .89 |
+  | d = 3, 2e7 | .92 | .81 | .75 | .79 | .74 | .85 | .79 | .91 |
+  | d = 3, 3e7 | .96 | .92 | .76 | .93 | .89 | .87 | .98 | .88 |
+  | d = 12, 2e7 | .72 | .66 | .79 | .75 | .68 | .74 | .78 | .87 |
+  | d = 12, 3e7 | .51 | .67 | .55 | .89 | .43 | .64 | .77 | **.50** |
+  | d = 21, 3e7 | .54 | .51 | .41 | .79 | .33 | .50 | .68 | .43 |
+
+  - Events on d = 3 (the registered count): 0. For information, on d = 12 sector 7 fell .87 -> .50 (2e7 -> 3e7), a
+    drop >= .3. That is outside the registered count, which follows the controls' d = 3 tables.
+  - The curriculum is much slower than the control (frontier 17 vs 24 at 3e7): d_move 0 halves the bouts that open.
+    "Frontier 24 by 3e7" for s0 (p .6): **miss**.
+  - PPO log (median / max per 1e7 window):
+    - approx KL .009 / .045 -> .015 / .050 -> .020 / .071;
+    - clip fraction .10 / .26 -> .15 / .43 -> .18 / .29;
+    - in-bout entropy .72 -> .47 -> .15.
+    - As the in-bout policy becomes nearly deterministic, each update moves it more, at a constant LR of 3e-4.
+  - Seed 1 is running. The outcome is decided after it; with s0 not qualifying it cannot be (a).
 - **RESULT (Nov 16 ~01:40): THE LABEL COUNT** (`docs/data/learner_w2/label_count/`; each row is 100 rollout
   iterations, 819k steps, with that checkpoint's weights, world state and frontier, no updates).
   - Definitions: MEMORY-ONLY bout = a later hearing (not the token's first in this life) at d >= 3. By construction
