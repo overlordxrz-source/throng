@@ -9548,6 +9548,26 @@ more expensive, because it produces publishable-looking nulls.
   - This is the baseline for (i)'s d = 21 table at 1e8. If (i)'s diagonals come within .10 of its cardinals, the cap
     costs the oracle reach in the saturated regime. That is a weaker claim than "the cap drives the late lock",
     which this pair can no longer test.
+- **RESULT (entry stamped Nov 17 05:03:50 EST): L4 (i) oracle + `--offset-wide` at 3e7: does NOT qualify; sector 7 DEAD**
+  (`docs/data/port_w2/l4/`; times copied from `queue_l4.out`: frontier 20 at 1e7 04:44:49, 24 at 2e7 04:53:04,
+  table 05:02:02).
+
+  | O4 3e7 | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 |
+  |---|---|---|---|---|---|---|---|---|
+  | d = 3 | .979 | .907 | .973 | .896 | .958 | .516 | .883 | **.003** |
+  | d = 12 | .879 | .780 | .860 | .699 | .841 | .489 | .832 | **.000** |
+  | d = 21 | .75 | .65 | .79 | .32 | .57 | .25 | .70 | **.00** |
+
+  - `decide.py`: PASS no, secondary no, QUALIFIES no (dead sector 7, +x -y).
+  - Predictions: frontier 24 by 2e7 (p .8) **hit**; 3e7 qualifies (p .7) **miss**.
+  - Extra, unregistered, eval only (d = 3 on the saved 1e7 / 2e7 params, `o4_1e7_2e7_d3_bysec_extra.txt`): sector 7
+    is .00 at 1e7 and .00 at 2e7. So it was **never learned**; this is not a late lock. Sector 5 (the other -y
+    diagonal): .65 -> .91 -> .52 at 1e7 / 2e7 / 3e7, a drop of .39 between the last two.
+  - Precedent: chain arm (a') (clipped) also had sector 7 dead and "never fully learned", and O-X' had sector 7 the
+    weakest (.49). (b') clipped happened to learn all eight. Every arm is one seed, so this table cannot separate
+    "L4 hurts sector 7" from the oracle's known run-to-run fragility on the +x -y diagonal.
+  - The sequence continues as registered: (i) trains to 1e8; (ii) and (iii) run only if 1e8 is not LOCK and
+    qualifies. My odds that it qualifies at 1e8: .15 (a sector at 0.00 for 3e7 steps rarely comes back).
 - **RESULT (Nov 16 ~01:40): THE LABEL COUNT** (`docs/data/learner_w2/label_count/`; each row is 100 rollout
   iterations, 819k steps, with that checkpoint's weights, world state and frontier, no updates).
   - Definitions: MEMORY-ONLY bout = a later hearing (not the token's first in this life) at d >= 3. By construction
