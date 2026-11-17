@@ -10172,6 +10172,13 @@ more expensive, because it produces publishable-looking nulls.
     - Wall time per leg within +10% of D1's.
     - If < 5% of steps are cut over 3e7-5e7, the target never bound, and E1 says little about the trigger whatever its
       outcome. I would flag that.
+- **RULING RECORDED (entry stamped Nov 17 11:50:54 EST): Cam Nov 17 ~16:55Z, E1 accepted with no changes.**
+  - Accepted: the re-score; the rule readings (the literal count with the strict count beside it; DEAD on d3); the
+    target-KL implementation and checks.
+  - The "< 5% cut over 3e7-5e7 = uninformative" flag is reported with the outcome.
+  - (a) branch: after the twin, I merge by hand. If the learner identity checks pass, I launch seed 8 (relabel + no-nav +
+    8-way + target-KL) to 1e8 without waiting, and report at 3e7 and 5e7.
+  - Reporting: E1 at each seed's 5e7 outcome. Other tables are logged only, unless a sector event or a dead sector appears.
 - **RESULT (Nov 16 ~01:40): THE LABEL COUNT** (`docs/data/learner_w2/label_count/`; each row is 100 rollout
   iterations, 819k steps, with that checkpoint's weights, world state and frontier, no updates).
   - Definitions: MEMORY-ONLY bout = a later hearing (not the token's first in this life) at d >= 3. By construction
