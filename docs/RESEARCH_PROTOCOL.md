@@ -10030,6 +10030,13 @@ more expensive, because it produces publishable-looking nulls.
   - Meal vs move: +.1 per item = 33 extra moves. Measured extra-move energy per hungry bout is .02-.07, so 20-70% of
     a meal goes to moving.
   - D1 runs on. A collapse at d_move = 0 would test the cost part directly.
+- **F2 ANALYSIS RESTRICTION (entry stamped Nov 17 09:38:51 EST), written before any F2 number was read.**
+  - `--implant-rot` edits the memory in place and the edit persists. A token's records are therefore rotated AGAIN
+    at each of its later hearings: 90 + 90 = 180, and 180 + 180 = 0.
+  - The analysis therefore uses only each token's SECOND hearing in a life (counted from the last death). There the
+    edited record set is exactly the record of the first, parent-led bout, edited once.
+  - Bouts after it in that life are contaminated and are not used. The unit "hearings with >= 1 record" becomes
+    "second hearings with >= 1 record". The predictions are unchanged.
 - **RESULT (Nov 16 ~01:40): THE LABEL COUNT** (`docs/data/learner_w2/label_count/`; each row is 100 rollout
   iterations, 819k steps, with that checkpoint's weights, world state and frontier, no updates).
   - Definitions: MEMORY-ONLY bout = a later hearing (not the token's first in this life) at d >= 3. By construction
