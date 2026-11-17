@@ -1,0 +1,5 @@
+E1 checks (scratchpad/e1id, 60 iterations each unless noted; reference d1/identity_check/port_m8_log16 = HEAD 97cb49a, same config)
+(1) flag off: curve rows identical except wall-clock 'sec'; frontier and gate scores identical; all 60 PPO lines identical. PASS
+(2) --target-kl 1e9 (upd_kl path, never stops): mb_done 32/32 in all 60; curve (non-time) and all 60 PPO lines bitwise identical. PASS (information)
+(3) synthetic high-KL batch (old log-probs - 1.0, target .015, 5 iterations): mb_done 0, kl_stop .718, dparam 0.0 in every iteration. PASS
+(4) real --target-kl .015: 0.994 of minibatch steps done (1 of 60 iterations stopped, at 20/32); frontier 3; 29.1 s vs 27.4 s flag off (+6%).

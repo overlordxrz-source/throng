@@ -1,0 +1,143 @@
+{
+ "cfg": {
+  "navs": "w2_out/nav_w13/*.msgpack",
+  "world": "0.0013,8,0.001",
+  "W": 32,
+  "N": 4,
+  "T": 64,
+  "d_move": null,
+  "ppo_log": true,
+  "target_kl": 0.015,
+  "tkl_synthetic_shift": 0.0,
+  "moves8": true,
+  "offset_wide": false,
+  "steps": 491520.0,
+  "oracle": true,
+  "seed": 0,
+  "epochs": 4,
+  "minibatches": 8,
+  "lr": 0.0003,
+  "d_max": 24,
+  "curve_every": 20,
+  "ckpt": "",
+  "max_seconds": 0,
+  "save_params": "",
+  "item_size": 0.1,
+  "hunger_gate": true,
+  "policy": "learner",
+  "v2": "/Users/overlord/throng-backup/evo2/evo2.ckpt",
+  "init_params": "",
+  "eval_only": false,
+  "frontier0": 1.0,
+  "frontier_schedule": "",
+  "gate": "honest",
+  "lookahead": 0.0,
+  "la_max": 12,
+  "giveup": 0.0,
+  "ent_bout": null,
+  "ent_anneal": 0.0,
+  "reinit_out": false,
+  "no_nav": true,
+  "topo": false,
+  "out": "/private/tmp/claude-501/-Users-overlord-CascadeProjects-throng/aad77c1d-d7ac-437e-bef4-aa525802ccc0/scratchpad/e1id/on.json"
+ },
+ "steps": 491520,
+ "frontier": 3.0,
+ "curve": [
+  {
+   "steps": 163840,
+   "frontier": 1.0,
+   "item_reach": 0.5921052631578947,
+   "food_per_step": 0.0034814486280083656,
+   "paid_per_step": 0.003387081902474165,
+   "frac_in_bout": 0.1728515625,
+   "hungry_reach": 0.5947136563876652,
+   "n_hungry": 454,
+   "n_hungry_lookahead": 0,
+   "gate_last": 0.501,
+   "sec": 11.9
+  },
+  {
+   "steps": 327680,
+   "frontier": 1.0,
+   "item_reach": 0.8670886075949367,
+   "food_per_step": 0.003443874418735504,
+   "paid_per_step": 0.0033998843282461166,
+   "frac_in_bout": 0.0977783203125,
+   "hungry_reach": 0.8726114649681529,
+   "n_hungry": 314,
+   "n_hungry_lookahead": 0,
+   "gate_last": 0.829,
+   "sec": 20.7
+  },
+  {
+   "steps": 491520,
+   "frontier": 3.0,
+   "item_reach": 0.6847826086956522,
+   "food_per_step": 0.003285531885921955,
+   "paid_per_step": 0.0032203306909650564,
+   "frac_in_bout": 0.2493896484375,
+   "hungry_reach": 0.6933701657458563,
+   "n_hungry": 362,
+   "n_hungry_lookahead": 0,
+   "gate_last": 0.7065,
+   "sec": 29.1
+  }
+ ],
+ "reach_by_start_energy": {
+  "E<0.6 d=1": {
+   "reach": 0.08320041000843048,
+   "bouts": 15673
+  },
+  "E<0.6 all": {
+   "reach": 0.08413476496934891,
+   "bouts": 15701
+  },
+  "0.6<=E<H d=1": {
+   "reach": 0.6332833766937256,
+   "bouts": 17354
+  },
+  "0.6<=E<H all": {
+   "reach": 0.6379737257957458,
+   "bouts": 21004
+  },
+  "H<=E<0.75 d=1": {
+   "reach": null,
+   "bouts": 0
+  },
+  "H<=E<0.75 all": {
+   "reach": null,
+   "bouts": 0
+  },
+  "E>=0.75 d=1": {
+   "reach": null,
+   "bouts": 0
+  },
+  "E>=0.75 all": {
+   "reach": null,
+   "bouts": 0
+  }
+ },
+ "gate_scores": [
+  0.02,
+  0.0305,
+  0.036,
+  0.038,
+  0.058,
+  0.08,
+  0.1155,
+  0.183,
+  0.276,
+  0.3825,
+  0.501,
+  0.624,
+  0.766,
+  0.829,
+  0.879,
+  0.8015,
+  0.8235,
+  0.7065
+ ],
+ "train_seconds": 29.1,
+ "throughput": 16892.99501733975
+}
