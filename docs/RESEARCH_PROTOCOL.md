@@ -9369,6 +9369,53 @@ more expensive, because it produces publishable-looking nulls.
       it does not time the lock.
   - **The oracle continuation runs** (`oc/run_oc.sh`, detached, registered in `laptop_jobs.sh` QUEUES). It resumed
     from the checkpoint copy at 29,982,720 steps (3 iterations before B's 3e7 end; within the registered <= 19).
+- **RULINGS (Cam, message headed "~07:45Z Nov 17", time copied from that header; entry stamped Nov 17 02:46:22 EST):**
+  - G1-G3 accepted. L1 DROPPED (the timeout never binds). The lock is action-side. The curve-peek disclosure is
+    accepted.
+  - NEW LEAD HYPOTHESIS, OFFSET-CLIP BLINDNESS:
+    - beyond d ~ 13 on a diagonal the agent cannot sense x-vs-y drift, so long diagonal bouts fail;
+    - those failures make "move" negative in diagonal contexts, and the stay lock spreads down to every diagonal
+      distance;
+    - the timing fits: seeded once the frontier passed ~13, completed at 21.
+  - G2b approved (below). The oracle continuation runs on as registered.
+  - L4 (not built): widen the offset sense (clip >= 32 per axis, or a non-saturating encoding). Also: report from
+    the code whether the memory RECORD stores the clipped displacement.
+  - STANDING: checkpoints every 1e7 in all runs from now on.
+- **REGISTRATION (entry stamped Nov 17 02:46:22 EST): G2b, before it is run.**
+  - Setup: pure geometry with the world's rules (G2). By sector, at d = 3, 9, 13, 17, 21; 200 bouts per cell.
+    The follower is the code's own `named_item.follower` rule, reimplemented in numpy for speed and cross-checked
+    against the original on random states before use:
+    - EAT on the item;
+    - step to the item when it is adjacent (8-neighbour, what the view shows);
+    - else the move maximising (offset + move) . u - 2 |(offset + move) x u|, where u is the sector direction.
+  - Arms:
+    - (a) OFFSET-ONLY: the offset the follower uses is the agent's input, `clip(off / 9, +-1) x 9` per axis. No
+      hidden counter. Ties are broken by the first move in action order, as `argmax` does.
+    - (b) (a) with 10% random actions (uniform over the 6 actions).
+    - (c) CONTROL: (a) with the unclipped offset. Also (c') = (c) + 10% noise, the matched control for (b).
+    - (d) EXTRA, not in Cam's list: (a) with random tie-breaking. On the diagonal ray +x and +y tie exactly. Once
+      the offset saturates, (a)'s first-in-order tie rule walks along one axis forever, so (a) fails by a
+      systematic drift. (d) shows how much of the failure is that rule, not the blindness itself.
+  - My reading before the run (from the arithmetic): the diagonal item at d = 13 is at (9, 9), exactly where
+    saturation starts, so d = 13 should still pass; d = 17 (12, 12) and d = 21 (15, 15) need steering blind.
+  - Predictions:
+    - (a): cardinals 1.0 at every d; diagonals 1.0 at d = 3, 9, 13 and 0.0 at d = 17, 21 (deterministic, so all
+      200 bouts per cell are identical). p .85.
+    - (b): cardinals >= .95 at every d; diagonals >= .85 at d <= 9, >= .5 at d = 13, <= .15 at d >= 17. p .65.
+    - (c): 1.0 everywhere (it must). (c'): >= .95 everywhere. p .9.
+    - (d): cardinals 1.0; diagonals 1.0 at d <= 13, .5-.95 at d = 17, .3-.85 at d = 21. p .6.
+  - Reading rule:
+    - Cam's bar: (a) and (b) pass the cardinals at every d and fail the diagonals at d >= 17 = the hypothesis is
+      confirmed for a memoryless offset-steerer.
+    - Limit: this shows the input CANNOT support blind diagonal steering without a counter. It does not show that
+      the network's lock comes from it; the oracle continuation and an L4 run would.
+    - If (d) recovers much of the diagonal reach, the blindness costs a memoryless policy only partially.
+  - Code answer (Cam item 5): the memory RECORD stores the UNCLIPPED displacement. `disp =
+    torus(s3.pos - start)` at the bout's close, written as disp / 24 (`learner_w2_rl2.py`; `mem_write` in
+    `named_item.py`). Only the in-bout offset INPUT is clipped at 9.
+  - Standing rule (checkpoints every 1e7) applied to the running oracle continuation: a light watcher
+    (`oc/snap_oc.py`, in QUEUES) copies the atomic checkpoint at the first save >= each 1e7 from 5e7. 3e7 is
+    chain/B.ckpt. 4e7 was missed: the watcher started at ~4.6e7.
 - **RESULT (Nov 16 ~01:40): THE LABEL COUNT** (`docs/data/learner_w2/label_count/`; each row is 100 rollout
   iterations, 819k steps, with that checkpoint's weights, world state and frontier, no updates).
   - Definitions: MEMORY-ONLY bout = a later hearing (not the token's first in this life) at d >= 3. By construction
