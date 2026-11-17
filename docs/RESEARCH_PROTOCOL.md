@@ -9622,6 +9622,110 @@ more expensive, because it produces publishable-looking nulls.
       code asymmetry); a different sector = seed-tied.
   - **Selection caveat:** the clipped (b') was continued BECAUSE it qualified at 3e7; L4 (i) is a fresh draw. That
     biases "worse than clipped on every summary" against L4. A fresh pair removes it.
+- **RULING (Cam, message headed "~13:00Z Nov 17", time copied from that header; entry stamped Nov 17 07:54:40 EST).**
+  - Recorded:
+    - Clipped (b') at 1e8: KEEP, PASS. The 5e7 PARTIAL was transient. The d = 21 baseline is .66 / .80.
+    - L4 (i) FAIL: sector 7 never learned; sectors 1 / 2 slumped 5e7 -> 1e8; the >= .3 alerts are recorded.
+    - The "LOCK -> L3" branch does NOT apply: it was written for a late lock, and this sector was never learned.
+    - Caveats (a) seed 0 systematic, (b) selection and (c) near-field resolution are accepted, and so is the
+      correction. The leg-2 slowness is noted, cause unknown.
+  - Reading: the clip hypothesis for the late lock is WEAKENED. **L4 DROPPED**; the /9 offset stays. **L4' parked.**
+  - STEP A (free, now):
+    - A1, a code audit for any sector asymmetry, +x -y especially: MOVES order and action indexing; argmax
+      tie-breaks; item placement rounding on each ray; torus wrap at the item cell; eat / visibility checks; sector
+      binning of the head label; the scripted parent's path rule. Show the sector-7 item cells at d = 3 / 12 / 21
+      next to sectors 1 / 3 / 5.
+    - A2, eval only: d = 3 by-sector tables on o4 6e7..9e7, and a logit split of sector 7 at 1e8.
+  - STEP B (laptop, under "keep going", p first):
+    - If A1 finds a defect: fix it, then clipped (b') fresh on seeds 0 AND 1 to 3e7, nothing else changed. Report.
+    - If A1 is clean: **L2, 8-WAY MOVEMENT**. Add 4 diagonal steps at a cardinal step's energy cost; timeout,
+      visibility, the /9 offset and everything else unchanged.
+      - Checks: flag-off identity; a scripted sector + offset-only follower (no counter) reaches 8/8 at d = 3..24.
+      - Then oracle (b') + 8-way on seeds 0 and 1, 3e7 each, by-sector tables at d = 3 / 12 / 21.
+      - If both qualify: reference from seed 0 (bar3, >= 2000 bouts), then the twin + learner seed 8 (relabel +
+        no-nav + 8-way) to 1e8, as previously queued. Otherwise report.
+    - Why 8-way: under 4-way moves a diagonal splits "toward" over two actions while "stay" is one action. That is
+      a structural stay advantage in exactly the sectors that keep dying. Diagonal steps also remove the cap
+      blindness on the ray.
+  - Modal nothing; guard $41; laptop on AC.
+- **REGISTRATION (entry stamped Nov 17 07:54:40 EST): Step A, before the A2 evals and before the A1 write-up.**
+  - Disclosure: while reading the ruling I had already re-read `named_item.py`, `port_w2.py`, `env.py` (MOVES, step,
+    observe) and `RecAgent` (`learnability.py`). In them I saw no sector-specific defect so far.
+    - In particular, the oracle one-hot is x[118:126] and sector 7 is x[125], the LAST column. RecAgent's side input
+      is x[100:] + x[98:100], so x[125] does reach the network; no off-by-one slice drops it.
+    - So the A1 odds below are partly informed.
+  - A1: P(a defect that makes some sector structurally harder for the network) .12; P(one that singles out sector
+    7) .06.
+  - A2:
+    - sector 7 < .05 at d = 3 at every one of 6e7..9e7 (p .95);
+    - the sector 1 / 2 slump is GRADUAL, i.e. no single 1e7 interval has a drop >= .2 in sector 1 or 2 at d = 3
+      (p .45);
+    - logit split, sector 7 at 1e8, d = 3, hearing step: p(toward) < .2 (p .8); p(eat) > p(stay) (p .55, from the
+      (a') precedent of .41 eat vs .27 stay).
+- **RESULT (entry stamped Nov 17 07:56:30 EST): Step A.** A1 is CLEAN: no sector asymmetry in the code. A2: sector 7 has an ACTIVE
+  learned stay; the oracle policy is volatile per sector. Files: `docs/data/port_w2/stepA/` (`a1_audit.py` /
+  `.json`, `bysec_6to9.txt`, `o4_1e8_logit_split.json`).
+  - **A1**, tested numerically with the code's own functions (`a1_audit.py`; FAILS = []):
+    - Placement: a helper matching `NI.place` (4000 / 4000 draws) puts every sector's item at d = 1..24 exactly
+      symmetric. Cardinals (+-d, 0) / (0, +-d); diagonals (+-m, +-m) with m = round(d / sqrt2). No d / sqrt2 lies
+      within 1e-3 of a half, so half-to-even rounding never acts.
+
+      | sector | d = 3 | d = 12 | d = 21 |
+      |---|---|---|---|
+      | 1 (+x +y) | (2, 2) | (8, 8) | (15, 15) |
+      | 3 (-x +y) | (-2, 2) | (-8, 8) | (-15, 15) |
+      | 5 (-x -y) | (-2, -2) | (-8, -8) | (-15, -15) |
+      | **7 (+x -y)** | **(2, -2)** | **(8, -8)** | **(15, -15)** |
+
+    - Torus wrap: starts at all four corners, two edges and the centre give the same offsets for every sector.
+    - MOVES = stay, -x, +x, +y, -y, eat. Every diagonal has exactly 2 toward moves (sector 7: +x, -y); every
+      cardinal has 1. Stay and eat do not move (checked through `env.step`).
+    - Eat: item open AND position == item cell AND action == EAT, evaluated before the step. No sector term.
+    - Visibility: with the agent at each of the 49 offsets around the item, for every sector at d = 3 / 12 / 21, the
+      mark is in the right window cell exactly when Chebyshev <= 1, and nowhere else.
+    - Sector binning: `learnability.sector`, `relabel.sector_of` (with the record's /24 round trip) and
+      `traj_analysis.sector_of` all return k on every placed item. Over a 49 x 49 box the cells per sector are
+      248 / 352 alternating (cardinal / diagonal), identical across the four of each kind.
+    - Tie-breaks:
+      - The policy samples (categorical); argmax is used only under `--greedy-bout`, which no eval here passes.
+      - The scripted parent (`step_toward`) breaks |dx| = |dy| ties x-first, so every diagonal alternates x, y.
+        Sector 7's path is +x, -y, ...; all four diagonals take 16 moves at d = 12.
+    - The oracle one-hot is x[118:126]; sector 7 = x[125] reaches RecAgent's side input (x[100:]).
+    - Sector draw: `randint(0, 8)`, counts 459-536 in 4000.
+    - Prediction P(defect) .12: none found, as expected.
+  - **A2 (1), d = 3 by sector on o4 6e7..9e7** (with 3e7 / 5e7 / 1e8 from the run):
+
+    | o4 | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 |
+    |---|---|---|---|---|---|---|---|---|
+    | 5e7 | .93 | .81 | .93 | .92 | .94 | .93 | .95 | .01 |
+    | 6e7 | .97 | .92 | .93 | .92 | .97 | **.23** | .97 | .01 |
+    | 7e7 | .99 | .94 | .97 | .95 | .95 | .81 | .98 | .00 |
+    | 8e7 | .96 | .88 | .92 | .95 | .97 | .95 | .93 | .00 |
+    | 9e7 | .99 | .96 | .97 | .97 | .98 | .97 | .97 | .00 |
+    | 1e8 | .99 | **.59** | **.59** | .92 | .98 | .95 | .97 | .00 |
+
+    - Sector 7 < .05 throughout (p .95): **hit**.
+    - The sector 1 / 2 slump is ABRUPT and late: .96 / .97 at 9e7 -> .59 / .59 at 1e8. "Gradual" (p .45): **miss**.
+    - New: sector 5 collapsed to .23 at 6e7 and recovered by 8e7. The policy loses and regains whole sectors
+      within 1e7. Any single table, including the 1e8 verdicts of every arm so far, is a snapshot of a volatile
+      policy.
+  - **A2 (2), logit split at 1e8, d = 3, hearing step** (D = logit minus the best toward move; trunk + side):
+
+    | sector | reach | D_stay (trunk + side) | D_eat | p(stay) | p(eat) | p(toward) |
+    |---|---|---|---|---|---|---|
+    | **7** | .00 | **+4.18** (-.02 + 4.20) | +2.55 | **.62** | .28 | .08 |
+    | 1 | .59 | -2.11 (+.09 - 2.20) | -1.12 | .18 | .28 | .49 |
+    | 2 | .59 | -.86 (+.72 - 1.59) | -.19 | .26 | .38 | .32 |
+    | 5 | .95 | -4.55 | -6.43 | .05 | .03 | .91 |
+    | 0 | .99 | -6.02 | -8.16 | .01 | .01 | .97 |
+
+    - p(toward) < .2 for sector 7 (p .8): **hit**. p(eat) > p(stay) (p .55): **miss** (.28 vs .62).
+    - Sector 7's stay is ACTIVE and comes from the side path (the GRU, which sees the oracle sector): +4.2. The
+      trunk is neutral (-.02). This is unlike (a''s) sector 7, where the side pushed toward too weakly. Here the
+      network has learned "stay" for that sector.
+    - The slumped sectors 1 / 2 show the same pattern in a mild form: the side still pushes toward, but stay and eat
+      take about half the mass.
+  - A1 is clean, so Step B is **L2, 8-way movement**, as ruled.
 - **RESULT (Nov 16 ~01:40): THE LABEL COUNT** (`docs/data/learner_w2/label_count/`; each row is 100 rollout
   iterations, 819k steps, with that checkpoint's weights, world state and frontier, no updates).
   - Definitions: MEMORY-ONLY bout = a later hearing (not the token's first in this life) at d >= 3. By construction
