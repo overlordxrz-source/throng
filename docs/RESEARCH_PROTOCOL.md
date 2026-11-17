@@ -9540,6 +9540,14 @@ more expensive, because it produces publishable-looking nulls.
     no baseline.
   - Prediction: diagonal mean reach at d = 21 below the cardinal mean by >= .10 (p .5).
   - Meaning: a gap >= .10 here plus L4 within .10 = the cap matters in the saturated regime, for the oracle.
+- **RESULT (entry stamped Nov 17 04:38:08 EST): clipped oracle at 1e8, d = 21 by sector** (`oc_clipped/oc_1e8_d21_bysec.txt`).
+  - Reach by sector: .78 / .72 / .84 / .63 / .87 / .58 / .71 / .72 (n 217-274 per sector).
+  - Cardinal mean .80; diagonal mean .66. The gap is .14 (>= .10): **the prediction hit (p .5).**
+  - The network is far above the offset-only follower's 0.00 on the diagonals at d = 21. It compensates partly, but
+    it pays about .14 on the diagonals in the saturated regime, which the d = 3 / 12 tables cannot see.
+  - This is the baseline for (i)'s d = 21 table at 1e8. If (i)'s diagonals come within .10 of its cardinals, the cap
+    costs the oracle reach in the saturated regime. That is a weaker claim than "the cap drives the late lock",
+    which this pair can no longer test.
 - **RESULT (Nov 16 ~01:40): THE LABEL COUNT** (`docs/data/learner_w2/label_count/`; each row is 100 rollout
   iterations, 819k steps, with that checkpoint's weights, world state and frontier, no updates).
   - Definitions: MEMORY-ONLY bout = a later hearing (not the token's first in this life) at d >= 3. By construction
