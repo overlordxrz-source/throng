@@ -9513,6 +9513,33 @@ more expensive, because it produces publishable-looking nulls.
     evidence that the cap drives the late diagonal lock.
   - Report at (i)'s 3e7 and 1e8 tables and at seed 8's 3e7 and 5e7 pauses. Other 1e7 tables are logged only, unless
     a sector drops >= .3 between two consecutive tables.
+- **RESULT (entry stamped Nov 17 04:37:21 EST): clipped oracle continuation at 1e8** (`docs/data/port_w2/oc_clipped/`; times copied
+  from `run_oc.out` and `queue_l4.out`: leg 2 started 02:52:38, trained 04:34:29, table and OC_DONE 04:35:05; the L4
+  copies were folded in and (i) started 04:35:57).
+  - d = 3: .983 / .895 / .981 / .969 / .988 / .878 / .964 / .979.
+  - d = 12: .913 / .820 / .889 / .823 / .924 / .753 / .797 / .859.
+  - `decide.py`: **PASS** (min d = 12 .753), and so also secondary and qualifies.
+  - Registered class at 1e8 vs the 3e7 base: **KEEP** (p .45, hit). 0 dead; diagonal mean at d = 12 .814 (base .837,
+    down .023); min d = 3 .878.
+  - The 5e7 PARTIAL was a transient dip. Sector 1 recovered (d = 3 .767 -> .895, d = 12 .589 -> .820), and no
+    sector dropped >= .3 between consecutive tables.
+  - Checkpoints every 1e7 kept from 5e7 (`oc_ckpt_{5..10}e7.ckpt`, scratch; 4e7 missed, disclosed earlier).
+  - ETA miss: leg 2 took 102 min for 5e7 steps, not the ~33 min registered. On AC power throughout. The cause is not
+    known. (i)'s ETA is likely too short by the same factor.
+  - **Reading under Cam's rule.** The clipped run is KEEP, so the pair (clipped, L4) cannot give the registered
+    causal evidence that the cap drives the late diagonal lock, whatever L4 shows.
+  - What is shown: with the same flags, the clipped oracle does NOT late-lock its diagonals at d = 3 or 12 between
+    3e7 and 1e8.
+  - What is not shown: anything about the saturated regime. The d = 3 / 12 tables never probe it (diagonal
+    saturation starts at d = 13). So the cap's effect on the oracle at d >= 13 is still unmeasured.
+  - Seed 7's late lock (a learner) is not explained by this run. The cap remains a candidate there only through its
+    frontier-21 training mix (9 of 21 d values saturated on the diagonals).
+- **REGISTRATION (entry stamped Nov 17 04:37:21 EST): clipped oracle at 1e8, d = 21 by sector** (eval only on `oc_1e8.params`, the
+  chain's flags without `--offset-wide`, `oscreen/bysec_o.py`; light, beside (i)).
+  - Why: (i) reports d = 21 by sector at 1e8 with the wide input. Without a clipped d = 21 table, that number has
+    no baseline.
+  - Prediction: diagonal mean reach at d = 21 below the cardinal mean by >= .10 (p .5).
+  - Meaning: a gap >= .10 here plus L4 within .10 = the cap matters in the saturated regime, for the oracle.
 - **RESULT (Nov 16 ~01:40): THE LABEL COUNT** (`docs/data/learner_w2/label_count/`; each row is 100 rollout
   iterations, 819k steps, with that checkpoint's weights, world state and frontier, no updates).
   - Definitions: MEMORY-ONLY bout = a later hearing (not the token's first in this life) at d >= 3. By construction
