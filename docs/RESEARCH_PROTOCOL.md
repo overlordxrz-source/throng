@@ -9770,6 +9770,31 @@ more expensive, because it produces publishable-looking nulls.
       .5 per seed.
   - Report rule: report at each seed's 3e7 table and at a STOP. 1e7 / 2e7 tables are logged unless a sector drops
     >= .3 between consecutive tables.
+- **BUILD + REGISTRATION (entry stamped Nov 17 08:06:28 EST): the 8-way ep learner (seed 8), before it runs.**
+  - Build: comm-toy branch `moves8-learner`, in a separate worktree so that no file the running oracle jobs re-read
+    was touched.
+    - `EpAgent` / `EpAgentDev` take `n_act` (Dense_2, side_head).
+    - `learner_w2_rl2.py --moves8`: Cfg, Dx + 4, appended prev-action columns; learner policy with `--no-nav` only.
+    - `learner_w2_rl_traj.py`: the ep path accepts `--moves8`.
+    - The scripted parent stays 4-way ("everything else unchanged").
+  - Checks (`docs/data/port_w2/m8/learner_identity/`):
+    - flag-off `learner_w2_rl2` (seed 7 recipe, 3 rows): 3 / 3 identical to `l4id/rl2_off.json`;
+    - flag-off ep traj eval on seed 7's params at d = 3: 27 / 27 keys identical between the old and new code;
+    - flag-on (seed 8, 1 row) acts: actions 6..9 are used (28k / 29k / 28k / 24k of 384k);
+    - the traj evaluator and rl2's own evaluator agree on the flag-on net's d = 3 reach (.181 / .181).
+  - Queue: `scratchpad/m8/queue_m8l.sh` (in QUEUES).
+    - It waits for `run_m8.sh`. Only if both oracles qualify and the twin is done does it fast-forward merge the
+      branch into comm-toy (nothing running) and run `run_m8l.sh`.
+    - `run_m8l.sh` is the L4 (iii) script with `--offset-wide` -> `--moves8`, the reference `o8_ref_d12_long.json`
+      and the twin `tw8_eval_d12.json`. Pauses at every 1e7 with d = 3 / 12 / 21 tables; early stops A (3e7) and
+      B (5e7) as before.
+  - Predictions (seed 8 + 8-way, if it runs):
+    - no early stop A (p .8); head on later hearings at d = 3 >= .5 at 3e7 (p .7); no early stop B (p .85);
+    - frontier >= 22 at 1e8 (p .45);
+    - every diagonal later-right reach at d = 3 >= .30 at 1e8 (p .55); every sector, diagonal or cardinal, >= .30
+      (p .4);
+    - bar reach PASS (p .2); life PASS (p .85).
+  - Reports: at the 3e7 and 5e7 pauses, and at any >= .3 drop between consecutive tables.
 - **RESULT (Nov 16 ~01:40): THE LABEL COUNT** (`docs/data/learner_w2/label_count/`; each row is 100 rollout
   iterations, 819k steps, with that checkpoint's weights, world state and frontier, no updates).
   - Definitions: MEMORY-ONLY bout = a later hearing (not the token's first in this life) at d >= 3. By construction
