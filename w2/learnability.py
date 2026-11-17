@@ -66,17 +66,19 @@ class RecAgent(nn.Module):
     bound: float = 0.0          # > 0: the side head's logit contribution is bound * tanh(raw / bound)
     topo: bool = False          # Cam Nov 16 ~17:25Z O-T: move logits += g * P @ s (s = x[topo_at: topo_at + 8]); g learned, init 0
     topo_at: int = 118          # the oracle one-hot's slot in the harness layout (100 view + 11 heard + 6 act + 1 reward)
+    n_act: int = 6              # Cam Nov 17 L2: 10 with 8-way movement (actions 6..9 = diagonal steps)
 
     @nn.compact
     def __call__(self, h, x):
         obs, side = x[..., :100], jnp.concatenate([x[..., 100:], x[..., 98:100]], -1)   # heard (+ speaker offset), prev act / reward, own energy + age
         t = nn.tanh(nn.Dense(128, name="Dense_0")(obs)); t = nn.tanh(nn.Dense(128, name="Dense_1")(t))
-        lg_nav = nn.Dense(6, name="Dense_2")(t); v_nav = nn.Dense(1, name="Dense_3")(t)[..., 0]
+        lg_nav = nn.Dense(self.n_act, name="Dense_2")(t); v_nav = nn.Dense(1, name="Dense_3")(t)[..., 0]
         z = nn.tanh(nn.Dense(64, name="side_enc")(jnp.concatenate([side, t], -1)))
         h, y = nn.GRUCell(self.hd, name="gru")(h, z)
         zi = nn.initializers.zeros
-        sh = nn.Dense(6, name="side_head", kernel_init=zi, bias_init=zi)(y)
+        sh = nn.Dense(self.n_act, name="side_head", kernel_init=zi, bias_init=zi)(y)
         lg = lg_nav + (self.bound * jnp.tanh(sh / self.bound) if self.bound > 0 else sh)
+        assert not (self.topo and self.n_act != 6), "--topo is 4-way only"
         if self.topo:                                                       # the TOPOGRAPHIC TIE (off: no parameter, no change)
             g = self.param("topo_g", nn.initializers.zeros, ())
             lg = lg + g * jnp.concatenate([jnp.zeros(x.shape[:-1] + (1,)), x[..., self.topo_at: self.topo_at + 8] @ TOPO_P.T, jnp.zeros(x.shape[:-1] + (1,))], -1)

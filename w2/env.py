@@ -13,6 +13,8 @@ import jax
 import jax.numpy as jnp
 
 MOVES = jnp.array([[0, 0], [-1, 0], [1, 0], [0, 1], [0, -1], [0, 0]], jnp.int32)
+# Cam Nov 17 ~13:00Z L2 (8-WAY MOVEMENT, Cfg.moves8): actions 6..9 = the diagonal steps toward sectors 1, 3, 5, 7
+MOVES8 = jnp.concatenate([MOVES, jnp.array([[1, 1], [-1, 1], [-1, -1], [1, -1]], jnp.int32)], 0)
 EAT = 5
 
 
@@ -42,6 +44,7 @@ class Cfg(NamedTuple):
     inclusive: bool = False      # inclusive-fitness reward: + mean over living kin of relatedness x their drive reduction
     juvenile: int = 0            # Cam Nov 10: for the first J steps of life a newborn is topped up to E0 by its living parent
     relocate: float = 0.0        # per-step probability that each food patch jumps to a random location
+    moves8: bool = False         # Cam Nov 17 L2: actions 6..9 are diagonal steps (MOVES8), same energy cost as a cardinal step
 
 
 class State(NamedTuple):
@@ -109,7 +112,7 @@ def drive(cfg: Cfg, E):
 def step(cfg: Cfg, s: State, act, key):
     """returns (state', reward (N,), info)"""
     alive = s.alive
-    mv = MOVES[act] * alive[:, None]
+    mv = (MOVES8 if cfg.moves8 else MOVES)[act] * alive[:, None]
     pos = (s.pos + mv) % cfg.L
     moved = jnp.any(mv != 0, 1)
     eat = (act == EAT) & alive

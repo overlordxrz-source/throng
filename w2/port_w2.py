@@ -36,6 +36,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--navs", default="w2_out/nav_w13/*.msgpack"); ap.add_argument("--world", default="0.0013,8,0.001")
     ap.add_argument("--W", type=int, default=16); ap.add_argument("--N", type=int, default=4); ap.add_argument("--T", type=int, default=64)
+    ap.add_argument("--moves8", action="store_true", help="Cam Nov 17 ~13:00Z L2: 8-way movement (actions 6..9 = diagonal steps, a cardinal step's energy cost); prev-action one-hot columns 6..9 appended at x[126:130]")
     ap.add_argument("--offset-wide", action="store_true", help="Cam Nov 17 L4: in-bout offset input clip(off, +-48) / 24 (w2/offset_wide.py) instead of clip(off / 9, +-1)")
     ap.add_argument("--steps", type=float, default=3e7); ap.add_argument("--oracle", action="store_true"); ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--epochs", type=int, default=4); ap.add_argument("--minibatches", type=int, default=8); ap.add_argument("--lr", type=float, default=3e-4)
@@ -58,9 +59,10 @@ def main():
     ap.add_argument("--out", required=True)
     a = ap.parse_args()
     S = a.item_size; gated = a.hunger_gate; nupd = a.eval_only or a.policy == "follower"
-    cfg = env.Cfg(L=96, N=a.N, patch_sigma=1.0, reproduce=False, A_max=3000, **world_kw(a.world)); L, W, N, T = cfg.L, a.W, a.N, a.T
+    cfg = env.Cfg(L=96, N=a.N, patch_sigma=1.0, reproduce=False, A_max=3000, moves8=a.moves8, **world_kw(a.world)); L, W, N, T = cfg.L, a.W, a.N, a.T
     nav = flax.serialization.from_bytes(Net().init(jax.random.PRNGKey(1), jnp.zeros((1, 100))), open(sorted(glob.glob(a.navs))[0], "rb").read())
-    rnet = RecAgent(128, topo=a.topo); Dx = 100 + 11 + 6 + 1 + 8                 # the harness layout (oracle slot always present; zero when off)
+    rnet = RecAgent(128, topo=a.topo, n_act=10 if a.moves8 else 6); Dx = 100 + 11 + 6 + 1 + 8 + (4 if a.moves8 else 0)   # the harness layout (oracle slot always present; zero when off)
+    assert not (a.moves8 and (a.policy == "follower" or not a.no_nav)), "--moves8 is built for the learner policy with --no-nav only"
     rp = rnet.init(jax.random.PRNGKey(a.seed), jnp.zeros((128,)), jnp.zeros((Dx,)))
     pp = {k: (dict(v) if hasattr(v, "items") else v) for k, v in rp["params"].items()}
     for k in ("Dense_0", "Dense_1", "Dense_2", "Dense_3"):
@@ -84,7 +86,8 @@ def main():
 
     def obs_x(s, item, code, pa, pr):
         o = NI.observe(cfg, s, item); hr = (OW.hear_wide if a.offset_wide else NI.hear)(s, item, code, L)
-        return jnp.concatenate([o, hr, jax.nn.one_hot(pa, 6), pr[:, None], NI.oracle(item, a.oracle)], 1)
+        x_ = jnp.concatenate([o, hr, jax.nn.one_hot(pa, 6), pr[:, None], NI.oracle(item, a.oracle)], 1)
+        return jnp.concatenate([x_, jax.nn.one_hot(pa, 10)[:, 6:]], 1) if a.moves8 else x_
 
     def world_reset(key, dfront):
         s = env.reset(cfg, key)

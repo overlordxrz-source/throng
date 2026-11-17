@@ -93,20 +93,24 @@ def main():
     ap.add_argument("--traj-out", default=""); ap.add_argument("--eval-mix-la", type=float, default=0.0)
     ap.add_argument("--d-fixed", type=int, default=0); ap.add_argument("--eval-d-max", type=int, default=12)
     ap.add_argument("--out", required=True)
+    ap.add_argument("--moves8", action="store_true", help="Cam Nov 17 L2: 8-way movement (rec learner only); see port_w2.py")
     ap.add_argument("--lookahead", type=float, default=0.0); ap.add_argument("--la-max", type=int, default=12); ap.add_argument("--stop-at", type=float, default=0.0)
     ap.add_argument("--head-relabel-token", action="store_true", help="Cam/M Nov 16: cross-hearing relabel of the head (own record buffer only)")
     a = ap.parse_args()
     S = a.item_size; gated = a.hunger_gate; ep = a.learner == "ep"; KV = not os.environ.get("KV_OFF")
-    cfg = env.Cfg(L=96, N=a.N, patch_sigma=1.0, reproduce=False, A_max=3000, **world_kw(a.world)); L, W, N, T = cfg.L, a.W, a.N, a.T
+    cfg = env.Cfg(L=96, N=a.N, patch_sigma=1.0, reproduce=False, A_max=3000, moves8=a.moves8, **world_kw(a.world)); L, W, N, T = cfg.L, a.W, a.N, a.T
     nav = flax.serialization.from_bytes(Net().init(jax.random.PRNGKey(1), jnp.zeros((1, 100))), open(sorted(glob.glob(a.navs))[0], "rb").read())
-    Dx = 100 + 11 + 6 + 1 + 8
+    Dx = 100 + 11 + 6 + 1 + 8 + (4 if a.moves8 else 0)
+    assert not (a.moves8 and (ep or a.policy != "learner")), "--moves8: rec learner policy only"
     if ep:
         rnet = EpAgentDev(S=a.slots, use_hind=a.hindsight > 0, shared_tok=a.shared_tok); Hd = 128 + a.slots * 11 + 1   # same params as EpAgent
     else:
-        rnet = RecAgent(128, topo=a.topo); Hd = 128
+        rnet = RecAgent(128, topo=a.topo, n_act=10 if a.moves8 else 6); Hd = 128
     rp = rnet.init(jax.random.PRNGKey(a.seed), jnp.zeros((Hd,)), jnp.zeros((Dx,)))
     pp = {k: (dict(v) if hasattr(v, "items") else v) for k, v in rp["params"].items()}
     for k in ("Dense_0", "Dense_1", "Dense_2", "Dense_3"):
+        if a.moves8 and k == "Dense_2":                                    # 10 outputs: keep the fresh init (the params file overwrites it)
+            continue
         pp[k] = dict(nav["params"][k])
     p = {"params": pp}
     if a.init_params:
@@ -142,11 +146,13 @@ def main():
         if a.demonstrator:
             o = NI.mark_demo(o, s, c["dem_pos"], c["dem_on"] & item["act"], L)
         x = jnp.concatenate([o, (OW.hear_wide if a.offset_wide else NI.hear)(s, item, code, L), jax.nn.one_hot(pa, 6), pr[:, None], NI.oracle(item, a.oracle)], 1)
+        if a.moves8:
+            x = jnp.concatenate([x, jax.nn.one_hot(pa, 10)[:, 6:]], 1)
         h2, lg, v, aux = jax.vmap(lambda hh, xx: rnet.apply(pp_, hh, xx))(h, x)
         def trunk(P, ob):                                                   # LOGIT SPLIT: the navigator trunk (Dense_0-2 on the 100-dim view)
             t_ = jnp.tanh(ob @ P["Dense_0"]["kernel"] + P["Dense_0"]["bias"]); t_ = jnp.tanh(t_ @ P["Dense_1"]["kernel"] + P["Dense_1"]["bias"])
             return t_ @ P["Dense_2"]["kernel"] + P["Dense_2"]["bias"]
-        lgn = trunk(pp_["params"], x[:, :100]) if a.logits else jnp.zeros_like(lg); lgp = trunk(nav["params"], x[:, :100]) if a.logits else jnp.zeros_like(lg)
+        lgn = trunk(pp_["params"], x[:, :100]) if a.logits else jnp.zeros_like(lg); lgp = trunk(nav["params"], x[:, :100]) if (a.logits and not a.moves8) else jnp.zeros_like(lg)
         hl = aux[0] if ep else jnp.zeros((N, 8))
         samp = jax.random.categorical(k1, lg)
         if a.greedy_bout:                                                   # GREEDY in bouts (diagnostic)
