@@ -9934,6 +9934,33 @@ more expensive, because it produces publishable-looking nulls.
     - Frontier 24 by 3e7: s0 .6, s1 .6 (fewer bouts per step, so a slower gate).
     - The PPO log shows a KL or clip-fraction spike (> 2x the run's median) within the 1e7 window of any D1
       collapse event, if events occur: .35.
+- **C1 RESULT + C2 REGISTRATION (entry stamped Nov 17 09:22:04 EST).**
+  - **C1: all five events SKIPPED, none was logged.** `port_w2.py` never logged approx KL, clip fraction or
+    entropy before `--ppo-log` (built today for D1). The logs of the runs concerned (`m8/o8s0.log`, `o8s1.log`,
+    `l4/o4.log`, `oc/oc.log`) contain only CURVE rows (reach, frontier, food, bout share). LR was a constant 3e-4
+    (Adam, no schedule) in every run. D1 carries the new log, so any D1 collapse can be checked.
+  - **C2 design** (`scratchpad/c2/run_c2.sh`, `c2.py`; eval only, beside D1):
+    - The checkpoint BEFORE each event, with the run's own flags:
+      - o8 s0 2e7 (sector 2 dies; F = 24);
+      - o8 s1 1e7 (sectors 4 / 6; F = 16);
+      - o4 5e7 (sector 5);
+      - o4 9e7 (sectors 1 / 2);
+      - clipped (b') at **3e7** for its sector 1 event. Its 4e7 checkpoint was missed (disclosed earlier), so the
+        checkpoint before spans 3e7 -> 5e7.
+    - d ~ uniform{1..F}. That IS the oracle's training distribution: `LA.sampler` with no lookahead = floor(U x F) +
+      1. At frontier 24, uniform on 1..24: half the bouts have d > 12, and 9 / 24 have d >= 16.
+    - Plus a d = 21 eval. Per sector, hungry bouts (closed, not by death, never sated): success, moves per bout,
+      extra move energy (.003 x moves), net payoff (.1 x eaten - extra move energy; generic intake is not recorded
+      per bout, so the share of bouts with a generic meal is reported instead), success at d <= 12 vs > 12, and
+      d = 21 reach.
+    - Hit = the dying sector is the lowest on net payoff OR on d = 21 reach. For two-sector events, either sector.
+  - Meal vs move cost (arithmetic): an item is +.1 energy; a move costs .003 more than a stay. One meal pays for 33
+    extra moves. At d = 21 a 4-way diagonal needs ~31 moves, an 8-way cardinal 21. In reward units at a typical
+    bout-opening E = .65: a meal is about +.40 (20 x (.15^2 - .05^2)); one extra move costs about .018.
+  - Predictions:
+    - Cam's (lowest net payoff or d = 21 reach in >= 3 of 5 events) .45;
+    - the dying sector has NEGATIVE mean net payoff in >= 2 events .2;
+    - >= 300 hungry bouts per sector in every eval .8 (else the eval is lengthened and that is disclosed).
 - **RESULT (Nov 16 ~01:40): THE LABEL COUNT** (`docs/data/learner_w2/label_count/`; each row is 100 rollout
   iterations, 819k steps, with that checkpoint's weights, world state and frontier, no updates).
   - Definitions: MEMORY-ONLY bout = a later hearing (not the token's first in this life) at d >= 3. By construction
