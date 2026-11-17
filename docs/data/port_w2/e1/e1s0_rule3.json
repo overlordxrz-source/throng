@@ -1,0 +1,1 @@
+{"tables": ["E1s0_3e7", "E1s0_4e7", "E1s0_5e7"], "mean_d3": [0.878, 0.886, 0.858, 0.909, 0.876, 0.883, 0.794, 0.921], "mean_d12": [0.792, 0.815, 0.734, 0.831, 0.708, 0.795, 0.621, 0.784], "frontier": 24.0, "final_dead": [], "dead": [], "PASS": false, "SECONDARY": true, "QUALIFIES": true}

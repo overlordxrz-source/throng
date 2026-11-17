@@ -10179,6 +10179,43 @@ more expensive, because it produces publishable-looking nulls.
   - (a) branch: after the twin, I merge by hand. If the learner identity checks pass, I launch seed 8 (relabel + no-nav +
     8-way + target-KL) to 1e8 without waiting, and report at 3e7 and 5e7.
   - Reporting: E1 at each seed's 5e7 outcome. Other tables are logged only, unless a sector event or a dead sector appears.
+- **RESULT (entry stamped Nov 17 12:24:05 EST): E1 seed 0 PASSES its gate at 5e7.**
+  - Gate: frontier 24; QUALIFIES (SECONDARY) on the 3e7 / 4e7 / 5e7 mean; 0 dead; 0 sector events (strict count also 0);
+    0 broad dips.
+  - Times copied from `e1/run_e1.out`: 5e7 leg done 12:22:39. Files: `docs/data/port_w2/e1/` (verdicts, d21 by sector,
+    `e1s0_rule3.json`, `e1s0_ppo_tkl.jsonl`).
+
+  | E1 s0, d = 3 | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | frontier |
+  |---|---|---|---|---|---|---|---|---|---|
+  | 1e7 | .69 | .60 | .22 | .67 | .53 | .66 | .64 | .62 | 20 |
+  | 2e7 | .66 | .70 | .66 | .78 | .67 | .70 | .62 | .74 | 24 |
+  | 3e7 | .85 | .89 | .90 | .90 | .88 | .86 | .85 | .90 | 24 |
+  | 4e7 | .87 | .83 | .74 | .89 | .83 | .83 | .61 | .92 | 24 |
+  | 5e7 | .92 | .94 | .93 | .95 | .92 | .96 | .93 | .94 | 24 |
+  | mean 3-5e7, d = 3 | .88 | .89 | .86 | .91 | .88 | .88 | .79 | .92 | |
+  | mean 3-5e7, d = 12 | .79 | .82 | .73 | .83 | .71 | .80 | .62 | .78 | |
+
+  - Not counted (registered readings):
+    - sector 2 at .22 at 1e7 came before frontier 24;
+    - sector 6's 3e7 -> 4e7 slide was .85 -> .61 at d = 3 (under .3), .77 -> .29 at d = 12, and .63 -> .01 at d = 21. It
+      recovered to .93 / .80 / .74 at 5e7.
+    - The d = 12 values under .30 after frontier 24 (sector 6 .20 at 2e7, .29 at 4e7) are information only.
+    - A real wobble on sector 6 exists, but nothing abrupt or absorbing.
+  - Target-KL cut, by 1e7 window: .12 / .33 / .37 / .44 / .45; .42 over 3e7-5e7.
+    - The limit binds, so the "uninformative" flag does not apply.
+    - My predictions: first-1e7 < 10% MISSED (.12); late 25-50% HIT.
+  - PPO log medians per 1e7 window:
+
+    | window | KL | clip fraction | in-bout entropy |
+    |---|---|---|---|
+    | 1e7 | .0095 | .10 | .85 |
+    | 2e7 | .0128 | .14 | 1.20 |
+    | 3e7 | .0133 | .15 | 1.11 |
+    | 4e7 | .0146 | .17 | .96 |
+    | 5e7 | .0142 | .16 | 1.03 |
+
+    In-bout entropy did NOT collapse; in D1 s0 it went .72 -> .15 at constant per-update size. One seed; seed 1 is next.
+  - Wall time per leg ~6.5-7 min (vs ~8.5 min in D1).
 - **RESULT (Nov 16 ~01:40): THE LABEL COUNT** (`docs/data/learner_w2/label_count/`; each row is 100 rollout
   iterations, 819k steps, with that checkpoint's weights, world state and frontier, no updates).
   - Definitions: MEMORY-ONLY bout = a later hearing (not the token's first in this life) at d >= 3. By construction
