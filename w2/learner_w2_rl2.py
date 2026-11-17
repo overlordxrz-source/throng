@@ -45,6 +45,7 @@ from w2 import named_item as NI  # noqa: E402
 from w2.gate import HonestGate  # noqa: E402
 from w2 import lookahead as LA  # noqa: E402
 from w2 import relabel as RL  # noqa: E402
+from w2 import lr_anneal as LRA  # noqa: E402
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "scripts"))
 import ckpt as _ck  # noqa: E402
 
@@ -86,6 +87,11 @@ def main():
     ap.add_argument("--out", required=True)
     ap.add_argument("--lookahead", type=float, default=0.0); ap.add_argument("--la-max", type=int, default=12); ap.add_argument("--stop-at", type=float, default=0.0)
     ap.add_argument("--head-relabel-token", action="store_true", help="Cam/M Nov 16: cross-hearing relabel of the head (own record buffer only)")
+    ap.add_argument("--lr-anneal", action="store_true", help="Cam Nov 17 ~19:10Z G2: LR linear lr -> --lr-end over --lr-anneal-len steps from max(--lr-anneal-after, the step the frontier first reaches --lr-anneal-frontier), then held (w2/lr_anneal.py); needs --target-kl")
+    ap.add_argument("--lr-end", type=float, default=3e-5); ap.add_argument("--lr-anneal-after", type=float, default=5e7); ap.add_argument("--lr-anneal-len", type=float, default=5e7)
+    ap.add_argument("--lr-anneal-frontier", type=float, default=24.0, help="the frontier that triggers t24 (24; lowered only in the G2 checks)")
+    ap.add_argument("--lr-anneal-stop", action="store_true", help="G2 learner run length: end the run (normally, as at --steps) at the anneal start + --lr-anneal-len; --steps is the cap")
+    ap.add_argument("--early-stop-step", type=float, default=0.0, help="the step for --early-stop-frontier (default --steps / 2; set 5e7 when --steps is the 1.5e8 cap)")
     ap.add_argument("--target-kl", type=float, default=None, help="Cam Nov 17 ~16:40Z E1: before applying each minibatch step, the k3 approx KL of the POLICY (current vs rollout, that minibatch); if > this, skip the batch's remaining epochs / minibatches. Logs TKL lines")
     ap.add_argument("--tkl-synthetic-shift", type=float, default=0.0, help="E1 CHECK ONLY: subtract this from the batch's old log-probs (a synthetic high-KL batch)")
     ap.add_argument("--moves8", action="store_true", help="Cam Nov 17 ~13:00Z L2: 8-way movement (actions 6..9 = diagonal steps, a cardinal step's energy cost); prev-action columns 6..9 appended at x[126:130]; the parent stays 4-way")
@@ -94,6 +100,7 @@ def main():
     cfg = env.Cfg(L=96, N=a.N, patch_sigma=1.0, reproduce=False, A_max=3000, moves8=a.moves8, **world_kw(a.world)); L, W, N, T = cfg.L, a.W, a.N, a.T
     nav = flax.serialization.from_bytes(Net().init(jax.random.PRNGKey(1), jnp.zeros((1, 100))), open(sorted(glob.glob(a.navs))[0], "rb").read())
     Dx = 100 + 11 + 6 + 1 + 8 + (4 if a.moves8 else 0); NA = 10 if a.moves8 else 6
+    assert not (a.lr_anneal and a.target_kl is None), "--lr-anneal is applied through the target-KL update (G2: target-KL is standard)"
     assert not (a.moves8 and (not a.no_nav or a.policy != "learner")), "--moves8: learner policy with --no-nav only"
     if ep:
         rnet = EpAgentDev(S=a.slots, use_hind=a.hindsight > 0, shared_tok=a.shared_tok, n_act=NA); Hd = 128 + a.slots * 11 + 1   # same params as EpAgent
@@ -263,9 +270,9 @@ def main():
         u, os_ = opt.update(g, os_, pp_); return optax.apply_updates(pp_, u), os_
 
     @jax.jit
-    def upd_kl(pp_, os_, bt):                                               # E1 (--target-kl only)
+    def upd_kl(pp_, os_, bt, sc):                                           # E1 (--target-kl only); sc = lr_t / lr (G2; exactly 1.0 otherwise)
         (_, kl), g = jax.value_and_grad(lambda q: (lambda o: (o[0].mean(), o[1].mean()))(jax.vmap(lambda b_: seq_loss(q, b_, True))(bt)), has_aux=True)(pp_)
-        u, os2 = opt.update(g, os_, pp_); return optax.apply_updates(pp_, u), os2, kl
+        u, os2 = opt.update(g, os_, pp_); u = jax.tree_util.tree_map(lambda x_: x_ * sc, u); return optax.apply_updates(pp_, u), os2, kl
 
     # ------------------------------------------------------------------ evaluation on the necessity lives / keys
     if a.eval_necessity:
@@ -324,7 +331,7 @@ def main():
 
     # ------------------------------------------------------------------ training
     rng = np.random.default_rng(a.seed); key = jax.random.PRNGKey(a.seed + 1)
-    dfront = a.frontier0; recent = []; GATE = HonestGate(); steps = 0; it = 0; curve = []; nan_run = 0; hacc = [0, 0, 0, 0]
+    dfront = a.frontier0; recent = []; GATE = HonestGate(); steps = 0; it = 0; curve = []; nan_run = 0; hacc = [0, 0, 0, 0]; t24 = None
     c = jax.vmap(world_reset, in_axes=(0, None))(jax.random.split(key, W), dfront)
     Ck = _ck.load(a.ckpt) if a.ckpt else None
     if Ck is not None:
@@ -333,20 +340,25 @@ def main():
         dfront, recent, steps, it, curve = Ck["dfront"], Ck["recent"], Ck["steps"], Ck["it"], Ck["curve"]; rng.bit_generator.state = Ck["rng"]
         if "gate" in Ck:
             GATE.load(Ck["gate"])
+        if a.lr_anneal:                                                     # G2: t24 from the checkpoint, else from its curve
+            t24 = (None if float(Ck["t24"]) < 0 else float(Ck["t24"])) if "t24" in Ck else LRA.t24_from_curve(curve, a.lr_anneal_frontier)
+            print(f"LR_ANNEAL resume t24 {t24} ({'checkpoint' if 't24' in Ck else 'curve'})", flush=True)
         print(f"resumed at {steps:,} steps, frontier {dfront}", flush=True)
     t0 = time.time(); nupd = a.policy != "learner" and not a.head_only
     while steps < a.steps:
         if a.ckpt and it % 20 == 0 and it > 0:
-            _ck.save(a.ckpt, dict(p=p, ost=ost, c=c, key=key, dfront=dfront, recent=recent, steps=steps, it=it, curve=curve, rng=rng.bit_generator.state, gate=GATE.state()))
+            _ck.save(a.ckpt, dict(p=p, ost=ost, c=c, key=key, dfront=dfront, recent=recent, steps=steps, it=it, curve=curve, rng=rng.bit_generator.state, gate=GATE.state(), **(dict(t24=(-1.0 if t24 is None else float(t24))) if a.lr_anneal else {})))
             if a.max_seconds and time.time() - t0 > a.max_seconds:
                 print(f"CHUNK_STOP at {steps:,}", flush=True); sys.exit(3)
         if a.stop_at and steps >= a.stop_at:
             if a.ckpt:
-                _ck.save(a.ckpt, dict(p=p, ost=ost, c=c, key=key, dfront=dfront, recent=recent, steps=steps, it=it, curve=curve, rng=rng.bit_generator.state, gate=GATE.state()))
+                _ck.save(a.ckpt, dict(p=p, ost=ost, c=c, key=key, dfront=dfront, recent=recent, steps=steps, it=it, curve=curve, rng=rng.bit_generator.state, gate=GATE.state(), **(dict(t24=(-1.0 if t24 is None else float(t24))) if a.lr_anneal else {})))
             if a.save_params:
                 open(a.save_params, "wb").write(flax.serialization.to_bytes(p))
             print(f"PAUSE_AT {steps:,} frontier {dfront}", flush=True); sys.exit(5)
-        if a.early_stop_frontier and steps >= a.steps / 2 and dfront <= a.early_stop_frontier:
+        if a.lr_anneal and a.lr_anneal_stop and t24 is not None and steps >= LRA.anneal_start(t24, a.lr_anneal_after) + a.lr_anneal_len:
+            print(f"LR_ANNEAL_STOP at {steps:,} (anneal start {LRA.anneal_start(t24, a.lr_anneal_after):,.0f} + {a.lr_anneal_len:,.0f})", flush=True); break
+        if a.early_stop_frontier and steps >= (a.early_stop_step or a.steps / 2) and dfront <= a.early_stop_frontier:
             print(f"EARLY_STOP frontier {dfront} at {steps:,} (counted FAIL)", flush=True); break
         key, k = jax.random.split(key); c, R_ = roll(p, c, jax.random.split(k, W), jnp.float32(dfront))
         R_ = {k_: np.asarray(v_) for k_, v_ in R_.items()}                    # (W, T, N, ...)
@@ -385,13 +397,14 @@ def main():
         p_prev, o_prev = p, ost
         if a.tkl_synthetic_shift:                                            # E1 check only: a synthetic high-KL batch
             bt["lp"] = bt["lp"] - a.tkl_synthetic_shift
-        n_mb = 0; kl_stop = None
+        LR_T = LRA.lr_at(steps, t24, a.lr, a.lr_end, a.lr_anneal_after, a.lr_anneal_len) if a.lr_anneal else a.lr
+        SC = jnp.float32(LR_T / a.lr); n_mb = 0; kl_stop = None
         for _ in range(0 if nupd else a.epochs):
             for mb in np.array_split(rng.permutation(W * N), a.minibatches):
                 if a.target_kl is None:
                     p, ost = upd(p, ost, {k_: v_[mb] for k_, v_ in bt.items()})
                 else:                                                       # E1: skip the batch's remaining epochs / minibatches once approx KL > target
-                    p2_, o2_, kl_ = upd_kl(p, ost, {k_: v_[mb] for k_, v_ in bt.items()})
+                    p2_, o2_, kl_ = upd_kl(p, ost, {k_: v_[mb] for k_, v_ in bt.items()}, SC)
                     if float(kl_) > a.target_kl:
                         kl_stop = float(kl_); break
                     p, ost = p2_, o2_
@@ -400,7 +413,7 @@ def main():
                 break
         if a.target_kl is not None:
             dpar = float(sum(jnp.abs(x1 - x0).sum() for x1, x0 in zip(jax.tree_util.tree_leaves(p), jax.tree_util.tree_leaves(p_prev))))
-            print("TKL", json.dumps(dict(it=it, mb_done=n_mb, mb_total=(0 if nupd else a.epochs * a.minibatches), kl_stop=kl_stop, dparam=dpar)), flush=True)
+            print("TKL", json.dumps(dict(it=it, mb_done=n_mb, mb_total=(0 if nupd else a.epochs * a.minibatches), kl_stop=kl_stop, dparam=dpar, **(dict(lr=LR_T, t24=t24) if a.lr_anneal else {}))), flush=True)
         if not all(bool(jnp.isfinite(l_).all()) for l_ in jax.tree_util.tree_leaves(p)):
             p, ost = p_prev, o_prev; nan_run += 1; print(f"NAN_SKIP {it}", flush=True)
             if nan_run >= 10:
@@ -418,6 +431,8 @@ def main():
                 dfront += 1; print(f"GATE_UP frontier -> {dfront:.0f} at {steps:,} (last windows {GATE.scores[-2:]})", flush=True)
         elif len(recent) >= 500 and np.mean(recent) >= 0.8 and dfront < a.d_max:
             dfront += 1; recent = []
+        if a.lr_anneal and t24 is None and dfront >= a.lr_anneal_frontier:   # G2: the frontier first reaches 24
+            t24 = float(steps); print(f"LR_ANNEAL t24 {t24:,.0f}; anneal starts at {LRA.anneal_start(t24, a.lr_anneal_after):,.0f}", flush=True)
         if it % a.curve_every == 0:
             curve.append(dict(steps=steps, frontier=dfront, item_reach=n_eat / max(n_close, 1), food_per_step=float(R_["gain"].mean()), paid_per_step=float(R_["pd"].mean()),
                               frac_in_bout=float(R_["inb"].mean()), head_acc_first=hacc[0] / max(hacc[1], 1), head_acc_later=hacc[2] / max(hacc[3], 1),
