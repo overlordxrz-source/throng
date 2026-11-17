@@ -10,3 +10,9 @@ G1 TABLE s1 9e7 {"arm": "E1s1_9e7", "frontier": 24.0, "d3": [0.908, 0.947, 0.909
 G1 s1 10e7 frontier 24.0 cut last-1e7 mb_done/total 0.555 14:34:19
 G1 TABLE s1 10e7 {"arm": "E1s1_10e7", "frontier": 24.0, "d3": [0.93, 0.944, 0.927, 0.962, 0.934, 0.967, 0.826, 0.948], "d12": [0.778, 0.911, 0.836, 0.887, 0.869, 0.947, 0.772, 0.826], "n3": [257, 270, 261, 287, 259, 270, 264, 268], "n12": [266, 269, 226, 257, 283, 262, 263, 258], "min3": 0.826, "min12": 0.772, "dead_lt030": [], "dead_le010": [], "PASS": false, "SECONDARY": true, "QUALIFIES": true} | d21:   oracle       reach by sector 0.65 0.86 0.75 0.80 0.76 0.81 0.54 0.72  n [206, 163, 186, 182, 167, 207, 212, 186] 14:35:20
 G1 s1 RULE3 {"tables": ["E1s1_8e7", "E1s1_9e7", "E1s1_10e7"], "mean_d3": [0.925, 0.949, 0.917, 0.96, 0.935, 0.941, 0.887, 0.955], "mean_d12": [0.827, 0.879, 0.85, 0.907, 0.868, 0.93, 0.815, 0.85], "frontier": 24.0, "final_dead": [], "dead": [], "PASS": true, "SECONDARY": true, "QUALIFIES": true} EVENTS {"s1_1e8": {"broad": [], "sector_events": [], "n_events": 0, "n_events_strict": 0, "dead": [], "n_dead": 0}} 14:35:20
+G1 QUALIFIED (i) {"ref_files": ["/private/tmp/claude-501/-Users-overlord-CascadeProjects-throng/aad77c1d-d7ac-437e-bef4-aa525802ccc0/scratchpad/e1/g1_ref_8e7.json", "/private/tmp/claude-501/-Users-overlord-CascadeProjects-throng/aad77c1d-d7ac-437e-bef4-aa525802ccc0/scratchpad/e1/g1_ref_9e7.json", "/private/tmp/claude-501/-Users-overlord-CascadeProjects-throng/aad77c1d-d7ac-437e-bef4-aa525802ccc0/scratchpad/e1/g1_ref_10e7.json"], "per_ckpt": [0.9878098368644714, 0.9800751805305481, 0.977686882019043], "n": [2461.0, 2660.0, 2689.0], "ref_mean": 0.9818572998046875, "bar": 0.8837} 14:39:50
+G1 TWIN 1e7 done 15:26:01
+G1 TWIN 2e7 done 16:15:50
+G1 TWIN 3e7 done 17:28:25
+G1 TWIN eval hungry_2nd 0.0 life 485.4614562988281 17:28:38
+G1_TWIN_DONE (merged-learner checks + seed 8 by hand) 17:28:38

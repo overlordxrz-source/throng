@@ -10355,6 +10355,17 @@ more expensive, because it produces publishable-looking nulls.
   - Results are unaffected: legs are checkpointed and resume, and the per-iteration computation does not depend on wall
     time. Only the timing is lost.
   - My two earlier "machine load" attributions (the E1 s0 1e8 result entry and the chat note) are WITHDRAWN.
+- **RESULT (entry stamped Nov 17 17:56:51 EST): G1 (i) reference and twin done.**
+  - Reference = E1 s1, the long d = 12 evals at 8e7 / 9e7 / 1e8: hungry reach .988 / .980 / .978 (n 2461 / 2660 / 2689);
+    mean .982; bar = .884 (`e1/G1_QUALIFIED`, `e1/e1_ref_mean.json`).
+  - Twin (8-way + target-KL, s1's curve, 3e7; times from `e1/run_g1.out`, done 17:28:38): at d = 12, item reach 0.0, mean
+    life 485 steps, 77 hungry bouts in the second half (`e1/tw_eval_d12.json`). The earlier 4-way lever twin lived 706.
+    It is the comparator for the life criterion.
+  - Twin legs ran slowly because the laptop slept on battery (correction entry above); it was on AC again by the time of
+    this entry.
+  - Next: the G2 + merged-learner run checks (`e1/g2_checks/`, running). If they pass, comm-toy is fast-forwarded to
+    moves8-learner and seed 8 (`e1/run_e1l.sh`: relabel + no-nav + 8-way + target-KL, no anneal, Cam's head watch) goes
+    to 1e8.
 - **RESULT (Nov 16 ~01:40): THE LABEL COUNT** (`docs/data/learner_w2/label_count/`; each row is 100 rollout
   iterations, 819k steps, with that checkpoint's weights, world state and frontier, no updates).
   - Definitions: MEMORY-ONLY bout = a later hearing (not the token's first in this life) at d >= 3. By construction
