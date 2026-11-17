@@ -10305,6 +10305,29 @@ more expensive, because it produces publishable-looking nulls.
       the same sector that was .22 at 1e7 here and locked in O8 s0).
     - It is a softer failure than before (no stay lock, entropy kept), but it fails the measurement rule.
   - Not done (needs Cam): any reference, the twin, the learner. Nothing is running but the guard.
+- **REGISTERED (entry stamped Nov 17 14:03:47 EST): Cam Nov 17 ~19:10Z rulings. G1 = E1 s1 from its 5e7 checkpoint to 1e8 (target-KL
+  only). G2 = --lr-anneal (code + checks). Branches (i) / (ii). Written before any G1 data.**
+  - Recorded from Cam:
+    - s0 fails at 1e8 (stopping was correct);
+    - the spread-policy reading is accepted;
+    - s0 sector 2 is a chronic weak spot;
+    - choosing s1 as the reference is accepted (it raises the bar, which is conservative for the learner).
+  - G1 (`e1/run_g1.sh`):
+    - It aborts unless `e1s1.ckpt` is byte-identical to `e1s1_ckpt_5e7.ckpt`.
+    - Legs 6e7..1e8, tables at d = 3 / 12 / 21 every 1e7.
+    - decide3 on 8e7 / 9e7 / 1e8; events_v2 on all ten tables (logged).
+    - (i) qualifies -> reference = mean of the long d = 12 evals at 8e7 / 9e7 / 1e8 (>= 2000 hungry bouts each) -> twin
+      (8-way + target-KL, s1's curve, 3e7) + eval -> STOP. Then the merged-learner checks and seed 8 (target-KL, no anneal,
+      Cam's head watch) by hand, reporting at 3e7 / 5e7 / 1e8.
+    - (ii) fails -> STOP. Then G3 by hand (target-KL + --lr-anneal from both seeds' 5e7 checkpoints to 1e8) after the G2
+      checks pass.
+  - G2 is written in a separate worktree (the G1 job re-reads comm-toy's port_w2.py). Rule: LR linear 3e-4 -> 3e-5 over
+    5e7 steps, starting at max(5e7, the step where the frontier first reaches 24), then held.
+    - Checks (the runs happen after G1, one training job at a time; the pure-Python unit test runs beside it): flag-off
+      identity; an LR schedule unit test incl. the frontier-triggered start; resume reproduces the schedule.
+  - Predictions:
+    - Cam: G1 qualifies .5; (ii) with anneal, both qualify .55.
+    - Mine: G1 qualifies .55; >= 1 v2 sector event in s1 over 6e7-1e8 .45; (ii) both qualify .50.
 - **RESULT (Nov 16 ~01:40): THE LABEL COUNT** (`docs/data/learner_w2/label_count/`; each row is 100 rollout
   iterations, 819k steps, with that checkpoint's weights, world state and frontier, no updates).
   - Definitions: MEMORY-ONLY bout = a later hearing (not the token's first in this life) at d >= 3. By construction
