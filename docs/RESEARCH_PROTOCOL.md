@@ -9830,6 +9830,34 @@ more expensive, because it produces publishable-looking nulls.
     - This time it is a cardinal. So the "split toward vs one stay" asymmetry is not needed for a sector to die. It
       may still raise the rate on diagonals.
     - Seed 1 is running. The sequence stops after it, because seed 0 does not qualify.
+- **RESULT (entry stamped Nov 17 08:54:20 EST): 8-way oracle, seed 1, at 3e7: does NOT qualify (no dead sector; min d = 3 .64).
+  Step B STOPPED as registered; the learner did not start** (times copied from `m8/run_m8.out`: frontier 16 at
+  1e7 08:35:10, 23 at 2e7 08:43:24, table and STOP 08:52:19).
+
+  | O8 s1 | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 |
+  |---|---|---|---|---|---|---|---|---|
+  | d = 3, 1e7 (log) | .75 | .82 | .76 | .85 | .85 | .87 | .83 | .80 |
+  | d = 3, 2e7 (log) | .65 | .66 | .51 | .60 | **.31** | .68 | **.42** | .73 |
+  | d = 3, 3e7 | .701 | .788 | .636 | .780 | .718 | .787 | .717 | .792 |
+  | d = 12, 3e7 | .411 | .776 | .316 | .718 | .316 | .678 | .410 | .737 |
+  | d = 21, 3e7 | .20 | .59 | .12 | .62 | .12 | .50 | .20 | .60 |
+
+  - The >= .3 rule fired on the logged tables: sector 4 .85 -> .31 and sector 6 .83 -> .42 (1e7 -> 2e7). Both came
+    back by 3e7 (.72 / .72).
+  - `decide.py`: no dead sector, but min d = 3 .64 < .75, so it is not secondary and does not qualify.
+  - All four cardinals are weak at long range: d = 12 .32-.41, d = 21 .12-.20. The diagonals are .68-.78 and
+    .50-.62.
+  - Predictions (s1): frontier 24 (p .7) **hit** (at 3e7); qualifies (p .5) **miss**; both qualify (p .35)
+    **miss**; d = 21 diagonal >= cardinal - .10 (p .65) **hit**; diagonal > cardinal (p .5) **hit**.
+  - **Reading across Step B (two seeds; not established).**
+    - 8-way movement removed the diagonal deficit and reversed it: on both seeds the diagonals are the strong
+      sectors, and the cardinals are weak (seed 1) or dead (seed 0, sector 2).
+    - Neither seed qualifies, while clipped 4-way (b') on seed 0 did.
+    - The sector collapses persist: s0 sector 2 dead into a learned stay; s1 sectors 4 / 6 fell .4-.5 within 1e7
+      and recovered.
+    - Across o4, (a'), O-X' and both 8-way seeds, the common thread is abrupt, sector-specific collapse and
+      recovery of the oracle policy. The geometry decides WHICH sectors are vulnerable, not WHETHER one is.
+  - Nothing runs except the guard. Branch `moves8-learner` is unmerged (kept). Waiting for Cam's ruling.
 - **RESULT (Nov 16 ~01:40): THE LABEL COUNT** (`docs/data/learner_w2/label_count/`; each row is 100 rollout
   iterations, 819k steps, with that checkpoint's weights, world state and frontier, no updates).
   - Definitions: MEMORY-ONLY bout = a later hearing (not the token's first in this life) at d >= 3. By construction
