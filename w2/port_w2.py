@@ -209,7 +209,7 @@ def main():
         else:
             nan_run = 0
         if a.ppo_log:
-            q_ = np.asarray(ppo_stats(p, bt))
+            q_ = np.asarray(ppo_stats(p, {k_: v_[:16] for k_, v_ in bt.items() if k_ in ('x', 'h0', 'act', 'lp', 'first')}))   # 16 of the 128 sequences (cost)
             print("PPO", json.dumps(dict(it=it, steps=steps + W * N * T, kl=float(q_[0]), kl3=float(q_[1]), clipfrac=float(q_[2]), ent=float(q_[3]), ent_bout=float(q_[4]), lr=a.lr)), flush=True)
         steps += W * N * T; it += 1
         n_close = int(closed.sum()); n_eat = int(ate_i.sum())
