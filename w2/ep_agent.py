@@ -13,6 +13,7 @@ import flax.linen as nn
 
 class EpAgent(nn.Module):  # noqa: D101
     S: int = 128; R: int = 11; hd: int = 128; hind: bool = True; shared_tok: bool = False; tok_at: int = 100
+    n_act: int = 6              # Cam Nov 17 L2: 10 with 8-way movement
 
     @nn.compact
     def __call__(self, h, x):
@@ -20,7 +21,7 @@ class EpAgent(nn.Module):  # noqa: D101
         mem = memf.reshape(self.S, self.R); filled = mem[:, :8].sum(-1) > 0
         obs, side = x[..., :100], jnp.concatenate([x[..., 100:], x[..., 98:100]], -1)
         t = nn.tanh(nn.Dense(128, name="Dense_0")(obs)); t = nn.tanh(nn.Dense(128, name="Dense_1")(t))
-        lg_nav = nn.Dense(6, name="Dense_2")(t); v_nav = nn.Dense(1, name="Dense_3")(t)[..., 0]
+        lg_nav = nn.Dense(self.n_act, name="Dense_2")(t); v_nav = nn.Dense(1, name="Dense_3")(t)[..., 0]
         z = nn.tanh(nn.Dense(64, name="side_enc")(jnp.concatenate([side, t], -1)))
         hg2, y = nn.GRUCell(self.hd, name="gru")(hg, z)
         qz = nn.tanh(nn.Dense(64, name="f1")(x))
@@ -37,6 +38,6 @@ class EpAgent(nn.Module):  # noqa: D101
         hl = nn.Dense(8, name="hind")(jnp.concatenate([y2, rd])) if self.hind else jnp.zeros(8)
         feat = jnp.concatenate([y2, jax.nn.softmax(hl)])
         zi = nn.initializers.zeros
-        lg = lg_nav + nn.Dense(6, name="side_head", kernel_init=zi, bias_init=zi)(feat)
+        lg = lg_nav + nn.Dense(self.n_act, name="side_head", kernel_init=zi, bias_init=zi)(feat)
         v = v_nav + nn.Dense(1, name="side_value", kernel_init=zi, bias_init=zi)(feat)[..., 0]
         return jnp.concatenate([hg2, memf, ptr]), lg, v, (hl, w)

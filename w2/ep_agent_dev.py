@@ -10,10 +10,11 @@ import flax.linen as nn
 
 class EpAgentDev(nn.Module):  # noqa: D101
     S: int = 128; R: int = 11; hd: int = 128; use_hind: bool = True; shared_tok: bool = False; tok_at: int = 100
+    n_act: int = 6              # Cam Nov 17 L2: 10 with 8-way movement
 
     def setup(self):
         zi = nn.initializers.zeros
-        self.Dense_0 = nn.Dense(128); self.Dense_1 = nn.Dense(128); self.Dense_2 = nn.Dense(6); self.Dense_3 = nn.Dense(1)
+        self.Dense_0 = nn.Dense(128); self.Dense_1 = nn.Dense(128); self.Dense_2 = nn.Dense(self.n_act); self.Dense_3 = nn.Dense(1)
         self.side_enc = nn.Dense(64); self.gru = nn.GRUCell(self.hd); self.f1 = nn.Dense(64)
         if self.shared_tok:
             self.tokemb = nn.Dense(16, use_bias=False); self.q = nn.Dense(16); self.k = nn.Dense(16)
@@ -22,7 +23,7 @@ class EpAgentDev(nn.Module):  # noqa: D101
         self.v = nn.Dense(32); self.f2 = nn.Dense(64)
         if self.use_hind:
             self.hind = nn.Dense(8)
-        self.side_head = nn.Dense(6, kernel_init=zi, bias_init=zi); self.side_value = nn.Dense(1, kernel_init=zi, bias_init=zi)
+        self.side_head = nn.Dense(self.n_act, kernel_init=zi, bias_init=zi); self.side_value = nn.Dense(1, kernel_init=zi, bias_init=zi)
 
     def kv(self, mem):
         if self.shared_tok:

@@ -86,15 +86,17 @@ def main():
     ap.add_argument("--out", required=True)
     ap.add_argument("--lookahead", type=float, default=0.0); ap.add_argument("--la-max", type=int, default=12); ap.add_argument("--stop-at", type=float, default=0.0)
     ap.add_argument("--head-relabel-token", action="store_true", help="Cam/M Nov 16: cross-hearing relabel of the head (own record buffer only)")
+    ap.add_argument("--moves8", action="store_true", help="Cam Nov 17 ~13:00Z L2: 8-way movement (actions 6..9 = diagonal steps, a cardinal step's energy cost); prev-action columns 6..9 appended at x[126:130]; the parent stays 4-way")
     a = ap.parse_args()
     S = a.item_size; gated = a.hunger_gate; ep = a.learner == "ep"; KV = not os.environ.get("KV_OFF")
-    cfg = env.Cfg(L=96, N=a.N, patch_sigma=1.0, reproduce=False, A_max=3000, **world_kw(a.world)); L, W, N, T = cfg.L, a.W, a.N, a.T
+    cfg = env.Cfg(L=96, N=a.N, patch_sigma=1.0, reproduce=False, A_max=3000, moves8=a.moves8, **world_kw(a.world)); L, W, N, T = cfg.L, a.W, a.N, a.T
     nav = flax.serialization.from_bytes(Net().init(jax.random.PRNGKey(1), jnp.zeros((1, 100))), open(sorted(glob.glob(a.navs))[0], "rb").read())
-    Dx = 100 + 11 + 6 + 1 + 8
+    Dx = 100 + 11 + 6 + 1 + 8 + (4 if a.moves8 else 0); NA = 10 if a.moves8 else 6
+    assert not (a.moves8 and (not a.no_nav or a.policy != "learner")), "--moves8: learner policy with --no-nav only"
     if ep:
-        rnet = EpAgentDev(S=a.slots, use_hind=a.hindsight > 0, shared_tok=a.shared_tok); Hd = 128 + a.slots * 11 + 1   # same params as EpAgent
+        rnet = EpAgentDev(S=a.slots, use_hind=a.hindsight > 0, shared_tok=a.shared_tok, n_act=NA); Hd = 128 + a.slots * 11 + 1   # same params as EpAgent
     else:
-        rnet = RecAgent(128); Hd = 128
+        rnet = RecAgent(128, n_act=NA); Hd = 128
     rp = rnet.init(jax.random.PRNGKey(a.seed), jnp.zeros((Hd,)), jnp.zeros((Dx,)))
     pp = {k: dict(v) for k, v in rp["params"].items()}
     for k in ("Dense_0", "Dense_1", "Dense_2", "Dense_3"):
@@ -133,6 +135,8 @@ def main():
         if a.demonstrator:
             o = NI.mark_demo(o, s, c["dem_pos"], c["dem_on"] & item["act"], L)
         x = jnp.concatenate([o, (OW.hear_wide if a.offset_wide else NI.hear)(s, item, code, L), jax.nn.one_hot(pa, 6), pr[:, None], NI.oracle(item, a.oracle)], 1)
+        if a.moves8:
+            x = jnp.concatenate([x, jax.nn.one_hot(pa, 10)[:, 6:]], 1)
         h2, lg, v, aux = jax.vmap(lambda hh, xx: rnet.apply(pp_, hh, xx))(h, x)
         hl = aux[0] if ep else jnp.zeros((N, 8))
         samp = jax.random.categorical(k1, lg)

@@ -101,9 +101,9 @@ def main():
     cfg = env.Cfg(L=96, N=a.N, patch_sigma=1.0, reproduce=False, A_max=3000, moves8=a.moves8, **world_kw(a.world)); L, W, N, T = cfg.L, a.W, a.N, a.T
     nav = flax.serialization.from_bytes(Net().init(jax.random.PRNGKey(1), jnp.zeros((1, 100))), open(sorted(glob.glob(a.navs))[0], "rb").read())
     Dx = 100 + 11 + 6 + 1 + 8 + (4 if a.moves8 else 0)
-    assert not (a.moves8 and (ep or a.policy != "learner")), "--moves8: rec learner policy only"
+    assert not (a.moves8 and a.policy != "learner"), "--moves8: learner policy only"
     if ep:
-        rnet = EpAgentDev(S=a.slots, use_hind=a.hindsight > 0, shared_tok=a.shared_tok); Hd = 128 + a.slots * 11 + 1   # same params as EpAgent
+        rnet = EpAgentDev(S=a.slots, use_hind=a.hindsight > 0, shared_tok=a.shared_tok, n_act=10 if a.moves8 else 6); Hd = 128 + a.slots * 11 + 1   # same params as EpAgent
     else:
         rnet = RecAgent(128, topo=a.topo, n_act=10 if a.moves8 else 6); Hd = 128
     rp = rnet.init(jax.random.PRNGKey(a.seed), jnp.zeros((Hd,)), jnp.zeros((Dx,)))
