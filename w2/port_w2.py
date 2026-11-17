@@ -23,6 +23,7 @@ from w2.learnability import RecAgent  # noqa: E402
 from w2.worlds import world_kw  # noqa: E402
 from w2.gae import gae  # noqa: E402
 from w2 import offset_wide as OW  # noqa: E402
+from w2 import lr_anneal as LRA  # noqa: E402
 from w2 import named_item as NI  # noqa: E402
 from w2.gate import HonestGate  # noqa: E402
 from w2 import lookahead as LA  # noqa: E402
@@ -38,6 +39,9 @@ def main():
     ap.add_argument("--W", type=int, default=16); ap.add_argument("--N", type=int, default=4); ap.add_argument("--T", type=int, default=64)
     ap.add_argument("--d-move", type=float, default=None, help="Cam Nov 17 ~14:10Z D1 (H-COST test): override the per-step move cost env.Cfg.d_move (default: the world's 0.003)")
     ap.add_argument("--ppo-log", action="store_true", help="Cam Nov 17 ~14:10Z C1: after each iteration's updates, log approx KL / clip fraction / entropy on that iteration's batch (a separate forward pass; training unchanged)")
+    ap.add_argument("--lr-anneal", action="store_true", help="Cam Nov 17 ~19:10Z G2: LR linear lr -> --lr-end over --lr-anneal-len steps from max(--lr-anneal-after, the step the frontier first reaches --lr-anneal-frontier), then held (w2/lr_anneal.py); needs --target-kl")
+    ap.add_argument("--lr-end", type=float, default=3e-5); ap.add_argument("--lr-anneal-after", type=float, default=5e7); ap.add_argument("--lr-anneal-len", type=float, default=5e7)
+    ap.add_argument("--lr-anneal-frontier", type=float, default=24.0, help="the frontier that triggers t24 (24; lowered only in the G2 checks)")
     ap.add_argument("--target-kl", type=float, default=None, help="Cam Nov 17 ~16:40Z E1: before applying each minibatch step, the k3 approx KL (current vs rollout policy, that minibatch); if > this, skip the batch's remaining epochs / minibatches. Logs TKL lines")
     ap.add_argument("--tkl-synthetic-shift", type=float, default=0.0, help="E1 CHECK ONLY: subtract this from the batch's old log-probs (a synthetic high-KL batch)")
     ap.add_argument("--moves8", action="store_true", help="Cam Nov 17 ~13:00Z L2: 8-way movement (actions 6..9 = diagonal steps, a cardinal step's energy cost); prev-action one-hot columns 6..9 appended at x[126:130]")
@@ -66,6 +70,7 @@ def main():
     cfg = env.Cfg(L=96, N=a.N, patch_sigma=1.0, reproduce=False, A_max=3000, moves8=a.moves8, **world_kw(a.world), **({} if a.d_move is None else dict(d_move=a.d_move))); L, W, N, T = cfg.L, a.W, a.N, a.T
     nav = flax.serialization.from_bytes(Net().init(jax.random.PRNGKey(1), jnp.zeros((1, 100))), open(sorted(glob.glob(a.navs))[0], "rb").read())
     rnet = RecAgent(128, topo=a.topo, n_act=10 if a.moves8 else 6); Dx = 100 + 11 + 6 + 1 + 8 + (4 if a.moves8 else 0)   # the harness layout (oracle slot always present; zero when off)
+    assert not (a.lr_anneal and a.target_kl is None), "--lr-anneal is applied through the target-KL update (G2: target-KL is standard)"
     assert not (a.moves8 and (a.policy == "follower" or not a.no_nav)), "--moves8 is built for the learner policy with --no-nav only"
     rp = rnet.init(jax.random.PRNGKey(a.seed), jnp.zeros((128,)), jnp.zeros((Dx,)))
     pp = {k: (dict(v) if hasattr(v, "items") else v) for k, v in rp["params"].items()}
@@ -156,9 +161,9 @@ def main():
         return (pg + 0.5 * (v - bt["ret"]) ** 2 + ec * (jnp.exp(ls) * ls).sum(-1)).mean(), kl
 
     @jax.jit
-    def upd_kl(pp_, os_, bt):
+    def upd_kl(pp_, os_, bt, sc):                                           # sc = lr_t / lr (G2 anneal; exactly 1.0 otherwise)
         (_, kl), g = jax.value_and_grad(lambda q: (lambda o: (o[0].mean(), o[1].mean()))(jax.vmap(seq_loss_kl, in_axes=(None, 0))(q, bt)), has_aux=True)(pp_)
-        u, os2 = opt.update(g, os_, pp_); return optax.apply_updates(pp_, u), os2, kl
+        u, os2 = opt.update(g, os_, pp_); u = jax.tree_util.tree_map(lambda x_: x_ * sc, u); return optax.apply_updates(pp_, u), os2, kl
 
     @jax.jit
     def ppo_stats(pp_, bt):                                                # C1: diagnostics only, never in the gradient
@@ -179,7 +184,7 @@ def main():
         u, os_ = opt.update(g, os_, pp_); return optax.apply_updates(pp_, u), os_
 
     rng = np.random.default_rng(a.seed); key = jax.random.PRNGKey(a.seed + 1)
-    dfront = a.frontier0; recent = []; SPLIT = []; GATE = HonestGate(); steps = 0; it = 0; curve = []; nan_run = 0
+    dfront = a.frontier0; recent = []; SPLIT = []; GATE = HonestGate(); steps = 0; it = 0; curve = []; nan_run = 0; t24 = None
     c = jax.vmap(world_reset, in_axes=(0, None))(jax.random.split(key, W), dfront)
     Ck = _ck.load(a.ckpt) if a.ckpt else None
     if Ck is not None:
@@ -188,6 +193,9 @@ def main():
         dfront, recent, steps, it, curve = Ck["dfront"], Ck["recent"], Ck["steps"], Ck["it"], Ck["curve"]; rng.bit_generator.state = Ck["rng"]
         if "gate" in Ck:
             GATE.load(Ck["gate"])
+        if a.lr_anneal:                                                     # G2: t24 from the checkpoint, else from its curve (older checkpoints)
+            t24 = (None if float(Ck["t24"]) < 0 else float(Ck["t24"])) if "t24" in Ck else LRA.t24_from_curve(curve, a.lr_anneal_frontier)
+            print(f"LR_ANNEAL resume t24 {t24} ({'checkpoint' if 't24' in Ck else 'curve'})", flush=True)
         print(f"resumed at {steps:,} steps, frontier {dfront}", flush=True)
     SCHED = [(c_["steps"], c_["frontier"]) for c_ in json.load(open(a.frontier_schedule))["curve"]] if a.frontier_schedule else None
 
@@ -202,7 +210,7 @@ def main():
         if SCHED is not None:
             dfront = sched_front(steps)
         if a.ckpt and it % 20 == 0 and it > 0:
-            _ck.save(a.ckpt, dict(p=p, ost=ost, c=c, key=key, dfront=dfront, recent=recent, steps=steps, it=it, curve=curve, rng=rng.bit_generator.state, gate=GATE.state()))
+            _ck.save(a.ckpt, dict(p=p, ost=ost, c=c, key=key, dfront=dfront, recent=recent, steps=steps, it=it, curve=curve, rng=rng.bit_generator.state, gate=GATE.state(), **(dict(t24=(-1.0 if t24 is None else float(t24))) if a.lr_anneal else {})))
             if a.max_seconds and time.time() - t0 > a.max_seconds:
                 print(f"CHUNK_STOP at {steps:,}", flush=True); sys.exit(3)
         key, k = jax.random.split(key); c, R_ = roll(p, c, jax.random.split(k, W), jnp.float32(dfront))
@@ -220,13 +228,14 @@ def main():
         p_prev, o_prev = p, ost
         if a.tkl_synthetic_shift:                                            # E1 check only: a synthetic high-KL batch (old log-probs shifted down)
             bt["lp"] = bt["lp"] - a.tkl_synthetic_shift
-        n_mb = 0; kl_stop = None
+        LR_T = LRA.lr_at(steps, t24, a.lr, a.lr_end, a.lr_anneal_after, a.lr_anneal_len) if a.lr_anneal else a.lr
+        SC = jnp.float32(LR_T / a.lr); n_mb = 0; kl_stop = None
         for _ in range(0 if nupd else a.epochs):
             for mb in np.array_split(rng.permutation(W * N), a.minibatches):
                 if a.target_kl is None:
                     p, ost = upd(p, ost, {k_: v_[mb] for k_, v_ in bt.items()})
                 else:                                                       # E1: skip the batch's remaining epochs / minibatches once approx KL > target
-                    p2_, o2_, kl_ = upd_kl(p, ost, {k_: v_[mb] for k_, v_ in bt.items()})
+                    p2_, o2_, kl_ = upd_kl(p, ost, {k_: v_[mb] for k_, v_ in bt.items()}, SC)
                     if float(kl_) > a.target_kl:
                         kl_stop = float(kl_); break
                     p, ost = p2_, o2_
@@ -235,7 +244,7 @@ def main():
                 break
         if a.target_kl is not None:
             dpar = float(sum(jnp.abs(x1 - x0).sum() for x1, x0 in zip(jax.tree_util.tree_leaves(p), jax.tree_util.tree_leaves(p_prev))))
-            print("TKL", json.dumps(dict(it=it, mb_done=n_mb, mb_total=(0 if nupd else a.epochs * a.minibatches), kl_stop=kl_stop, dparam=dpar)), flush=True)
+            print("TKL", json.dumps(dict(it=it, mb_done=n_mb, mb_total=(0 if nupd else a.epochs * a.minibatches), kl_stop=kl_stop, dparam=dpar, **(dict(lr=LR_T, t24=t24) if a.lr_anneal else {}))), flush=True)
         if not all(bool(jnp.isfinite(l_).all()) for l_ in jax.tree_util.tree_leaves(p)):   # NaN guard
             p, ost = p_prev, o_prev; nan_run += 1; print(f"NAN_SKIP {it}", flush=True)
             if nan_run >= 10:
@@ -244,7 +253,7 @@ def main():
             nan_run = 0
         if a.ppo_log:
             q_ = np.asarray(ppo_stats(p, {k_: v_[:16] for k_, v_ in bt.items() if k_ in ('x', 'h0', 'act', 'lp', 'first')}))   # 16 of the 128 sequences (cost)
-            print("PPO", json.dumps(dict(it=it, steps=steps + W * N * T, kl=float(q_[0]), kl3=float(q_[1]), clipfrac=float(q_[2]), ent=float(q_[3]), ent_bout=float(q_[4]), lr=a.lr)), flush=True)
+            print("PPO", json.dumps(dict(it=it, steps=steps + W * N * T, kl=float(q_[0]), kl3=float(q_[1]), clipfrac=float(q_[2]), ent=float(q_[3]), ent_bout=float(q_[4]), lr=(LR_T if a.lr_anneal else a.lr))), flush=True)
         steps += W * N * T; it += 1
         n_close = int(closed.sum()); n_eat = int(ate_i.sum())
         recent.extend([1] * n_eat + [0] * max(n_close - n_eat, 0)); recent = recent[-500:]
@@ -255,6 +264,8 @@ def main():
                 dfront += 1; print(f"GATE_UP frontier -> {dfront:.0f} at {steps:,} (last windows {GATE.scores[-2:]})", flush=True)
         elif SCHED is None and len(recent) >= 500 and np.mean(recent) >= 0.8 and dfront < a.d_max:
             dfront += 1; recent = []
+        if a.lr_anneal and t24 is None and dfront >= a.lr_anneal_frontier:   # G2: the frontier first reaches 24 (twin: the replayed frontier)
+            t24 = float(steps); print(f"LR_ANNEAL t24 {t24:,.0f}; anneal starts at {LRA.anneal_start(t24, a.lr_anneal_after):,.0f}", flush=True)
         if it % a.curve_every == 0:
             curve.append(dict(steps=steps, frontier=dfront, item_reach=n_eat / max(n_close, 1), food_per_step=float(gain.mean()), paid_per_step=float(pd.mean()), frac_in_bout=float(inb.mean()),
                               hungry_reach=float(hate.sum() / max(hung.sum(), 1)), n_hungry=int(hung.sum()), n_hungry_lookahead=n_la, gate_last=(GATE.scores[-1] if GATE.scores else None), sec=round(time.time() - t0, 1)))
