@@ -9858,6 +9858,82 @@ more expensive, because it produces publishable-looking nulls.
     - Across o4, (a'), O-X' and both 8-way seeds, the common thread is abrupt, sector-specific collapse and
       recovery of the oracle policy. The geometry decides WHICH sectors are vulnerable, not WHETHER one is.
   - Nothing runs except the guard. Branch `moves8-learner` is unmerged (kept). Waiting for Cam's ruling.
+- **RULING (Cam, message headed "~14:10Z Nov 17", time copied from that header; entry stamped Nov 17 09:15:38 EST).**
+  - Recorded:
+    - A1 clean; A2 accepted (o4 sector 7 = an active learned stay; any single table is a snapshot).
+    - Step B: the 8-way oracle FAILS on both seeds; stopping was correct.
+    - The 4-way "split toward" asymmetry is NOT necessary for a sector to die. Cam's 8-way rationale is refuted as
+      the cause; geometry sets WHICH sectors are exposed.
+  - Cam's added reading to test, **H-COST**. The sectors that die are the ones weakest at LONG d beforehand
+    (4-way: diagonals; 8-way: cardinals). The hearing-time policy can't see d, and a move costs 3.3x a stay. So in
+    a sector whose long bouts mostly fail, "go" can pay less on average than "stay". Stay is then locally right and
+    absorbing: no practice, so no recovery.
+  - Option (3) as worded (random rotation of the frame) is a no-op: the world is isotropic. A real tie needs a
+    D4-equivariant policy: new inborn wiring (M's card first), and it ties cardinals to cardinals only. Parked as
+    the fallback.
+  - STEP C (free, eval / log only, beside D):
+    - C1: PPO logs around each collapse event vs quiet windows: approx KL, clip fraction, entropy, LR. Events: o8
+      s0 sector 2 (2e7 -> 3e7); o8 s1 sectors 4 / 6 (1e7 -> 2e7); o4 sector 5 (5e7 -> 6e7); o4 sectors 1 / 2
+      (9e7 -> 1e8); clipped (b') sector 1 (4e7 -> 5e7). Skip any not logged. Cam p(no collapse-specific spike) .6.
+    - C2: at the checkpoint BEFORE each event, per sector, >= 300 hungry bouts with d from that run's training
+      distribution at the time. Report success, mean extra move energy per bout, net payoff (food gained minus
+      extra move energy) and d = 21 reach. Cam p(the sector that dies next has the lowest net payoff, or the
+      lowest d = 21 reach, in >= 3 events) .55.
+    - Also: the training d-distribution at frontier 24, and one meal's energy relative to the move cost.
+  - STEP D (launch now): D1 = oracle (b') + 8-way + **d_move = 0**, seeds 0 and 1, 3e7 each, tables at 1e7 / 2e7 /
+    3e7 at d = 3 / 12 / 21. The controls are the 8-way s0 / s1 tables.
+    - Checks first: flag-off identity; flag-on changes energy on move steps only.
+    - Collapse event = a sector dropping >= .3 between consecutive tables, or falling < .30 after having been
+      >= .60. The controls had 3 events in 2 seeds.
+    - Outcomes:
+      - (a) 0 events and both qualify: H-cost SUPPORTED. Continue s0 to 1e8 (tables every 1e7) as the reference
+        candidate. Then the twin (8-way + d_move 0, 3e7): if free movement does not keep listening worth it (life
+        >= 1.3x, LB > 1.0), STOP before seed 8. Otherwise merge moves8-learner and run seed 8 (relabel + no-nav +
+        8-way + d_move 0) to 1e8.
+      - (b) <= 1 event but a seed does not qualify: report.
+      - (c) >= 2 events or a dead sector: H-cost not sufficient. Report. Next candidates: the D4 tie, or LR
+        annealing if C1 shows spikes.
+      - Cam p: (a) .35, (b) .30, (c) .35.
+  - **MEASUREMENT RULE (registered before any reference or learner verdict):**
+    - A verdict uses the last three 1e7 tables, not one snapshot; reach = the mean of the three.
+    - A sector < .30 in the final table = FAIL whatever the mean.
+    - The reference is measured the same way: the bar3 long eval on each of the last three checkpoints, averaged.
+      The bar stays 0.9 x reference.
+  - Modal nothing; guard $41; laptop on AC; moves8-learner stays unmerged unless (a).
+- **BUILD + REGISTRATION (entry stamped Nov 17 09:21:12 EST): D1 (H-cost test), before it runs.**
+  - Build (comm-toy):
+    - `port_w2.py` / `learner_w2_rl_traj.py --d-move X` overrides `env.Cfg.d_move`.
+    - `port_w2.py --ppo-log`: after each iteration's updates, ONE extra forward pass on that iteration's batch logs
+      approx KL (two estimators), clip fraction (|ratio - 1| > .2), entropy (all steps and in-bout) and LR. It never
+      enters the gradient.
+  - Checks (`docs/data/port_w2/d1/identity_check/`):
+    - `test_dmove.py` ALL PASS: d_move 0 removes exactly .003 of energy on move steps (4-way actions 1..4; 8-way also
+      6..9) and nothing elsewhere; position and food are identical. World: a move costs .0043, a stay .0013; with
+      d_move 0 both cost .0013.
+    - Flag-off identity: (b') 3 / 3 rows; traj 27 / 27 keys.
+    - `--moves8 --ppo-log`: 3 / 3 rows identical to the 8-way control seed 0's own first three rows, so logging
+      does not change training; 60 PPO lines (one per iteration).
+    - d_move 0 acts: row 1 has fewer hungry bouts (229 vs 406) and lower reach (.48 vs .62). With cheaper moves
+      energy falls more slowly, so fewer bouts open (hunger gate).
+  - Run: `scratchpad/d1/run_d1.sh` (QUEUES). Seeds 0 then 1, legs of 1e7, tables at every 1e7 at d = 3 / 12 / 21
+    with `decide.py`, `--ppo-log` on.
+    - Outcome by `d1_outcome.py`. EVENTS are counted on the d = 3 tables, as the controls' 3 were (only d = 3 exists
+      for the controls at 1e7 / 2e7); d = 12 events are listed for information. Self-test: on the controls' tables
+      it finds exactly the 3 registered events plus the dead sector, giving class (c); flat tables give (a).
+    - The case "1 event and both qualify" is not covered by (a) / (b) / (c). The script stops and reports it as
+      unregistered.
+    - (a) -> s0 to 1e8. Then the 3-table rule (`decide3.py` on 8e7 / 9e7 / 1e8). If it qualifies, the reference =
+      the mean of the long d = 12 evals at 8e7 / 9e7 / 1e8, then the twin (3e7) + its eval. The life gate and the
+      learner are done by hand.
+    - Qualification at 3e7 is `decide.py` on the 3e7 snapshot, as for the controls. The three-table rule is applied
+      to the reference (1e8); the 3e7 three-table version is reported as information.
+  - Predictions:
+    - (a) .25, (b) .30, (c) .45. The 8-way controls collapsed with cheap stays; with d_move 0, stay still pays the
+      same basal cost as go, so H-cost predicts fewer collapses. But o4 / 8-way collapses also hit sectors that were
+      not the weakest (sector 2 at .79 -> .05).
+    - Frontier 24 by 3e7: s0 .6, s1 .6 (fewer bouts per step, so a slower gate).
+    - The PPO log shows a KL or clip-fraction spike (> 2x the run's median) within the 1e7 window of any D1
+      collapse event, if events occur: .35.
 - **RESULT (Nov 16 ~01:40): THE LABEL COUNT** (`docs/data/learner_w2/label_count/`; each row is 100 rollout
   iterations, 819k steps, with that checkpoint's weights, world state and frontier, no updates).
   - Definitions: MEMORY-ONLY bout = a later hearing (not the token's first in this life) at d >= 3. By construction

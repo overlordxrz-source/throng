@@ -1,0 +1,104 @@
+{
+ "cfg": {
+  "navs": "w2_out/nav_w13/*.msgpack",
+  "world": "0.0013,8,0.001",
+  "W": 32,
+  "N": 4,
+  "T": 64,
+  "d_move": 0.0,
+  "ppo_log": false,
+  "moves8": true,
+  "offset_wide": false,
+  "steps": 163840.0,
+  "oracle": true,
+  "seed": 0,
+  "epochs": 4,
+  "minibatches": 8,
+  "lr": 0.0003,
+  "d_max": 24,
+  "curve_every": 20,
+  "ckpt": "",
+  "max_seconds": 0,
+  "save_params": "",
+  "item_size": 0.1,
+  "hunger_gate": true,
+  "policy": "learner",
+  "v2": "/Users/overlord/throng-backup/evo2/evo2.ckpt",
+  "init_params": "",
+  "eval_only": false,
+  "frontier0": 1.0,
+  "frontier_schedule": "",
+  "gate": "honest",
+  "lookahead": 0.0,
+  "la_max": 12,
+  "giveup": 0.0,
+  "ent_bout": null,
+  "ent_anneal": 0.0,
+  "reinit_out": false,
+  "no_nav": true,
+  "topo": false,
+  "out": "/private/tmp/claude-501/-Users-overlord-CascadeProjects-throng/aad77c1d-d7ac-437e-bef4-aa525802ccc0/scratchpad/d1id/port_m8_d0.json"
+ },
+ "steps": 163840,
+ "frontier": 1.0,
+ "curve": [
+  {
+   "steps": 163840,
+   "frontier": 1.0,
+   "item_reach": 0.48034934497816595,
+   "food_per_step": 0.0014018595684319735,
+   "paid_per_step": 0.0013613947667181492,
+   "frac_in_bout": 0.0938720703125,
+   "hungry_reach": 0.48034934497816595,
+   "n_hungry": 229,
+   "n_hungry_lookahead": 0,
+   "gate_last": 0.391,
+   "sec": 26.6
+  }
+ ],
+ "reach_by_start_energy": {
+  "E<0.6 d=1": {
+   "reach": 0.06217870116233826,
+   "bouts": 8170
+  },
+  "E<0.6 all": {
+   "reach": 0.06217870116233826,
+   "bouts": 8170
+  },
+  "0.6<=E<H d=1": {
+   "reach": 0.2533661723136902,
+   "bouts": 6090
+  },
+  "0.6<=E<H all": {
+   "reach": 0.2533661723136902,
+   "bouts": 6090
+  },
+  "H<=E<0.75 d=1": {
+   "reach": null,
+   "bouts": 0
+  },
+  "H<=E<0.75 all": {
+   "reach": null,
+   "bouts": 0
+  },
+  "E>=0.75 d=1": {
+   "reach": null,
+   "bouts": 0
+  },
+  "E>=0.75 all": {
+   "reach": null,
+   "bouts": 0
+  }
+ },
+ "gate_scores": [
+  0.0205,
+  0.036,
+  0.0385,
+  0.0745,
+  0.1365,
+  0.273,
+  0.391
+ ],
+ "train_seconds": 26.6,
+ "throughput": 6167.854957370391
+}
