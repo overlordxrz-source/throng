@@ -86,6 +86,8 @@ def main():
     ap.add_argument("--out", required=True)
     ap.add_argument("--lookahead", type=float, default=0.0); ap.add_argument("--la-max", type=int, default=12); ap.add_argument("--stop-at", type=float, default=0.0)
     ap.add_argument("--head-relabel-token", action="store_true", help="Cam/M Nov 16: cross-hearing relabel of the head (own record buffer only)")
+    ap.add_argument("--target-kl", type=float, default=None, help="Cam Nov 17 ~16:40Z E1: before applying each minibatch step, the k3 approx KL of the POLICY (current vs rollout, that minibatch); if > this, skip the batch's remaining epochs / minibatches. Logs TKL lines")
+    ap.add_argument("--tkl-synthetic-shift", type=float, default=0.0, help="E1 CHECK ONLY: subtract this from the batch's old log-probs (a synthetic high-KL batch)")
     ap.add_argument("--moves8", action="store_true", help="Cam Nov 17 ~13:00Z L2: 8-way movement (actions 6..9 = diagonal steps, a cardinal step's energy cost); prev-action columns 6..9 appended at x[126:130]; the parent stays 4-way")
     a = ap.parse_args()
     S = a.item_size; gated = a.hunger_gate; ep = a.learner == "ep"; KV = not os.environ.get("KV_OFF")
@@ -223,37 +225,47 @@ def main():
         _, (lg, v, hl) = jax.lax.scan(body, bt["h0"][:128], (bt["x"], bt["first"], valid))
         return lg, v, hl
 
-    def seq_loss(pp_, bt):
+    def seq_loss(pp_, bt, with_kl=False):
         if ep and KV:
             lg, v, hl = seq_loss_kv(pp_, bt)
-            return ppo_terms(lg, v, hl, bt)
-        return seq_loss_old(pp_, bt)
+            return ppo_terms(lg, v, hl, bt, with_kl)
+        return seq_loss_old(pp_, bt, with_kl)
 
-    def seq_loss_old(pp_, bt):
+    def seq_loss_old(pp_, bt, with_kl=False):
         def body(hc, xa):
             xx, f, hm = xa; hc = jnp.where(f > 0, 0.0, hc)
             hh = jnp.concatenate([hc, hm[128:]]) if ep else hc               # the memory part is the world's (stored); the GRU part is replayed
             h2, lg, v, aux = rnet.apply(pp_, hh, xx); return h2[:128], (lg, v, aux[0] if ep else jnp.zeros(8))
         _, (lg, v, hl) = jax.lax.scan(body, bt["h0"][:128], (bt["x"], bt["first"], bt["hm"]))
-        return ppo_terms(lg, v, hl, bt)
+        return ppo_terms(lg, v, hl, bt, with_kl)
 
-    def ppo_terms(lg, v, hl, bt):
+    def ppo_terms(lg, v, hl, bt, with_kl=False):
         ls = jax.nn.log_softmax(lg); lp = jnp.take_along_axis(ls, bt["act"][:, None], 1)[:, 0]
         ratio = jnp.exp(jnp.clip(lp - bt["lp"], -20.0, 20.0)); adv = bt["adv"]
         pg = -jnp.minimum(ratio * adv, jnp.clip(ratio, 0.8, 1.2) * adv)
         ce = -jnp.take_along_axis(jax.nn.log_softmax(hl), bt["sec"][:, None], 1)[:, 0] * bt["hear"]
         hloss = a.hindsight * ce.sum() / jnp.maximum(bt["hear"].sum(), 1.0)
         if a.head_only:
-            return hloss
-        if a.ent_bout is None:
-            return (pg + 0.5 * (v - bt["ret"]) ** 2 + 0.01 * (jnp.exp(ls) * ls).sum(-1)).mean() + hloss
-        ec = jnp.where(bt["x"][..., 108] > 0, bt["ecb"] if a.ent_anneal else a.ent_bout, 0.01)   # O-X / O-X': in-bout entropy coefficient
-        return (pg + 0.5 * (v - bt["ret"]) ** 2 + ec * (jnp.exp(ls) * ls).sum(-1)).mean() + hloss
+            loss = hloss
+        elif a.ent_bout is None:
+            loss = (pg + 0.5 * (v - bt["ret"]) ** 2 + 0.01 * (jnp.exp(ls) * ls).sum(-1)).mean() + hloss
+        else:
+            ec = jnp.where(bt["x"][..., 108] > 0, bt["ecb"] if a.ent_anneal else a.ent_bout, 0.01)   # O-X / O-X': in-bout entropy coefficient
+            loss = (pg + 0.5 * (v - bt["ret"]) ** 2 + ec * (jnp.exp(ls) * ls).sum(-1)).mean() + hloss
+        if not with_kl:
+            return loss
+        d_ = lp - bt["lp"]                                                  # E1: k3 approx KL (policy only), params BEFORE this step
+        return loss, jax.lax.stop_gradient(((jnp.exp(d_) - 1) - d_).mean())
 
     @jax.jit
     def upd(pp_, os_, bt):
         g = jax.grad(lambda q: jax.vmap(seq_loss, in_axes=(None, 0))(q, bt).mean())(pp_)
         u, os_ = opt.update(g, os_, pp_); return optax.apply_updates(pp_, u), os_
+
+    @jax.jit
+    def upd_kl(pp_, os_, bt):                                               # E1 (--target-kl only)
+        (_, kl), g = jax.value_and_grad(lambda q: (lambda o: (o[0].mean(), o[1].mean()))(jax.vmap(lambda b_: seq_loss(q, b_, True))(bt)), has_aux=True)(pp_)
+        u, os2 = opt.update(g, os_, pp_); return optax.apply_updates(pp_, u), os2, kl
 
     # ------------------------------------------------------------------ evaluation on the necessity lives / keys
     if a.eval_necessity:
@@ -371,9 +383,24 @@ def main():
             print("KV_MEMCHECK it %d count mismatch %d ; content max|d| %.3g ; writes %d deaths %d" % (it, int(mc[0].max()), float(mc[1].max()), nw, nd), flush=True)
             print("KV_COMPARE it %d loss old %.7g new %.7g ; grad max|d| %.3g (max |grad| %.3g)" % (it, float(l_old), float(l_new), gd, gm), flush=True)
         p_prev, o_prev = p, ost
+        if a.tkl_synthetic_shift:                                            # E1 check only: a synthetic high-KL batch
+            bt["lp"] = bt["lp"] - a.tkl_synthetic_shift
+        n_mb = 0; kl_stop = None
         for _ in range(0 if nupd else a.epochs):
             for mb in np.array_split(rng.permutation(W * N), a.minibatches):
-                p, ost = upd(p, ost, {k_: v_[mb] for k_, v_ in bt.items()})
+                if a.target_kl is None:
+                    p, ost = upd(p, ost, {k_: v_[mb] for k_, v_ in bt.items()})
+                else:                                                       # E1: skip the batch's remaining epochs / minibatches once approx KL > target
+                    p2_, o2_, kl_ = upd_kl(p, ost, {k_: v_[mb] for k_, v_ in bt.items()})
+                    if float(kl_) > a.target_kl:
+                        kl_stop = float(kl_); break
+                    p, ost = p2_, o2_
+                n_mb += 1
+            if kl_stop is not None:
+                break
+        if a.target_kl is not None:
+            dpar = float(sum(jnp.abs(x1 - x0).sum() for x1, x0 in zip(jax.tree_util.tree_leaves(p), jax.tree_util.tree_leaves(p_prev))))
+            print("TKL", json.dumps(dict(it=it, mb_done=n_mb, mb_total=(0 if nupd else a.epochs * a.minibatches), kl_stop=kl_stop, dparam=dpar)), flush=True)
         if not all(bool(jnp.isfinite(l_).all()) for l_ in jax.tree_util.tree_leaves(p)):
             p, ost = p_prev, o_prev; nan_run += 1; print(f"NAN_SKIP {it}", flush=True)
             if nan_run >= 10:
