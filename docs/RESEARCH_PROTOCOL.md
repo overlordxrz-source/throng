@@ -9229,6 +9229,27 @@ more expensive, because it produces publishable-looking nulls.
   - Predictions: p(read forms) 0.75 HIT; p(0 dead later sectors at 3e7) 0.35 HIT; p(frontier > 6 at 5e7) 0.3 ->
     already 15 at 3e7.
   - What remains for the bar: d = 12 2nd-half hungry reach 0.761 against 0.877, and life against the new twin.
+- **RESULT (entry stamped Nov 16 20:26:46 EST): seed 7 at 1e8 (relabel + `--no-nav`): THE REACH CRITERIA FAIL, so the bar FAILS
+  whatever the twin gives** (the life criterion and the formal bar3 verdict wait for the lever twin, now training).
+  `docs/data/learner_w2/relabel_screen/s7_final/`.
+  - Final frontier **21** (21 at 49.2M; no advance in the last ~5e7 steps). TRAINED at 100,007,936.
+  - d = 12 eval lengthened to 24,000 steps (true / shuffled each >= 2000 2nd-half hungry bouts): 2nd-half hungry
+    reach **0.564** (n 6,684), shuffled 0.335, wiped 0.425. Criteria: >= 0.8772 FAIL; >= shuffled + 0.30 = 0.635
+    FAIL; >= 2x shuffled = 0.671 FAIL. Head on later hearings 0.918 (default eval); wiped / shuffled 0.13.
+  - **The diagonals COLLAPSED between 3e7 and 1e8.** Later right-head reach by sector:
+    - d = 3: 3e7: 0.91 0.89 0.95 0.84 0.94 0.64 0.92 0.75 -> 1e8: **0.99 0.46 0.97 0.03 0.98 0.01 0.97 0.08**;
+    - d = 12 at 1e8: 0.89 0.19 0.84 0.18 0.88 0.00 0.90 0.22.
+    - The four cardinal sectors are at 0.97-0.99. Diagonals 3, 5 and 7 are dead and diagonal 1 is weak.
+  - **Logit split on the final weights (exploratory; d = 3, hearing step; identity checked): the same learned LOCK.**
+    In the dead diagonals the young stays 76-95% of the time. The side head ADDS stay there (+0.69 / +2.72 / +3.46 in
+    sectors 3 / 5 / 7). The trunk, trained from scratch, learned its own stay margin too (+2.0 / +2.3 in sectors
+    3 / 5). Working sectors: side head -3.6 to -5.6.
+  - **Reading:** removing the inborn prior removed the EARLY lock (3e7: no dead sector, frontier 15). The lock still
+    forms LATER, on the diagonals, while the frontier sits at 21 and long-range diagonal bouts keep failing. A
+    diagonal item needs two alternating move types, so "stay" can win back sector by sector.
+    - The oracle (b') kept its diagonals at d = 3 (0.94-0.97). The learner lost them. The difference is the
+      learner's read and the relabel targets, the only things the two do not share (CONJECTURED).
+  - Predictions: p(bar PASS) 0.1 -> FAIL (reach). "0 dead sectors at 3e7" held at 3e7 but not at 1e8.
 - **RESULT (Nov 16 ~01:40): THE LABEL COUNT** (`docs/data/learner_w2/label_count/`; each row is 100 rollout
   iterations, 819k steps, with that checkpoint's weights, world state and frontier, no updates).
   - Definitions: MEMORY-ONLY bout = a later hearing (not the token's first in this life) at d >= 3. By construction
