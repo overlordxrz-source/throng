@@ -9574,6 +9574,38 @@ more expensive, because it produces publishable-looking nulls.
   - d = 12: .921 / .719 / .803 / .894 / .892 / .862 / .890 / .000.
   - d = 21: .80 / .55 / .72 / .57 / .80 / .77 / .85 / .00.
   - Still does not qualify: sector 7 is dead (5e7 steps at 0.00). Sector 5 has recovered (.52 -> .93 at d = 3).
+- **RESULT (entry stamped Nov 17 06:01:59 EST): L4 (i) at 1e8: does NOT qualify; registered class LOCK (by the rule, on a sector that
+  was never learned); the sequence STOPPED before (ii) / (iii) as registered** (table and STOP 06:00:09 copied from
+  `queue_l4.out`; `docs/data/port_w2/l4/`; checkpoints at every 1e7 kept in scratch, `o4_ckpt_{1..10}e7.ckpt`).
+
+  | O4 1e8 | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 |
+  |---|---|---|---|---|---|---|---|---|
+  | d = 3 | .986 | .585 | .591 | .915 | .975 | .954 | .969 | **.002** |
+  | d = 12 | .898 | .553 | .778 | .787 | .858 | .805 | .821 | **.000** |
+  | d = 21 | .77 | .43 | .73 | .49 | .68 | .60 | .75 | **.00** |
+
+  - `lockcheck.py` vs (i)'s own 3e7 table: **LOCK**. The trigger was sector 7 < .30. The other LOCK test did not
+    fire: the diagonal mean at d = 12 ROSE, from .492 to .536.
+  - Sector 7 was at 0.00 from 1e7 onward, so this is an early never-learned sector, not a LATE lock. The registered
+    rule does not tell the two apart. The script's STOP message ("late diagonal lock despite L4; L3 next") follows
+    the rule's wording; it is not a finding about late locking. The stop itself is right either way: 1e8 does not
+    qualify.
+  - **Report rule fired (>= .3 between consecutive tables, 5e7 -> 1e8):** sector 2 (+y, a CARDINAL) at d = 3,
+    .927 -> .591 (-.34). Sector 1 also fell, .812 -> .585 (-.23), as did sector 3 at d = 21 (.57 -> .49).
+  - d = 21: cardinal mean .73; diagonal mean .38 (.51 without the dead sector 7). Clipped baseline at 1e8: .80 / .66.
+  - Predictions for (i): frontier 24 by 2e7 (p .8) **hit**; 3e7 qualifies (p .7) **miss**; 1e8 class LOCK (p .25)
+    **by the rule**; 1e8 qualifies (p .6) **miss**; d = 21 diagonals within .10 of the cardinals (p .6) **miss**.
+  - **Reading (one seed each; not established).**
+    - On this seed the wide-offset oracle is worse than the clipped (b') on every summary: a dead diagonal from the
+      start, a late slump on sectors 1 / 2 at d = 3, and a larger diagonal deficit at d = 21.
+    - So widening the input did not buy the diagonals in the saturated regime, even though the information is
+      provably in the input (the G2b follower on the wide input is 8/8).
+    - Two explanations are open:
+      (1) run-to-run fragility on the +x -y diagonal: (a') also never learned sector 7;
+      (2) a cost of L4 itself. The wide scale shrinks one cell from .111 to .042 of input range, a 2.7x loss of
+      near-field resolution, and the slumps are at d = 3.
+    - Neither is tested.
+  - Nothing runs now except the guard. Waiting for Cam's ruling.
 - **RESULT (Nov 16 ~01:40): THE LABEL COUNT** (`docs/data/learner_w2/label_count/`; each row is 100 rollout
   iterations, 819k steps, with that checkpoint's weights, world state and frontier, no updates).
   - Definitions: MEMORY-ONLY bout = a later hearing (not the token's first in this life) at d >= 3. By construction
