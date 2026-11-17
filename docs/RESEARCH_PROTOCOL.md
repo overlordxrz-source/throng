@@ -9998,6 +9998,38 @@ more expensive, because it produces publishable-looking nulls.
     - Predictions: oracle R^2 >= .5 (p .55); learner s7 R^2 >= .5 (p .4); random-init R^2 < .2 (p .75); raw input
       R^2 < .1 (p .85).
   - F1 (video) has no prediction.
+- **RESULT (entry stamped Nov 17 09:34:37 EST): C2. Net payoff / d = 21 reach before each collapse predicts the dying sector in 1
+  of 5 events (2 of 5 if already-dead sectors are excluded). Cam's p .55 and my .45: miss. H-cost as a SELECTION
+  rule is not supported.** Files: `docs/data/port_w2/c2/`.
+  - Hungry bouts per sector >= 300 in every table used: the two 8-way evals were lengthened to 6000 steps
+    (320-437 per sector; the first, 3000-step versions had 174-255 and are kept but not used). "Every eval >= 300"
+    (p .8): miss.
+  - Per event, at the checkpoint before (net = .1 x eaten - .003 x moves, per hungry bout):
+
+    | event | dying | its success / net / r21 | lowest net (living) | lowest r21 (living) | hit |
+    |---|---|---|---|---|---|
+    | o8 s0 2e7 | 2 | .70 / +.004 / .59 | **2** (+.004) | 6 (.41) | yes (net) |
+    | o8 s1 1e7 | 4, 6 | .91 / +.057 / .81; .84 / +.044 / .80 | 0 (+.023) | 2 (.24) | no |
+    | o4 5e7 | 5 | .99 / +.046 / .97 | 7 dead (+.006); living: 1 (+.028) | 7 dead (.00); living: 1 (.79) | no |
+    | o4 9e7 | 1, 2 | .96 / +.041 / .88; .97 / +.057 / .95 | 7 dead; living: **1** (+.0407; sector 5 +.0408) | 7 dead; living: 6 (.83) | registered: no; excluding dead: yes (a tie) |
+    | clipped (b') 3e7 | 1 | .94 / +.038 / .94 | 6 (+.027) | 3 (.86) | no |
+
+    - The registered computation ranked ALL sectors, so o4's long-dead sector 7 is "lowest" in both o4 events.
+      Excluding it is post hoc and is shown as such.
+  - No dying sector had a negative mean net payoff (the short eval gave -.005 for o8 s0 sector 2; the lengthened one
+    gave +.004). "Negative in >= 2 events" (p .2): did not happen.
+  - **What it shows.**
+    - Three of the five collapses hit sectors that were healthy just before: o4 sector 5 at .99 success, o8 s1
+      sectors 4 / 6 at .91 / .84, clipped sector 1 at .94. They were not the weakest at long d, and not the lowest
+      payoff.
+    - Only o8 s0 sector 2 fits H-cost: the weakest, net about 0, 22 moves per bout.
+    - A class-level pattern does hold, post hoc. In 4-way every diagonal costs ~18-19 moves against ~12-13 for a
+      cardinal, so the diagonals are the lowest-payoff CLASS. Every 4-way collapse was a diagonal.
+  - Training d-distribution: the oracle's `LA.sampler` without lookahead = uniform{1..frontier}; at frontier 24,
+    P(d > 12) = .5, P(d >= 16) = .375.
+  - Meal vs move: +.1 per item = 33 extra moves. Measured extra-move energy per hungry bout is .02-.07, so 20-70% of
+    a meal goes to moving.
+  - D1 runs on. A collapse at d_move = 0 would test the cost part directly.
 - **RESULT (Nov 16 ~01:40): THE LABEL COUNT** (`docs/data/learner_w2/label_count/`; each row is 100 rollout
   iterations, 819k steps, with that checkpoint's weights, world state and frontier, no updates).
   - Definitions: MEMORY-ONLY bout = a later hearing (not the token's first in this life) at d >= 3. By construction
