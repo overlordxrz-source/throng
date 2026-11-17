@@ -22,6 +22,7 @@ from w2.learn import Net  # noqa: E402
 from w2.learnability import RecAgent  # noqa: E402
 from w2.worlds import world_kw  # noqa: E402
 from w2.gae import gae  # noqa: E402
+from w2 import offset_wide as OW  # noqa: E402
 from w2 import named_item as NI  # noqa: E402
 from w2.gate import HonestGate  # noqa: E402
 from w2 import lookahead as LA  # noqa: E402
@@ -35,6 +36,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--navs", default="w2_out/nav_w13/*.msgpack"); ap.add_argument("--world", default="0.0013,8,0.001")
     ap.add_argument("--W", type=int, default=16); ap.add_argument("--N", type=int, default=4); ap.add_argument("--T", type=int, default=64)
+    ap.add_argument("--offset-wide", action="store_true", help="Cam Nov 17 L4: in-bout offset input clip(off, +-48) / 24 (w2/offset_wide.py) instead of clip(off / 9, +-1)")
     ap.add_argument("--steps", type=float, default=3e7); ap.add_argument("--oracle", action="store_true"); ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--epochs", type=int, default=4); ap.add_argument("--minibatches", type=int, default=8); ap.add_argument("--lr", type=float, default=3e-4)
     ap.add_argument("--d-max", type=int, default=24); ap.add_argument("--curve-every", type=int, default=20)
@@ -81,7 +83,7 @@ def main():
         return LA.sampler(dfront, N, a.lookahead, a.la_max)                   # mixed curriculum: uniform{1..frontier} (+ lookahead bouts)
 
     def obs_x(s, item, code, pa, pr):
-        o = NI.observe(cfg, s, item); hr = NI.hear(s, item, code, L)
+        o = NI.observe(cfg, s, item); hr = (OW.hear_wide if a.offset_wide else NI.hear)(s, item, code, L)
         return jnp.concatenate([o, hr, jax.nn.one_hot(pa, 6), pr[:, None], NI.oracle(item, a.oracle)], 1)
 
     def world_reset(key, dfront):
