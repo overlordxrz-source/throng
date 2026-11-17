@@ -9507,6 +9507,12 @@ more expensive, because it produces publishable-looking nulls.
       - every diagonal later-right reach at d = 3 >= .30 at 1e8 (p .45);
       - bar reach PASS (p .2); life PASS (p .85).
   - ETA: the continuation ends ~40 min after this entry; (i) ~90 min; (ii) ~25 min; (iii) ~4 h.
+- **RULING (Cam, message headed "~08:25Z Nov 17", time copied from that header; entry stamped Nov 17 03:19:05 EST): accepted, no changes.**
+  - The L4 build, the checks, the fold-in and the watcher fix are accepted.
+  - The clipped continuation runs to 1e8 as registered. Reading rule: clipped LOCK / PARTIAL plus L4 KEEP = causal
+    evidence that the cap drives the late diagonal lock.
+  - Report at (i)'s 3e7 and 1e8 tables and at seed 8's 3e7 and 5e7 pauses. Other 1e7 tables are logged only, unless
+    a sector drops >= .3 between two consecutive tables.
 - **RESULT (Nov 16 ~01:40): THE LABEL COUNT** (`docs/data/learner_w2/label_count/`; each row is 100 rollout
   iterations, 819k steps, with that checkpoint's weights, world state and frontier, no updates).
   - Definitions: MEMORY-ONLY bout = a later hearing (not the token's first in this life) at d >= 3. By construction
