@@ -10347,6 +10347,14 @@ more expensive, because it produces publishable-looking nulls.
   - Predictions: Cam .5, mine .55 -> qualifies (HIT for both). My ">= 1 v2 event over 6e7-1e8, p .45": none occurred.
   - Reading: under target-KL, s1 is clean over 1e8. s0's late event looks seed-specific (its chronic sector 2), not
     general. n = 1 vs 1.
+- **CORRECTION (entry stamped Nov 17 15:26:48 EST): the slow legs were the laptop SLEEPING ON BATTERY, not "machine load".**
+  - Source: `pmset -g log`. "Maintenance Sleep ... Using Batt" at 13:00:04 and 13:00:18 (E1 s0 leg 6 was the slow leg),
+    sleep again from ~14:48 to the lid wake at 15:25:22 (the G1 twin's 1e7 leg took 46 min).
+  - Power now: Battery 30%, discharging. This breaks the standing "laptop on AC" rule.
+  - The owner is notified (desktop notification; mobile push was not sent because Remote Control is inactive).
+  - Results are unaffected: legs are checkpointed and resume, and the per-iteration computation does not depend on wall
+    time. Only the timing is lost.
+  - My two earlier "machine load" attributions (the E1 s0 1e8 result entry and the chat note) are WITHDRAWN.
 - **RESULT (Nov 16 ~01:40): THE LABEL COUNT** (`docs/data/learner_w2/label_count/`; each row is 100 rollout
   iterations, 819k steps, with that checkpoint's weights, world state and frontier, no updates).
   - Definitions: MEMORY-ONLY bout = a later hearing (not the token's first in this life) at d >= 3. By construction
