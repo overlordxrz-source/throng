@@ -270,7 +270,12 @@ def main():
         u, os_ = opt.update(g, os_, pp_); return optax.apply_updates(pp_, u), os_
 
     @jax.jit
-    def upd_kl(pp_, os_, bt, sc):                                           # E1 (--target-kl only); sc = lr_t / lr (G2; exactly 1.0 otherwise)
+    def upd_kl(pp_, os_, bt):                                               # E1 (--target-kl only)
+        (_, kl), g = jax.value_and_grad(lambda q: (lambda o: (o[0].mean(), o[1].mean()))(jax.vmap(lambda b_: seq_loss(q, b_, True))(bt)), has_aux=True)(pp_)
+        u, os2 = opt.update(g, os_, pp_); return optax.apply_updates(pp_, u), os2, kl
+
+    @jax.jit
+    def upd_kl_sc(pp_, os_, bt, sc):                                        # G2 (--lr-anneal only): sc = lr_t / lr scales the Adam update
         (_, kl), g = jax.value_and_grad(lambda q: (lambda o: (o[0].mean(), o[1].mean()))(jax.vmap(lambda b_: seq_loss(q, b_, True))(bt)), has_aux=True)(pp_)
         u, os2 = opt.update(g, os_, pp_); u = jax.tree_util.tree_map(lambda x_: x_ * sc, u); return optax.apply_updates(pp_, u), os2, kl
 
@@ -404,7 +409,7 @@ def main():
                 if a.target_kl is None:
                     p, ost = upd(p, ost, {k_: v_[mb] for k_, v_ in bt.items()})
                 else:                                                       # E1: skip the batch's remaining epochs / minibatches once approx KL > target
-                    p2_, o2_, kl_ = upd_kl(p, ost, {k_: v_[mb] for k_, v_ in bt.items()}, SC)
+                    p2_, o2_, kl_ = (upd_kl_sc(p, ost, {k_: v_[mb] for k_, v_ in bt.items()}, SC) if a.lr_anneal else upd_kl(p, ost, {k_: v_[mb] for k_, v_ in bt.items()}))
                     if float(kl_) > a.target_kl:
                         kl_stop = float(kl_); break
                     p, ost = p2_, o2_
