@@ -10423,6 +10423,29 @@ more expensive, because it produces publishable-looking nulls.
   - Predictions: head >= .50 at 3e7 p .80 -> HIT. Cut 30-50% -> on track (.33 / .47 / .49).
   - Early stop B (frontier <= 6 at 5e7) is now the live risk. At the recent pace (about +1 per 3.5M) the frontier would be
     about 11 at 5e7. Not a prediction change; reported for Cam.
+- **RESULT (entry stamped Nov 17 19:24:40 EST): SEED 8 at 5e7. Early stop B is NOT triggered (frontier 10 > 6). The head is strong
+  (later-hearing .91 / .90 / .81 at d = 3 / 12 / 21). The curriculum is still slow (frontier 10; seed 7: 21 by 4.9e7).
+  The CARDINAL sectors are weak even with the head right.**
+  - Times copied from `scratchpad/e1l/run_e1l.out`: 4e7 19:14:52 (frontier 8), 5e7 19:24:09 (frontier 10).
+  - Frontier steps: 7 at 34.2M, 8 at 35.1M, 9 at 40.3M, 10 at 47.0M.
+  - Watch: head d3 / d12 / d21 = .94 / .94 / .86 at 4e7, .91 / .90 / .81 at 5e7. Cut .46 / .46.
+  - Later right-head reach by sector at 5e7 (cardinals = even sectors):
+
+    | | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 |
+    |---|---|---|---|---|---|---|---|---|
+    | d = 3 | .59 | .88 | .46 | .91 | .56 | .88 | .57 | .90 |
+    | d = 12 | .37 | .77 | .28 | .72 | .18 | .75 | .18 | .66 |
+    | d = 21 | .21 | .56 | .13 | .36 | .11 | .44 | .00 | .45 |
+
+  - Reading:
+    - Listening works: the head names the sector .9 of the time.
+    - The walk fails on the four cardinal directions: at d = 3, within the curriculum, .46-.59 vs .88-.91 for the
+      diagonals.
+    - d = 12 / 21 are beyond the current frontier (10), so part of their deficit is untrained distance.
+    - It is the same diagonal-strong / cardinal-weak split as the 8-way oracle at Step B. The E1 oracles had removed it by
+      3e7; this learner has not by 5e7.
+  - The run continues to 1e8 (bar3 vs reference .982, bar .884). No change to the recipe or the registered predictions.
+    My own reading, not a registered number: bar3 at 1e8 now looks less likely than my registered .40.
 - **RESULT (Nov 16 ~01:40): THE LABEL COUNT** (`docs/data/learner_w2/label_count/`; each row is 100 rollout
   iterations, 819k steps, with that checkpoint's weights, world state and frontier, no updates).
   - Definitions: MEMORY-ONLY bout = a later hearing (not the token's first in this life) at d >= 3. By construction

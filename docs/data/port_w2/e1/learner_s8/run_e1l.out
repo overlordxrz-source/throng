@@ -15,3 +15,13 @@ E1L S8 3e7 frontier 6.0 19:04:42
   later_right  reach by sector 0.02 0.32 0.06 0.00 0.14 0.23 0.02 0.00  n [43, 93, 121, 13, 28, 13, 122, 57]
 E1L S8 3e7 WATCH head_later {"s8_3e7_traj_d3_m0.npz": {"acc": 0.884, "n": 3398}, "s8_3e7_traj_d12_m0.npz": {"acc": 0.785, "n": 1737}, "s8_3e7_traj_d21_m0.npz": {"acc": 0.408, "n": 1217}} cut this-leg 0.493 (n_it 1221; chunk restarts replay <= 20 its)
 E1L S8 3e7 head later d=3 0.8840494155883789
+E1L S8 4e7 frontier 8.0 19:14:52
+  later_right  reach by sector 0.68 0.95 0.68 0.95 0.65 0.96 0.62 0.91  n [260, 237, 266, 246, 217, 252, 266, 233]
+  later_right  reach by sector 0.34 0.86 0.34 0.88 0.34 0.78 0.27 0.86  n [168, 166, 172, 209, 170, 135, 176, 143]
+  later_right  reach by sector 0.11 0.65 0.12 0.60 0.14 0.40 0.12 0.63  n [70, 102, 100, 86, 87, 65, 85, 84]
+E1L S8 4e7 WATCH head_later {"s8_4e7_traj_d3_m0.npz": {"acc": 0.942, "n": 2098}, "s8_4e7_traj_d12_m0.npz": {"acc": 0.935, "n": 1436}, "s8_4e7_traj_d21_m0.npz": {"acc": 0.863, "n": 791}} cut this-leg 0.464 (n_it 1220; chunk restarts replay <= 20 its)
+E1L S8 5e7 frontier 10.0 19:24:09
+  later_right  reach by sector 0.59 0.88 0.46 0.91 0.56 0.88 0.57 0.90  n [248, 269, 263, 251, 247, 229, 239, 241]
+  later_right  reach by sector 0.37 0.77 0.28 0.72 0.18 0.75 0.18 0.66  n [145, 168, 160, 170, 130, 146, 136, 145]
+  later_right  reach by sector 0.21 0.56 0.13 0.36 0.11 0.44 0.00 0.45  n [67, 85, 85, 74, 79, 89, 76, 67]
+E1L S8 5e7 WATCH head_later {"s8_5e7_traj_d3_m0.npz": {"acc": 0.91, "n": 2183}, "s8_5e7_traj_d12_m0.npz": {"acc": 0.901, "n": 1333}, "s8_5e7_traj_d21_m0.npz": {"acc": 0.811, "n": 774}} cut this-leg 0.462 (n_it 1221; chunk restarts replay <= 20 its)
