@@ -1,0 +1,6 @@
+Seed 8 at 1e8, later right-head bouts, the first 6 steps: D = logit(the cardinal move) - logit(the best adjacent diagonal),
+split into trunk (lgn) and side (lg - lgn). Source npz: scratchpad/e1ldiag/s8_1e8_d{3,12}_m0.npz (--logits eval).
+d3:  sector 0: n 1214 total -2.82 trunk +1.51 side -4.32 | sector 2: n 1059 total -3.99 trunk +1.15 side -5.13
+     sector 4: n 1054 total +3.33 trunk +0.88 side +2.45 | sector 6: n 1067 total -2.56 trunk +1.28 side -3.84
+d12: sector 0: n 912 total -4.46 trunk +0.62 side -5.08 | sector 2: n 1002 total -4.69 trunk +0.29 side -4.99
+     sector 4: n 1070 total +4.28 trunk +0.42 side +3.86 | sector 6: n 1032 total -2.81 trunk -0.05 side -2.76
