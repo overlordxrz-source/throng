@@ -43,7 +43,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from w2 import env  # noqa: E402
 from w2.learn import Net  # noqa: E402
 from w2.learnability import RecAgent  # noqa: E402
-from w2.d4 import RecAgentD4  # noqa: E402
+from w2.d4 import RecAgentD4, EpAgentDevD4  # noqa: E402
 from w2.ep_agent import EpAgent  # noqa: E402
 from w2.ep_agent_dev import EpAgentDev  # noqa: E402
 from w2.worlds import world_kw  # noqa: E402
@@ -105,9 +105,10 @@ def main():
     nav = flax.serialization.from_bytes(Net().init(jax.random.PRNGKey(1), jnp.zeros((1, 100))), open(sorted(glob.glob(a.navs))[0], "rb").read())
     Dx = 100 + 11 + 6 + 1 + 8 + (4 if a.moves8 else 0)
     assert not (a.moves8 and a.policy != "learner"), "--moves8: learner policy only"
-    assert not (a.d4_side and (ep or not a.eval_necessity)), "--d4-side here: rec (oracle) evals only (the ep learner trains in rl2)"
+    assert not (a.d4_side and not a.eval_necessity), "--d4-side here: evals only (training: port_w2 / rl2)"
+    HG = 128 * (8 if (a.d4_side and ep) else 1)
     if ep:
-        rnet = EpAgentDev(S=a.slots, use_hind=a.hindsight > 0, shared_tok=a.shared_tok, n_act=10 if a.moves8 else 6); Hd = 128 + a.slots * 11 + 1   # same params as EpAgent
+        rnet = (EpAgentDevD4 if a.d4_side else EpAgentDev)(S=a.slots, use_hind=a.hindsight > 0, shared_tok=a.shared_tok, n_act=10 if a.moves8 else 6); Hd = HG + a.slots * 11 + 1   # same params as EpAgent
     else:
         rnet = (RecAgentD4(128, n_act=10 if a.moves8 else 6) if a.d4_side else RecAgent(128, topo=a.topo, n_act=10 if a.moves8 else 6)); Hd = 128 * (8 if a.d4_side else 1)
     rp = rnet.init(jax.random.PRNGKey(a.seed), jnp.zeros((Hd,)), jnp.zeros((Dx,)))
@@ -181,10 +182,10 @@ def main():
         item2, closed, opened = NI.close_and_open(item, on_item, dead, s3, k3, dfn_of(dfront), L, gated, H)
         wflag = closed & ~dead
         if ep:                                                              # the inborn write: one raw record per closed bout
-            wslot = h2[:, 128 + a.slots * 11].astype(jnp.int32) % a.slots
+            wslot = h2[:, HG + a.slots * 11].astype(jnp.int32) % a.slots
             disp = NI.torus(s3.pos - item["start"], L).astype(jnp.float32)
             wrec = jnp.concatenate([jax.nn.one_hot(tok_now, 8), disp / 24.0, on_item[:, None].astype(jnp.float32)], 1)
-            h2 = NI.mem_write(h2, 128, a.slots, 11, wflag, tok_now, disp, on_item)
+            h2 = NI.mem_write(h2, HG, a.slots, 11, wflag, tok_now, disp, on_item)
         else:
             wslot = jnp.zeros(N, jnp.int32); wrec = jnp.zeros((N, 11))
         ncode = jax.vmap(lambda kk: jax.random.permutation(kk, 8))(jax.random.split(k4, N))
@@ -193,7 +194,7 @@ def main():
             rc = jax.vmap(lambda kk: jax.random.permutation(kk, 8))(jax.random.split(jax.random.fold_in(k4, 7), N))
             code2 = jnp.where(opened[:, None], rc, code2)
         if mode == 4 and ep:                                                # memory wiped at every bout open
-            h3 = h3.at[:, 128:].set(jnp.where(opened[:, None], 0.0, h3[:, 128:]))
+            h3 = h3.at[:, HG:].set(jnp.where(opened[:, None], 0.0, h3[:, HG:]))
         hcnt = jnp.where(dead[:, None], 0, c["hcnt"]); tok_new = code2[ar, item2["sec"]]
         hcnt = hcnt + (jax.nn.one_hot(tok_new, 8).astype(jnp.int32) * opened[:, None])
         dem_on = jnp.where(opened, a.demonstrator & (jnp.take_along_axis(hcnt, tok_new[:, None], 1)[:, 0] <= K), c["dem_on"] & ~closed)
@@ -226,7 +227,7 @@ def main():
         """(T, S + T) validity of [start-of-sequence slots ; this sequence's written records] at each replay step t:
         the memory the rollout read at step t, rebuilt exactly from write times, slots and death resets."""
         S_ = a.slots; tt = jnp.arange(T)
-        mem0 = bt["h0"][128: 128 + S_ * 11].reshape(S_, 11); filled0 = mem0[:, :8].sum(-1) > 0
+        mem0 = bt["h0"][HG: HG + S_ * 11].reshape(S_, 11); filled0 = mem0[:, :8].sum(-1) > 0
         lastreset = jax.lax.cummax(jnp.where(bt["first"] > 0, tt, -1))                       # wipe before step t
         ef = bt["wflag"] > 0; es = bt["wslot"]
         Es = jax.nn.one_hot(es, S_) * ef[:, None]                                           # (T, S)
@@ -240,12 +241,12 @@ def main():
 
     def seq_loss_kv(pp_, bt):
         mem0, valid = kv_masks(bt)
-        K0, V0 = rnet.apply(pp_, mem0, method=EpAgentDev.kv); Ke, Ve = rnet.apply(pp_, bt["wrec"], method=EpAgentDev.kv)
-        K = jnp.concatenate([K0, Ke]); V = jnp.concatenate([V0, Ve])
+        K0, V0 = rnet.apply(pp_, mem0, method=type(rnet).kv); Ke, Ve = rnet.apply(pp_, bt["wrec"], method=type(rnet).kv)
+        K = jnp.concatenate([K0, Ke], -2); V = jnp.concatenate([V0, Ve], -2)   # -2: the record axis (D4: (8, n, d))
         def body(hc, xa):
             xx, f, vm = xa; hc = jnp.where(f > 0, 0.0, hc)
-            h2, lg, v, hl = rnet.apply(pp_, hc, xx, K, V, vm, method=EpAgentDev.step_kv); return h2, (lg, v, hl)
-        _, (lg, v, hl) = jax.lax.scan(body, bt["h0"][:128], (bt["x"], bt["first"], valid))
+            h2, lg, v, hl = rnet.apply(pp_, hc, xx, K, V, vm, method=type(rnet).step_kv); return h2, (lg, v, hl)
+        _, (lg, v, hl) = jax.lax.scan(body, bt["h0"][:HG], (bt["x"], bt["first"], valid))
         return lg, v, hl
 
     def seq_loss(pp_, bt):
@@ -257,9 +258,9 @@ def main():
     def seq_loss_old(pp_, bt):
         def body(hc, xa):
             xx, f, hm = xa; hc = jnp.where(f > 0, 0.0, hc)
-            hh = jnp.concatenate([hc, hm[128:]]) if ep else hc               # the memory part is the world's (stored); the GRU part is replayed
-            h2, lg, v, aux = rnet.apply(pp_, hh, xx); return h2[:128], (lg, v, aux[0] if ep else jnp.zeros(8))
-        _, (lg, v, hl) = jax.lax.scan(body, bt["h0"][:128], (bt["x"], bt["first"], bt["hm"]))
+            hh = jnp.concatenate([hc, hm[HG:]]) if ep else hc               # the memory part is the world's (stored); the GRU part is replayed
+            h2, lg, v, aux = rnet.apply(pp_, hh, xx); return h2[:HG], (lg, v, aux[0] if ep else jnp.zeros(8))
+        _, (lg, v, hl) = jax.lax.scan(body, bt["h0"][:HG], (bt["x"], bt["first"], bt["hm"]))
         return ppo_terms(lg, v, hl, bt)
 
     def ppo_terms(lg, v, hl, bt):
@@ -380,7 +381,7 @@ def main():
         adv = gae(r_, v_, d_, 0.99, 0.95); ret = adv + v_; A_ = (adv - adv.mean()) / (adv.std() + 1e-8)
         first = np.concatenate([np.zeros((W * N, 1)), d_[:, :-1]], 1)
         if a.head_relabel_token:                                             # targets from the young's own record buffer only (never the code table)
-            h0f = R_["h"][:, 0].reshape(W * N, Hd); m0 = h0f[:, 128: 128 + a.slots * 11]; p0 = h0f[:, 128 + a.slots * 11]
+            h0f = R_["h"][:, 0].reshape(W * N, Hd); m0 = h0f[:, HG: HG + a.slots * 11]; p0 = h0f[:, HG + a.slots * 11]
             RT, RM, _, RST = RL.relabel(sq(R_["hear"]), sq(R_["x"])[..., 100:108], m0, p0, sq(R_["wflag"]), sq(R_["wrec"]), sq(R_["dead"]) > 0, a.slots)
             HEAR = RM; TGT = np.where(RM, RT, 0).astype(np.int32); RLST = RST
         else:
@@ -399,7 +400,7 @@ def main():
             gm = max(float(jnp.abs(x_).max()) for x_ in jax.tree_util.tree_leaves(g_old))
             def memcheck(b1):                                                # rebuilt memory == stored memory at every step (order-free)
                 mem0, valid = kv_masks(b1); ent = jnp.concatenate([mem0, b1["wrec"]])
-                stored = b1["hm"][:, 128: 128 + a.slots * 11].reshape(T, a.slots, 11); sf = stored[:, :, :8].sum(-1) > 0
+                stored = b1["hm"][:, HG: HG + a.slots * 11].reshape(T, a.slots, 11); sf = stored[:, :, :8].sum(-1) > 0
                 c1 = valid.sum(1) - sf.sum(1); c2 = jnp.abs((valid[:, :, None] * ent[None]).sum(1) - (sf[:, :, None] * stored).sum(1)).max()
                 return jnp.abs(c1).max(), c2
             mc = jax.vmap(memcheck)(bt); nw = int(bt["wflag"].sum()); nd = int(bt["first"].sum())

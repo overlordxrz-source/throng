@@ -106,3 +106,75 @@ class RecAgentD4(nn.Module):
         meal = nn.Dense(9, name="aux_meal")(y[0]); other = nn.Dense(5, name="aux_other")(y[0])     # unused by port_w2's loss
         view = nn.Dense(49, name="aux_view")(jnp.concatenate([t, y[0]], -1))
         return hg2.reshape(-1), lg, v, (meal, other, view)
+
+
+def rec_tables():
+    """Memory record [token one-hot (8), disp / 24 (2), ate (1)]: g turns disp (signed 2x2 permutation); token / ate fixed."""
+    PR = np.tile(np.arange(11), (8, 1)); SR = np.ones((8, 11))
+    for g, M in enumerate(MATS):
+        for i in range(2):
+            j = int(np.flatnonzero(M[i])[0]); PR[g, 8 + i] = 8 + j; SR[g, 8 + i] = M[i, j]
+    return PR, SR.astype(np.float32)
+
+
+class EpAgentDevD4(nn.Module):
+    """w2/ep_agent_dev.EpAgentDev (the learner) with the side path D4-tied by 8-stream group averaging: every stream g gets
+    g . x (incl. trunk(g . view) for side_enc), its own GRU state, a memory read over g-turned records, its own head hl_g
+    and side_head(feat_g). Outputs: lg = lg_nav + untie(side_head), v = v_nav + mean_g side_value, hl = untie over the
+    SECTOR permutation (the head is equivariant). Same parameter tree as EpAgentDev. h = [8 x hd GRU states, memory, ptr]."""
+    S: int = 128; R: int = 11; hd: int = 128; use_hind: bool = True; shared_tok: bool = False; tok_at: int = 100
+    n_act: int = 6
+    mutant: bool = False
+
+    def setup(self):
+        zi = nn.initializers.zeros
+        self.Dense_0 = nn.Dense(128); self.Dense_1 = nn.Dense(128); self.Dense_2 = nn.Dense(self.n_act); self.Dense_3 = nn.Dense(1)
+        self.side_enc = nn.Dense(64); self.gru = nn.GRUCell(self.hd); self.f1 = nn.Dense(64)
+        if self.shared_tok:
+            self.tokemb = nn.Dense(16, use_bias=False); self.q = nn.Dense(16); self.k = nn.Dense(16)
+        else:
+            self.q = nn.Dense(32); self.k = nn.Dense(32)
+        self.v = nn.Dense(32); self.f2 = nn.Dense(64)
+        if self.use_hind:
+            self.hind = nn.Dense(8)
+        self.side_head = nn.Dense(self.n_act, kernel_init=zi, bias_init=zi); self.side_value = nn.Dense(1, kernel_init=zi, bias_init=zi)
+
+    def _tabs(self):
+        def mut(P, S, PI, SIG):
+            PI = PI.copy(); PI[3, [1, 2]] = PI[3, [2, 1]]; return P, S, PI, SIG
+        P, S, PI, SIG = tables(self.n_act, mut if self.mutant else None); PR, SR = rec_tables()
+        return jnp.asarray(P), jnp.asarray(S), jnp.asarray(PI), jnp.asarray(SIG), jnp.asarray(PR), jnp.asarray(SR)
+
+    def kv(self, mem):
+        """(..., n, R) raw records -> K (8, ..., n, dk), V (8, ..., n, 32): stream g reads g-turned records."""
+        _, _, _, _, PR, SR = self._tabs()
+        mg = jnp.stack([mem[..., PR[g]] * SR[g] for g in range(8)])
+        K = jnp.concatenate([self.tokemb(mg[..., :8]), self.k(mg)], -1) if self.shared_tok else self.k(mg)
+        return K, self.v(mg)
+
+    def step_kv(self, hg, x, K, V, valid):
+        P, S, PI, SIG, _, _ = self._tabs()
+        xg = transform(x, P, S)                                             # (8, Dx)
+        obs = x[..., :100]; t = jnp.tanh(self.Dense_1(jnp.tanh(self.Dense_0(obs))))
+        lg_nav = self.Dense_2(t); v_nav = self.Dense_3(t)[..., 0]
+        tg = jnp.tanh(self.Dense_1(jnp.tanh(self.Dense_0(xg[..., :100]))))
+        side = jnp.concatenate([xg[..., 100:], xg[..., 98:100]], -1)
+        z = jnp.tanh(self.side_enc(jnp.concatenate([side, tg], -1)))
+        hg2, y = self.gru(hg.reshape(8, self.hd), z)
+        qz = jnp.tanh(self.f1(xg))
+        q = jnp.concatenate([self.tokemb(xg[..., self.tok_at: self.tok_at + 8]), self.q(qz)], -1) if self.shared_tok else self.q(qz)   # (8, dk)
+        att = jnp.where(valid[None], jnp.einsum("gnd,gd->gn", K, q) / jnp.sqrt(32.0), -1e9); w = jax.nn.softmax(att, -1) * valid.any()
+        rd = jnp.einsum("gn,gnd->gd", w, V)                                 # (8, 32)
+        y2 = jnp.tanh(self.f2(jnp.concatenate([y, rd], -1)))
+        hl = self.hind(jnp.concatenate([y2, rd], -1)) if self.use_hind else jnp.zeros((8, 8))
+        feat = jnp.concatenate([y2, jax.nn.softmax(hl, -1)], -1)
+        lg = lg_nav + untie(self.side_head(feat), PI); v = v_nav + self.side_value(feat)[..., 0].mean(0)
+        return hg2.reshape(-1), lg, v, untie(hl, SIG)
+
+    def __call__(self, h, x):
+        H8 = 8 * self.hd
+        hg, memf, ptr = h[:H8], h[H8: H8 + self.S * self.R], h[H8 + self.S * self.R:]
+        mem = memf.reshape(self.S, self.R); filled = mem[:, :8].sum(-1) > 0
+        K, V = self.kv(mem)
+        hg2, lg, v, hl = self.step_kv(hg, x, K, V, filled)
+        return jnp.concatenate([hg2, memf, ptr]), lg, v, (hl, None)
