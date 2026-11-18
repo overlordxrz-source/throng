@@ -43,6 +43,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from w2 import env  # noqa: E402
 from w2.learn import Net  # noqa: E402
 from w2.learnability import RecAgent  # noqa: E402
+from w2.d4 import RecAgentD4  # noqa: E402
 from w2.ep_agent import EpAgent  # noqa: E402
 from w2.ep_agent_dev import EpAgentDev  # noqa: E402
 from w2.worlds import world_kw  # noqa: E402
@@ -77,6 +78,7 @@ def main():
     ap.add_argument("--d-max", type=int, default=24); ap.add_argument("--curve-every", type=int, default=20)
     ap.add_argument("--ckpt", default=""); ap.add_argument("--max-seconds", type=float, default=0); ap.add_argument("--save-params", default="")
     ap.add_argument("--item-size", type=float, default=0.1); ap.add_argument("--hunger-gate", action="store_true")
+    ap.add_argument("--d4-side", action="store_true", help="Cam Nov 18: the D4-tied side path (w2/d4.py); oracle / rec path here (the ep learner: rl2 + its own D4 module)")
     ap.add_argument("--learner", default="rec", choices=["rec", "ep"]); ap.add_argument("--slots", type=int, default=128)
     ap.add_argument("--hindsight", type=float, default=0.0); ap.add_argument("--shared-tok", action="store_true")
     ap.add_argument("--gate", default="old", choices=["old", "honest"]); ap.add_argument("--parent-waits", action="store_true", help="Cam Nov 15 ~12:05: the scripted parent never gets more than 2 cells ahead of its young")
@@ -103,10 +105,11 @@ def main():
     nav = flax.serialization.from_bytes(Net().init(jax.random.PRNGKey(1), jnp.zeros((1, 100))), open(sorted(glob.glob(a.navs))[0], "rb").read())
     Dx = 100 + 11 + 6 + 1 + 8 + (4 if a.moves8 else 0)
     assert not (a.moves8 and a.policy != "learner"), "--moves8: learner policy only"
+    assert not (a.d4_side and (ep or not a.eval_necessity)), "--d4-side here: rec (oracle) evals only (the ep learner trains in rl2)"
     if ep:
         rnet = EpAgentDev(S=a.slots, use_hind=a.hindsight > 0, shared_tok=a.shared_tok, n_act=10 if a.moves8 else 6); Hd = 128 + a.slots * 11 + 1   # same params as EpAgent
     else:
-        rnet = RecAgent(128, topo=a.topo, n_act=10 if a.moves8 else 6); Hd = 128
+        rnet = (RecAgentD4(128, n_act=10 if a.moves8 else 6) if a.d4_side else RecAgent(128, topo=a.topo, n_act=10 if a.moves8 else 6)); Hd = 128 * (8 if a.d4_side else 1)
     rp = rnet.init(jax.random.PRNGKey(a.seed), jnp.zeros((Hd,)), jnp.zeros((Dx,)))
     pp = {k: (dict(v) if hasattr(v, "items") else v) for k, v in rp["params"].items()}
     for k in ("Dense_0", "Dense_1", "Dense_2", "Dense_3"):

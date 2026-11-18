@@ -24,6 +24,7 @@ from w2.worlds import world_kw  # noqa: E402
 from w2.gae import gae  # noqa: E402
 from w2 import offset_wide as OW  # noqa: E402
 from w2 import lr_anneal as LRA  # noqa: E402
+from w2.d4 import RecAgentD4  # noqa: E402
 from w2 import named_item as NI  # noqa: E402
 from w2.gate import HonestGate  # noqa: E402
 from w2 import lookahead as LA  # noqa: E402
@@ -39,6 +40,7 @@ def main():
     ap.add_argument("--W", type=int, default=16); ap.add_argument("--N", type=int, default=4); ap.add_argument("--T", type=int, default=64)
     ap.add_argument("--d-move", type=float, default=None, help="Cam Nov 17 ~14:10Z D1 (H-COST test): override the per-step move cost env.Cfg.d_move (default: the world's 0.003)")
     ap.add_argument("--ppo-log", action="store_true", help="Cam Nov 17 ~14:10Z C1: after each iteration's updates, log approx KL / clip fraction / entropy on that iteration's batch (a separate forward pass; training unchanged)")
+    ap.add_argument("--d4-side", action="store_true", help="Cam Nov 18 ~16:15Z (M card yes, stage 1): the side path D4-tied by exact 8-stream group averaging (w2/d4.py RecAgentD4); hidden state 8 x 128")
     ap.add_argument("--lr-anneal", action="store_true", help="Cam Nov 17 ~19:10Z G2: LR linear lr -> --lr-end over --lr-anneal-len steps from max(--lr-anneal-after, the step the frontier first reaches --lr-anneal-frontier), then held (w2/lr_anneal.py); needs --target-kl")
     ap.add_argument("--lr-end", type=float, default=3e-5); ap.add_argument("--lr-anneal-after", type=float, default=5e7); ap.add_argument("--lr-anneal-len", type=float, default=5e7)
     ap.add_argument("--lr-anneal-frontier", type=float, default=24.0, help="the frontier that triggers t24 (24; lowered only in the G2 checks)")
@@ -69,10 +71,12 @@ def main():
     S = a.item_size; gated = a.hunger_gate; nupd = a.eval_only or a.policy == "follower"
     cfg = env.Cfg(L=96, N=a.N, patch_sigma=1.0, reproduce=False, A_max=3000, moves8=a.moves8, **world_kw(a.world), **({} if a.d_move is None else dict(d_move=a.d_move))); L, W, N, T = cfg.L, a.W, a.N, a.T
     nav = flax.serialization.from_bytes(Net().init(jax.random.PRNGKey(1), jnp.zeros((1, 100))), open(sorted(glob.glob(a.navs))[0], "rb").read())
-    rnet = RecAgent(128, topo=a.topo, n_act=10 if a.moves8 else 6); Dx = 100 + 11 + 6 + 1 + 8 + (4 if a.moves8 else 0)   # the harness layout (oracle slot always present; zero when off)
+    assert not (a.d4_side and (a.topo or a.policy == 'follower')), '--d4-side: learner policy, no --topo'
+    HS = 128 * (8 if a.d4_side else 1)
+    rnet = (RecAgentD4(128, n_act=10 if a.moves8 else 6) if a.d4_side else RecAgent(128, topo=a.topo, n_act=10 if a.moves8 else 6)); Dx = 100 + 11 + 6 + 1 + 8 + (4 if a.moves8 else 0)   # the harness layout (oracle slot always present; zero when off)
     assert not (a.lr_anneal and a.target_kl is None), "--lr-anneal is applied through the target-KL update (G2: target-KL is standard)"
     assert not (a.moves8 and (a.policy == "follower" or not a.no_nav)), "--moves8 is built for the learner policy with --no-nav only"
-    rp = rnet.init(jax.random.PRNGKey(a.seed), jnp.zeros((128,)), jnp.zeros((Dx,)))
+    rp = rnet.init(jax.random.PRNGKey(a.seed), jnp.zeros((HS,)), jnp.zeros((Dx,)))
     pp = {k: (dict(v) if hasattr(v, "items") else v) for k, v in rp["params"].items()}
     for k in ("Dense_0", "Dense_1", "Dense_2", "Dense_3"):
         if a.no_nav or (a.reinit_out and k == "Dense_2"):              # (b') / (a'): keep the fresh init (flax Dense default = the navigator's own init)
@@ -102,7 +106,7 @@ def main():
         s = env.reset(cfg, key)
         item, _ = NI.open_bouts(NI.new_item(N), s, jax.random.fold_in(key, 1), dfn_of(dfront), L, (s.energy < H) if gated else jnp.ones(N, bool))
         code = jax.vmap(lambda kk: jax.random.permutation(kk, 8))(jax.random.split(jax.random.fold_in(key, 3), N))
-        return (s, item, jnp.zeros((N, 128)), jnp.zeros(N, jnp.int32), jnp.zeros(N), code)
+        return (s, item, jnp.zeros((N, HS)), jnp.zeros(N, jnp.int32), jnp.zeros(N), code)
 
     def rollout_world(pp_, c, key, dfront):
         def body(c, k):
@@ -228,7 +232,7 @@ def main():
         first = np.concatenate([np.zeros((W * N, 1)), d_[:, :-1]], 1)
         if a.ent_anneal:                                                    # O-X': the current in-bout coefficient, one per sequence
             ECB = 0.01 + (a.ent_bout - 0.01) * max(0.0, 1.0 - steps / a.ent_anneal)
-        bt = dict(**(dict(ecb=jnp.full((W * N,), ECB, jnp.float32)) if a.ent_anneal else {}), x=jnp.asarray(sq(x)), h0=jnp.asarray(hin[:, 0].reshape(W * N, 128)), act=jnp.asarray(sq(act)), lp=jnp.asarray(sq(lp)),
+        bt = dict(**(dict(ecb=jnp.full((W * N,), ECB, jnp.float32)) if a.ent_anneal else {}), x=jnp.asarray(sq(x)), h0=jnp.asarray(hin[:, 0].reshape(W * N, HS)), act=jnp.asarray(sq(act)), lp=jnp.asarray(sq(lp)),
                   adv=jnp.asarray(A_.astype(np.float32)), ret=jnp.asarray(ret.astype(np.float32)), first=jnp.asarray(first.astype(np.float32)))
         p_prev, o_prev = p, ost
         if a.tkl_synthetic_shift:                                            # E1 check only: a synthetic high-KL batch (old log-probs shifted down)
