@@ -1,0 +1,11 @@
+--d4-side oracle checks (scratchpad/d4chk; laptop on BATTERY during these runs, so absolute times are slow; ratios hold)
+unit (w2/test_d4.py): ALL PASS
+  group closed, sector/action perms are homomorphisms, stay/eat fixed, grid perm bijective;
+  equivariance all 8 g through 6 recurrent steps: max err 2.4e-7 / 4.8e-7 (4-way), 9.5e-7 / 4.8e-7 (8-way);
+  MUTANT (g = 3, actions 1/2 swapped) caught: err 2.38 (4-way), 3.54 (8-way);
+  one-hot oracle: stay/eat equal across each orbit, spread 4.8e-7 (4-way), 1.2e-7 (8-way);
+  semantics: view cell, offset, move, sector each follow the world turned by M; positive control: untied agent spread 3.80.
+port_w2 flag off (4-way, 60 its) == pre-merge d1/identity_check/port_off (curve): True
+traj flag off (h1s0_5e7.params, d3) == the H1 table eval with the same command (modes): True
+--d4-side runs (port 60 its with target-KL; traj eval on its params): no errors
+speed: target-KL 143.8 s vs target-KL + d4 261.3 s for 60 iterations -> x1.82

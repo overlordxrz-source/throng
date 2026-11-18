@@ -1,0 +1,145 @@
+{
+ "cfg": {
+  "navs": "w2_out/nav_w13/*.msgpack",
+  "world": "0.0013,8,0.001",
+  "W": 32,
+  "N": 4,
+  "T": 64,
+  "d_move": null,
+  "ppo_log": false,
+  "d4_side": true,
+  "lr_anneal": false,
+  "lr_end": 3e-05,
+  "lr_anneal_after": 50000000.0,
+  "lr_anneal_len": 50000000.0,
+  "lr_anneal_frontier": 24.0,
+  "target_kl": 0.015,
+  "tkl_synthetic_shift": 0.0,
+  "moves8": false,
+  "offset_wide": false,
+  "steps": 491520.0,
+  "oracle": true,
+  "seed": 0,
+  "epochs": 4,
+  "minibatches": 8,
+  "lr": 0.0003,
+  "d_max": 24,
+  "curve_every": 20,
+  "ckpt": "",
+  "max_seconds": 0,
+  "save_params": "/private/tmp/claude-501/-Users-overlord-CascadeProjects-throng/aad77c1d-d7ac-437e-bef4-aa525802ccc0/scratchpad/d4chk/d4.params",
+  "item_size": 0.1,
+  "hunger_gate": true,
+  "policy": "learner",
+  "v2": "/Users/overlord/throng-backup/evo2/evo2.ckpt",
+  "init_params": "",
+  "eval_only": false,
+  "frontier0": 1.0,
+  "frontier_schedule": "",
+  "gate": "honest",
+  "lookahead": 0.0,
+  "la_max": 12,
+  "giveup": 0.0,
+  "ent_bout": null,
+  "ent_anneal": 0.0,
+  "reinit_out": false,
+  "no_nav": true,
+  "topo": false,
+  "out": "/private/tmp/claude-501/-Users-overlord-CascadeProjects-throng/aad77c1d-d7ac-437e-bef4-aa525802ccc0/scratchpad/d4chk/d4.json"
+ },
+ "steps": 491520,
+ "frontier": 1.0,
+ "curve": [
+  {
+   "steps": 163840,
+   "frontier": 1.0,
+   "item_reach": 0.6322418136020151,
+   "food_per_step": 0.003642849624156952,
+   "paid_per_step": 0.00334947369992733,
+   "frac_in_bout": 0.15283203125,
+   "hungry_reach": 0.6467532467532467,
+   "n_hungry": 385,
+   "n_hungry_lookahead": 0,
+   "gate_last": 0.555,
+   "sec": 190.2
+  },
+  {
+   "steps": 327680,
+   "frontier": 1.0,
+   "item_reach": 0.7007299270072993,
+   "food_per_step": 0.0032041186932474375,
+   "paid_per_step": 0.002758609363809228,
+   "frac_in_bout": 0.1029052734375,
+   "hungry_reach": 0.7241379310344828,
+   "n_hungry": 261,
+   "n_hungry_lookahead": 0,
+   "gate_last": 0.7385,
+   "sec": 226.6
+  },
+  {
+   "steps": 491520,
+   "frontier": 1.0,
+   "item_reach": 0.6919191919191919,
+   "food_per_step": 0.0028585041873157024,
+   "paid_per_step": 0.0021075005643069744,
+   "frac_in_bout": 0.0743408203125,
+   "hungry_reach": 0.7403314917127072,
+   "n_hungry": 181,
+   "n_hungry_lookahead": 0,
+   "gate_last": 0.7215,
+   "sec": 261.3
+  }
+ ],
+ "reach_by_start_energy": {
+  "E<0.6 d=1": {
+   "reach": 0.10810034722089767,
+   "bouts": 10444
+  },
+  "E<0.6 all": {
+   "reach": 0.10810034722089767,
+   "bouts": 10444
+  },
+  "0.6<=E<H d=1": {
+   "reach": 0.5623880624771118,
+   "bouts": 19547
+  },
+  "0.6<=E<H all": {
+   "reach": 0.5623880624771118,
+   "bouts": 19547
+  },
+  "H<=E<0.75 d=1": {
+   "reach": null,
+   "bouts": 0
+  },
+  "H<=E<0.75 all": {
+   "reach": null,
+   "bouts": 0
+  },
+  "E>=0.75 d=1": {
+   "reach": null,
+   "bouts": 0
+  },
+  "E>=0.75 all": {
+   "reach": null,
+   "bouts": 0
+  }
+ },
+ "gate_scores": [
+  0.039,
+  0.0475,
+  0.0715,
+  0.096,
+  0.154,
+  0.2385,
+  0.3295,
+  0.4095,
+  0.555,
+  0.674,
+  0.718,
+  0.7385,
+  0.7585,
+  0.7215
+ ],
+ "train_seconds": 261.3,
+ "throughput": 1881.2938508265083
+}
