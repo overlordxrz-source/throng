@@ -10545,6 +10545,16 @@ more expensive, because it produces publishable-looking nulls.
   - In-bout entropy .57 / .56 / .55 / .47 / .46. Lower than 8-way (fewer actions: max ln 6 = 1.79 vs ln 10 = 2.30) and
     drifting down slowly.
   - Seed 1 is running.
+- **LOG (entry stamped Nov 18 00:10:53 EST; information, not a counted event): H1 seed 1 at 1e7 (frontier 8, below 24, so not DEAD by
+  rule).**
+  - Diagonal sectors 1 and 3 are at d3 .10 / .11 and d12 .00 / .00 (others d3 .88-.96). Time from `run_h1.out`: 00:03:09.
+  - Logit split at the hearing step (light eval run beside training at background priority; `h1/diag_s1_1e7/split.json`):
+    - p(stay) only .02 / .01;
+    - p(EAT) .36 / .55;
+    - p(toward) .56 / .19 (healthy sectors: toward .92, eat .04).
+  - The side pushes against stay (-5.4 / -4.6).
+  - Reading: an EAT-at-hearing habit on two diagonals, not the classic stay lock. It is early (pre-24); it counts as DEAD
+    only if it is still < .30 once the frontier reaches 24.
 - **RESULT (Nov 16 ~01:40): THE LABEL COUNT** (`docs/data/learner_w2/label_count/`; each row is 100 rollout
   iterations, 819k steps, with that checkpoint's weights, world state and frontier, no updates).
   - Definitions: MEMORY-ONLY bout = a later hearing (not the token's first in this life) at d >= 3. By construction
