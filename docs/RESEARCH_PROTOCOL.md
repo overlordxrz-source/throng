@@ -10398,6 +10398,31 @@ more expensive, because it produces publishable-looking nulls.
   - Early stops A / B; bar3 vs reference .982 (bar .884) and the twin.
   - The E1 reference and twin were trained with pre-merge code. The merged oracle / target-KL path is bitwise identical to
     it (check 3), so they are the same levers.
+- **RESULT (entry stamped Nov 17 19:05:55 EST): SEED 8 at 3e7 (relabel + no-nav + 8-way + target-KL). The head watch is CLEAR:
+  later-hearing head at d = 3 = .884 (rl2 eval; seed 7 .933; threshold .50). Early stop A passed. The curriculum is SLOW:
+  frontier 6 at 3e7 (seed 7: 13).**
+  - Times copied from `scratchpad/e1l/run_e1l.out`: 3e7 leg 19:04:42. Files: `e1/learner_s8/`.
+  - Watch (`head_later.py` on the traj npz; d = 3 / 12 / 21) and cut fraction per leg:
+
+    | | d = 3 | d = 12 | d = 21 | cut |
+    |---|---|---|---|---|
+    | 1e7 | .33 | .21 | .23 | .33 |
+    | 2e7 | .51 | .32 | .31 | .47 |
+    | 3e7 | .88 | .79 | .41 | .49 |
+
+  - Frontier: 2 at 0.43M, 3 at 0.72M, then flat until 4 at 22.8M; 5 at 26.7M; 6 at 30.0M. Seed 7 reached 3 at 10.2M and
+    13 by 28.1M.
+  - rl2 eval at d = 3 (modes 0 / 3 / 4):
+    - head .884 / .121 / .131;
+    - hungry reach .73 / .25 / .30.
+    - Seed 7 at 3e7: head .933 / .127 / .119; hungry reach .83 / .20 / .20.
+  - d = 3 reach in later right-head bouts, by sector: .55 / .85 / .54 / .88 / .64 / .86 / .52 / .84.
+    - Diagonal sectors (odd) are .84-.88; cardinals (even) are .52-.64.
+    - The same diagonal-strong / cardinal-weak split showed in the 8-way oracle at Step B.
+  - Head by the previous same-sector bout (d = 3): .99 if that bout was solved, .64 if unsolved.
+  - Predictions: head >= .50 at 3e7 p .80 -> HIT. Cut 30-50% -> on track (.33 / .47 / .49).
+  - Early stop B (frontier <= 6 at 5e7) is now the live risk. At the recent pace (about +1 per 3.5M) the frontier would be
+    about 11 at 5e7. Not a prediction change; reported for Cam.
 - **RESULT (Nov 16 ~01:40): THE LABEL COUNT** (`docs/data/learner_w2/label_count/`; each row is 100 rollout
   iterations, 819k steps, with that checkpoint's weights, world state and frontier, no updates).
   - Definitions: MEMORY-ONLY bout = a later hearing (not the token's first in this life) at d >= 3. By construction
