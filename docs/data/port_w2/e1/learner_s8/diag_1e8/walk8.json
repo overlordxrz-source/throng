@@ -1,0 +1,182 @@
+{
+"s8_1e8_d3_m0.npz": {
+"0": {
+"n": 217,
+"reach": 0.35,
+"diag": 0.6,
+"card": 0.076,
+"stay": 0.167,
+"eat": 0.157,
+"timeouts": 141,
+"to_vis_noeat": 0.05,
+"to_mind": 2.15
+},
+"1": {
+"n": 184,
+"reach": 0.848,
+"diag": 0.529,
+"card": 0.037,
+"stay": 0.158,
+"eat": 0.276,
+"timeouts": 28,
+"to_vis_noeat": 0.107,
+"to_mind": 1.86
+},
+"2": {
+"n": 180,
+"reach": 0.311,
+"diag": 0.414,
+"card": 0.08,
+"stay": 0.364,
+"eat": 0.142,
+"timeouts": 124,
+"to_vis_noeat": 0.04,
+"to_mind": 2.14
+},
+"3": {
+"n": 190,
+"reach": 0.921,
+"diag": 0.563,
+"card": 0.059,
+"stay": 0.091,
+"eat": 0.286,
+"timeouts": 15,
+"to_vis_noeat": 0.267,
+"to_mind": 1.53
+},
+"4": {
+"n": 222,
+"reach": 0.829,
+"diag": 0.123,
+"card": 0.443,
+"stay": 0.172,
+"eat": 0.262,
+"timeouts": 38,
+"to_vis_noeat": 0.105,
+"to_mind": 2.18
+},
+"5": {
+"n": 206,
+"reach": 0.917,
+"diag": 0.516,
+"card": 0.078,
+"stay": 0.092,
+"eat": 0.314,
+"timeouts": 17,
+"to_vis_noeat": 0.353,
+"to_mind": 1.59
+},
+"6": {
+"n": 197,
+"reach": 0.538,
+"diag": 0.481,
+"card": 0.123,
+"stay": 0.153,
+"eat": 0.243,
+"timeouts": 91,
+"to_vis_noeat": 0.033,
+"to_mind": 2.2
+},
+"7": {
+"n": 196,
+"reach": 0.821,
+"diag": 0.525,
+"card": 0.051,
+"stay": 0.164,
+"eat": 0.26,
+"timeouts": 34,
+"to_vis_noeat": 0.118,
+"to_mind": 1.82
+}
+},
+"s8_1e8_d12_m0.npz": {
+"0": {
+"n": 152,
+"reach": 0.125,
+"diag": 0.694,
+"card": 0.044,
+"stay": 0.125,
+"eat": 0.137,
+"timeouts": 128,
+"to_vis_noeat": 0.016,
+"to_mind": 5.07
+},
+"1": {
+"n": 168,
+"reach": 0.863,
+"diag": 0.73,
+"card": 0.022,
+"stay": 0.098,
+"eat": 0.149,
+"timeouts": 23,
+"to_vis_noeat": 0.043,
+"to_mind": 3.96
+},
+"2": {
+"n": 167,
+"reach": 0.054,
+"diag": 0.502,
+"card": 0.046,
+"stay": 0.279,
+"eat": 0.173,
+"timeouts": 155,
+"to_vis_noeat": 0.0,
+"to_mind": 5.38
+},
+"3": {
+"n": 160,
+"reach": 0.869,
+"diag": 0.694,
+"card": 0.102,
+"stay": 0.055,
+"eat": 0.148,
+"timeouts": 20,
+"to_vis_noeat": 0.2,
+"to_mind": 4.5
+},
+"4": {
+"n": 179,
+"reach": 0.799,
+"diag": 0.139,
+"card": 0.697,
+"stay": 0.052,
+"eat": 0.112,
+"timeouts": 32,
+"to_vis_noeat": 0.156,
+"to_mind": 4.53
+},
+"5": {
+"n": 160,
+"reach": 0.812,
+"diag": 0.647,
+"card": 0.177,
+"stay": 0.046,
+"eat": 0.13,
+"timeouts": 29,
+"to_vis_noeat": 0.103,
+"to_mind": 4.38
+},
+"6": {
+"n": 172,
+"reach": 0.203,
+"diag": 0.525,
+"card": 0.142,
+"stay": 0.091,
+"eat": 0.243,
+"timeouts": 135,
+"to_vis_noeat": 0.007,
+"to_mind": 5.21
+},
+"7": {
+"n": 182,
+"reach": 0.78,
+"diag": 0.698,
+"card": 0.091,
+"stay": 0.067,
+"eat": 0.144,
+"timeouts": 38,
+"to_vis_noeat": 0.079,
+"to_mind": 4.89
+}
+}
+}

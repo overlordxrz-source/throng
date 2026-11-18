@@ -10446,6 +10446,43 @@ more expensive, because it produces publishable-looking nulls.
       3e7; this learner has not by 5e7.
   - The run continues to 1e8 (bar3 vs reference .982, bar .884). No change to the recipe or the registered predictions.
     My own reading, not a registered number: bar3 at 1e8 now looks less likely than my registered .40.
+- **RESULT (entry stamped Nov 17 20:24:53 EST): SEED 8 FAILS bar3 at 1e8.**
+  - Times copied from `scratchpad/e1l/run_e1l.out`: 20:22:54.
+  - Files: `e1/learner_s8/` (`s8_bar.json`; diagnostics in `diag_1e8/`, light evals with nothing training).
+  - The bar (`s8_bar.json`):
+
+    | criterion | value | threshold | result |
+    |---|---|---|---|
+    | hungry reach at d = 12 (long eval, 4788 bouts) | .698 | .884 (.9 x ref .982) | FAIL |
+    | true minus shuffled (.449) | .249 | .30 | FAIL |
+    | true vs wiped (.310) | | c_2x | FAIL |
+    | life vs twin | 2743 vs 485 (5.65x, LB 5.28) | 1.3x, LB > 1 | PASS |
+
+    head later .94, first .13.
+  - Frontier 11 at 1e8 (10 at 4.7e7, 11 at ~8e7): the d = 12 eval sits beyond the curriculum.
+  - Later right-head reach by sector at 1e8:
+    - d3: .35 / .85 / .31 / .92 / .83 / .92 / .54 / .82;
+    - d12: .12 / .86 / .05 / .87 / .80 / .81 / .20 / .78.
+    - Sectors 0 (+x), 2 (+y) and 6 (-y) fail; sector 4 (-x) and all four diagonals work.
+  - MECHANISM (`diag_1e8/walk8.json`, later right-head bouts by sector): move mix in the bouts.
+
+    | sector | reach d3 | diagonal moves | cardinal moves |
+    |---|---|---|---|
+    | 0 (+x), d3 / d12 | .35 | .60 / .69 | .08 / .04 |
+    | 2 (+y), d3 / d12 | .31 | .41 / .50 | .08 / .05 |
+    | 6 (-y), d3 / d12 | .54 | .48 / .53 | .12 / .14 |
+    | 4 (-x, works), d3 / d12 | .83 | .12 / .14 | .44 / .70 |
+    | diagonals | .82-.92 | .52-.73 | .02-.18 |
+
+    - Timed-out bouts on the failing sectors never get close: min Chebyshev distance 2.1-2.2 at d3, 5.1-5.4 at d12, and
+      visible-but-not-eaten only .00-.05.
+    - The hearing-step logit split shows no stay lock: p(toward) .63 / .35 / .54 for sectors 0 / 2 / 6, with the side
+      pushing AGAINST stay. Sector 2 alone has a high p(stay) .30 and p(eat) .29.
+    - Reading: the learner's MOVE REPERTOIRE collapsed onto the four diagonals plus one cardinal action (-x). It walks to
+      +x / +y / -y items with diagonal steps and drifts off. Listening is intact (head .94). The failure is motor.
+    - This in turn keeps the honest gate (mean hungry reach .80) from advancing past 10-11, so d = 12 is never trained.
+  - Predictions: bar3 PASS p .40 -> MISS. Head >= .50 at 3e7 HIT; cut 30-50% HIT (.33-.49).
+  - Nothing is running but the guard. Waiting for Cam.
 - **RESULT (Nov 16 ~01:40): THE LABEL COUNT** (`docs/data/learner_w2/label_count/`; each row is 100 rollout
   iterations, 819k steps, with that checkpoint's weights, world state and frontier, no updates).
   - Definitions: MEMORY-ONLY bout = a later hearing (not the token's first in this life) at d >= 3. By construction

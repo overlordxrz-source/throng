@@ -1,0 +1,15 @@
+== s8_8e7_traj_d3_m0.npz
+  dem          reach by sector 0.88 0.90 0.85 0.83 0.85 0.86 0.88 0.92  n [101, 115, 109, 107, 114, 109, 112, 107]
+  later_right  reach by sector 0.57 0.88 0.57 0.87 0.81 0.81 0.49 0.92  n [216, 229, 213, 231, 211, 235, 196, 241]
+  later_wrong  reach by sector 0.21 0.16 0.04 0.08 0.19 0.08 0.03 0.17  n [14, 19, 25, 24, 26, 13, 35, 6]
+  head (later) by previous same-sector bout: {'prev_solved': '0.991 (n1506)', 'prev_unsolved': '0.654 (n428)'}
+== s8_8e7_traj_d12_m0.npz
+  dem          reach by sector 0.85 0.80 0.83 0.80 0.76 0.70 0.77 0.75  n [135, 140, 134, 132, 144, 138, 131, 138]
+  later_right  reach by sector 0.20 0.80 0.19 0.83 0.59 0.68 0.03 0.75  n [248, 282, 268, 219, 245, 253, 224, 245]
+  later_wrong  reach by sector 0.05 0.07 0.00 0.02 0.00 0.03 0.00 0.03  n [39, 44, 42, 50, 61, 35, 54, 35]
+  head (later) by previous same-sector bout: {'prev_solved': '0.999 (n1381)', 'prev_unsolved': '0.627 (n963)'}
+== s8_8e7_traj_d21_m0.npz
+  dem          reach by sector 0.78 0.63 0.65 0.65 0.68 0.64 0.56 0.72  n [166, 165, 172, 171, 160, 169, 163, 173]
+  later_right  reach by sector 0.10 0.56 0.05 0.59 0.24 0.26 0.01 0.31  n [196, 172, 178, 197, 162, 201, 151, 216]
+  later_wrong  reach by sector 0.03 0.02 0.00 0.00 0.00 0.00 0.00 0.00  n [30, 53, 73, 59, 49, 40, 64, 39]
+  head (later) by previous same-sector bout: {'prev_unsolved': '0.619 (n1063)', 'prev_solved': '0.998 (n817)'}
