@@ -10527,6 +10527,24 @@ more expensive, because it produces publishable-looking nulls.
   - Predictions (mine): (a) .45, (b) .20, (c) .30, unregistered .05.
     - If (a): the first reference seed qualifies at 1e8, p .55.
     - d21 diagonal mean within .10 of cardinals at 5e7, p .5.
+- **RESULT (entry stamped Nov 18 00:03:34 EST): H1 seed 0 (4-way + target-KL) PASSES its gate at 5e7, with a full PASS on the 3-table
+  mean. 0 sector events, 0 broad dips, 0 dead.**
+  - Times copied from `scratchpad/h1/run_h1.out`: start 23:21:33 (after IDCHECK True; attempt 1 failed with Permission
+    denied and produced no data), 5e7 leg 23:55:35.
+  - Frontier 22 at 1e7, 24 from 2e7.
+  - d3 tables: all sectors >= .96 (1e7), >= .89 (2e7), >= .92 (3e7), >= .94 (4e7), >= .96 (5e7).
+  - 3e7-5e7 mean: d3 .97 / .96 / .97 / .94 / .97 / .97 / .98 / .96; d12 .91 / .86 / .90 / .82 / .92 / .88 / .94 / .83.
+  - d = 21 by sector (not counted by any rule):
+    - 1e7 diagonals .60-.67 vs cardinals .78-.82;
+    - 2e7-4e7 within about .10;
+    - 5e7: .67 / .58 / .52 / **.08** / .71 / .65 / .81 / .55, a broad d21 drop, with sector 3 down from .81.
+    - Information; it is the kind of long-range wobble seen before.
+    - My prediction "d21 diagonal mean within .10 of cardinals at 5e7" (p .5): diagonals mean .47 vs cardinals .68 ->
+      MISS.
+  - Cut 3e7-5e7: .46.
+  - In-bout entropy .57 / .56 / .55 / .47 / .46. Lower than 8-way (fewer actions: max ln 6 = 1.79 vs ln 10 = 2.30) and
+    drifting down slowly.
+  - Seed 1 is running.
 - **RESULT (Nov 16 ~01:40): THE LABEL COUNT** (`docs/data/learner_w2/label_count/`; each row is 100 rollout
   iterations, 819k steps, with that checkpoint's weights, world state and frontier, no updates).
   - Definitions: MEMORY-ONLY bout = a later hearing (not the token's first in this life) at d >= 3. By construction
