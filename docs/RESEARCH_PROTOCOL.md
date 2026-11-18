@@ -10571,6 +10571,63 @@ more expensive, because it produces publishable-looking nulls.
       flip.
     - With 8-way + target-KL, neither oracle seed locked (E1 / G1), but the learner mis-mapped cardinals (seed 8).
   - Predictions: (c) p .30 (mine) -> (c). The (a)-branch predictions are void.
+- **RULINGS RECORDED + SIDE-PATH REPORT (entry stamped Nov 18 11:08:20 EST): Cam Nov 18 ~16:06Z and ~16:15Z (times copied from Cam's
+  message headers).**
+  - Recorded:
+    - H1 accepted. Cam's reading: target-KL fixes the late flips but not an early PRIVATE lock, and every dissected lock is
+      a side-path private stay/eat bias on one sector.
+    - DECISION: a D4 tie on the SIDE PATH only (--d4-side).
+    - M APPROVED it on the card: "Yes, for stage 1 only" (permanent for stage 1; revisit at stage 2).
+    - J1 chain: 4-way oracle (b') + target-KL + --d4-side, s1 then s0 to 5e7 (E1 gate) -> reference -> twin -> merged
+      learner checks -> learner seed 9 to 1e8 without waiting. Reports at 3e7 / 5e7 / 1e8.
+    - Seed 8 is PARKED (checkpoints kept).
+    - Cam p: both pass .55; s1 sector 3 not dead .70.
+  - Seed 8, eval-only (Cam's item 4; existing --logits evals, no new runs; `e1/learner_s8/diag_1e8/card_split.txt`):
+    - The mis-map is on the POLICY side, not the head side: these are right-head bouts, with head accuracy .94.
+    - Within the policy it is the SIDE path. For +x / +y / -y targets, logit(cardinal) - logit(best adjacent diagonal) is
+      trunk +1.15 to +1.51 (the trunk prefers the cardinal) and side -3.84 to -5.13 (the side overrides it) at d3.
+    - For -x the side is +2.45. The same private per-sector side-path mapping, here on moves, that the tie rules out.
+  - WHAT THE SIDE PATH TAKES (code: `w2/learnability.py` RecAgent, `w2/ep_agent.py` EpAgent). 4-way x layout:
+
+    | slice | content |
+    |---|---|
+    | 0:49 | food 7x7 window (item mark when within Chebyshev 1) |
+    | 49:98 | occupancy 7x7 |
+    | 98:100 | energy, age |
+    | 100:108 | heard token one-hot (per-life random code) |
+    | 108 | bout flag |
+    | 109:111 | in-bout offset clip((start - pos) / 9) |
+    | 111:117 | prev action one-hot (6) |
+    | 117 | prev reward |
+    | 118:126 | oracle sector one-hot |
+    | 126:130 (8-way only) | prev-action diagonal columns |
+
+    - TRUNK (Dense_0/1 -> lg_nav, v_nav): x[0:100] only. **The sector does NOT enter the trunk.** Direction reaches it only
+      through the view; the item is marked only when adjacent.
+    - SIDE PATH (oracle): side_enc(concat(x[100:], x[98:100], t)) -> GRU (128) -> side_head (policy) and side_value.
+      Here t = the trunk's 128 VIEW features.
+    - Learner: the same, plus an episodic memory read (query f1(full x); keys = token embedding + records; records
+      [token (8), disp / 24 (2), ate]) -> f2 -> the head hl (8 sector logits) -> side_head(y2, softmax(hl)).
+  - Transform under g, all practical:
+    - oracle one-hot and head logits: permute the sectors;
+    - offset and record disp: 2x2 signed permutation;
+    - prev action: permute the moves (stay / eat fixed);
+    - view windows: a D4 permutation of the 7x7 grid;
+    - token, bout flag, reward, energy, age, ate: unchanged. The code is random per life, so the code distribution is
+      D4-invariant.
+  - Not cheap:
+    - (1) the side path reads the trunk's view features t, so each g needs the trunk re-run on g.view;
+    - (2) the GRU (and the learner's memory read) are recurrent, so exact averaging needs 8 hidden streams, each fed
+      g-transformed inputs from life start (h: 128 -> 8 x 128).
+  - Choice (mine, proceeding; Cam can overrule): EXACT averaging as specified.
+    - 8 streams over the whole side path incl. trunk(g.view), the GRU and the memory read;
+    - tied logits = mean_g pi_g^-1 side_g; the side value = the mean over streams (invariant); the learner head hl
+      averaged equivariantly (sector permutation).
+    - Rejected: tying only the readout. It is cheap, but h can then carry a private per-sector state, which is what the
+      tie must rule out.
+    - The flag-off path is untouched code (a separate module), so identity holds by construction; it will be checked.
+    - Speed cost: measured in the checks. If it is above ~5x per leg, I report before J1. A fallback would drop t from the
+      side input under the tie (no trunk re-runs), which is an architecture change and needs Cam's ruling.
 - **RESULT (Nov 16 ~01:40): THE LABEL COUNT** (`docs/data/learner_w2/label_count/`; each row is 100 rollout
   iterations, 819k steps, with that checkpoint's weights, world state and frontier, no updates).
   - Definitions: MEMORY-ONLY bout = a later hearing (not the token's first in this life) at d >= 3. By construction
