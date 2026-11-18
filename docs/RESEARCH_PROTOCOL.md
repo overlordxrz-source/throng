@@ -10628,6 +10628,32 @@ more expensive, because it produces publishable-looking nulls.
     - The flag-off path is untouched code (a separate module), so identity holds by construction; it will be checked.
     - Speed cost: measured in the checks. If it is above ~5x per leg, I report before J1. A fallback would drop t from the
       side input under the tie (no trunk re-runs), which is an architecture change and needs Cam's ruling.
+- **REGISTERED (entry stamped Nov 18 11:25:58 EST): --d4-side built and checked (oracle); J1 design and predictions. Written before any
+  J1 data.**
+  - Code: throng-toy comm-toy 195fab8.
+    - `w2/d4.py` RecAgentD4: exact 8-stream group averaging of the whole side path (side_enc on [g . x side inputs,
+      trunk(g . view)] -> GRU per stream -> side_head), untied by pi_g; side value = the mean over streams.
+    - The trunk is unchanged on the original view.
+    - Same parameter names as RecAgent. port_w2 + traj rec eval take --d4-side.
+  - Checks (`docs/data/port_w2/j1/d4_checks/RESULT.txt`), ALL PASS:
+    - equivariance over all 8 g through 6 recurrent steps: max err <= 9.5e-7 (4-way and 8-way);
+    - the mutant is caught (err 2.4 / 3.5);
+    - stay / eat equal across each orbit for one-hot oracle inputs (spread <= 4.8e-7);
+    - semantic check: each transform follows the world turned by M;
+    - positive control: the untied agent's orbit spread is 3.80;
+    - flag-off identity for port_w2 and for the traj eval;
+    - cost x1.82 per iteration.
+  - J1 (`docs/data/port_w2/j1/run_j1.sh`): 4-way oracle (b') + target-KL .015 + --d4-side.
+    - s1 first, then s0, 5e7 each; E1 gate; logit split on any d3 sector < .5.
+    - (a) -> reference (s0 to 1e8, s1 if s0 fails) -> twin (tie, 3e7) -> STOP.
+    - Then by hand: the ep-learner D4 module (written during J1), the merged-learner checks with --d4-side, and learner
+      seed 9 (relabel + no-nav + 4-way + target-KL + --d4-side) to 1e8 without waiting if the checks pass. Same watch,
+      early stops and bar.
+  - Predictions:
+    - Cam: both pass .55; s1 sector 3 not dead .70.
+    - Mine: both pass .55; s1 sector 3 not dead .75; no learned private lock in any sector (orbit-equal side stay / eat by
+      construction) .80.
+    - Leg time x1.6-2.0 of H1's on AC.
 - **RESULT (Nov 16 ~01:40): THE LABEL COUNT** (`docs/data/learner_w2/label_count/`; each row is 100 rollout
   iterations, 819k steps, with that checkpoint's weights, world state and frontier, no updates).
   - Definitions: MEMORY-ONLY bout = a later hearing (not the token's first in this life) at d >= 3. By construction
