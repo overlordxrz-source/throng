@@ -10483,6 +10483,31 @@ more expensive, because it produces publishable-looking nulls.
     - This in turn keeps the honest gate (mean hungry reach .80) from advancing past 10-11, so d = 12 is never trained.
   - Predictions: bar3 PASS p .40 -> MISS. Head >= .50 at 3e7 HIT; cut 30-50% HIT (.33-.49).
   - Nothing is running but the guard. Waiting for Cam.
+- **CORRECTION (entry stamped Nov 17 20:27:24 EST) to the seed 8 verdict entry above. "The move repertoire collapsed onto the four
+  diagonals plus -x" is WITHDRAWN: walk8 lumped actions 1-4, and "collapsed" implies a loss that was not shown.**
+  - Per-action counts (`e1/learner_s8/diag_1e8/acts8.txt`; later right-head bouts at d = 3, at 3e7 / 5e7 / 7e7 / 1e8).
+    Actions: 1 -x, 2 +x, 3 +y, 4 -y, 6 (+1,+1), 7 (-1,+1), 8 (-1,-1), 9 (+1,-1).
+    - The cardinal actions are NOT gone: over all steps, +x / +y / -y are .10 / .07 / .08 at 1e8 (.14 / .11 / .09 at 3e7).
+    - In bouts to a CARDINAL item, the policy takes an ADJACENT DIAGONAL instead of the cardinal step, already at 3e7:
+
+      | sector | cardinal step share (3e7 -> 1e8) | adjacent diagonals at 1e8 |
+      |---|---|---|
+      | 0 (+x) | action 2: .06 -> .05 | action 9 .43, action 6 .10 |
+      | 2 (+y) | action 3: .07 -> .03 | action 7 .29, plus stay .36 |
+      | 6 (-y) | action 4: .10 -> .05 | action 8 .19, action 9 .23 |
+      | 4 (-x) | action 1: .09 at 3e7, .08 at 5e7 -> .42 at 7e7 | (used diagonals 7 / 8 at .18 / .24 at 3e7) |
+
+    - Sector 4 SWITCHED from diagonals to -x between 5e7 and 7e7, and its d3 reach rose .56 -> .89.
+    - Corrected reading: a 45-degree-off action choice for cardinal targets, present from 3e7. It was corrected for one
+      sector (late) and never acquired for the other three. Sectors 0 and 2 declined further at the end (d3 .58 -> .35,
+      .58 -> .31 between 7e7 and 1e8). Not a stay lock.
+  - For comparison, seed 7 (4-way, no target-KL; protocol entry stamped Nov 16 20:26:46, time copied from that entry) also
+    FAILED the bar at 1e8: reach .564 vs .877. Its mechanism was different: a learned STAY LOCK on the diagonals (cardinals
+    .97-.99, side adds stay +0.7 to +3.5).
+  - So the handoff 2z phrase "8-way is what created the learner's asymmetry" is NOT established (2z is corrected in place,
+    with the withdrawal marked). What the data support:
+    - with 8-way + target-KL, the learner shows no stay lock (unlike seed 7);
+    - it fails a different way, by choosing an adjacent diagonal for cardinal targets, a choice 4-way moves cannot make.
 - **RESULT (Nov 16 ~01:40): THE LABEL COUNT** (`docs/data/learner_w2/label_count/`; each row is 100 rollout
   iterations, 819k steps, with that checkpoint's weights, world state and frontier, no updates).
   - Definitions: MEMORY-ONLY bout = a later hearing (not the token's first in this life) at d >= 3. By construction
