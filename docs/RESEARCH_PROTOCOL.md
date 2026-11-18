@@ -10555,6 +10555,22 @@ more expensive, because it produces publishable-looking nulls.
   - The side pushes against stay (-5.4 / -4.6).
   - Reading: an EAT-at-hearing habit on two diagonals, not the classic stay lock. It is early (pre-24); it counts as DEAD
     only if it is still < .30 once the frontier reaches 24.
+- **RESULT (entry stamped Nov 18 00:22:41 EST): H1 seed 1 has a DEAD sector -> H1 outcome is (c) by the registered rule. Sector 3
+  (diagonal) is at d3 .01 / d12 .00 at 3e7, with the frontier at 24 (3e7 leg 00:17:04 from `run_h1.out`). It is a
+  LEARNED EAT/STAY LOCK. The script finishes seed 1 to 5e7 (registered) and then stops; there is no reference chain.**
+  - Seed 1, d3 sector 3: .11 (1e7) -> .02 (2e7) -> .01 (3e7). Diagonal sector 1 went .10 -> .76 -> .96 (recovered).
+    Other sectors .94-.99 at 3e7.
+  - Sector 3 at 3e7 (`h1/diag_s1_3e7/split3e7.json`; light eval at background priority):
+    - in its bouts the young EATS .77 and stays .16 of all steps, toward moves .03;
+    - at the hearing step p(eat) .49, p(stay) .35, p(toward) .12;
+    - the side head ADDS eat (+3.75) and stay (+1.04); the trunk is against eat (-1.87).
+    - It is the same learned-lock shape as seed 7's diagonal stay lock, with eat as the absorbing action here.
+  - Seed 0 passed (full PASS, 0 events).
+  - Reading:
+    - target-KL does NOT prevent a 4-way diagonal lock. It formed early, during the curriculum (1e7-2e7), not by a late
+      flip.
+    - With 8-way + target-KL, neither oracle seed locked (E1 / G1), but the learner mis-mapped cardinals (seed 8).
+  - Predictions: (c) p .30 (mine) -> (c). The (a)-branch predictions are void.
 - **RESULT (Nov 16 ~01:40): THE LABEL COUNT** (`docs/data/learner_w2/label_count/`; each row is 100 rollout
   iterations, 819k steps, with that checkpoint's weights, world state and frontier, no updates).
   - Definitions: MEMORY-ONLY bout = a later hearing (not the token's first in this life) at d >= 3. By construction
