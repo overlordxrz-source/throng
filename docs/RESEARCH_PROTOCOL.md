@@ -10508,6 +10508,25 @@ more expensive, because it produces publishable-looking nulls.
     with the withdrawal marked). What the data support:
     - with 8-way + target-KL, the learner shows no stay lock (unlike seed 7);
     - it fails a different way, by choosing an adjacent diagonal for cardinal targets, a choice 4-way moves cannot make.
+- **REGISTERED (entry stamped Nov 17 22:50:36 EST): H1 = option (A) step 1, on the owner's "go" (Cam has not ruled on (A) / (B); this is
+  the recommended option). A 4-WAY oracle (b') + target-KL .015 lock check. Written before any H1 data.**
+  - Why: 8-way was adopted because the 4-way oracle / learner locked on diagonals. Target-KL removed the lock pattern (E1,
+    G1, seed 8). If a 4-way oracle with target-KL shows no locks, 4-way can return. That would rule out the learner's
+    45-degree mis-map for cardinal targets, which 4-way moves cannot make.
+  - Control: the clipped 4-way oracle (one seed, no target-KL) PASSED at 1e8, with d21 diagonals .66 vs cardinals .80.
+    The 4-way runs that locked a sector were the offset-wide (L4) variant, and seed 7's learner locked its diagonals.
+    There is no 2-seed 4-way control under the v2 rule; this is noted as a limit.
+  - Code: none new. In-script pre-check: merged comm-toy (393558d), 4-way, flag off, 60 iterations == the pre-merge
+    `d1/identity_check/port_off` curve, or ABORT.
+  - Run (`docs/data/port_w2/h1/run_h1.sh`): seeds 0 then 1 to 5e7; tables every 1e7 at d = 3 / 12 / 21; --ppo-log.
+    - Gate = E1's: `e1_outcome.py` (frontier 24; decide3 on 3e7-5e7; 0 dead on d3 after 24; <= 1 v2 sector event).
+    - (a) both pass -> s0 to 1e8 with the 3-table rule; if s0 fails, s1 to 1e8 (the G1 precedent Cam accepted). The first
+      that qualifies gives the reference (long d12 evals at 8e7 / 9e7 / 1e8). Then the twin (4-way + target-KL, 3e7) +
+      eval -> STOP. Learner seed 9 (relabel + no-nav + 4-way + target-KL, the seed-8 watch and stops) by hand.
+    - (b) / (c) / unregistered -> STOP and report.
+  - Predictions (mine): (a) .45, (b) .20, (c) .30, unregistered .05.
+    - If (a): the first reference seed qualifies at 1e8, p .55.
+    - d21 diagonal mean within .10 of cardinals at 5e7, p .5.
 - **RESULT (Nov 16 ~01:40): THE LABEL COUNT** (`docs/data/learner_w2/label_count/`; each row is 100 rollout
   iterations, 819k steps, with that checkpoint's weights, world state and frontier, no updates).
   - Definitions: MEMORY-ONLY bout = a later hearing (not the token's first in this life) at d >= 3. By construction
