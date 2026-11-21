@@ -10909,6 +10909,21 @@ more expensive, because it produces publishable-looking nulls.
   - rl2 (learner seed 7, flag off) == `m8/learner_identity/rl2_off` (curve): TRUE.
   - Smoke runs with --offset-proj (oracle + target-KL + tie; learner + target-KL + tie): both ran clean.
   - Fallback (3) is fully checked and waits for Cam's ruling after seed 9's verdict.
+- **RESULT (entry stamped Nov 21 17:02:20 EST): SPEED SMOKE, L4 leg done; the pinned CPU leg is still running (its result is pending).**
+  Files: `docs/data/modal_b1/s9smoke/`. Times copied from the container log (UTC).
+  - L4 (+4 cores, 8 GiB): 2e6 steps, exit 0, wall 368.8 s (21:57:09 UTC).
+    - ~6,682 steps/s after compile. The laptop, within one 8-minute chunk, is ~2,440 steps/s (it also recompiles each
+      chunk), so the L4 is ~2.7x faster.
+    - GPU util: median 48.5%, mean 40.3% (n 74; the mean includes compile zeros); > 30%, so NOT host-loop bound and no T4
+      leg.
+    - First 3 iterations' dparam 553.836 / 536.759 / 633.095 vs laptop 553.881 / 536.822 / 633.067: max relative diff
+      1.2e-4 (< 1e-3; GPU reduction order). mb_done 32 / 32 / 32.
+  - CPU pinned (taskset 0-7, affinity 8 confirmed): dparam BITWISE equal to the laptop. Speed pending (1e6 steps).
+    CPU unpinned: ~800 steps/s.
+  - Projection (L4): 1e8 in ~3.5-4.2 h (early-phase speed; the laptop's later legs ran ~25% faster than its first), i.e.
+    ~$4.0-4.4 per 1e8 incl. evals at $1.053 / h. It is the only option near the 4 h line, so it is the tentative PICK.
+    For two parallel seeds the cap would be ~$5.0 each (+25% stop $6.25), total <= $12.5 (Cam's limit is $15).
+  - Metered (bazingagi1) $0.34, incl. image builds.
 - **RESULT (Nov 16 ~01:40): THE LABEL COUNT** (`docs/data/learner_w2/label_count/`; each row is 100 rollout
   iterations, 819k steps, with that checkpoint's weights, world state and frontier, no updates).
   - Definitions: MEMORY-ONLY bout = a later hearing (not the token's first in this life) at d >= 3. By construction
