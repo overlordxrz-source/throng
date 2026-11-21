@@ -10806,6 +10806,26 @@ more expensive, because it produces publishable-looking nulls.
   - Run-level flag-off identity (oracle + learner) is a prepared script (`j1/offset_proj/run_flagoff.sh`). NOT run:
     "code only" while seed 9 and the queue run. It runs on Cam's ruling, before any --offset-proj launch.
   - If (3) is used: the full sense-change route (requalify the oracle; new reference and twin).
+- **RULING RECORDED (entry stamped Nov 21 16:31:31 EST): Cam Nov 21 ~21:40Z (time copied from Cam's message header). NEW MODAL ACCOUNT
+  bazingagi1 ($42; M authenticated the CLI himself).**
+  - Security (standing): the account is used only through the modal CLI / SDK. ~/.modal.toml and any token are never
+    opened, printed, copied or committed. `modal profile current` (name only) is allowed. The old account stays at
+    $35.47; nothing more runs there.
+  - Fallback (3) build accepted (abed942). run_flagoff.sh runs NOW at background QoS.
+  - GUARD FIRST: the spend guard on bazingagi1 (CAP $41, this account's own billing); a kill-switch test (a dummy app
+    with a test cap below the current spend is stopped within one poll); a per-item spend watch at the item's cap +25%.
+  - SPEED SMOKE (cap $1.00 total; p registered before launch): the exact seed-9 recipe, 2e6 steps each, on (a) one CPU
+    container (8 cores) and (b) one L4 GPU.
+    - Report steps/s, $ per 1e8, and the first 3 iterations' losses vs the laptop on the same seed (1e-3 relative).
+    - Pick: the lowest $ per 1e8 among options finishing 1e8 in <= 4 h; else the faster one under $6 per 1e8.
+    - No batch changes. Checkpoints and logs go to a Modal volume and are copied back to ~/throng-backup/.
+  - After seed 9's verdict:
+    - PASS -> seeds 10 and 11 IN PARALLEL on Modal (each cap = projection +25%; total <= $15), verdict3 each, and the
+      laptop confirm chain DISARMED.
+    - FAIL -> fallback (3) on Modal: oracle s0 / s1 in parallel to 5e7, then reference + twin, then learner seed 10
+      (total <= $20).
+    - Report before launching if any projection exceeds the totals.
+  - Laptop: on AC until seed 9's verdict, then free for M.
 - **RESULT (Nov 16 ~01:40): THE LABEL COUNT** (`docs/data/learner_w2/label_count/`; each row is 100 rollout
   iterations, 819k steps, with that checkpoint's weights, world state and frontier, no updates).
   - Definitions: MEMORY-ONLY bout = a later hearing (not the token's first in this life) at d >= 3. By construction
