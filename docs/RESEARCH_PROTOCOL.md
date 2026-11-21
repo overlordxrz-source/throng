@@ -10722,6 +10722,18 @@ more expensive, because it produces publishable-looking nulls.
     - 0 dead sectors (< .30) at d = 3 and d = 12 at 1e8: p .80;
     - bar3 reach + shuffled + wiped PASS at 1e8 (bar .8959 is tight given ~.93-.95 head ceiling): p .55;
     - life PASS (>= 1.3x twin 497.4, LB > 1.0): p .90.
+- **SEED 9 THROUGH 6e7 (entry stamped Nov 21 15:48:58 EST): 3e7 watch CLEAR, 5e7 early-stop B not fired, 6e7 diagonal reach dip with the read intact. Run still going. Recipe unchanged.** Table clock times are copied from `~/throng-backup/scratch/j1l/run_j1l.out` (the script prints `date` when it writes each table). Sectors are 0..7; even = cardinals, odd = diagonals. Three `later_right` lines per checkpoint are d = 3, then d = 12, then d = 21. Snapshot of the tables and the official 3e7 eval: `docs/data/port_w2/j1/learner_s9/`.
+  - **1e7 (10:21:14) frontier 7.0.** d = 3 reach .95 .94 .92 .97 .95 .96 .96 .95. Head later d3/d12/d21 .943 / .65 / .50 (n 2714 / 2702 / 1075).
+  - **2e7 (11:23:09) frontier 23.0.** d = 3 .98 .92 .98 .97 .97 .91 .99 .91. Head .968 / .958 / .894.
+  - **3e7 (12:22:51) frontier 24.0. WATCH CLEAR.** Official `s9_3e7_d3.json`: mode 0 (true code) head_acc_later 0.8247, 2nd-half hungry reach 0.6650; mode 3 (a new shuffled code at every bout) head 0.1143, hungry 0.1608; mode 4 (memory wiped at every bout) head 0.1195, hungry 0.0353. The log line printed head later d = 3 as 0.8246581554412842. No `WATCH_REPORT` (that fires below .50) and no early stop A (below .25).
+    - d = 3 later_right .89 .77 .88 .70 .87 .73 .87 .72 (diagonals .70-.77, none below .30).
+    - d = 12 .86 .79 .91 .77 .88 .82 .86 .83.
+    - Traj head .825 / .938 / .884 (n 4534 / 2573 / 1563).
+  - **4e7 (13:17:22) frontier 24.** The 3e7 diagonal dip recovered: d = 3 .97 .91 .96 .92 .97 .92 .97 .94. Head .969 / .96 / .901.
+  - **5e7 (14:09:09) frontier 24.0.** Early stop B not fired (it needs frontier <= 6). d = 3 .98 .94 .97 .95 .96 .96 .95 .94. d = 12 .89 .91 .93 .91 .92 .89 .92 .91. Head .963 / .917 / .876 (n 3522 / 2329 / 1749).
+  - **6e7 (15:02:10) frontier 24. Not a registered stop.** d = 3 later_right .90 .50 .76 .48 .88 .50 .84 .61: diagonals .48 / .50 / .50 / .61, cardinals .76-.90, no sector below .30. d = 12 diagonals .71 .74 .72 .69 (all >= .69). d = 21 diagonals .53 .55 .58 .53. Head later still .979 / .940 / .903 (n 4911 / 2080 / 1090). The read is intact; the close-range diagonal walk dropped. Same shape as this seed's own 3e7 dip, which had recovered one checkpoint later, and the same shape as seed 7's later diagonal reach drop. The mixed training curve does not show it: hungry_reach on `s9.log` stayed about .82-.91 from 60M to 65M steps.
+  - **Predictions scored:** later-hearing head at d = 3 at 3e7 >= .50 (p .85): **HIT** (0.825). Frontier > 6 at 5e7 (p .85): **HIT** (24). The 1e8 predictions (0 dead sectors, bar3, life) stay open.
+  - **Still running at this stamp.** Shell `run_j1l.sh` pid 26766, in the 7e7 leg (`--stop-at 7e7`). Last flushed CURVE on `s9.log` before the stamp: 68,157,440 steps, frontier 24, head_acc_later 0.890, hungry_reach 0.829. Legs have been about 50-60 min, so the morning estimate for the 1e8 verdict is stale; four legs plus the long evals remain. Laptop on AC, battery 100%. Guard heartbeat 15:48 from `cap_guard_r3.log`: cap 41.0, metered 35.47. Do not change the recipe. Do not launch seed 10 or Modal.
 - **RESULT (Nov 16 ~01:40): THE LABEL COUNT** (`docs/data/learner_w2/label_count/`; each row is 100 rollout
   iterations, 819k steps, with that checkpoint's weights, world state and frontier, no updates).
   - Definitions: MEMORY-ONLY bout = a later hearing (not the token's first in this life) at d >= 3. By construction
