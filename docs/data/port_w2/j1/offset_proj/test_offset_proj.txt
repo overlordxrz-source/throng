@@ -1,0 +1,9 @@
+PASS (1) named_item.hear untouched vs comm-toy 
+PASS (2) within 9 cells: hear_proj == NI.hear bitwise (all 361 offsets, all 11 columns) 
+PASS (3a) proj(M off) == M proj(off), all 8 g, |off| <= 47 (bitwise) 
+PASS (3b) the tie's input tables carry the proj input of a world to that of the turned world 
+PASS (4) G2b follower on the NEW input: 8/8 at every d = 3..24 reached per sector [22, 22, 22, 22, 22, 22, 22, 22] of 22
+PASS (4-neg) on the OLD clipped input it fails diagonals (cardinals all pass) failing (sector, d) n = 40; min failing d = 15; [(1, 15), (1, 16), (1, 17), (1, 18), (1, 19), (1, 20), (1, 21), (1, 22), (1, 23), (1, 24)]
+PASS (5a) MUTANT L2 denominator caught by (2) 
+PASS (5b) MUTANT x-only denominator caught by (3) 
+ALL PASS

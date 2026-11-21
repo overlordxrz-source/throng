@@ -10787,6 +10787,25 @@ more expensive, because it produces publishable-looking nulls.
   - Item 5 (tie profiling): code only, beside seed 9. Short microbenchmarks only, at background priority; no training runs.
     Any faster implementation must pass test_d4 / test_d4_learner and match current outputs to 1e-6. Not swapped in
     mid-confirm.
+- **RULING RECORDED + BUILT (entry stamped Nov 21 16:20:11 EST): Cam Nov 21 ~21:25Z (time copied from Cam's message header).**
+  - Accepted: verdict3 / decomp / the confirm chain incl. controls; the life reading (mean ratio >= 1.3 AND every LB
+    > 1.0) as THE registered reading; the item 5 profile (no swap; architecture savings PARKED). Cam's p stays .40 / .90.
+  - Fallback (3) --offset-proj BUILT, code only: throng-toy branch `offset-proj` (worktree
+    `~/throng-backup/scratch/opwt`, pushed, NOT merged). Nothing the live queue reads was changed.
+    - `w2/offset_proj.py`: off / max(9, ||off||_inf), with --offset-proj in port_w2 / rl2 / traj, exclusive with
+      --offset-wide.
+  - Checks (`w2/test_offset_proj.py`, function level, background priority; `j1/offset_proj/test_offset_proj.txt`):
+    ALL PASS.
+    - (1) named_item.hear untouched vs comm-toy;
+    - (2) within 9 cells BITWISE equal to the /9 clip (all 361 offsets, all 11 columns);
+    - (3) D4 equivariance proj(M off) == M proj(off), all g, |off| <= 47, bitwise; the tie's input tables carry the
+      proj input of a world to that of the turned world;
+    - (4) the G2b follower on the new input reaches 8/8 at every d = 3..24 (22 / 22 per sector). Negative control: the
+      old clipped input fails 40 diagonal cells, min failing d = 15, cardinals all pass;
+    - (5) mutants caught: the L2 denominator (by 2) and the x-only denominator (by 3).
+  - Run-level flag-off identity (oracle + learner) is a prepared script (`j1/offset_proj/run_flagoff.sh`). NOT run:
+    "code only" while seed 9 and the queue run. It runs on Cam's ruling, before any --offset-proj launch.
+  - If (3) is used: the full sense-change route (requalify the oracle; new reference and twin).
 - **RESULT (Nov 16 ~01:40): THE LABEL COUNT** (`docs/data/learner_w2/label_count/`; each row is 100 rollout
   iterations, 819k steps, with that checkpoint's weights, world state and frontier, no updates).
   - Definitions: MEMORY-ONLY bout = a later hearing (not the token's first in this life) at d >= 3. By construction
