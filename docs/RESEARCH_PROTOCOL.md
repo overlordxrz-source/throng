@@ -10860,6 +10860,49 @@ more expensive, because it produces publishable-looking nulls.
     - L4: 3,000-12,000 steps/s ($2.4-9.7 per 1e8); <= 4 h, p .35.
     - If neither is <= 4 h, one is under $6 per 1e8, p .6.
     - CPU dparam within 1e-3 relative of the laptop, p .85. L4 within 1e-3, p .6 (GPU reduction order).
+- **INCIDENT + FIXES (entry stamped Nov 21 16:50:24 EST): seed 9's script DIED ~16:10 with no output; the 16:16 "Q FAIL seed 9" is
+  VOID; seed 9 RESUMED exactly; both guards are now under launchd KeepAlive. Cam ~21:50Z / ~21:55Z (times copied from
+  Cam's message headers) recorded.**
+  - Seed 9's script and the old guard died in the same window. The script's last log line was the 7e7 table (16:05); s9.ckpt
+    was written at 16:10 (70,451,200 steps, it 8600); the old guard's last heartbeat was 16:10.
+    - Neither left stderr (the guard's .out was last written Nov 17).
+    - Both had been started by the Carbon session through `detach.py` (setsid double fork), so setsid did not protect them.
+    - Cause: NOT FOUND in any log. Most likely an external teardown of that session's processes (the owner switched
+      agents around then). Unproven.
+  - VOID: the confirm queue's `pgrep -f run_j1l.sh` saw no script at 16:15:20 and ran verdict3 on non-existent 8e7 / 9e7
+    / 1e8 files. Its "V3 S9 VERDICT" (empty) and "Q FAIL seed 9 (3-table) 16:16:13" are artifacts, NOT a verdict. The files
+    were moved to `~/throng-backup/scratch/j1l/void_v3_1616/`. Nothing was launched or reported on them.
+  - Resume: `run_j1l_resume.sh` = run_j1l.sh with the leg loop limited to K = 8 9 10 (diff: those two lines only, so
+    1e7-7e7 params / tables are not overwritten).
+    - It was launched under launchd (one-shot `com.throng.s9resume`; plists in `~/throng-backup/launchd/`, NOT in
+      LaunchAgents, so nothing reruns at login).
+    - s9.log: "resumed at 70,451,200 steps, frontier 24.0" (16:46:10). The checkpoint write is atomic (tmp +
+      os.replace); it loaded cleanly.
+  - The verdict queue is re-armed as `queue_verdict9.sh` (launchd one-shot):
+    - it waits on `run_j1l(_resume)?[.]sh`;
+    - it runs verdict3 ONLY if run_j1l.out has the script's own "J1L S9 PASS|FAIL" line, else ALERT;
+    - it stops after seed 9 (the laptop seeds 10 / 11 chain is DISARMED: Cam 21:40Z sends them to Modal).
+    - Fixed in passing: the first re-armed pattern also matched my own tail of run_j1l.out.
+  - Guards (Cam 21:50Z item 2):
+    - both are under launchd KeepAlive (`com.throng.guard.r3`, `.b1`) through `guard_run.sh`, which logs every (re)start
+      to `~/throng-smoke/guard_restarts.log`;
+    - a heartbeat watchdog (`com.throng.guard.wd`) alerts and kills a guard whose heartbeat is > 2 polls (120 s) stale,
+      for a launchd restart;
+    - the per-item watch also alerts on a stale b1 heartbeat;
+    - restart test: kill of b1 at 16:46:58 -> launchd restart at 16:47:28 (throttle 30 s), logged, heartbeat fresh.
+  - Per-item watch fixed: runtime is counted only while the app has a running task (the first version counted from app
+    creation, which charged GPU queue time).
+  - Smoke so far:
+    - CPU UNPINNED (cpu=8, JAX saw 24 cores): ~800 steps/s (iterations 20 -> 39 in 193 s), about 4x slower than the
+      laptop (~3,100); stopped after 39 iterations.
+    - Its first 3 iterations' dparam 553.8809814453125 / 536.8223876953125 / 633.067138671875 and mb_done 32 / 32 / 32 are
+      BITWISE equal to the laptop's seed-9 run.
+    - The first L4 app never got a container in ~12 min and was stopped unbilled.
+    - Relaunched: CPU PINNED (taskset 0-7, OMP 8; 1e6 steps; cap .25) and L4 with nvidia-smi sampling every 5 s
+      (`throng-s9smoke-l4b`; cap .40).
+    - Cam's prior art (Nov 15 pre-relabel W2 learner): Modal CPU ~3.5k steps/s (2.7x slower than the laptop); GPU
+      host-loop bound (T4 ~$1.40, L4 ~$2.24 per 5e7). A T4 leg is added if L4 GPU util < 30%.
+    - Metered $0.06.
 - **RESULT (Nov 16 ~01:40): THE LABEL COUNT** (`docs/data/learner_w2/label_count/`; each row is 100 rollout
   iterations, 819k steps, with that checkpoint's weights, world state and frontier, no updates).
   - Definitions: MEMORY-ONLY bout = a later hearing (not the token's first in this life) at d >= 3. By construction
