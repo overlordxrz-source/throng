@@ -10750,6 +10750,43 @@ more expensive, because it produces publishable-looking nulls.
       allows. A private single-sector lock is ruled out by construction; a whole orbit can still weaken together.
   - Carbon's `carbon.md` proposals (lg_nav / trunk tie; 8-way + D4; projective offset scaling) are recorded as PROPOSALS
     for Cam. None are applied. The --d4-side spec ("trunk unchanged") was Cam's; the untied lg_nav is by design, not a bug.
+- **RULINGS RECORDED + REGISTERED (entry stamped Nov 21 16:15:01 EST): Cam Nov 21 ~21:20Z (time copied from Cam's message header).
+  Written before seed 9's 8e7 table (none in `run_j1l.out` at stamping).**
+  - Recorded:
+    - the incident fixes; scratch lives in ~/throng-backup/scratch/ from now on;
+    - NEW STANDING RULE: work done by another agent is re-verified against the raw logs before Cam rules;
+    - J1 = (a), clean; seed 8 mis-map = side path (parked);
+    - seed 9 to 7e7: 6e7 was a BROAD orbit dip; the trunk is untied BY SPEC.
+  - Carbon proposals:
+    - (1) trunk tie: NOT for stage 1 (revisit only on a trunk-side private lock);
+    - (2) 8-way + D4: PARKED fallback;
+    - (3) projective offset: PARKED as the first fallback if seed 9 fails policy-side on diagonals. It needs the full
+      sense-change route: flag-off identity, G2b follower 8/8 at d = 3..24, oracle requalification, new reference + twin.
+  - SEED 9 VERDICT procedure (`docs/data/port_w2/j1/verdict3.sh`, `verdict3.py`), run after the registered script:
+    - For each of 8e7 / 9e7 / 1e8: the default d = 12 rl2 eval (modes 0 / 3 / 4) + a lengthened eval (>= 2000 2nd-half
+      hungry bouts in modes 0 and 3), then bar3.py vs `j1_ref_mean.json` and `tw_eval_d12.json`. The 1e8 pair reuses the
+      registered script's own evals.
+    - Reach criteria on the MEANS of the three: mean true >= .8959; >= mean shuffled + .30; >= 2 x mean shuffled.
+    - Life: the mean life ratio >= 1.3 (vs 497.4) AND every checkpoint's LB > 1.0 (my reading of "LB > 1.0" for three
+      checkpoints; the conservative one).
+    - Final-table rule: any sector of the 1e8 later right-head reach at d = 3 or d = 12 < .30 -> FAIL.
+    - Controls on verdict3.py: seed 8's bar file reproduces seed 8's FAIL (true .698); a synthetic passing bar gives PASS;
+      a final table with one sector at .20 gives FAIL.
+  - d12 DECOMPOSITION (`decomp_d12.py`, on each checkpoint's table npz, later bouts, per sector):
+    P(head right) x reach|right + P(head wrong) x reach|wrong. Check at 7e7 (information): later reach .804 =
+    .931 x .863 + .069 x .000. Per sector, P(right) .87-.97 and reach|right .80-.92 (lowest on the diagonals 3 / 5 / 7).
+  - CONFIRM chain (`queue_confirm.sh`; `run_seed.sh` = run_j1l.sh with only the seed and the dir changed; diff checked):
+    - wait for seed 9's script, then its 3-table verdict;
+    - PASS -> seeds 10 then 11 back to back, each with its 3-table verdict; CONFIRMED if >= 2 of 3 (9 / 10 / 11) pass;
+    - FAIL -> stop, report, launch nothing.
+  - Predictions:
+    - Cam: reach PASS .40; life PASS .90.
+    - Mine: reach PASS .25; life PASS .92. The limit, if it fails, is POLICY-side (reach|right < .896 on the diagonals),
+      p .70.
+    - If seed 9 passes: >= 2 of 3 pass, p .55.
+  - Item 5 (tie profiling): code only, beside seed 9. Short microbenchmarks only, at background priority; no training runs.
+    Any faster implementation must pass test_d4 / test_d4_learner and match current outputs to 1e-6. Not swapped in
+    mid-confirm.
 - **RESULT (Nov 16 ~01:40): THE LABEL COUNT** (`docs/data/learner_w2/label_count/`; each row is 100 rollout
   iterations, 819k steps, with that checkpoint's weights, world state and frontier, no updates).
   - Definitions: MEMORY-ONLY bout = a later hearing (not the token's first in this life) at d >= 3. By construction
