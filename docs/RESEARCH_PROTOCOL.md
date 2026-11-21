@@ -10903,6 +10903,12 @@ more expensive, because it produces publishable-looking nulls.
     - Cam's prior art (Nov 15 pre-relabel W2 learner): Modal CPU ~3.5k steps/s (2.7x slower than the laptop); GPU
       host-loop bound (T4 ~$1.40, L4 ~$2.24 per 5e7). A T4 leg is added if L4 GPU util < 30%.
     - Metered $0.06.
+- **RESULT (entry stamped Nov 21 16:51:04 EST): --offset-proj run-level flag-off checks ALL PASS** (`j1/offset_proj/run_flagoff.sh`,
+  run at background QoS per Cam 21:40Z; `j1/offset_proj/run_flagoff_RESULT.txt`).
+  - Port (4-way oracle, flag off, 60 iterations) == `d1/identity_check/port_off` (curve): TRUE.
+  - rl2 (learner seed 7, flag off) == `m8/learner_identity/rl2_off` (curve): TRUE.
+  - Smoke runs with --offset-proj (oracle + target-KL + tie; learner + target-KL + tie): both ran clean.
+  - Fallback (3) is fully checked and waits for Cam's ruling after seed 9's verdict.
 - **RESULT (Nov 16 ~01:40): THE LABEL COUNT** (`docs/data/learner_w2/label_count/`; each row is 100 rollout
   iterations, 819k steps, with that checkpoint's weights, world state and frontier, no updates).
   - Definitions: MEMORY-ONLY bout = a later hearing (not the token's first in this life) at d >= 3. By construction
