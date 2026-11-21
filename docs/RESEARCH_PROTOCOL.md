@@ -10654,6 +10654,24 @@ more expensive, because it produces publishable-looking nulls.
     - Mine: both pass .55; s1 sector 3 not dead .75; no learned private lock in any sector (orbit-equal side stay / eat by
       construction) .80.
     - Leg time x1.6-2.0 of H1's on AC.
+- **INCIDENT + RESTART (entry stamped Nov 20 19:10:56 EST): Nov 18 J1 run and `/private/tmp` scratchpad lost; J1 relaunched on
+  persistent paths (no code, seed, flag or gate change).**
+  - What happened: the Nov 18 J1 run (launched on battery at 11:29 EST) and `cap_guard_r3.sh` (last heartbeat
+    Nov 18 12:20 from `cap_guard_r3.log`, metered $35.39) stopped; `/private/tmp/claude-501/.../scratchpad/` was
+    subsequently wiped (no J1 outputs survived; dead `/private/tmp` worktrees pruned; `comm-toy` `195fab8` and
+    `d4-learner` `a7087f2` are intact in `.git`).
+  - Modal checked (`MODAL_PROFILE=roadtoagi111`): metered $35.44, 0 running tasks. Fixed empty-JSON crash in
+    `~/throng-smoke/cap_guard_r3.sh` `live()` and restarted detached (`CAP=41.0`; `guard_check.sh` ALIVE).
+  - J1 relaunched (`docs/data/port_w2/j1/run_j1_restart.sh`, copied to `~/throng-backup/scratch/j1/run_j1.sh`,
+    detached via `~/throng-backup/scratch/detach.py`, logging to `~/throng-backup/scratch/j1/run_j1.out`).
+    - Exact `comm-toy` `195fab8`, identical flags / seeds / gate / predictions as registered Nov 18 (`6c1cb6d`);
+      only `SP` moved from `/private/tmp` to `~/throng-backup/scratch`, and helper scripts point to committed copies
+      under `docs/data/`.
+    - Pre-check passed: `J1 IDCHECK 4-way flag-off == pre-merge port_off: True`; `J1 start 19:10:26` (copied from
+      `run_j1.out`).
+  - Prepared persistent-path `run_j1l_restart.sh` and `learner_checks/run_restart.sh` (replaces lost `s7.params` in
+    the traj flag-off identity check with pre-merge `195fab8` vs post-merge `a7087f2` on freshly saved `l_off.params`).
+  - Power at launch: laptop on BATTERY (40%, discharging); owner notified to plug in AC power.
 - **RESULT (Nov 16 ~01:40): THE LABEL COUNT** (`docs/data/learner_w2/label_count/`; each row is 100 rollout
   iterations, 819k steps, with that checkpoint's weights, world state and frontier, no updates).
   - Definitions: MEMORY-ONLY bout = a later hearing (not the token's first in this life) at d >= 3. By construction
