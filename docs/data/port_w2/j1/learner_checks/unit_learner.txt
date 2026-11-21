@@ -1,0 +1,12 @@
+PASS learner equivariance (lg, v, hl), 8 g, T = 5, memory turned (n_act 6, shared_tok True) max err 4.77e-07 (max |logit| 2.53)
+PASS kv / step_kv == __call__ (n_act 6, shared_tok True) 0.0e+00
+PASS learner equivariance (lg, v, hl), 8 g, T = 5, memory turned (n_act 6, shared_tok False) max err 4.77e-07 (max |logit| 3.47)
+PASS kv / step_kv == __call__ (n_act 6, shared_tok False) 0.0e+00
+PASS learner MUTANT caught (n_act 6) mutant err 1.92e+00
+PASS learner equivariance (lg, v, hl), 8 g, T = 5, memory turned (n_act 10, shared_tok True) max err 4.77e-07 (max |logit| 6.03)
+PASS kv / step_kv == __call__ (n_act 10, shared_tok True) 0.0e+00
+PASS learner equivariance (lg, v, hl), 8 g, T = 5, memory turned (n_act 10, shared_tok False) max err 4.77e-07 (max |logit| 5.66)
+PASS kv / step_kv == __call__ (n_act 10, shared_tok False) 0.0e+00
+PASS learner MUTANT caught (n_act 10) mutant err 1.02e+00
+PASS record disp turns with the world (M . disp); token / ate fixed 
+ALL PASS

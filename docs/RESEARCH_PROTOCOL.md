@@ -10672,6 +10672,56 @@ more expensive, because it produces publishable-looking nulls.
   - Prepared persistent-path `run_j1l_restart.sh` and `learner_checks/run_restart.sh` (replaces lost `s7.params` in
     the traj flag-off identity check with pre-merge `195fab8` vs post-merge `a7087f2` on freshly saved `l_off.params`).
   - Power at launch: laptop on BATTERY (40%, discharging); owner notified to plug in AC power.
+- **RESULT (entry stamped Nov 21 09:12:39 EST): J1 OUTCOME = (a) CLEAN SWEEP; s0 QUALIFIES at 1e8 (10/10 FULL PASS); reference
+  .9954 (bar .8959); twin done (life 497.4).** Files: `docs/data/port_w2/j1/` (`run_j1.out`, `j1_outcome.json`,
+  `j1_events_v2.jsonl`, `j1s0_rule3.json`, `J1_QUALIFIED`, `j1_ref_mean.json`, `tw_eval_d12.json`, verdicts, d21
+  tables). All times copied from `j1/run_j1.out`.
+  - **s1 (H1's lock seed) to 5e7** (19:10:26 -> 22:17:08; 0 sector events, 0 broad dips, 0 dead):
+    - frontier: 22 (1e7), 24 (2e7..5e7);
+    - d = 3 min across all 5 tables: .948 / .980 / .952 / .976 / .945;
+    - d = 12 min across all 5 tables: .891 / .903 / .883 / .889 / .871;
+    - every table 1e7..5e7 = **FULL PASS**. H1's sector-3 eat/stay lock is completely gone.
+  - **s0 to 5e7** (22:17:08 -> 01:02:28; 0 events, 0 broad dips, 0 dead):
+    - frontier: 22 (1e7), 24 (2e7..5e7);
+    - d = 3 min: .961 / .974 / .978 / .974 / .934;
+    - d = 12 min: .884 / .915 / .887 / .874 / .880;
+    - every table 1e7..5e7 = **FULL PASS**.
+  - **J1 OUTCOME (01:02:28): (a)**, 0 events, 0 dead, `pass: {'s0': True, 's1': True}`.
+  - **s0 continued to 1e8** (01:02:28 -> 03:41:16; 10/10 tables FULL PASS; `j1_events_v2.jsonl`: 0 sector events,
+    0 strict events, 0 broad dips, 0 dead across all 10 tables):
+    - 3-table rule (8e7 / 9e7 / 1e8, `j1s0_rule3.json`):
+      - `mean_d3`: .987 / .980 / .974 / .988 / .981 / .983 / .982 / .982;
+      - `mean_d12`: .911 / .885 / .918 / .915 / .920 / .905 / .923 / .889;
+      - **FULL PASS, QUALIFIES: true, final_dead: []**.
+    - d = 21 info (s0 1e8): cardinals .75 / .74 / .75 / .79 (mean .76) vs diagonals .60 / .68 / .66 / .70
+      (mean .66; tight within each orbit).
+  - **Reference (`J1_QUALIFIED`, 03:43:39):** s0 long d = 12 evals at 8e7 / 9e7 / 1e8: 2nd-half hungry reach
+    .9909 (n 2,205) / .9979 (n 2,349) / .9974 (n 3,819) -> **ref_mean = .9954 -> learner reach bar = .8959**.
+  - **Twin (`tw_eval_d12.json`, 05:41:42):** 4-way + target-KL + `--d4-side`, s0's curve, 3e7 -> d = 12 2nd-half
+    hungry reach 0.0, **mean life 497.4 steps**.
+  - **Predictions scored:**
+    - Cam & Will `both pass` (.55): **HIT**; `s1 sector 3 not dead` (.70 / .75): **HIT**; `no learned private lock`
+      (.80): **HIT** (0 locks, 0 events across 15 tables).
+    - Will `leg time x1.6-2.0 of H1 on AC`: **MISS** (actual legs 29-48 min vs H1's 6-8 min = **~4.5-6x**, because
+      Nov 18 `d4_checks` `x1.82` was measured on battery where non-D4 was 6x throttled).
+- **CHECKS + LAUNCH (entry stamped Nov 21 09:12:39 EST): J1 learner fold-in checks ALL PASS 6/6 (`j1/learner_checks/RESULT.txt`);
+  `comm-toy` fast-forwarded to `d4-learner` (`a7087f2`); SEED 9 LAUNCHED (`j1l/run_j1l.sh`).**
+  - Checks (`j1/learner_checks/run_restart.sh`, pre-merge `195fab8` vs `d4-learner` `a7087f2`):
+    - unit tests (`test_d4.py`, `test_d4_learner.py`): ALL PASS;
+    - `rl2` flag-off seed 7 == committed pre-merge `m8/learner_identity/rl2_off.json` (curve): PASS;
+    - `traj ep` flag-off post == pre on `l_off.params` d = 3 (modes): PASS (replaces lost `/private/tmp/.../s7.params`);
+    - `--d4-side` smoke (`l_d4`, `traj_d4`, `l_d4_eval`): PASS; head_later at 20 iters `[0.124, 0.128, 0.120]` (chance);
+    - AC speed: `rl2` target-KL `18.1 s` vs `+ --d4-side` `66.2 s` -> **x3.66** (20 iters).
+  - Launch: `~/throng-backup/scratch/j1l/run_j1l.sh` (copy of `j1/run_j1l_restart.sh`), detached via `detach.py`,
+    logging to `~/throng-backup/scratch/j1l/run_j1l.out` and `s9.log`.
+    - Recipe: relabel + `--no-nav` + 4-way + target-KL .015 + `--d4-side`, seed 9, to 1e8; bar3 vs ref .9954
+      (bar .8959) and twin life 497.4; watch + early stops A (3e7 head < .25, report if < .50) and B (5e7 frontier <= 6).
+  - **Predictions for Seed 9 (registered before any Seed 9 data is read):**
+    - later-hearing head at d = 3 at 3e7 >= .50: p .85;
+    - frontier > 6 at 5e7 (no early stop B): p .85;
+    - 0 dead sectors (< .30) at d = 3 and d = 12 at 1e8: p .80;
+    - bar3 reach + shuffled + wiped PASS at 1e8 (bar .8959 is tight given ~.93-.95 head ceiling): p .55;
+    - life PASS (>= 1.3x twin 497.4, LB > 1.0): p .90.
 - **RESULT (Nov 16 ~01:40): THE LABEL COUNT** (`docs/data/learner_w2/label_count/`; each row is 100 rollout
   iterations, 819k steps, with that checkpoint's weights, world state and frontier, no updates).
   - Definitions: MEMORY-ONLY bout = a later hearing (not the token's first in this life) at d >= 3. By construction

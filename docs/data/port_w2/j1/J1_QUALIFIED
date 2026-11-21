@@ -1,0 +1,1 @@
+{"ref_seed": 0, "ref_files": ["/Users/overlord/throng-backup/scratch/j1/j1_ref_8e7.json", "/Users/overlord/throng-backup/scratch/j1/j1_ref_9e7.json", "/Users/overlord/throng-backup/scratch/j1/j1_ref_10e7.json"], "per_ckpt": [0.9909297227859497, 0.997871458530426, 0.9973815083503723], "n": [2205.0, 2349.0, 3819.0], "ref_mean": 0.995394229888916, "bar": 0.8959}

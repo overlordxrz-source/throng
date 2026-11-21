@@ -1,0 +1,9 @@
+PASS unit tests (oracle, learner) 
+PASS rl2 flag-off seed 7 == pre-merge rl2_off (curve) 
+PASS traj ep flag-off post == pre on l_off.params d3 (modes) 
+PASS runs: l_d4.json 
+PASS runs: traj_d4_d3.json 
+PASS runs: l_d4_eval_d3.json 
+speed: rl2 target-KL 18.1 s vs + d4 66.2 s -> x3.66
+d4 eval modes 0/3/4 head_later [0.124, 0.128, 0.12]
+ALL PASS 6/6

@@ -1,0 +1,18 @@
+PASS D4 closed under composition (8 distinct) 
+PASS action / sector perms are homomorphisms (n_act 6) 
+PASS stay / eat fixed by every g (n_act 6) 
+PASS grid perm bijective, identity at g = 0 (n_act 6) 
+PASS action / sector perms are homomorphisms (n_act 10) 
+PASS stay / eat fixed by every g (n_act 10) 
+PASS grid perm bijective, identity at g = 0 (n_act 10) 
+PASS equivariance, all 8 g, T = 6 recurrent steps (n_act 6) max err 2.38e-07 (max |logit| 2.68)
+PASS equivariance, second random draw (n_act 6) max err 4.77e-07
+PASS MUTANT (g = 3: actions 1 / 2 swapped) is caught (n_act 6) mutant err 2.38e+00
+PASS equivariance, all 8 g, T = 6 recurrent steps (n_act 10) max err 9.54e-07 (max |logit| 5.62)
+PASS equivariance, second random draw (n_act 10) max err 4.77e-07
+PASS MUTANT (g = 3: actions 1 / 2 swapped) is caught (n_act 10) mutant err 3.54e+00
+PASS one-hot oracle: stay / eat equal across each orbit (n_act 6) max within-orbit spread 4.77e-07; cardinal vs diagonal differ by 0.516 (allowed)
+PASS one-hot oracle: stay / eat equal across each orbit (n_act 10) max within-orbit spread 1.19e-07; cardinal vs diagonal differ by 1.507 (allowed)
+PASS semantics: view cell, offset, move and sector each follow the world turned by M 
+PASS positive control: the UNTIED agent's stay / eat differ across the cardinal orbit spread 3.800
+ALL PASS
