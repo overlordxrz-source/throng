@@ -10734,6 +10734,22 @@ more expensive, because it produces publishable-looking nulls.
   - **6e7 (15:02:10) frontier 24. Not a registered stop.** d = 3 later_right .90 .50 .76 .48 .88 .50 .84 .61: diagonals .48 / .50 / .50 / .61, cardinals .76-.90, no sector below .30. d = 12 diagonals .71 .74 .72 .69 (all >= .69). d = 21 diagonals .53 .55 .58 .53. Head later still .979 / .940 / .903 (n 4911 / 2080 / 1090). The read is intact; the close-range diagonal walk dropped. Same shape as this seed's own 3e7 dip, which had recovered one checkpoint later, and the same shape as seed 7's later diagonal reach drop. The mixed training curve does not show it: hungry_reach on `s9.log` stayed about .82-.91 from 60M to 65M steps.
   - **Predictions scored:** later-hearing head at d = 3 at 3e7 >= .50 (p .85): **HIT** (0.825). Frontier > 6 at 5e7 (p .85): **HIT** (24). The 1e8 predictions (0 dead sectors, bar3, life) stay open.
   - **Still running at this stamp.** Shell `run_j1l.sh` pid 26766, in the 7e7 leg (`--stop-at 7e7`). Last flushed CURVE on `s9.log` before the stamp: 68,157,440 steps, frontier 24, head_acc_later 0.890, hungry_reach 0.829. Legs have been about 50-60 min, so the morning estimate for the 1e8 verdict is stale; four legs plus the long evals remain. Laptop on AC, battery 100%. Guard heartbeat 15:48 from `cap_guard_r3.log`: cap 41.0, metered 35.47. Do not change the recipe. Do not launch seed 10 or Modal.
+- **NOTE (entry stamped Nov 21 15:54:02 EST; Will resumes from the Nov 20-21 Carbon sessions).**
+  - Re-checked against the raw logs (`~/throng-backup/scratch/j1/run_j1.out`, `j1l/run_j1l.out`,
+    `j1/learner_checks/RESULT.txt`); Carbon's records match:
+    - J1 OUTCOME a (01:02:28); s0 RULE3 PASS; reference .9954, bar .8959; twin life 497.4 (05:41:42);
+    - learner checks 6/6, x3.66;
+    - seed 9 tables 1e7-6e7 as logged.
+  - Pushed: throng master (3 commits were local) and throng-toy comm-toy (fast-forwarded to a7087f2, already on
+    origin/d4-learner). Neither changes a file the live seed-9 job reads.
+  - Seed 9's d = 3 later-right tables scored with the v2 rule (information; that rule was registered for oracle tables;
+    `j1/learner_s9/s9_ev_input.json`):
+    - 0 sector events, 0 dead;
+    - BROAD dips at 2e7 -> 3e7 (mean -.15, 5 / 8 sectors) and 5e7 -> 6e7 (mean -.27, 6 / 8 sectors).
+    - The 6e7 dip is ORBIT-WIDE: the four diagonals are .50 / .48 / .50 / .61 together. This is the shape the side tie
+      allows. A private single-sector lock is ruled out by construction; a whole orbit can still weaken together.
+  - Carbon's `carbon.md` proposals (lg_nav / trunk tie; 8-way + D4; projective offset scaling) are recorded as PROPOSALS
+    for Cam. None are applied. The --d4-side spec ("trunk unchanged") was Cam's; the untied lg_nav is by design, not a bug.
 - **RESULT (Nov 16 ~01:40): THE LABEL COUNT** (`docs/data/learner_w2/label_count/`; each row is 100 rollout
   iterations, 819k steps, with that checkpoint's weights, world state and frontier, no updates).
   - Definitions: MEMORY-ONLY bout = a later hearing (not the token's first in this life) at d >= 3. By construction
