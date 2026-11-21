@@ -1,0 +1,10 @@
+Item 5 (Cam Nov 21 ~21:20Z): profile of the --d4-side cost (microbenchmark only, background priority, beside seed 9).
+Learner replay fwd+bwd, B 16 x T 64, KV memory (S 96 + T records): base EpAgentDev 63.6 ms, EpAgentDevD4 444.3 ms -> x6.98.
+MAC count per step: base 143,736; D4 1,179,072 (x8.20). D4 share: GRU .500, trunk (8 views + the untied pass) .223,
+q/attention .076, f2 .069, side_enc .068, f1 .055, heads .009. The full-training x3.66 is this x7 diluted by the
+environment / rollout work that the tie does not touch.
+Reading: the cost is the 8 streams themselves (GRU + trunk on g . view), which exact group averaging needs. Exact savings
+available: drop the redundant untied trunk pass (t = tg[0], ~2.5% of MACs); fold the x-permutations into first-layer
+weights (removes gathers, no MACs). Estimated total < 10%: not worth a swap.
+Larger savings need NON-exact changes, i.e. architecture changes for Cam: a smaller per-stream GRU, or dropping the trunk
+features from the side input (~22%).
