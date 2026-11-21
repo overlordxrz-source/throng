@@ -10826,6 +10826,40 @@ more expensive, because it produces publishable-looking nulls.
       (total <= $20).
     - Report before launching if any projection exceeds the totals.
   - Laptop: on AC until seed 9's verdict, then free for M.
+- **RESULT + REGISTERED (entry stamped Nov 21 16:36:09 EST): bazingagi1 guard live and kill-switch tested; SPEED SMOKE design and
+  predictions, written before any smoke launch.** Times copied from `~/throng-smoke/b1/*.log` and `cap_guard_b1.log`.
+  - Guard `~/throng-smoke/cap_guard_b1.sh` (a copy of cap_guard_r3 with MODAL_PROFILE=bazingagi1, an app prefix and a
+    test mode):
+    - live at CAP $41.0 (metered $0.00, pid 40906; check with `guard_check_b1.sh`);
+    - refuses CAP <= metered; its test mode refuses any prefix but throng-guardtest.
+  - Kill-switch test: a dummy app `throng-guardtest` (cpu 0.125, sleeping) was live at 16:32:39. A test guard with CAP -1
+    (below the $0.00 spend) started at 16:32:46, saw it on its first poll at 16:32:47 and stopped it at 16:32:48 (state
+    stopped at 16:32:53). That is within one poll (3 s after start).
+  - Per-item watch `~/throng-smoke/item_watch_b1.sh NAME RATE CAP` (standing rule, cap +25%). The estimate is runtime x
+    the hourly rate of the requested resources, because the billing report is hourly and lags.
+    - Kill test: the dummy at rate 1000 $/h, cap .001 (stop .00125), live 16:34:09, stopped at 16:34:10 on the first poll.
+    - Metered after both tests: $0.00.
+  - Old account: its guard (cap_guard_r3, pid 49440) was found DEAD (last heartbeat 16:10; cause unknown; no cap event).
+    It was restarted at 16:33 (CAP 41, metered 35.47). The old account is idle: 4 deployed apps, 0 tasks.
+  - SPEED SMOKE (`scripts/modal_s9smoke.py`, two apps `throng-s9smoke-cpu` / `throng-s9smoke-l4`):
+    - Code: a clone of the pushed throng-toy comm-toy at EXACTLY a7087f2 (the seed-9 code).
+    - Recipe: the seed-9 recipe, seed 9, 2e6 steps, the same batch / minibatches / epochs / target-KL / --d4-side.
+      The --early-stop-frontier stopping rule is OMITTED: it is not a dynamics change, and it would end a 2e6 run at 1e6.
+    - jax 0.10.0 / flax 0.12.7 / optax 0.2.8 (laptop versions); jax[cuda12] on L4.
+    - Outputs go to the Modal volume `throng-runs-b1` and are copied back to `~/throng-backup/modal_b1/`.
+    - Resources:
+      - (a) CPU: 8 cores, 8 GiB -> $0.4424/h; item cap $0.30 (watch stop $0.375); timeout 45 min.
+      - (b) L4 + 4 cores + 8 GiB -> $1.053/h; item cap $0.48 (stop $0.60); timeout 27 min.
+      - Total worst case $0.975 <= $1.00.
+    - Identity measure: rl2 does not log losses, so the per-iteration dparam (the total |parameter change|, a function of
+      the losses' gradients) and mb_done are compared for iterations 0-2 vs the laptop's own seed-9 run (s9.log:
+      553.881 / 536.822 / 633.067, 32 / 32 / 32), at 1e-3 relative.
+    - Laptop reference speed: ~3,100 steps/s (seed 9, ~53 min per 1e7).
+  - Predictions:
+    - CPU-8: 1,500-3,000 steps/s, so 1e8 in 9-18 h ($4-8 per 1e8); finishes 1e8 <= 4 h, p .02.
+    - L4: 3,000-12,000 steps/s ($2.4-9.7 per 1e8); <= 4 h, p .35.
+    - If neither is <= 4 h, one is under $6 per 1e8, p .6.
+    - CPU dparam within 1e-3 relative of the laptop, p .85. L4 within 1e-3, p .6 (GPU reduction order).
 - **RESULT (Nov 16 ~01:40): THE LABEL COUNT** (`docs/data/learner_w2/label_count/`; each row is 100 rollout
   iterations, 819k steps, with that checkpoint's weights, world state and frontier, no updates).
   - Definitions: MEMORY-ONLY bout = a later hearing (not the token's first in this life) at d >= 3. By construction
