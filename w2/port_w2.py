@@ -23,6 +23,7 @@ from w2.learnability import RecAgent  # noqa: E402
 from w2.worlds import world_kw  # noqa: E402
 from w2.gae import gae  # noqa: E402
 from w2 import offset_wide as OW  # noqa: E402
+from w2 import offset_proj as OP  # noqa: E402
 from w2 import lr_anneal as LRA  # noqa: E402
 from w2.d4 import RecAgentD4  # noqa: E402
 from w2 import named_item as NI  # noqa: E402
@@ -47,6 +48,7 @@ def main():
     ap.add_argument("--target-kl", type=float, default=None, help="Cam Nov 17 ~16:40Z E1: before applying each minibatch step, the k3 approx KL (current vs rollout policy, that minibatch); if > this, skip the batch's remaining epochs / minibatches. Logs TKL lines")
     ap.add_argument("--tkl-synthetic-shift", type=float, default=0.0, help="E1 CHECK ONLY: subtract this from the batch's old log-probs (a synthetic high-KL batch)")
     ap.add_argument("--moves8", action="store_true", help="Cam Nov 17 ~13:00Z L2: 8-way movement (actions 6..9 = diagonal steps, a cardinal step's energy cost); prev-action one-hot columns 6..9 appended at x[126:130]")
+    ap.add_argument("--offset-proj", action="store_true", help="Cam Nov 21 ~21:25Z fallback (3): in-bout offset input off / max(9, ||off||_inf) (w2/offset_proj.py); bitwise = the /9 clip within 9 cells; D4-equivariant")
     ap.add_argument("--offset-wide", action="store_true", help="Cam Nov 17 L4: in-bout offset input clip(off, +-48) / 24 (w2/offset_wide.py) instead of clip(off / 9, +-1)")
     ap.add_argument("--steps", type=float, default=3e7); ap.add_argument("--oracle", action="store_true"); ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--epochs", type=int, default=4); ap.add_argument("--minibatches", type=int, default=8); ap.add_argument("--lr", type=float, default=3e-4)
@@ -68,6 +70,7 @@ def main():
     ap.add_argument("--topo", action="store_true", help="Cam Nov 16 ~17:25Z O-T: the topographic tie in RecAgent (move logits += g P s, g learned, init 0)")
     ap.add_argument("--out", required=True)
     a = ap.parse_args()
+    assert not (a.offset_proj and a.offset_wide), '--offset-proj and --offset-wide are exclusive'
     S = a.item_size; gated = a.hunger_gate; nupd = a.eval_only or a.policy == "follower"
     cfg = env.Cfg(L=96, N=a.N, patch_sigma=1.0, reproduce=False, A_max=3000, moves8=a.moves8, **world_kw(a.world), **({} if a.d_move is None else dict(d_move=a.d_move))); L, W, N, T = cfg.L, a.W, a.N, a.T
     nav = flax.serialization.from_bytes(Net().init(jax.random.PRNGKey(1), jnp.zeros((1, 100))), open(sorted(glob.glob(a.navs))[0], "rb").read())
@@ -98,7 +101,7 @@ def main():
         return LA.sampler(dfront, N, a.lookahead, a.la_max)                   # mixed curriculum: uniform{1..frontier} (+ lookahead bouts)
 
     def obs_x(s, item, code, pa, pr):
-        o = NI.observe(cfg, s, item); hr = (OW.hear_wide if a.offset_wide else NI.hear)(s, item, code, L)
+        o = NI.observe(cfg, s, item); hr = (OW.hear_wide if a.offset_wide else OP.hear_proj if a.offset_proj else NI.hear)(s, item, code, L)
         x_ = jnp.concatenate([o, hr, jax.nn.one_hot(pa, 6), pr[:, None], NI.oracle(item, a.oracle)], 1)
         return jnp.concatenate([x_, jax.nn.one_hot(pa, 10)[:, 6:]], 1) if a.moves8 else x_
 

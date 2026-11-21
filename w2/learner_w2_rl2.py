@@ -41,6 +41,7 @@ from w2.ep_agent_dev import EpAgentDev  # noqa: E402
 from w2.worlds import world_kw  # noqa: E402
 from w2.gae import gae  # noqa: E402
 from w2 import offset_wide as OW  # noqa: E402
+from w2 import offset_proj as OP  # noqa: E402
 from w2 import named_item as NI  # noqa: E402
 from w2.gate import HonestGate  # noqa: E402
 from w2 import lookahead as LA  # noqa: E402
@@ -68,6 +69,7 @@ def main():
     ap.add_argument("--ent-bout", type=float, default=None); ap.add_argument("--ent-anneal", type=float, default=0.0)
     ap.add_argument("--navs", default="w2_out/nav_w13/*.msgpack"); ap.add_argument("--world", default="0.0013,8,0.001")
     ap.add_argument("--W", type=int, default=32); ap.add_argument("--N", type=int, default=4); ap.add_argument("--T", type=int, default=64)
+    ap.add_argument("--offset-proj", action="store_true", help="Cam Nov 21 ~21:25Z fallback (3): in-bout offset input off / max(9, ||off||_inf) (w2/offset_proj.py); bitwise = the /9 clip within 9 cells; D4-equivariant")
     ap.add_argument("--offset-wide", action="store_true", help="Cam Nov 17 L4: in-bout offset input clip(off, +-48) / 24 (w2/offset_wide.py) instead of clip(off / 9, +-1)")
     ap.add_argument("--steps", type=float, default=3e7); ap.add_argument("--oracle", action="store_true"); ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--epochs", type=int, default=4); ap.add_argument("--minibatches", type=int, default=8); ap.add_argument("--lr", type=float, default=3e-4)
@@ -98,6 +100,7 @@ def main():
     ap.add_argument("--tkl-synthetic-shift", type=float, default=0.0, help="E1 CHECK ONLY: subtract this from the batch's old log-probs (a synthetic high-KL batch)")
     ap.add_argument("--moves8", action="store_true", help="Cam Nov 17 ~13:00Z L2: 8-way movement (actions 6..9 = diagonal steps, a cardinal step's energy cost); prev-action columns 6..9 appended at x[126:130]; the parent stays 4-way")
     a = ap.parse_args()
+    assert not (a.offset_proj and a.offset_wide), '--offset-proj and --offset-wide are exclusive'
     S = a.item_size; gated = a.hunger_gate; ep = a.learner == "ep"; KV = not os.environ.get("KV_OFF")
     cfg = env.Cfg(L=96, N=a.N, patch_sigma=1.0, reproduce=False, A_max=3000, moves8=a.moves8, **world_kw(a.world)); L, W, N, T = cfg.L, a.W, a.N, a.T
     nav = flax.serialization.from_bytes(Net().init(jax.random.PRNGKey(1), jnp.zeros((1, 100))), open(sorted(glob.glob(a.navs))[0], "rb").read())
@@ -147,7 +150,7 @@ def main():
         o = NI.observe(cfg, s, item)
         if a.demonstrator:
             o = NI.mark_demo(o, s, c["dem_pos"], c["dem_on"] & item["act"], L)
-        x = jnp.concatenate([o, (OW.hear_wide if a.offset_wide else NI.hear)(s, item, code, L), jax.nn.one_hot(pa, 6), pr[:, None], NI.oracle(item, a.oracle)], 1)
+        x = jnp.concatenate([o, (OW.hear_wide if a.offset_wide else OP.hear_proj if a.offset_proj else NI.hear)(s, item, code, L), jax.nn.one_hot(pa, 6), pr[:, None], NI.oracle(item, a.oracle)], 1)
         if a.moves8:
             x = jnp.concatenate([x, jax.nn.one_hot(pa, 10)[:, 6:]], 1)
         h2, lg, v, aux = jax.vmap(lambda hh, xx: rnet.apply(pp_, hh, xx))(h, x)
