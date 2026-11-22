@@ -1,0 +1,2 @@
+=== container start 03:56:24 seed 9 cap $0.3 = 1025s used 1100s remaining -75s env {'OUTTAG': 'smoke_capcheck', 'SMOKE': '1', 'LEGSTEP': '163840', 'NLEG': '2', 'CHUNK': '60', 'EXTRA_TR': '--early-stop-step 1e12'}
+=== LEDGER: cap time used up; not starting

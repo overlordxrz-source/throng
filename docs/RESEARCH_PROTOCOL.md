@@ -10991,6 +10991,29 @@ more expensive, because it produces publishable-looking nulls.
     - s9.log "resumed at 94,044,160 steps" (the last checkpoint; <= 20 iterations replayed, deterministic).
     - Seed 9 and the guards are now cron-owned (not app-attributed).
   - offset-proj run-level flag-off identity: ALL PASS (reported earlier; restated for the verdict report).
+- **RESULT (entry stamped Nov 21 22:56:54 EST): IN-CONTAINER SMOKE of scripts/modal_seeds.py PASSES (Cam 03:35Z item 4), after one fix.
+  One accidental launch was stopped before any container started.** Times copied from the container log (UTC).
+  Files: `docs/data/modal_b1/seeds_smoke/`; full copy in `~/throng-backup/modal_b1/seeds_smoke/files/`.
+  - Smoke = the seed-9 recipe with smoke-only overrides (legs of 163,840 steps, 2 legs, 60 s chunks, --early-stop-step 1e12;
+    the defaults reproduce the registered `--steps 1e8` / `--stop-at Ke7` strings exactly).
+    - Call 1 was HARD-KILLED (SIGKILL to the process group) 30 s into leg 2 at 03:46:13.
+    - Call 2 (03:46:15): "1e7 leg already done (idempotent)". s9.log: "resumed at 163,840 steps" (the end of leg 1; no
+      leg re-run). Leg 2 finished at 03:51:07.
+    - The verdict step on a SYNTHETIC table: verdict3.py -> PASS=True (as constructed). The decomposition on the real leg-2
+      npz: n 3540.
+    - Volume writes: params / ckpt copies / tables / ledger all present. Copied back to ~/throng-backup/.
+    - Spend: metered $0.35 -> $0.61 incl. the image build (~$0.26 <= cap $0.30); per-item watch estimate $0.20.
+  - BUG FOUND + FIXED: the in-container LEDGER read the default cap ($5.5): the cap env var was set only on the laptop. The
+    SERVER-SIDE timeout was right (1025 s, computed when the app was defined), so the smoke stayed bounded.
+    - Fix: the cap is baked into the image env.
+    - Verified (03:56:24): a ledger already at 1100 s with cap $0.30 (= 1025 s) -> "LEDGER: cap time used up; not
+      starting".
+  - SLIP (on the record): while preparing that check I started `modal_seeds.py::main --seed 9` by mistake (app
+    throng-seedcapcheck, cap $0.30). It was stopped within ~2 min, before any container started: no seeds/s9 dir on the
+    volume, no task, metered unchanged ($0.57).
+  - Rule applied: server-side timeout = cap / $1.053 per h; at most 1 retry; the ledger makes all attempts count toward
+    one cap. Laptop guard + item watch as the second layer.
+  - Ready for the PASS branch: seeds 10 / 11, each SEED_CAP 5.5 (server-side 18,803 s = 5.2 h), total $11 <= $15.
 - **RESULT (Nov 16 ~01:40): THE LABEL COUNT** (`docs/data/learner_w2/label_count/`; each row is 100 rollout
   iterations, 819k steps, with that checkpoint's weights, world state and frontier, no updates).
   - Definitions: MEMORY-ONLY bout = a later hearing (not the token's first in this life) at d >= 3. By construction

@@ -39,6 +39,7 @@ volume = modal.Volume.from_name("throng-runs-b1", create_if_missing=True)
 image = (modal.Image.debian_slim(python_version="3.12").apt_install("git", "zsh")
          .run_commands(f"git clone {REPO} /root/tt", f"cd /root/tt && git checkout {SHA}", f'cd /root/tt && test "$(git rev-parse HEAD)" = "{SHA}"')
          .pip_install("jax[cuda12]==0.10.0", "flax==0.12.7", "optax==0.2.8", "numpy==2.5.4"))
+image = image.env({"SEED_CAP": str(CAP)})                               # the SAME cap inside the container (the ledger), fixed after the smoke
 for dst, src in AUX.items():
     image = image.add_local_file(src, dst, copy=True)
 
@@ -96,3 +97,9 @@ def smoke():
     call 2 must skip leg 1 and resume leg 2 from the checkpoint; then the verdict step runs on a synthetic table."""
     print(run_seed.remote(9, SMOKE_ENV, kill_after_leg1_s=30))
     print(run_seed.remote(9, SMOKE_ENV, 0))
+
+
+@app.local_entrypoint()
+def capcheck():
+    """The in-container ledger uses the SAME cap as the server-side timeout: a ledger already past the cap must refuse."""
+    print(run_seed.remote(9, dict(SMOKE_ENV, OUTTAG="smoke_capcheck"), 0))
