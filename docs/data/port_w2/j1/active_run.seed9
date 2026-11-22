@@ -1,0 +1,6 @@
+NAME=seed9
+DIR=/Users/overlord/throng-backup/scratch/j1l
+RESUME=./run_j1l_resume.sh >> run_j1l.out 2>&1
+PROC=run_j1l(_resume)?[.]sh|learner_w2_rl(2|_traj)[.]py.*s9(\.ckpt|_[0-9]+e7|_eval|\.log)|bar3[.]py.*s9_
+DONE_FILE=/Users/overlord/throng-backup/scratch/j1l/run_j1l.out
+DONE_RE=^J1L S9 (PASS|FAIL|EARLY_STOP|CRASH)

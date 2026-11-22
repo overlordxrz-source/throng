@@ -10963,6 +10963,34 @@ more expensive, because it produces publishable-looking nulls.
     supervisor and the seed-9 resume are still app-attributed: another Claude update / quit would stop them again.
   - The verdict queue is not re-armed yet (it would also be app-attributed). Seed 9's verdict will be run by hand once
     its script prints PASS / FAIL.
+- **RULINGS RECORDED + CRON KEEP-ALIVE INSTALLED AND TESTED (entry stamped Nov 21 22:33:39 EST): Cam Nov 22 ~03:32Z / ~03:35Z (times
+  copied from Cam's message headers). M's card: "Yes, Will installs it".**
+  - Recorded:
+    - incident 2 and the recovery accepted;
+    - L4 accepted as the pick (smoke $0.35);
+    - NEW STANDING RULE: every Modal function gets a SERVER-SIDE timeout = item cap / its hourly rate (incl. CPU +
+      memory), and bounded retries whose time counts toward the same cap; the laptop guard + item watch stay as a second
+      layer;
+    - an in-container smoke of modal_seeds.py (cap $0.30) is required before the first real launch;
+    - the post-verdict branches are pre-authorized (PASS -> seeds 10 / 11 on L4 if the smoke passed; FAIL -> build + smoke
+      fallback (3) on Modal and launch oracle seeds 0 / 1 to 5e7 if the flag-off identity passed; chain <= $20).
+  - INSTALLED: the user crontab has exactly ONE line, `* * * * * /Users/overlord/CascadeProjects/throng/scripts/ensure_running.sh`
+    (there was no crontab before).
+    - REMOVE WITH: `crontab -l | grep -v ensure_running.sh | crontab -`.
+    - ensure_running.sh (in the repo) uses a lock dir so runs never overlap, logs every start to
+      `~/throng-backup/logs/ensure.log`, and (re)starts ONLY:
+      - (1) the guard supervisor (which starts / restarts both guards);
+      - (2) the ONE laptop run named in `~/throng-backup/logs/active_run` (now seed 9; copy at
+        `j1/active_run.seed9`), and only if that run's done-pattern (J1L S9 PASS|FAIL|EARLY_STOP|CRASH) is NOT in its log
+        and none of its processes is alive.
+    - It never starts a finished run or anything on Modal.
+  - Test 1: killed the supervisor + both guards at 22:31:32 -> cron restarted the supervisor at 22:32:00 -> both guards
+    up at 22:32:00, heartbeats fresh. All back in 30 s.
+  - Test 2: killed seed 9's resume script + trainer at 22:32:18 -> cron restarted the resume at 22:33:00.
+    - "8e7 leg already done", "9e7 leg already done" (no leg re-run).
+    - s9.log "resumed at 94,044,160 steps" (the last checkpoint; <= 20 iterations replayed, deterministic).
+    - Seed 9 and the guards are now cron-owned (not app-attributed).
+  - offset-proj run-level flag-off identity: ALL PASS (reported earlier; restated for the verdict report).
 - **RESULT (Nov 16 ~01:40): THE LABEL COUNT** (`docs/data/learner_w2/label_count/`; each row is 100 rollout
   iterations, 819k steps, with that checkpoint's weights, world state and frontier, no updates).
   - Definitions: MEMORY-ONLY bout = a later hearing (not the token's first in this life) at d >= 3. By construction
