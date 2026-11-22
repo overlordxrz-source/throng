@@ -11014,6 +11014,14 @@ more expensive, because it produces publishable-looking nulls.
   - Rule applied: server-side timeout = cap / $1.053 per h; at most 1 retry; the ledger makes all attempts count toward
     one cap. Laptop guard + item watch as the second layer.
   - Ready for the PASS branch: seeds 10 / 11, each SEED_CAP 5.5 (server-side 18,803 s = 5.2 h), total $11 <= $15.
+- **RULING RECORDED + BUILT (entry stamped Nov 21 23:17:34 EST): Cam Nov 22 ~04:20Z (time copied from Cam's message header).**
+  - Accepted: the smoke ($0.26), the cron install + tests, and the accidental launch ($0, nothing written).
+  - NEW GUARD (built): `scripts/modal_seeds.py::main` needs `--run-id`, which must match EXACTLY ONE protocol line of the
+    form `RUN-ID: <id> | seed <S> | recipe seed9-recipe@a7087f2 | cap $<C>`, with that seed, this recipe and the cap in
+    effect (SEED_CAP). Otherwise it prints REFUSED and returns before `.remote()`, so no container is created.
+    - Controls: no id / unknown id / wrong seed / wrong cap all REFUSE; a matching line passes.
+    - Smoke / test entrypoints (`smoke`, `capcheck`) stay separate.
+  - Standing check: the first container log line prints the cap; it is checked within 2 min of every real launch.
 - **RESULT (Nov 16 ~01:40): THE LABEL COUNT** (`docs/data/learner_w2/label_count/`; each row is 100 rollout
   iterations, 819k steps, with that checkpoint's weights, world state and frontier, no updates).
   - Definitions: MEMORY-ONLY bout = a later hearing (not the token's first in this life) at d >= 3. By construction
