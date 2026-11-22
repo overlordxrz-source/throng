@@ -30,6 +30,11 @@ AUX = {  # container path -> local source
     "/root/aux/tw_eval_d12.json": os.path.join(J1, "tw_eval_d12.json"),
 }
 app = modal.App(os.environ.get("SEED_APP", "throng-seed"))
+# Cam Nov 22 ~03:35Z standing rule: SERVER-SIDE timeout = item cap / hourly rate (L4 $0.80 + 4 cores x $0.0473 + 8 GiB x
+# $0.008 = $1.053 / h); at most 1 retry, and an in-container LEDGER on the volume makes every attempt's runtime count
+# toward the same cap (an attempt starts with remaining = cap time - used, and is killed at 0).
+RATE = 1.053
+CAP = float(os.environ.get("SEED_CAP", "5.5")); CAP_S = int(CAP / RATE * 3600)
 volume = modal.Volume.from_name("throng-runs-b1", create_if_missing=True)
 image = (modal.Image.debian_slim(python_version="3.12").apt_install("git", "zsh")
          .run_commands(f"git clone {REPO} /root/tt", f"cd /root/tt && git checkout {SHA}", f'cd /root/tt && test "$(git rev-parse HEAD)" = "{SHA}"')
@@ -38,26 +43,56 @@ for dst, src in AUX.items():
     image = image.add_local_file(src, dst, copy=True)
 
 
-@app.function(image=image, gpu="L4", cpu=4.0, memory=8192, timeout=24 * 60 * 60, retries=modal.Retries(max_retries=2, initial_delay=10.0),
+@app.function(image=image, gpu="L4", cpu=4.0, memory=8192, timeout=CAP_S, retries=modal.Retries(max_retries=1, initial_delay=10.0),
               volumes={VOL: volume})
-def run_seed(seed: int) -> str:
+def run_seed(seed: int, env: dict | None = None, kill_after_leg1_s: int = 0) -> str:
+    import json
+    import signal
     import subprocess
     import time
     os.chdir("/root/tt")
     assert subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True, text=True).stdout.strip() == SHA
-    out = f"{VOL}/seeds/s{seed}"; os.makedirs(out, exist_ok=True)
-    log = open(f"{out}/run.out", "a"); log.write(f"=== container start {time.strftime('%H:%M:%S')} seed {seed}\n"); log.flush()
+    env = dict(env or {}); tag = env.get("OUTTAG", f"s{seed}"); out = f"{VOL}/seeds/{tag}"; os.makedirs(out, exist_ok=True)
+    led = f"{out}/ledger.json"; volume.reload()
+    used = json.load(open(led))["used_s"] if os.path.exists(led) else 0.0; remaining = CAP_S - used
+    log = open(f"{out}/run.out", "a"); log.write(f"=== container start {time.strftime('%H:%M:%S')} seed {seed} cap ${CAP} = {CAP_S}s used {used:.0f}s remaining {remaining:.0f}s env {env}\n"); log.flush()
+    if remaining <= 0:
+        log.write("=== LEDGER: cap time used up; not starting\n"); log.close(); volume.commit(); return f"seed {seed}: cap time used up"
     smi = subprocess.Popen(["nvidia-smi", "--query-gpu=timestamp,utilization.gpu,memory.used", "--format=csv,noheader", "-l", "30"],
                            stdout=open(f"{out}/gpu_util.csv", "a"), stderr=subprocess.STDOUT)
-    p = subprocess.Popen(["zsh", "/root/aux/run_seed_modal.sh", str(seed)], stdout=log, stderr=subprocess.STDOUT)
+    p = subprocess.Popen(["zsh", "/root/aux/run_seed_modal.sh", str(seed)], stdout=log, stderr=subprocess.STDOUT, env=dict(os.environ, **env),
+                         start_new_session=True)
+    t0 = time.time(); killed = None; leg1_seen = None
     while p.poll() is None:
-        time.sleep(60); log.flush(); volume.commit()
-    smi.kill(); log.write(f"=== container exit {p.returncode} {time.strftime('%H:%M:%S')}\n"); log.close(); volume.commit()
+        time.sleep(10); log.flush(); used_now = used + time.time() - t0
+        json.dump(dict(used_s=used_now, cap_s=CAP_S), open(led, "w")); volume.commit()
+        if used_now >= CAP_S:
+            os.killpg(p.pid, signal.SIGKILL); killed = "LEDGER cap time reached"; break
+        if kill_after_leg1_s:                                               # smoke only: a hard kill mid leg 2
+            if leg1_seen is None and f"J1L S{seed} 1e7 WATCH" in open(f"{out}/run.out").read():
+                leg1_seen = time.time()
+            if leg1_seen and time.time() - leg1_seen >= kill_after_leg1_s:
+                os.killpg(p.pid, signal.SIGKILL); killed = f"SMOKE hard kill {kill_after_leg1_s}s into leg 2"; break
+    p.wait(); smi.kill(); json.dump(dict(used_s=used + time.time() - t0, cap_s=CAP_S), open(led, "w"))
+    log.write(f"=== container exit {p.returncode} {killed or ''} {time.strftime('%H:%M:%S')}\n"); log.close(); volume.commit()
+    if killed:
+        return f"seed {seed}: {killed}"
     if p.returncode != 0:
         raise RuntimeError(f"seed {seed}: script exit {p.returncode} (retry resumes from the volume)")
     return f"seed {seed}: done"
 
 
+SMOKE_ENV = dict(OUTTAG="smoke_s9", SMOKE="1", LEGSTEP="163840", NLEG="2", CHUNK="60", EXTRA_TR="--early-stop-step 1e12")
+
+
 @app.local_entrypoint()
 def main(seed: int):
     print(run_seed.remote(seed))
+
+
+@app.local_entrypoint()
+def smoke():
+    """Cam Nov 22 ~03:35Z item 4: tiny legs (163,840 steps), 2 legs, 60 s chunks; call 1 is hard-killed 30 s into leg 2;
+    call 2 must skip leg 1 and resume leg 2 from the checkpoint; then the verdict step runs on a synthetic table."""
+    print(run_seed.remote(9, SMOKE_ENV, kill_after_leg1_s=30))
+    print(run_seed.remote(9, SMOKE_ENV, 0))

@@ -10,14 +10,17 @@
 # reference (j1_ref_mean.json) and the J1 twin (tw_eval_d12.json). Reports at 3e7 / 5e7 / 1e8.
 SP=/mnt/runs; R=/root/aux; TRJ=/root/aux; BAR=/root/aux; PY=python3
 cd /root/tt
-S=${1:?seed}; M=$SP/seeds/s$S; mkdir -p $M
+S=${1:?seed}; M=$SP/seeds/${OUTTAG:-s$S}; mkdir -p $M
+# smoke-only overrides (defaults = the registered recipe: legs of 1e7, 10 legs, 3000 s chunks, no extra flags)
+LEGSTEP=${LEGSTEP:-1e7}; NLEG=${NLEG:-10}; CHUNK=${CHUNK:-3000}; SMOKE=${SMOKE:-0}; EXTRA_TR=${EXTRA_TR:-}
+TOTAL=$(python3 -c "print('1e8' if '$LEGSTEP' == '1e7' and $NLEG == 10 else int(float('$LEGSTEP') * $NLEG))")
 XT="--learner ep --slots 96 --shared-tok --hindsight 0.5 --head-own-meal --demonstrator --parent-waits --gate honest --hunger-gate --item-size 0.1 --W 32 --lookahead 0.25 --la-max 12 --head-relabel-token --d4-side"
 X="$XT --no-nav --target-kl 0.015"
-TR="--steps 1e8 --early-stop-frontier 6 --seed $S --ckpt $M/s$S.ckpt --max-seconds 3000 --out $M/s${S}_train.json"
+TR="--steps $TOTAL --early-stop-frontier 6 --seed $S --ckpt $M/s$S.ckpt --max-seconds $CHUNK --out $M/s${S}_train.json $EXTRA_TR"
 echo "J1L S$S start $(date '+%H:%M:%S')"
-for K in 1 2 3 4 5 6 7 8 9 10; do
+for K in $(seq 1 $NLEG); do
   [ -f $M/s${S}_${K}e7.params ] && [ -f $M/s${S}_${K}e7_bysec.txt ] && { echo "J1L S$S ${K}e7 leg already done (idempotent; container retry)"; continue; }
-  ST=""; [ $K -lt 10 ] && ST="--stop-at ${K}e7"
+  ST=""; [ $K -lt $NLEG ] && ST="--stop-at $(python3 -c "print('${K}e7' if '$LEGSTEP' == '1e7' else int(float('$LEGSTEP') * $K))")"
   N0=$(grep -c '^TKL' $M/s$S.log 2>/dev/null); N0=${N0:-0}
   for i in $(seq 1 200); do $PY w2/learner_w2_rl2.py ${=X} ${=TR} ${=ST} --save-params $M/s${S}_${K}e7.params >> $M/s$S.log 2>&1
     [ -f $M/s${S}_${K}e7.params ] && break; [ -f $M/s${S}_train.json ] && break; grep -q Traceback $M/s$S.log && { echo "J1L S$S CRASH"; exit 1; }; done
@@ -36,6 +39,18 @@ import sys,json;r=[json.loads(l[4:]) for l in sys.stdin];print('this-leg %.3f (n
   grep -q "EARLY_STOP frontier" $M/s$S.log && { echo "J1L S$S EARLY_STOP_B (FAIL) $(date '+%H:%M:%S')"; exit 0; }
   [ -f $M/s${S}_train.json ] && break
 done
+if [ "$SMOKE" = 1 ]; then      # smoke: the verdict step on a SYNTHETIC table (bar JSONs + a bysec file), and decomp on the real leg-2 npz
+  python3 - "$M" <<'PYS'
+import json, sys
+M = sys.argv[1]; base = dict(hungry_2nd_true=0.95, hungry_2nd_shuffled=0.40, hungry_2nd_wiped=0.30, life_ratio=5.0, life_lb=4.5, need=0.8959, head_later=0.95, bouts_2nd_half={"0": 2500})
+for k in (8, 9, 10): json.dump(base, open(f"{M}/v3_syn_{k}e7_bar.json", "w"))
+open(f"{M}/syn_bysec.txt", "w").write("== x\n  later_right  reach by sector 0.95 0.94 0.92 0.97 0.95 0.96 0.96 0.95  n [1]\n  later_right  reach by sector 0.9 0.9 0.9 0.9 0.9 0.9 0.9 0.9  n [1]\n")
+PYS
+  python3 /root/aux/verdict3.py $M/v3_syn_{8,9,10}e7_bar.json $M/syn_bysec.txt > $M/v3_syn_verdict.json
+  python3 /root/aux/decomp_d12.py $M/s${S}_${NLEG}e7_traj_d12_m0.npz > $M/smoke_decomp.json
+  echo "SMOKE V3 synthetic verdict PASS=$(python3 -c "import json;print(json.load(open('$M/v3_syn_verdict.json'))['PASS'])") decomp_n=$(python3 -c "import json;d=json.load(open('$M/smoke_decomp.json'));print(list(d.values())[0]['later_all']['n'])") $(date '+%H:%M:%S')"
+  exit 0
+fi
 P=$M/s${S}_10e7.params; [ -f $P ] || P=$(ls -t $M/s${S}_*e7.params | head -1)
 $PY w2/learner_w2_rl2.py ${=X} --seed $S --init-params $P --d-fixed 12 --eval-necessity 0,3,4 --out $M/s${S}_eval_d12.json >> $M/s${S}_evals.log 2>&1
 cp $M/s${S}_eval_d12.json $M/s${S}_eval_d12_long.json
