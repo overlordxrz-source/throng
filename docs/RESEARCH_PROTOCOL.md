@@ -10924,6 +10924,45 @@ more expensive, because it produces publishable-looking nulls.
     ~$4.0-4.4 per 1e8 incl. evals at $1.053 / h. It is the only option near the 4 h line, so it is the tentative PICK.
     For two parallel seeds the cap would be ~$5.0 each (+25% stop $6.25), total <= $12.5 (Cam's limit is $15).
   - Metered (bazingagi1) $0.34, incl. image builds.
+- **RESULT + INCIDENT 2 (entry stamped Nov 21 20:56:55 EST): SPEED SMOKE complete -> PICK = L4. Second teardown at 17:37: the Claude
+  desktop app UPDATED and took every launchd job it had bootstrapped with it. Seed 9 resumed again; the guards are under a
+  supervisor loop.**
+  - CPU PINNED (taskset 0-7, affinity 8): 1e6 steps, exit 0 (wall 1075.7 s). ~1,020 steps/s after compile (unpinned:
+    ~800). First 3 dparam BITWISE equal to the laptop.
+  - Comparison:
+
+    | option | steps/s | 1e8 | $ per 1e8 |
+    |---|---|---|---|
+    | CPU-8 pinned | ~1,020 | ~27 h | ~$12 |
+    | L4 | ~6,700 | ~4.2 h at early-phase speed (later legs ran ~25% faster on the laptop, so ~3.5-4.2 h) | ~$4.4 incl. evals |
+    | laptop (within one chunk) | ~2,440 | | |
+
+  - PICK by Cam's rule: no option is clearly <= 4 h (L4 is borderline); the faster one under $6 per 1e8 is the L4. The L4
+    is the pick on either branch.
+    - For seeds 10 / 11 in parallel: cap ~$5.5 each (projection +25%), total ~$11 <= $15.
+    - Smoke spend: metered $0.35 incl. image builds (cap $1.00). No live apps.
+  - INCIDENT 2. From the system log (`log show`), 17:37:29:
+    - "Queried 6 attributed services: caller=loginwindow[422], coalition=12321": com.anthropic.claudefordesktop.ShipIt
+      plus all five com.throng.* launchd jobs. The Claude desktop app updated (ShipIt), and loginwindow tore down the
+      services ATTRIBUTED to it.
+    - launchd jobs bootstrapped from the app's shell are attributed to the app, so KeepAlive did not help.
+    - The same mechanism very likely explains the 16:10 deaths: the Carbon app's processes were taken down with that app.
+      Inference, not shown.
+    - Lost: seed 9 at ~76.3M steps (s9.ckpt 17:36, atomic), the verdict queue, both guards, the watchdog. Nothing ran on
+      Modal meanwhile (b1 metered $0.35 unchanged; the old account $35.47 unchanged).
+  - Recovery (20:54-20:55):
+    - seed 9 resumed again from 76,349,440 steps (s9.log). `run_j1l_resume.sh` now SKIPS legs whose params and table
+      exist, so a resume can never overwrite a finished leg;
+    - the guards run under `~/throng-smoke/guard_supervise.sh`: it restarts a missing guard every 30 s, and alerts / kills /
+      restarts at a heartbeat > 120 s once the guard has been up >= 90 s;
+    - restart test: kill b1 at 20:55:21 -> restart at 20:55:51, logged.
+    - An earlier watchdog race (it killed the new guards on the old stale heartbeat files) is why the supervisor has the
+      90 s grace.
+  - NOT done (needs the owner): a crontab line running an idempotent `ensure.sh` every minute. cron is not attributed to
+    any app, so it would survive app quits and updates. The permission system DENIED installing a crontab. The current
+    supervisor and the seed-9 resume are still app-attributed: another Claude update / quit would stop them again.
+  - The verdict queue is not re-armed yet (it would also be app-attributed). Seed 9's verdict will be run by hand once
+    its script prints PASS / FAIL.
 - **RESULT (Nov 16 ~01:40): THE LABEL COUNT** (`docs/data/learner_w2/label_count/`; each row is 100 rollout
   iterations, 819k steps, with that checkpoint's weights, world state and frontier, no updates).
   - Definitions: MEMORY-ONLY bout = a later hearing (not the token's first in this life) at d >= 3. By construction
