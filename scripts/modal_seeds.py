@@ -86,8 +86,33 @@ def run_seed(seed: int, env: dict | None = None, kill_after_leg1_s: int = 0) -> 
 SMOKE_ENV = dict(OUTTAG="smoke_s9", SMOKE="1", LEGSTEP="163840", NLEG="2", CHUNK="60", EXTRA_TR="--early-stop-step 1e12")
 
 
+RECIPE = "seed9-recipe@a7087f2"       # relabel + no-nav + 4-way + target-KL .015 + --d4-side (run_seed_modal.sh)
+PROTOCOL = os.path.join(os.path.dirname(HERE), "docs", "RESEARCH_PROTOCOL.md")
+
+
+def _registered(run_id: str, seed: int) -> str:
+    """Cam Nov 22 ~04:20Z: a REAL run needs a protocol line `RUN-ID: <id> | seed <S> | recipe <R> | cap $<C>` registered
+    BEFORE launch, matching this seed, this recipe and the cap in effect (SEED_CAP). Returns '' if OK, else the reason."""
+    import re
+    if not run_id:
+        return "no --run-id given"
+    pat = re.compile(r"RUN-ID: (\S+) \| seed (\d+) \| recipe (\S+) \| cap \$([0-9.]+)")
+    hits = [m for m in pat.finditer(open(PROTOCOL).read()) if m.group(1) == run_id]
+    if len(hits) != 1:
+        return f"run-id {run_id!r} registered {len(hits)} times in the protocol (need exactly 1)"
+    m = hits[0]
+    if int(m.group(2)) != seed or m.group(3) != RECIPE or abs(float(m.group(4)) - CAP) > 1e-9:
+        return f"run-id {run_id!r} is registered as seed {m.group(2)} / {m.group(3)} / cap ${m.group(4)}; this launch is seed {seed} / {RECIPE} / cap ${CAP}"
+    return ""
+
+
 @app.local_entrypoint()
-def main(seed: int):
+def main(seed: int, run_id: str = ""):
+    """REAL run. Refuses (before any container exists) unless --run-id matches a registered protocol line."""
+    why = _registered(run_id, seed)
+    if why:
+        print(f"REFUSED: {why}. Nothing launched."); return
+    print(f"launching run-id {run_id}: seed {seed}, {RECIPE}, cap ${CAP} (server-side timeout {CAP_S} s)")
     print(run_seed.remote(seed))
 
 
