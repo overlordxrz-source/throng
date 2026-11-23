@@ -1,0 +1,56 @@
+=== container start 06:09:16 seed 10 cap $5.5 = 18803s used 0s remaining 18803s env {'XT_EXTRA': '--offset-proj', 'REF_FILE': '/mnt/runs/oracle/o0/f3_ref_mean.json', 'TWIN_FILE': '/mnt/runs/oracle/o0/tw_eval_d12.json'}
+J1L S10 start 06:09:16
+J1L S10 1e7 frontier 11.0 06:30:26
+  later_right  reach by sector 0.99 0.98 0.99 0.98 0.98 0.98 0.99 0.97  n [433, 441, 457, 426, 425, 489, 465, 407]
+  later_right  reach by sector 0.86 0.80 0.88 0.76 0.85 0.83 0.87 0.76  n [367, 391, 349, 303, 349, 353, 381, 357]
+  later_right  reach by sector 0.63 0.24 0.70 0.30 0.52 0.28 0.52 0.31  n [100, 62, 70, 54, 101, 87, 83, 59]
+J1L S10 1e7 WATCH head_later {"s10_1e7_traj_d3_m0.npz": {"acc": 0.965, "n": 3671}, "s10_1e7_traj_d12_m0.npz": {"acc": 0.914, "n": 3118}, "s10_1e7_traj_d21_m0.npz": {"acc": 0.522, "n": 1203}} cut this-leg 0.444 (n_it 1221; chunk restarts replay <= 20 its)
+J1L S10 2e7 frontier 24.0 06:51:14
+  later_right  reach by sector 0.96 0.90 0.94 0.91 0.95 0.90 0.97 0.92  n [456, 441, 463, 462, 494, 488, 465, 435]
+  later_right  reach by sector 0.88 0.88 0.88 0.92 0.92 0.87 0.86 0.91  n [312, 284, 291, 283, 298, 268, 285, 311]
+  later_right  reach by sector 0.82 0.68 0.70 0.67 0.75 0.66 0.79 0.62  n [141, 147, 169, 154, 149, 160, 178, 144]
+J1L S10 2e7 WATCH head_later {"s10_2e7_traj_d3_m0.npz": {"acc": 0.977, "n": 3793}, "s10_2e7_traj_d12_m0.npz": {"acc": 0.944, "n": 2472}, "s10_2e7_traj_d21_m0.npz": {"acc": 0.919, "n": 1354}} cut this-leg 0.429 (n_it 1221; chunk restarts replay <= 20 its)
+J1L S10 3e7 frontier 24.0 07:13:27
+  later_right  reach by sector 0.95 0.92 0.95 0.96 0.96 0.95 0.96 0.93  n [368, 396, 391, 386, 405, 381, 390, 370]
+  later_right  reach by sector 0.90 0.89 0.92 0.91 0.94 0.91 0.92 0.89  n [277, 287, 294, 266, 264, 262, 245, 262]
+  later_right  reach by sector 0.77 0.73 0.84 0.81 0.73 0.76 0.78 0.76  n [155, 138, 162, 128, 159, 157, 156, 146]
+J1L S10 3e7 WATCH head_later {"s10_3e7_traj_d3_m0.npz": {"acc": 0.971, "n": 3178}, "s10_3e7_traj_d12_m0.npz": {"acc": 0.951, "n": 2268}, "s10_3e7_traj_d21_m0.npz": {"acc": 0.93, "n": 1293}} cut this-leg 0.362 (n_it 1221; chunk restarts replay <= 20 its)
+J1L S10 3e7 head later d=3 0.9713656306266785
+J1L S10 4e7 frontier 24.0 07:37:54
+  later_right  reach by sector 0.99 0.85 0.99 0.86 0.98 0.88 0.98 0.86  n [486, 456, 481, 440, 468, 474, 514, 465]
+  later_right  reach by sector 0.92 0.89 0.92 0.90 0.93 0.87 0.94 0.93  n [299, 334, 276, 300, 282, 342, 314, 286]
+  later_right  reach by sector 0.87 0.75 0.81 0.65 0.85 0.81 0.85 0.76  n [128, 127, 139, 124, 137, 151, 155, 126]
+J1L S10 4e7 WATCH head_later {"s10_4e7_traj_d3_m0.npz": {"acc": 0.973, "n": 3891}, "s10_4e7_traj_d12_m0.npz": {"acc": 0.95, "n": 2560}, "s10_4e7_traj_d21_m0.npz": {"acc": 0.905, "n": 1201}} cut this-leg 0.344 (n_it 1220; chunk restarts replay <= 20 its)
+J1L S10 5e7 frontier 24.0 08:01:04
+  later_right  reach by sector 0.97 0.94 1.00 0.96 0.97 0.89 0.99 0.95  n [365, 323, 403, 389, 381, 427, 376, 392]
+  later_right  reach by sector 0.93 0.88 0.92 0.91 0.93 0.90 0.95 0.90  n [257, 294, 250, 249, 291, 282, 293, 336]
+  later_right  reach by sector 0.87 0.78 0.80 0.80 0.82 0.78 0.82 0.77  n [149, 125, 148, 114, 152, 139, 158, 156]
+J1L S10 5e7 WATCH head_later {"s10_5e7_traj_d3_m0.npz": {"acc": 0.974, "n": 3139}, "s10_5e7_traj_d12_m0.npz": {"acc": 0.957, "n": 2352}, "s10_5e7_traj_d21_m0.npz": {"acc": 0.919, "n": 1243}} cut this-leg 0.318 (n_it 1221; chunk restarts replay <= 20 its)
+J1L S10 6e7 frontier 24.0 08:24:17
+  later_right  reach by sector 0.93 0.66 0.93 0.66 0.95 0.70 0.96 0.62  n [420, 385, 407, 423, 454, 423, 449, 419]
+  later_right  reach by sector 0.91 0.89 0.91 0.89 0.92 0.88 0.91 0.84  n [300, 271, 294, 253, 298, 284, 293, 331]
+  later_right  reach by sector 0.78 0.76 0.85 0.65 0.82 0.64 0.83 0.62  n [129, 154, 134, 122, 130, 133, 121, 149]
+J1L S10 6e7 WATCH head_later {"s10_6e7_traj_d3_m0.npz": {"acc": 0.967, "n": 3494}, "s10_6e7_traj_d12_m0.npz": {"acc": 0.945, "n": 2458}, "s10_6e7_traj_d21_m0.npz": {"acc": 0.935, "n": 1150}} cut this-leg 0.330 (n_it 1221; chunk restarts replay <= 20 its)
+J1L S10 7e7 frontier 24.0 08:47:14
+  later_right  reach by sector 0.95 0.78 0.97 0.79 0.97 0.82 0.98 0.78  n [407, 368, 351, 399, 384, 389, 412, 400]
+  later_right  reach by sector 0.91 0.90 0.92 0.89 0.91 0.89 0.94 0.85  n [262, 242, 293, 269, 274, 268, 314, 265]
+  later_right  reach by sector 0.82 0.65 0.85 0.64 0.77 0.59 0.79 0.64  n [123, 123, 158, 109, 122, 115, 158, 143]
+J1L S10 7e7 WATCH head_later {"s10_7e7_traj_d3_m0.npz": {"acc": 0.984, "n": 3162}, "s10_7e7_traj_d12_m0.npz": {"acc": 0.954, "n": 2294}, "s10_7e7_traj_d21_m0.npz": {"acc": 0.929, "n": 1132}} cut this-leg 0.323 (n_it 1220; chunk restarts replay <= 20 its)
+J1L S10 8e7 frontier 24.0 09:10:47
+  later_right  reach by sector 0.91 0.79 0.93 0.81 0.92 0.78 0.93 0.81  n [322, 322, 364, 321, 292, 331, 321, 338]
+  later_right  reach by sector 0.91 0.85 0.92 0.88 0.90 0.89 0.86 0.83  n [265, 216, 217, 230, 278, 247, 264, 249]
+  later_right  reach by sector 0.81 0.61 0.85 0.75 0.87 0.70 0.84 0.77  n [176, 130, 151, 126, 124, 125, 146, 144]
+J1L S10 8e7 WATCH head_later {"s10_8e7_traj_d3_m0.npz": {"acc": 0.931, "n": 2806}, "s10_8e7_traj_d12_m0.npz": {"acc": 0.929, "n": 2117}, "s10_8e7_traj_d21_m0.npz": {"acc": 0.927, "n": 1211}} cut this-leg 0.315 (n_it 1221; chunk restarts replay <= 20 its)
+J1L S10 9e7 frontier 24.0 09:35:03
+  later_right  reach by sector 0.92 0.89 0.93 0.89 0.94 0.91 0.91 0.90  n [382, 411, 399, 389, 403, 419, 426, 395]
+  later_right  reach by sector 0.88 0.88 0.90 0.89 0.89 0.90 0.90 0.87  n [281, 266, 298, 309, 309, 293, 280, 300]
+  later_right  reach by sector 0.80 0.77 0.74 0.72 0.77 0.70 0.80 0.75  n [120, 113, 124, 113, 133, 125, 127, 110]
+J1L S10 9e7 WATCH head_later {"s10_9e7_traj_d3_m0.npz": {"acc": 0.958, "n": 3365}, "s10_9e7_traj_d12_m0.npz": {"acc": 0.947, "n": 2467}, "s10_9e7_traj_d21_m0.npz": {"acc": 0.887, "n": 1091}} cut this-leg 0.278 (n_it 1221; chunk restarts replay <= 20 its)
+J1L S10 10e7 frontier 24.0 09:59:36
+  later_right  reach by sector 0.96 0.93 0.95 0.93 0.96 0.94 0.95 0.96  n [376, 461, 452, 430, 457, 467, 419, 435]
+  later_right  reach by sector 0.92 0.86 0.91 0.87 0.92 0.85 0.91 0.90  n [280, 288, 315, 277, 314, 314, 266, 289]
+  later_right  reach by sector 0.88 0.77 0.83 0.70 0.84 0.68 0.79 0.68  n [96, 125, 166, 138, 134, 127, 170, 132]
+J1L S10 10e7 WATCH head_later {"s10_10e7_traj_d3_m0.npz": {"acc": 0.962, "n": 3634}, "s10_10e7_traj_d12_m0.npz": {"acc": 0.935, "n": 2506}, "s10_10e7_traj_d21_m0.npz": {"acc": 0.917, "n": 1187}} cut this-leg 0.274 (n_it 1221; chunk restarts replay <= 20 its)
+J1L S10 FAIL 10:14:01
+V3 S10 VERDICT {'mean_true': 0.8523987730344137, 'mean_shuffled': 0.476034810145696, 'mean_wiped': 0.27032726009686786, 'need': 0.8948460280895233, 'c_reach': False, 'c_shuf30': True, 'c_2x': False, 'mean_life_ratio': 6.0859375, 'life_lbs': [5.8828125, 5.8828125, 5.8828125], 'c_life': True, 'final_dead': [], 'PASS': False} 10:42:53
+=== container exit 0  10:42:58

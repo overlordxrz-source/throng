@@ -11252,6 +11252,40 @@ more expensive, because it produces publishable-looking nulls.
   - Cut per leg .34 / .32.
   - Predictions: frontier > 6 at 5e7 -> HIT. Spend so far within the $5.5 cap (item watch). Next: the verdict at 1e8
     (3-table, in the container).
+- **RESULT (entry stamped Nov 23 05:45:50 EST): SEED 10 (fallback (3) learner) FAILS the 3-table verdict, closer than seed 9. Mean
+  reach .852 vs bar .8948 (seed 9: .822 vs .8959).** Times copied from the container log (UTC): 1e8 leg 09:59:36; the
+  1e8-only bar FAIL at 10:14:01; verdict at 10:42:53. Files: `docs/data/modal_b1/f3l/s10/`.
+  - Per checkpoint (long d12 eval, true / shuffled / wiped hungry reach; life, LB; head later):
+    - 8e7: .852 / .473 / .254; 6.09, 5.88; .929;
+    - 9e7: .851 / .475 / .256; 6.09, 5.88; .947;
+    - 1e8: .854 / .480 / .301; 6.09, 5.88; .935.
+    - All lives reached the 3000-step horizon (life ratio capped at 6.09).
+  - 3-table: mean true .852 vs need .8948 -> FAIL. Shuffled + .30 = .776 -> PASS; 2x shuffled = .952 -> FAIL. Life 6.09
+    (LB 5.88 x3) -> PASS. Final dead: none.
+  - d12 DECOMPOSITION (later bouts):
+
+    | | P(head right) | reach given right | reach given wrong | reach |
+    |---|---|---|---|---|
+    | 8e7 | .929 | .878 | .007 | .816 |
+    | 9e7 | .947 | .888 | .023 | .842 |
+    | 1e8 | .935 | .894 | .018 | .837 |
+
+    - At 1e8, reach given right by sector: cardinals .91-.92, diagonals .85-.90 (seed 9: .86-.91 / .76-.84).
+    - Reading: reach given right is now ~.89, just at or below the bar. The head misses (~5-7% of later bouts, ~0 reach)
+      cost ~.05. The remaining gap is SPLIT between the head side and the policy side; it is no longer mainly the
+      diagonal walk.
+  - Predictions:
+    - reach PASS (Cam .30 / mine .25) -> FAIL;
+    - life (.90 / .92) -> HIT;
+    - head >= .50 at 3e7 -> HIT; frontier > 6 at 5e7 -> HIT;
+    - d12 diagonal reach given right >= .85 at 1e8 (p .40) -> HIT (.85-.90).
+  - Trajectory: frontier 24 at 2e7 (seed 9: ~3e7); 6e7 d3 diagonal orbit dip (.62-.70), healed by 9e7 (.89-.91).
+  - Spend (billing report): seed 10 $4.816 (cap $5.5). F3 chain total $10.22 (oracle $2.81, reference + twin $2.10,
+    smokes $0.49, seed 10 $4.82) <= $20. b1 metered $10.85.
+  - Per Cam 05:10Z item 4: FAIL -> report with the decomposition + item 3; launch NOTHING.
+    - The next candidate is 8-way + D4 (item 5, built and checked) or a read-confidence fix.
+    - Item 3 (seed 9) found the diagonal loss MOTOR with a sharp read. Seed 10 shrank that motor share, and the head-side
+      share is now comparable.
 - **RESULT (Nov 16 ~01:40): THE LABEL COUNT** (`docs/data/learner_w2/label_count/`; each row is 100 rollout
   iterations, 819k steps, with that checkpoint's weights, world state and frontier, no updates).
   - Definitions: MEMORY-ONLY bout = a later hearing (not the token's first in this life) at d >= 3. By construction
