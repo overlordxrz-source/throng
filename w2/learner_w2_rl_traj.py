@@ -92,6 +92,7 @@ def main():
     ap.add_argument("--greedy-bout", action="store_true", help="TRAJ (Cam Nov 16 ~19:00Z): argmax actions during bouts, sampled outside")
     ap.add_argument("--topo", action="store_true", help="TRAJ: evaluate a RecAgent with the topographic tie (O-T)")
     ap.add_argument("--logits", action="store_true", help="TRAJ: also record the total, trunk (current params) and pretrained-navigator logits")
+    ap.add_argument("--head-probs", action="store_true", help="Cam Nov 23 ~05:10Z item 3 (eval only): also save the head's full 8-sector softmax per step (hpf) in the traj npz")
     ap.add_argument("--traj-out", default=""); ap.add_argument("--eval-mix-la", type=float, default=0.0)
     ap.add_argument("--d-fixed", type=int, default=0); ap.add_argument("--eval-d-max", type=int, default=12)
     ap.add_argument("--out", required=True)
@@ -313,7 +314,8 @@ def main():
                           hear=f["hear"], first=f["first"], dem=f["dem"], hl=f["hl"].argmax(-1).astype(jnp.int8),
                           hp=jax.nn.softmax(f["hl"]).max(-1).astype(jnp.float16), a=f["act"].astype(jnp.int8), ate=f["ate"],
                           cl_item=f["cl_item"], cl_tmax=f["cl_tmax"], cl_death=f["cl_death"], gen=f["gen"], hung=f["hung"], dead=f["dead"] > 0,
-                          **(dict(lg=f["lg"].astype(jnp.float16), lgn=f["lgn"].astype(jnp.float16), lgp=f["lgp"].astype(jnp.float16)) if a.logits else {}))
+                          **(dict(lg=f["lg"].astype(jnp.float16), lgn=f["lgn"].astype(jnp.float16), lgp=f["lgp"].astype(jnp.float16)) if a.logits else {}),
+                          **(dict(hpf=jax.nn.softmax(f["hl"]).astype(jnp.float16)) if a.head_probs else {}))
                 return (c2, A), tr
             z = jnp.float32(0.0)
             A0 = dict(**{f"{p_}_{n_}": z for p_ in ("n", "i", "t", "d", "hn", "hi") for n_ in ("dem_kept", "dem_lost", "late_hok", "late_hbad")}, ate2h=z, closed2h=z, ateh=z, closedh=z, demstep=z, demfar=z, **{f"{p_}_{n_}_{d_}": z for p_ in ("c", "g") for n_ in ("item", "tmax", "death") for d_ in ("all", "dem")}, alive=z, deaths=z, oldage=z, ateD=z, closedD=z, cnt=jnp.zeros(N), mx=z, ovf=z, over=z, recs=z, paid=z, ate=z, closed=z, ate2=z, closed2=z, h1=z, n1=z, hL=z, nL=z, cd=jnp.zeros(25), ad=jnp.zeros(25))
