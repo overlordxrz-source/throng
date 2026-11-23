@@ -14,7 +14,9 @@ import os
 
 import modal
 
-SHA = "a7087f23e5fd5aa2dfa01ff079d984a6c843ec88"
+VARIANT = os.environ.get("SEED_VARIANT", "")       # "" = the seed-9 recipe (a7087f2); "f3" = fallback (3) learner (offset-proj abed942)
+SHA = {"": "a7087f23e5fd5aa2dfa01ff079d984a6c843ec88", "f3": "abed942907474470edb60104584131a52516ed8f"}[VARIANT]
+VARIANT_ENV = {"": {}, "f3": dict(XT_EXTRA="--offset-proj", REF_FILE="/mnt/runs/oracle/o0/f3_ref_mean.json", TWIN_FILE="/mnt/runs/oracle/o0/tw_eval_d12.json")}[VARIANT]
 REPO = "https://github.com/overlordxrz-source/throng.git"
 VOL = "/mnt/runs"
 HERE = os.path.dirname(os.path.abspath(__file__)); DOCS = os.path.join(os.path.dirname(HERE), "docs", "data")
@@ -39,7 +41,7 @@ volume = modal.Volume.from_name("throng-runs-b1", create_if_missing=True)
 image = (modal.Image.debian_slim(python_version="3.12").apt_install("git", "zsh")
          .run_commands(f"git clone {REPO} /root/tt", f"cd /root/tt && git checkout {SHA}", f'cd /root/tt && test "$(git rev-parse HEAD)" = "{SHA}"')
          .pip_install("jax[cuda12]==0.10.0", "flax==0.12.7", "optax==0.2.8", "numpy==2.5.4"))
-image = image.env({"SEED_CAP": str(CAP)})                               # the SAME cap inside the container (the ledger), fixed after the smoke
+image = image.env({"SEED_CAP": str(CAP), "SEED_VARIANT": VARIANT})                               # the SAME cap inside the container (the ledger), fixed after the smoke
 for dst, src in AUX.items():
     image = image.add_local_file(src, dst, copy=True)
 
@@ -86,7 +88,7 @@ def run_seed(seed: int, env: dict | None = None, kill_after_leg1_s: int = 0) -> 
 SMOKE_ENV = dict(OUTTAG="smoke_s9", SMOKE="1", LEGSTEP="163840", NLEG="2", CHUNK="60", EXTRA_TR="--early-stop-step 1e12")
 
 
-RECIPE = "seed9-recipe@a7087f2"       # relabel + no-nav + 4-way + target-KL .015 + --d4-side (run_seed_modal.sh)
+RECIPE = {"": "seed9-recipe@a7087f2", "f3": "fallback3-learner@abed942"}[VARIANT]   # + --offset-proj and the F3 reference / twin for "f3"
 PROTOCOL = os.path.join(os.path.dirname(HERE), "docs", "RESEARCH_PROTOCOL.md")
 
 
@@ -113,15 +115,16 @@ def main(seed: int, run_id: str = ""):
     if why:
         print(f"REFUSED: {why}. Nothing launched."); return
     print(f"launching run-id {run_id}: seed {seed}, {RECIPE}, cap ${CAP} (server-side timeout {CAP_S} s)")
-    print(run_seed.remote(seed))
+    print(run_seed.remote(seed, VARIANT_ENV))
 
 
 @app.local_entrypoint()
 def smoke():
     """Cam Nov 22 ~03:35Z item 4: tiny legs (163,840 steps), 2 legs, 60 s chunks; call 1 is hard-killed 30 s into leg 2;
     call 2 must skip leg 1 and resume leg 2 from the checkpoint; then the verdict step runs on a synthetic table."""
-    print(run_seed.remote(9, SMOKE_ENV, kill_after_leg1_s=30))
-    print(run_seed.remote(9, SMOKE_ENV, 0))
+    env = dict(SMOKE_ENV, **VARIANT_ENV, **({"OUTTAG": "smoke_f3l"} if VARIANT else {}))
+    print(run_seed.remote(9, env, kill_after_leg1_s=30))
+    print(run_seed.remote(9, env, 0))
 
 
 @app.local_entrypoint()

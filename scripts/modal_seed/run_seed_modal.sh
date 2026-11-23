@@ -14,7 +14,7 @@ S=${1:?seed}; M=$SP/seeds/${OUTTAG:-s$S}; mkdir -p $M
 # smoke-only overrides (defaults = the registered recipe: legs of 1e7, 10 legs, 3000 s chunks, no extra flags)
 LEGSTEP=${LEGSTEP:-1e7}; NLEG=${NLEG:-10}; CHUNK=${CHUNK:-3000}; SMOKE=${SMOKE:-0}; EXTRA_TR=${EXTRA_TR:-}
 TOTAL=$(python3 -c "print('1e8' if '$LEGSTEP' == '1e7' and $NLEG == 10 else int(float('$LEGSTEP') * $NLEG))")
-XT="--learner ep --slots 96 --shared-tok --hindsight 0.5 --head-own-meal --demonstrator --parent-waits --gate honest --hunger-gate --item-size 0.1 --W 32 --lookahead 0.25 --la-max 12 --head-relabel-token --d4-side"
+XT="--learner ep --slots 96 --shared-tok --hindsight 0.5 --head-own-meal --demonstrator --parent-waits --gate honest --hunger-gate --item-size 0.1 --W 32 --lookahead 0.25 --la-max 12 --head-relabel-token --d4-side ${XT_EXTRA:-}"
 X="$XT --no-nav --target-kl 0.015"
 TR="--steps $TOTAL --early-stop-frontier 6 --seed $S --ckpt $M/s$S.ckpt --max-seconds $CHUNK --out $M/s${S}_train.json $EXTRA_TR"
 echo "J1L S$S start $(date '+%H:%M:%S')"
@@ -58,7 +58,7 @@ for ES in 6000 12000 24000; do
   NB=$(python3 -c "import json;m=json.load(open('$M/s${S}_eval_d12_long.json'))['modes'];print(int(min(m['0']['hungry_bouts_2nd_half'], m['3']['hungry_bouts_2nd_half'])))"); [ $NB -ge 2000 ] && break
   $PY w2/learner_w2_rl2.py ${=X} --seed $S --init-params $P --d-fixed 12 --eval-necessity 0,3,4 --eval-steps $ES --out $M/s${S}_eval_d12_long.json >> $M/s${S}_evals.log 2>&1
 done
-python3 $BAR/bar3.py $M/s${S}_eval_d12.json $M/s${S}_eval_d12_long.json $R/j1_ref_mean.json $R/tw_eval_d12.json > $M/s${S}_bar.json
+python3 $BAR/bar3.py $M/s${S}_eval_d12.json $M/s${S}_eval_d12_long.json ${REF_FILE:-$R/j1_ref_mean.json} ${TWIN_FILE:-$R/tw_eval_d12.json} > $M/s${S}_bar.json
 grep -q '"PASS": true' $M/s${S}_bar.json && echo "J1L S$S PASS $(date '+%H:%M:%S')" || echo "J1L S$S FAIL $(date '+%H:%M:%S')"
 
 # ---- 3-table verdict (= docs/data/port_w2/j1/verdict3.sh, container paths) ----
@@ -72,7 +72,7 @@ for K in 8 9 10; do
       $PY w2/learner_w2_rl2.py ${=X} --seed $S --init-params $P --d-fixed 12 --eval-necessity 0,3,4 --eval-steps $ES --out $EL >> $M/v3_s${S}.log 2>&1
     done
   fi
-  python3 $BAR/bar3.py $E $EL $R/j1_ref_mean.json $R/tw_eval_d12.json > $M/v3_s${S}_${K}e7_bar.json
+  python3 $BAR/bar3.py $E $EL ${REF_FILE:-$R/j1_ref_mean.json} ${TWIN_FILE:-$R/tw_eval_d12.json} > $M/v3_s${S}_${K}e7_bar.json
   python3 /root/aux/decomp_d12.py $M/s${S}_${K}e7_traj_d12_m0.npz > $M/v3_s${S}_${K}e7_decomp.json
 done
 python3 /root/aux/verdict3.py $M/v3_s${S}_{8,9,10}e7_bar.json $M/s${S}_10e7_bysec.txt > $M/v3_s${S}_verdict.json
