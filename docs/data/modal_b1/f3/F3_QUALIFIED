@@ -1,0 +1,1 @@
+{"ref_seed": 0, "ref_files": ["/mnt/runs/oracle/o0/f3_ref_8e7.json", "/mnt/runs/oracle/o0/f3_ref_9e7.json", "/mnt/runs/oracle/o0/f3_ref_10e7.json"], "per_ckpt": [0.9880120158195496, 0.9977210760116577, 0.9970870018005371], "n": [4004.0, 2194.0, 2403.0], "ref_mean": 0.9942733645439148, "bar": 0.8948}

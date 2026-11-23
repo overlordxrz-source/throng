@@ -11212,6 +11212,22 @@ more expensive, because it produces publishable-looking nulls.
     - No runs.
   - F3 chain: the reference qualified (ref mean .9943 from 8e7 / 9e7 / 1e8: .9880 / .9977 / .9971; bar .8949); the twin
     is training.
+- **RESULT + LAUNCHED (entry stamped Nov 23 01:10:05 EST): F3-REFTWIN-S0 done; learner seed 10 (F3-LEARNER-S10) launched on Modal L4.**
+  Times copied from the container logs (UTC). Files: `docs/data/modal_b1/f3/` (F3_QUALIFIED, f3_ref_mean.json,
+  tw_eval_d12.json, f3s0_rule3.json, o0_reftwin_run.out).
+  - s0 to 1e8: tables 6e7-1e8 all clean (d3 >= .936; d12 >= .843). 3-table rule (8e7 / 9e7 / 1e8): FULL PASS (mean d3
+    .960-.982, d12 .880-.938, no final dead).
+  - REFERENCE = mean of the long d12 evals .9880 / .9977 / .9971 (n 4004 / 2194 / 2403) = .9943 -> bar .8948.
+  - TWIN (target-KL + tie + proj, s0's curve, 3e7): d12 reach 0.0, life 492.9 steps (06:07:18).
+  - A container PREEMPTION mid-twin (the first container ended with no exit line after 05:35). The single retry
+    (05:49:08) ran correctly:
+    - the ledger carried 6070 s;
+    - legs 1-10 and the reference evals were skipped;
+    - the twin resumed at 19,169,280 steps;
+    - exit 0 at 06:07:21 within its cap.
+  - Seed 10 launched 01:08:44 EST (laptop clock). First container line 06:09:16 UTC: "cap $5.5 = 18803s used 0s", env
+    XT_EXTRA --offset-proj, REF / TWIN = the F3 files. Cap line checked within 2 min.
+  - Spend: b1 metered $6.02 before seed 10; the F3 chain so far ~$5.6 incl. smokes (<= $20). Seed 10 cap $5.5.
 - **RESULT (Nov 16 ~01:40): THE LABEL COUNT** (`docs/data/learner_w2/label_count/`; each row is 100 rollout
   iterations, 819k steps, with that checkpoint's weights, world state and frontier, no updates).
   - Definitions: MEMORY-ONLY bout = a later hearing (not the token's first in this life) at d >= 3. By construction
