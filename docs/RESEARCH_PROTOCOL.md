@@ -11052,6 +11052,33 @@ more expensive, because it produces publishable-looking nulls.
     each item's cap = projection +25%, chain total <= $20.
   - The laptop is free for M: the seed-9 entry was removed from ~/throng-backup/logs/active_run; cron now keeps only the
     guards alive.
+- **RESULT + REGISTERED (entry stamped Nov 22 21:37:02 EST): fallback (3) oracle in-container smoke PASSES (2 runs, $0.295 total by the
+  billing report: $0.170 + $0.125, within the $0.30 cap). Oracle seeds 0 / 1 are registered for launch.** Times copied from
+  the container logs (UTC). Files: `docs/data/modal_b1/f3_smoke/`.
+  - Smoke 1 (20-iteration legs):
+    - hard kill 30 s after the leg-1 table (02:21:17) -> rerun: "1e7 leg already done"; volume, tables, logit split and
+      copy-back all OK.
+    - GAP: port_w2 checkpoints every 20 iterations only when it continues, so a 20-iteration leg left NO checkpoint ("cp:
+      cannot stat f3s0.ckpt"), and leg 2 retrained from scratch. The resume was untested.
+    - Real legs (1,221 iterations) checkpoint throughout.
+  - Smoke 2 (25-iteration legs, cap $0.12):
+    - kill 20 s into leg 2 -> rerun: leg 1 skipped; f3s0.log "resumed at 163,840 steps" (the iteration-20 checkpoint).
+      Iterations 20-24 were replayed, then the run went on to 49. RESUME VERIFIED.
+    - The LEDGER then stopped the run at 415 s >= 410 s (cap $0.12): "LEDGER cap time reached". Ledger enforcement verified
+      too.
+  - Speed (L4, early phase): ~10k steps/s (163,840 steps in 16 s after compile); a table (3 traj evals) takes ~2.4 min.
+  - Projection per oracle seed to 5e7, on the CONSERVATIVE learner L4 rate of 6.7k steps/s: ~2.07 h training + 5 tables
+    ~0.2 h -> ~$2.4; cap = +25% -> $3.0 (server-side timeout 2.85 h).
+    - Chain (<= $20): oracle s0 + s1 $6.0, + reference (s0 to 1e8) ~$3.0, + twin 3e7 ~$1.5, + learner seed 10 ~$5.5 =
+      ~$16.0, plus the smokes ~$0.6.
+  - REGISTERED RUNS (the launch guard in scripts/modal_oracle.py matches these lines):
+    - RUN-ID: F3-ORACLE-S0 | seed 0 | recipe fallback3-oracle@abed942 | cap $3.0
+    - RUN-ID: F3-ORACLE-S1 | seed 1 | recipe fallback3-oracle@abed942 | cap $3.0
+  - Each is 4-way oracle (b') + target-KL .015 + --d4-side + --offset-proj, legs of 1e7 to 5e7, tables every 1e7, in
+    parallel on L4 (apps throng-f3o0 / throng-f3o1, per-item watch at $3.75).
+  - Gate (computed locally after copy-back): E1's `e1_outcome.py` on both seeds' 5 tables. Report at the gate.
+  - Predictions: both seeds pass the E1 gate p .55; d21 diagonal mean within .10 of cardinals at 5e7, p .55 (offset-proj
+    targets this; H1 4-way missed it).
 - **RESULT (Nov 16 ~01:40): THE LABEL COUNT** (`docs/data/learner_w2/label_count/`; each row is 100 rollout
   iterations, 819k steps, with that checkpoint's weights, world state and frontier, no updates).
   - Definitions: MEMORY-ONLY bout = a later hearing (not the token's first in this life) at d >= 3. By construction

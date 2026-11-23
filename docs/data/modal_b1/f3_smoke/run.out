@@ -1,0 +1,14 @@
+=== container start 02:17:29 seed 0 cap $0.3 = 1025s used 0s remaining 1025s env {'OUTTAG': 'smoke_o0', 'LEGSTEP': '163840', 'NLEG': '2', 'CHUNK': '60'}
+F3 s0 start 02:17:29 legs 2 x 163840 chunk 60
+cp: cannot stat '/mnt/runs/oracle/smoke_o0/f3s0.ckpt': No such file or directory
+F3 s0 1e7 frontier 1.0 02:18:34
+F3 TABLE s0 1e7 {"arm": "F3s0_1e7", "frontier": 1.0, "d3": [0.109, 0.123, 0.146, 0.086, 0.073, 0.076, 0.124, 0.116], "d12": [0.001, 0.0, 0.001, 0.0, 0.0, 0.0, 0.001, 0.001], "n3": [4022, 4068, 3959, 4051, 3987, 4055, 4048, 3977], "n12": [1075, 1036, 1043, 1073, 1074, 1041, 1057, 1056], "min3": 0.073, "min12": 0.0, "dead_lt030": [0, 1, 2, 3, 4, 5, 6, 7], "dead_le010": [0, 1, 2, 3, 4, 5, 6, 7], "PASS": false, "SECONDARY": false, "QUALIFIES": false} | d21:   oracle       reach by sector 0.00 0.00 0.00 0.00 0.00 0.00 0.00 0.00  n [639, 621, 581, 594, 604, 636, 576, 587] 02:20:36
+=== container exit -9 SMOKE hard kill 30s into leg 2 02:21:17
+=== container start 02:21:19 seed 0 cap $0.3 = 1025s used 229s remaining 796s env {'OUTTAG': 'smoke_o0', 'LEGSTEP': '163840', 'NLEG': '2', 'CHUNK': '60'}
+F3 s0 start 02:21:19 legs 2 x 163840 chunk 60
+F3 s0 1e7 leg already done (idempotent)
+F3 s0 2e7 frontier 1.0 02:22:37
+F3 TABLE s0 2e7 {"arm": "F3s0_2e7", "frontier": 1.0, "d3": [0.034, 0.028, 0.018, 0.03, 0.034, 0.023, 0.022, 0.031], "d12": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "n3": [4091, 4018, 3934, 4008, 4014, 4022, 4122, 4102], "n12": [1116, 1033, 1059, 1114, 1000, 1036, 1027, 1085], "min3": 0.018, "min12": 0.0, "dead_lt030": [0, 1, 2, 3, 4, 5, 6, 7], "dead_le010": [0, 1, 2, 3, 4, 5, 6, 7], "PASS": false, "SECONDARY": false, "QUALIFIES": false} | d21:   oracle       reach by sector 0.00 0.00 0.00 0.00 0.00 0.00 0.00 0.00  n [600, 577, 546, 588, 596, 636, 601, 611] 02:24:37
+F3 SPLIT s0 2e7 {'0': {'p_stay': 0.142, 'p_eat': 0.781, 'p_toward': 0.035, 'side_stay': 0.911, 'side_eat': 2.839}, '1': {'p_stay': 0.165, 'p_eat': 0.753, 'p_toward': 0.054, 'side_stay': 1.123, 'side_eat': 2.856}, '2': {'p_stay': 0.144, 'p_eat': 0.783, 'p_toward': 0.025, 'side_stay': 0.907, 'side_eat': 2.829}, '3': {'p_stay': 0.168, 'p_eat': 0.75, 'p_toward': 0.054, 'side_stay': 1.132, 'side_eat': 2.849}, '4': {'p_stay': 0.143, 'p_eat': 0.777, 'p_toward': 0.036, 'side_stay': 0.901, 'side_eat': 2.818}, '5': {'p_stay': 0.17, 'p_eat': 0.745, 'p_toward': 0.057, 'side_stay': 1.14, 'side_eat': 2.831}, '6': {'p_stay': 0.144, 'p_eat': 0.781, 'p_toward': 0.028, 'side_stay': 0.916, 'side_eat': 2.83}, '7': {'p_stay': 0.17, 'p_eat': 0.746, 'p_toward': 0.057, 'side_stay': 1.135, 'side_eat': 2.831}}
+F3 s0 DONE 02:25:21
+=== container exit 0  02:25:32
