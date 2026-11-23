@@ -11130,6 +11130,27 @@ more expensive, because it produces publishable-looking nulls.
     cap +25% -> $3.4 (server-side timeout 11,623 s).
   - RUN-ID: F3-REFTWIN-S0 | seed 0 | recipe fallback3-reftwin@abed942 | cap $3.4
   - Predictions: s0 qualifies at 1e8 under the 3-table rule, p .70; reference >= .98, p .6.
+- **RESULT + REGISTERED (entry stamped Nov 22 23:20:35 EST): fallback (3) LEARNER in-container smoke PASSES ($0.155 by the billing
+  report); learner seed 10 registered.** Times copied from the container log (UTC). Files: `docs/data/modal_b1/f3l_smoke/`.
+  - Code: `scripts/modal_seeds.py` with SEED_VARIANT=f3: offset-proj abed942, XT + --offset-proj, and the reference / twin
+    read from the volume (/mnt/runs/oracle/o0/f3_ref_mean.json, tw_eval_d12.json). The registered seed-9 defaults are
+    unchanged.
+  - Smoke:
+    - hard kill 30 s into leg 2 (04:15:31) -> rerun: "1e7 leg already done", s9.log "resumed at 163,840" (no leg re-run);
+    - the synthetic verdict step ran (PASS=True as constructed);
+    - the ledger carried 544 s (cap 1025 s).
+    - The saved cfg confirms the recipe: offset_proj True, d4_side True, target_kl .015, 4-way, no_nav True.
+  - RUN-ID: F3-LEARNER-S10 | seed 10 | recipe fallback3-learner@abed942 | cap $5.5
+    - Learner seed 10 = relabel + no-nav + 4-way + target-KL .015 + --d4-side + --offset-proj, to 1e8.
+    - The same watch (head later d = 3 at 3e7: report if < .50) and the registered early stops (A: < .25 at 3e7;
+      B: frontier <= 6 at 5e7).
+    - The 3-table bar vs the F3 reference (f3_ref_mean.json, bar .9 x) and the F3 twin.
+    - Cap $5.5 (server-side 18,803 s).
+    - LAUNCH only after F3-REFTWIN-S0 has written f3_ref_mean.json + tw_eval_d12.json (and only if s0 qualified).
+  - Predictions:
+    - head later d3 >= .50 at 3e7, p .85;
+    - 3-table reach PASS, p .35;
+    - d12 reach given head right, on the diagonals >= .85 at 1e8, p .5 (seed 9: .76-.84).
 - **RESULT (Nov 16 ~01:40): THE LABEL COUNT** (`docs/data/learner_w2/label_count/`; each row is 100 rollout
   iterations, 819k steps, with that checkpoint's weights, world state and frontier, no updates).
   - Definitions: MEMORY-ONLY bout = a later hearing (not the token's first in this life) at d >= 3. By construction

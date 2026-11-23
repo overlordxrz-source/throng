@@ -1,0 +1,18 @@
+=== container start 04:10:20 seed 9 cap $0.3 = 1025s used 0s remaining 1025s env {'OUTTAG': 'smoke_f3l', 'SMOKE': '1', 'LEGSTEP': '163840', 'NLEG': '2', 'CHUNK': '60', 'EXTRA_TR': '--early-stop-step 1e12', 'XT_EXTRA': '--offset-proj', 'REF_FILE': '/mnt/runs/oracle/o0/f3_ref_mean.json', 'TWIN_FILE': '/mnt/runs/oracle/o0/tw_eval_d12.json'}
+J1L S9 start 04:10:20
+J1L S9 1e7 frontier 1.0 04:14:55
+  later_right  reach by sector 0.03 0.14 0.05 0.24 0.04 0.06 0.03 0.00  n [1083, 43, 558, 25, 425, 16, 581, 20]
+  later_right  reach by sector 0.00 0.00 0.00 0.00 0.00 0.00 0.00 0.00  n [103, 17, 84, 3, 72, 5, 92, 5]
+  later_right  reach by sector 0.00 0.00 0.00 0.00 0.00 0.00 0.00 0.00  n [44, 5, 44, 2, 19, 1, 40, 2]
+J1L S9 1e7 WATCH head_later {"s9_1e7_traj_d3_m0.npz": {"acc": 0.126, "n": 22005}, "s9_1e7_traj_d12_m0.npz": {"acc": 0.126, "n": 3063}, "s9_1e7_traj_d21_m0.npz": {"acc": 0.131, "n": 1253}} cut this-leg 0.031 (n_it 20; chunk restarts replay <= 20 its)
+=== container exit -9 SMOKE hard kill 30s into leg 2 04:15:31
+=== container start 04:15:33 seed 9 cap $0.3 = 1025s used 311s remaining 714s env {'OUTTAG': 'smoke_f3l', 'SMOKE': '1', 'LEGSTEP': '163840', 'NLEG': '2', 'CHUNK': '60', 'EXTRA_TR': '--early-stop-step 1e12', 'XT_EXTRA': '--offset-proj', 'REF_FILE': '/mnt/runs/oracle/o0/f3_ref_mean.json', 'TWIN_FILE': '/mnt/runs/oracle/o0/tw_eval_d12.json'}
+J1L S9 start 04:15:33
+J1L S9 1e7 leg already done (idempotent; container retry)
+J1L S9 2e7 frontier 1.0 04:19:23
+  later_right  reach by sector 0.03 0.02 0.03 0.04 0.02 0.03 0.03 0.02  n [638, 622, 348, 247, 244, 312, 404, 751]
+  later_right  reach by sector 0.00 0.00 0.00 0.00 0.00 0.00 0.00 0.00  n [54, 118, 63, 57, 38, 56, 58, 89]
+  later_right  reach by sector 0.00 0.00 0.00 0.00 0.00 0.00 0.00 0.00  n [14, 32, 18, 21, 18, 11, 22, 32]
+J1L S9 2e7 WATCH head_later {"s9_2e7_traj_d3_m0.npz": {"acc": 0.137, "n": 26125}, "s9_2e7_traj_d12_m0.npz": {"acc": 0.147, "n": 3662}, "s9_2e7_traj_d21_m0.npz": {"acc": 0.133, "n": 1305}} cut this-leg 0.188 (n_it 20; chunk restarts replay <= 20 its)
+SMOKE V3 synthetic verdict PASS=True decomp_n=3609 04:19:24
+=== container exit 0  04:19:26
