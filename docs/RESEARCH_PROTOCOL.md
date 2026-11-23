@@ -11151,6 +11151,31 @@ more expensive, because it produces publishable-looking nulls.
     - head later d3 >= .50 at 3e7, p .85;
     - 3-table reach PASS, p .35;
     - d12 reach given head right, on the diagonals >= .85 at 1e8, p .5 (seed 9: .76-.84).
+- **RULINGS RECORDED (entry stamped Nov 23 00:16:43 EST): Cam Nov 23 ~05:10Z (time copied from Cam's message header). Plus: F3 s0
+  QUALIFIES at 1e8 (full PASS on 8e7 / 9e7 / 1e8: mean d3 .960-.982, d12 .880-.938, no final dead).**
+  - Recorded:
+    - seed 9 FAIL (policy-side on diagonals, head secondary);
+    - offset-proj flag-off ALL PASS;
+    - both smokes accepted (the 20-iteration gap closed);
+    - F3 oracle gate (a).
+  - CAVEAT (Cam), registered for reading seed 10: a d12 diagonal item sits at ~(8,8), INSIDE the 9-cell range where
+    --offset-proj is bitwise the old input. Any d12 gain must come indirectly: long diagonal bouts are now steerable, so
+    training sees fewer diagonal failures.
+  - Seed 10: launch after F3_REFTWIN_DONE (s0 qualified). Bar = .9 x the NEW reference, life vs the NEW twin, verdict3 +
+    decomposition, cap line checked within 2 min.
+    - Cam p: reach PASS .30, life .90.
+    - Mine, revised for the caveat (registered before launch): reach PASS .25 (was .35); life PASS .92; d12 diagonal
+      reach given head right >= .85 at 1e8, p .40 (was .5).
+  - Item 3 (eval only, laptop, running): seed 9 at 1e8, d12 later bouts.
+    - Split reach given right by head-confidence tercile and orbit; head mass on the true sector and its two neighbours;
+      move shares into true vs neighbouring sectors (`j1/item3/conf_split.py`).
+    - The eval needs the head's full softmax: a new eval-only flag `--head-probs` (throng-toy comm-toy 6a10612, flag off
+      unchanged).
+  - After seed 10's verdict:
+    - PASS -> seeds 11 and 12 in parallel on L4 ($5.5 each), CONFIRMED if >= 2 of 3;
+    - FAIL -> report with the decomposition + item 3, launch nothing.
+  - Item 5 (code only): 8-way + D4 on a branch, with function checks; no runs.
+  - Budget: the b1 chain <= $20, plus $11 for confirm seeds on PASS. Guard CAP $41.
 - **RESULT (Nov 16 ~01:40): THE LABEL COUNT** (`docs/data/learner_w2/label_count/`; each row is 100 rollout
   iterations, 819k steps, with that checkpoint's weights, world state and frontier, no updates).
   - Definitions: MEMORY-ONLY bout = a later hearing (not the token's first in this life) at d >= 3. By construction
