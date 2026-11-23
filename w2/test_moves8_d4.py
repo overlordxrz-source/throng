@@ -29,7 +29,7 @@ def rep(name, ok, info=""):
 here = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 st = subprocess.run(["git", "-C", here, "diff", "--name-only", "offset-proj"], capture_output=True, text=True).stdout.split()
 un = subprocess.run(["git", "-C", here, "status", "--porcelain"], capture_output=True, text=True).stdout
-rep("(1) only this test file differs from offset-proj (no trainer change)", st == [] and all("test_moves8_d4.py" in l or not l.strip() for l in un.splitlines()), f"diff {st}; untracked/modified {un.strip()!r}")
+rep("(1) only this test file differs from offset-proj (no trainer change)", set(st) <= {"w2/test_moves8_d4.py"} and all("test_moves8_d4.py" in l or not l.strip() for l in un.splitlines()), f"diff {st}; untracked/modified {un.strip()!r}")
 
 
 def rand(net, h0, x0, key):
