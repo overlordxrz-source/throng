@@ -11086,6 +11086,36 @@ more expensive, because it produces publishable-looking nulls.
     02:39:59 both read "cap $3.0 = 10256s used 0s". The cap print is checked.
   - Item watches at $3.75 each. b1 guard live (CAP $41).
   - Copy-back: `~/throng-backup/modal_b1/f3/` (run.out polled every 2 min; full volume copy at the gate).
+- **RESULT (entry stamped Nov 22 23:05:50 EST): FALLBACK (3) ORACLE GATE = (a). Both seeds pass the E1 gate: 0 sector events, 0 dead,
+  both frontier 24, both full PASS on the 3e7-5e7 3-table rule.** Times copied from the container logs (UTC): s0 done
+  03:53:09, s1 done 04:03:24. Files: `docs/data/modal_b1/f3/` (f3_outcome.json, verdicts, d21 tables, logs).
+  - s0:
+    - frontier 23 / 24 / 24 / 24 / 24;
+    - mean d3 (3-5e7) .946-.984; mean d12 .877-.922;
+    - no broad dips;
+    - the 4e7 diagonals at d3 dipped to .89-.92, uncounted.
+  - s1 (H1's lock seed):
+    - frontier 19 / 24 / 24 / 24 / 24;
+    - mean d3 .951-.981; mean d12 .879-.931;
+    - one BROAD dip 1e7 -> 2e7 (mean -.103; diagonals at d3 .74-.86), healed by 3e7 (diagonals .94-.96).
+  - d21 at 5e7 (information; the offset-proj target):
+
+    | seed | cardinals | diagonals | gap |
+    |---|---|---|---|
+    | s0 | .84-.86 (mean .85) | .76-.79 (mean .77) | .08 |
+    | s1 | .83-.88 (mean .85) | .66-.72 (mean .69) | .16 |
+
+    - s1's 4e7 d21 diagonals dipped to .44-.65 and recovered at 5e7.
+    - For contrast, H1 (4-way + target-KL, no tie, no proj) s0 at 5e7: diagonal mean .47 vs cardinals .68.
+  - Predictions:
+    - both pass, p .55 -> HIT;
+    - "d21 diagonal mean within .10 of cardinals at 5e7", p .55 -> s0 HIT (.08), s1 MISS (.16).
+  - Spend: b1 metered $0.92 -> $3.84 = $2.92 for both seeds (~$1.46 each; caps $3.0). Item watches never fired.
+  - NEXT (the pre-authorized chain, Cam 21:40Z item 5 / 03:35Z item 6):
+    - the reference: s0 legs 6-10 to 1e8 on Modal, the 3-table rule, long d12 evals at 8e7 / 9e7 / 1e8;
+    - then the twin (target-KL + tie + proj, s0's curve, 3e7);
+    - then learner seed 10 (relabel + no-nav + 4-way + target-KL + tie + --offset-proj) to 1e8.
+    - Each gets a registered run-id and a cap of projection +25%. Chain total so far ~$3.5 of $20.
 - **RESULT (Nov 16 ~01:40): THE LABEL COUNT** (`docs/data/learner_w2/label_count/`; each row is 100 rollout
   iterations, 819k steps, with that checkpoint's weights, world state and frontier, no updates).
   - Definitions: MEMORY-ONLY bout = a later hearing (not the token's first in this life) at d >= 3. By construction
