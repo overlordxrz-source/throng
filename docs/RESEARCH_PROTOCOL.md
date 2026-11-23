@@ -11116,6 +11116,20 @@ more expensive, because it produces publishable-looking nulls.
     - then the twin (target-KL + tie + proj, s0's curve, 3e7);
     - then learner seed 10 (relabel + no-nav + 4-way + target-KL + tie + --offset-proj) to 1e8.
     - Each gets a registered run-id and a cap of projection +25%. Chain total so far ~$3.5 of $20.
+- **REGISTERED (entry stamped Nov 22 23:07:04 EST): the fallback (3) REFERENCE + TWIN item, the next step of the pre-authorized chain
+  after the (a) gate.**
+  - `scripts/modal_oracle.py --chain reftwin`, seed 0, in the same volume dir as its gate run:
+    - legs 1-5 are skipped (idempotent); legs 6-10 resume from the 5e7 checkpoint to 1e8, with tables every 1e7;
+    - then the 3-table rule (decide3 on 8e7 / 9e7 / 1e8). If s0 does not qualify, STOP and report (s1 would be next, by
+      a new registered item);
+    - then the long d12 evals at 8e7 / 9e7 / 1e8 (>= 2000 2nd-half hungry bouts) -> f3_ref_mean.json (bar = .9 x mean);
+    - then the twin: port_w2 non-oracle + target-KL + tie + --offset-proj, s0's 1e8 frontier curve, 3e7, + its d12
+      eval -> tw_eval_d12.json.
+    - The item has its own ledger (ledger_reftwin.json), so the gate run's time does not count toward it.
+  - Projection: legs 6-10 ~1.4 h + reference evals ~0.25 h + twin ~0.8 h + eval ~0.05 h = ~2.6 h x $1.053 = ~$2.75;
+    cap +25% -> $3.4 (server-side timeout 11,623 s).
+  - RUN-ID: F3-REFTWIN-S0 | seed 0 | recipe fallback3-reftwin@abed942 | cap $3.4
+  - Predictions: s0 qualifies at 1e8 under the 3-table rule, p .70; reference >= .98, p .6.
 - **RESULT (Nov 16 ~01:40): THE LABEL COUNT** (`docs/data/learner_w2/label_count/`; each row is 100 rollout
   iterations, 819k steps, with that checkpoint's weights, world state and frontier, no updates).
   - Definitions: MEMORY-ONLY bout = a later hearing (not the token's first in this life) at d >= 3. By construction
