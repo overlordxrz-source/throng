@@ -1,0 +1,70 @@
+{
+ "card_ate": {
+  "n": 919,
+  "share_toward_x": 0.439,
+  "share_toward_y": 0.463,
+  "share_away": 0.009,
+  "share_stay": 0.007,
+  "share_eat": 0.082,
+  "axis_imbalance": 1.0,
+  "head_p_saturated": 0.855
+ },
+ "card_other": {
+  "n": 6,
+  "share_toward_x": 0.148,
+  "share_toward_y": 0.662,
+  "share_away": 0.107,
+  "share_stay": 0.037,
+  "share_eat": 0.046,
+  "axis_imbalance": 1.0,
+  "head_p_saturated": 0.5
+ },
+ "card_timeout": {
+  "n": 101,
+  "share_toward_x": 0.123,
+  "share_toward_y": 0.097,
+  "share_away": 0.27,
+  "share_stay": 0.337,
+  "share_eat": 0.173,
+  "axis_imbalance": 0.802,
+  "head_p_saturated": 0.426,
+  "end_along_mean": 5.37,
+  "end_cross_mean": 3.21,
+  "end_cheb_mean": 9.52,
+  "end_cheb_le1": 0.03
+ },
+ "diag_ate": {
+  "n": 800,
+  "share_toward_x": 0.457,
+  "share_toward_y": 0.455,
+  "share_away": 0.01,
+  "share_stay": 0.011,
+  "share_eat": 0.067,
+  "axis_imbalance": 0.011,
+  "head_p_saturated": 0.28
+ },
+ "diag_other": {
+  "n": 7,
+  "share_toward_x": 0.451,
+  "share_toward_y": 0.544,
+  "share_away": 0.003,
+  "share_stay": 0.0,
+  "share_eat": 0.003,
+  "axis_imbalance": 0.278,
+  "head_p_saturated": 0.286
+ },
+ "diag_timeout": {
+  "n": 194,
+  "share_toward_x": 0.369,
+  "share_toward_y": 0.344,
+  "share_away": 0.102,
+  "share_stay": 0.084,
+  "share_eat": 0.101,
+  "axis_imbalance": 0.202,
+  "head_p_saturated": 0.253,
+  "end_along_mean": -9.11,
+  "end_cross_mean": 4.65,
+  "end_cheb_mean": 12.23,
+  "end_cheb_le1": 0.015
+ }
+}

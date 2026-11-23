@@ -1,0 +1,12 @@
+PASS (1) only this test file differs from offset-proj (no trainer change) diff ['w2/test_moves8_d4.py']; untracked/modified ''
+PASS (2) oracle tie equivariance, all 8 g, 10 actions, 5 recurrent steps max err 4.77e-07
+PASS (5) MUTANT (one wrong 10-action permutation) caught by equivariance err 2.02e+00
+PASS (2) learner tie equivariance incl. 10 actions (test_d4_learner) 
+PASS (3) stabiliser: the reflection-swapped pair of moves gets EQUAL tied logits (all 8 sectors) max |diff| 5.96e-08
+PASS (3) positive control: the UNTIED agent breaks it max |diff| 8.324
+PASS (3) table check: for each cardinal ray, the reflection fixing it swaps its two neighbouring diagonals 
+PASS (4) 8-way follower on the --offset-proj input: 8/8 at every d = 3..24 [22, 22, 22, 22, 22, 22, 22, 22] of 22
+PASS (4) 8-way follower on the old clip input: 8/8 (as test_moves8) 
+PASS (4) NEGATIVE control: 4-way on the clip input fails diagonals failing cells 40
+PASS (6) a real 8-way + proj observation runs through the tie (Dx 130, 10 logits, finite) 
+ALL PASS

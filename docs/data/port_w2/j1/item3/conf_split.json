@@ -1,0 +1,82 @@
+{
+ "file": "/Users/overlord/throng-backup/scratch/item3/s9_1e8_d12hp_m0.npz",
+ "n_later": 2171,
+ "n_right": 2027,
+ "p_right": 0.934,
+ "tercile_cuts": [
+  1.0,
+  1.0
+ ],
+ "by_conf_orbit": {
+  "card_t0": {
+   "n": 194,
+   "reach_right": 0.686,
+   "pmax_mean": 0.919
+  },
+  "card_t1": {
+   "n": 832,
+   "reach_right": 0.945,
+   "pmax_mean": 1.0
+  },
+  "card_t2": {
+   "n": 0,
+   "reach_right": null,
+   "pmax_mean": null
+  },
+  "diag_t0": {
+   "n": 726,
+   "reach_right": 0.793,
+   "pmax_mean": 0.993
+  },
+  "diag_t1": {
+   "n": 275,
+   "reach_right": 0.815,
+   "pmax_mean": 1.0
+  },
+  "diag_t2": {
+   "n": 0,
+   "reach_right": null,
+   "pmax_mean": null
+  }
+ },
+ "mass": {
+  "card_ate": {
+   "n": 919,
+   "p_true": 0.998,
+   "p_neighbours": 0.001
+  },
+  "card_failed": {
+   "n": 107,
+   "p_true": 0.866,
+   "p_neighbours": 0.049
+  },
+  "diag_ate": {
+   "n": 800,
+   "p_true": 0.998,
+   "p_neighbours": 0.001
+  },
+  "diag_failed": {
+   "n": 201,
+   "p_true": 0.983,
+   "p_neighbours": 0.015
+  }
+ },
+ "moves": {
+  "card_ate": {
+   "into_true": 0.989,
+   "into_neighbour": 0.999
+  },
+  "card_failed": {
+   "into_true": 0.447,
+   "into_neighbour": 0.837
+  },
+  "diag_ate": {
+   "into_true": 0.988,
+   "into_neighbour": 0.988
+  },
+  "diag_failed": {
+   "into_true": 0.857,
+   "into_neighbour": 0.857
+  }
+ }
+}

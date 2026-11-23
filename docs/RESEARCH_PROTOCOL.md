@@ -11176,6 +11176,42 @@ more expensive, because it produces publishable-looking nulls.
     - FAIL -> report with the decomposition + item 3, launch nothing.
   - Item 5 (code only): 8-way + D4 on a branch, with function checks; no runs.
   - Budget: the b1 chain <= $20, plus $11 for confirm seeds on PASS. Guard CAP $41.
+- **RESULT (entry stamped Nov 23 00:25:33 EST): ITEM 3 (eval only): seed 9's DIAGONAL walk loss is MOTOR, not a soft read. ITEM 5:
+  8-way + D4 built and checked (code only). For the report with seed 10's verdict.**
+  - Item 3 (`j1/item3/`: conf_split.py / .json, diag_motor.py / .json): seed 9 at 1e8, d12, later bouts (n 2171; head
+    right .934).
+    - Control: the new `--head-probs` eval's modes are IDENTICAL to the original 1e8 d12 table eval.
+    - Read: on FAILED right-head diagonal bouts the head puts .983 on the true sector and .015 on its two neighbours
+      (successful: .998 / .001). Not split between neighbours.
+    - The cardinal failures are the softer read: .866 true / .049 neighbours.
+    - Motor, diagonal timeouts (n 194):
+      - 71% of moves still point toward the item (x .37, y .34), axis imbalance .20; away .10, stay .08, eat .10;
+      - at timeout the item is 12.2 cells away (Chebyshev), with CROSS-track error 4.65 cells and ALONG-track -9.1 (the
+        agent has walked PAST it along the ray);
+      - item within sight (Chebyshev <= 1) at the end: 1.5%.
+      - So the walk heads the right way but drifts a few cells off the diagonal ray, never comes within sight, and
+        overshoots.
+    - Cardinal timeouts (n 101) are a STALL instead: stay .34 + eat .17 + away .27 of moves; ends 9.5 cells away.
+    - Confidence terciles DEGENERATE: the head saturates (float16 p = 1.0 on most bouts), so the split is p < 1 vs
+      p = 1. Cardinal reach given right: .686 (p < 1, n 194) vs .945 (p = 1, n 832); diagonal: .793 (n 726) vs .815
+      (n 275).
+    - Reading: the diagonal loss is a motor precision limit in 4-way ray following; the read is sharp. This favours
+      8-way + D4 (Carbon's (2): a diagonal step follows the diagonal exactly, and the stabiliser forbids a chiral
+      preference) over a read-confidence fix. The cardinal stalls are a smaller, read-linked share.
+  - Item 5 (throng-toy branch `moves8-d4` 1d567f6 + check fix, pushed, NOT merged; `j1/moves8_d4/test_moves8_d4.txt`):
+    ALL PASS. No trainer change was needed; --moves8 + --d4-side already wire 10 actions + the 8-way layout.
+    - (1) only the test file differs from offset-proj;
+    - (2) equivariance, all 8 g, 10 actions: oracle max err 4.8e-7, learner (test_d4_learner) PASS;
+    - (3) STABILISER: for a one-hot sector, the tied side path gives EQUAL logits (|diff| 6e-8) to the two moves the
+      fixing reflection swaps (cardinal ray -> its two neighbouring diagonals; diagonal -> its two cardinals); the
+      untied agent breaks it (8.3); table check passes;
+    - (4) the follower reaches 8/8 at every d = 3..24 with 8-way on the proj input (and on clip); 4-way on clip fails 40
+      diagonal cells;
+    - (5) the mutant is caught (2.0);
+    - (6) a real 8-way + proj observation runs through the tie.
+    - No runs.
+  - F3 chain: the reference qualified (ref mean .9943 from 8e7 / 9e7 / 1e8: .9880 / .9977 / .9971; bar .8949); the twin
+    is training.
 - **RESULT (Nov 16 ~01:40): THE LABEL COUNT** (`docs/data/learner_w2/label_count/`; each row is 100 rollout
   iterations, 819k steps, with that checkpoint's weights, world state and frontier, no updates).
   - Definitions: MEMORY-ONLY bout = a later hearing (not the token's first in this life) at d >= 3. By construction
