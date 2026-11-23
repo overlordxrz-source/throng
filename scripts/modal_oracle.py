@@ -23,6 +23,7 @@ AUX = {  # container path -> local source
     "/root/aux/run_oracle_modal.sh": os.path.join(HERE, "modal_seed", "run_oracle_modal.sh"),
     "/root/aux/decide.py": os.path.join(HERE, "modal_seed", "decide.py"),
     "/root/aux/bysec_o.py": os.path.join(DOCS, "port_w2", "oracle_screen", "bysec_o.py"),
+    "/root/aux/decide3.py": os.path.join(HERE, "modal_seed", "decide3.py"),
 }
 app = modal.App(os.environ.get("F3_APP", "throng-f3o"))
 # Cam Nov 22 ~03:35Z standing rule: SERVER-SIDE timeout = item cap / hourly rate (L4 $0.80 + 4 cores x $0.0473 + 8 GiB x
@@ -49,7 +50,7 @@ def run_oracle(seed: int, env: dict | None = None, kill_after_leg1_s: int = 0) -
     os.chdir("/root/tt")
     assert subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True, text=True).stdout.strip() == SHA
     env = dict(env or {}); tag = env.get("OUTTAG", f"o{seed}"); out = f"{VOL}/oracle/{tag}"; os.makedirs(out, exist_ok=True)
-    led = f"{out}/ledger.json"; volume.reload()
+    led = f"{out}/ledger{env.get('LEDGER_TAG', '')}.json"; volume.reload()   # one ledger per registered item
     used = json.load(open(led))["used_s"] if os.path.exists(led) else 0.0; remaining = CAP_S - used
     log = open(f"{out}/run.out", "a"); log.write(f"=== container start {time.strftime('%H:%M:%S')} seed {seed} cap ${CAP} = {CAP_S}s used {used:.0f}s remaining {remaining:.0f}s env {env}\n"); log.flush()
     if remaining <= 0:
@@ -101,14 +102,21 @@ def _registered(run_id: str, seed: int) -> str:
     return ""
 
 
+CHAINS = {"": ({}, RECIPE), "reftwin": ({"NLEG": "10", "CHAIN": "reftwin", "LEDGER_TAG": "_reftwin"}, "fallback3-reftwin@abed942")}
+
+
 @app.local_entrypoint()
-def main(seed: int, run_id: str = ""):
-    """REAL run. Refuses (before any container exists) unless --run-id matches a registered protocol line."""
+def main(seed: int, run_id: str = "", chain: str = ""):
+    """REAL run. Refuses (before any container exists) unless --run-id matches a registered protocol line for this seed,
+    the recipe of this chain (gate: fallback3-oracle@abed942; --chain reftwin: legs 6-10 to 1e8 + the 3-table reference +
+    the twin, fallback3-reftwin@abed942) and the cap in effect."""
+    global RECIPE
+    env, RECIPE = CHAINS[chain]
     why = _registered(run_id, seed)
     if why:
         print(f"REFUSED: {why}. Nothing launched."); return
     print(f"launching run-id {run_id}: seed {seed}, {RECIPE}, cap ${CAP} (server-side timeout {CAP_S} s)")
-    print(run_oracle.remote(seed))
+    print(run_oracle.remote(seed, env))
 
 
 @app.local_entrypoint()
