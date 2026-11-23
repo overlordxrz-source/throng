@@ -78,7 +78,7 @@ def run_oracle(seed: int, env: dict | None = None, kill_after_leg1_s: int = 0) -
     return f"seed {seed}: done"
 
 
-SMOKE_ENV = dict(OUTTAG="smoke_o0", LEGSTEP="163840", NLEG="2", CHUNK="60")
+SMOKE_ENV = dict(OUTTAG="smoke_o0b", LEGSTEP="204800", NLEG="2", CHUNK="60")   # 25-iteration legs: port_w2 checkpoints every 20 iterations, so leg 1 leaves a ckpt at it 20 (the first smoke used 20-iteration legs: no ckpt, leg 2 retrained from scratch)
 
 
 RECIPE = "fallback3-oracle@abed942"   # oracle (b') + 4-way + target-KL .015 + --d4-side + --offset-proj (run_oracle_modal.sh)
@@ -115,5 +115,5 @@ def main(seed: int, run_id: str = ""):
 def smoke():
     """In-container smoke (cap $0.30): 2 tiny legs, 60 s chunks; call 1 hard-killed 30 s after its leg-1 table; call 2 must
     skip leg 1 and resume leg 2 from the checkpoint; files copied back by hand after."""
-    print(run_oracle.remote(0, SMOKE_ENV, kill_after_leg1_s=30))
+    print(run_oracle.remote(0, SMOKE_ENV, kill_after_leg1_s=20))
     print(run_oracle.remote(0, SMOKE_ENV, 0))
