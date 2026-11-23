@@ -11079,6 +11079,13 @@ more expensive, because it produces publishable-looking nulls.
   - Gate (computed locally after copy-back): E1's `e1_outcome.py` on both seeds' 5 tables. Report at the gate.
   - Predictions: both seeds pass the E1 gate p .55; d21 diagonal mean within .10 of cardinals at 5e7, p .55 (offset-proj
     targets this; H1 4-way missed it).
+- **LAUNCHED (entry stamped Nov 22 21:40:40 EST): F3-ORACLE-S0 and F3-ORACLE-S1 on Modal L4 (apps throng-f3o0 / throng-f3o1),
+  in parallel.**
+  - The first attempt launched nothing: modal run needs `::main` named when a file has two entrypoints.
+  - First container log lines, within 2 min of launch (times from the container logs, UTC): s1 at 02:38:42 and s0 at
+    02:39:59 both read "cap $3.0 = 10256s used 0s". The cap print is checked.
+  - Item watches at $3.75 each. b1 guard live (CAP $41).
+  - Copy-back: `~/throng-backup/modal_b1/f3/` (run.out polled every 2 min; full volume copy at the gate).
 - **RESULT (Nov 16 ~01:40): THE LABEL COUNT** (`docs/data/learner_w2/label_count/`; each row is 100 rollout
   iterations, 819k steps, with that checkpoint's weights, world state and frontier, no updates).
   - Definitions: MEMORY-ONLY bout = a later hearing (not the token's first in this life) at d >= 3. By construction
