@@ -11244,6 +11244,14 @@ more expensive, because it produces publishable-looking nulls.
   - Under Cam's d12 caveat (the d12 diagonal is inside the 9-cell bitwise range), this d12 diagonal gain is indirect, as
     predicted possible.
   - Predictions: head >= .50 at 3e7 (p .85) -> HIT. Spend estimate $1.17 so far (cap $5.5).
+- **RESULT (entry stamped Nov 23 03:02:36 EST): SEED 10 at 5e7. Early stop B NOT fired (frontier 24). Head .974 / .957 / .919 (d3 / d12
+  / d21). Later right-head reach d3 .89-1.00, d12 .88-.95, d21 .77-.87.** Times copied from the container log (UTC): 4e7
+  07:37:54, 5e7 08:01:04.
+  - 4e7: d3 diagonals .85-.88 (cardinals .98-.99), a small orbit dip, healed at 5e7 (diagonals .89-.96); d12 .87-.94.
+  - 5e7 d12 by sector: .93 / .88 / .92 / .91 / .93 / .90 / .95 / .90 (diagonals .88-.91).
+  - Cut per leg .34 / .32.
+  - Predictions: frontier > 6 at 5e7 -> HIT. Spend so far within the $5.5 cap (item watch). Next: the verdict at 1e8
+    (3-table, in the container).
 - **RESULT (Nov 16 ~01:40): THE LABEL COUNT** (`docs/data/learner_w2/label_count/`; each row is 100 rollout
   iterations, 819k steps, with that checkpoint's weights, world state and frontier, no updates).
   - Definitions: MEMORY-ONLY bout = a later hearing (not the token's first in this life) at d >= 3. By construction
