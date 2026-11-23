@@ -1,0 +1,4 @@
+V3 S9 8e7 bar3 {'hungry_2nd_true': 0.8452, 'hungry_2nd_shuffled': 0.4574, 'hungry_2nd_wiped': 0.2913, 'life_ratio': 5.9845, 'life_lb': 5.7538, 'head_later': 0.9509, 'PASS': False} 20:58:47
+V3 S9 9e7 bar3 {'hungry_2nd_true': 0.8048, 'hungry_2nd_shuffled': 0.4267, 'hungry_2nd_wiped': 0.2262, 'life_ratio': 5.7612, 'life_lb': 5.4648, 'head_later': 0.931, 'PASS': False} 21:15:14
+V3 S9 10e7 bar3 {'hungry_2nd_true': 0.8162, 'hungry_2nd_shuffled': 0.4683, 'hungry_2nd_wiped': 0.2315, 'life_ratio': 5.9385, 'life_lb': 5.6947, 'head_later': 0.9337, 'PASS': False} 21:15:14
+V3 S9 VERDICT {'mean_true': 0.8220643401145935, 'mean_shuffled': 0.45080957810084027, 'mean_wiped': 0.249658465385437, 'need': 0.8958548069000244, 'c_reach': False, 'c_shuf30': True, 'c_2x': False, 'mean_life_ratio': 5.894717230781097, 'life_lbs': [5.753846153846154, 5.464763216983058, 5.694656488549619], 'c_life': True, 'final_dead': [], 'PASS': False} 21:15:14

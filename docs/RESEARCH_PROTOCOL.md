@@ -11022,6 +11022,36 @@ more expensive, because it produces publishable-looking nulls.
     - Controls: no id / unknown id / wrong seed / wrong cap all REFUSE; a matching line passes.
     - Smoke / test entrypoints (`smoke`, `capcheck`) stay separate.
   - Standing check: the first container log line prints the cap; it is checked within 2 min of every real launch.
+- **RESULT (entry stamped Nov 22 21:15:50 EST): SEED 9 FAILS the 3-table verdict.** Times copied from `run_j1l.out` / `verdict3_s9.out`:
+  trained to 100,007,936 steps (1e8 leg 00:13:45; the script's 1e8-only bar FAIL at 00:39:28); verdict3 at 21:15:14.
+  Files: `docs/data/port_w2/j1/learner_s9/` (v3_s9_*).
+  - Per checkpoint (long d12 eval, true / shuffled / wiped hungry reach; life ratio, LB):
+    - 8e7: .845 / .457 / .291; 5.98, 5.75;
+    - 9e7: .805 / .427 / .226; 5.76, 5.46;
+    - 1e8: .816 / .468 / .232; 5.94, 5.69.
+  - 3-table: mean true .822 vs need .8959 -> FAIL. mean shuffled .451: + .30 = .751 -> PASS; 2x = .902 -> FAIL.
+    Life mean 5.89 (every LB > 1) -> PASS. Final-table dead: none. Head later .93-.95; first .18.
+  - d12 DECOMPOSITION (later bouts, `v3_s9_{8,9,10}e7_decomp.json`):
+
+    | | P(head right) | reach given right | reach given wrong | reach |
+    |---|---|---|---|---|
+    | 8e7 | .951 | .875 | .037 | .834 |
+    | 9e7 | .931 | .866 | .019 | .808 |
+    | 1e8 | .934 | .848 | .000 | .792 |
+
+    - Per sector at 1e8 (P right / reach given right): 0 .94/.86; 1 .94/.80; 2 .96/.91; 3 .91/.80; 4 .97/.90; 5 .93/.84;
+      6 .96/.91; 7 .88/.76. Cardinals .86-.91; diagonals .76-.84.
+    - Reading: the limit is POLICY-SIDE first. reach given right (.85-.88 overall) is below the bar on its own, so even a
+      perfect head would miss. It is lowest on the diagonals, at every checkpoint.
+    - The head-side loss is secondary: about 5-7% of later bouts, which reach ~0. This is Cam's "policy-side diagonal
+      limit" -> fallback (3).
+  - Predictions: Cam reach PASS .40 / mine .25 -> FAIL. Life PASS (.90 / .92) -> HIT. "If it fails, the limit is
+    policy-side", mine p .70 -> HIT (diagonals lowest).
+  - Per Cam 03:35Z (pre-authorized): FAIL -> build + smoke fallback (3) on Modal (built: `scripts/modal_oracle.py`,
+    offset-proj abed942; the offset-proj flag-off identity passed). Then launch oracle seeds 0 / 1 to 5e7 (E1 gate),
+    each item's cap = projection +25%, chain total <= $20.
+  - The laptop is free for M: the seed-9 entry was removed from ~/throng-backup/logs/active_run; cron now keeps only the
+    guards alive.
 - **RESULT (Nov 16 ~01:40): THE LABEL COUNT** (`docs/data/learner_w2/label_count/`; each row is 100 rollout
   iterations, 819k steps, with that checkpoint's weights, world state and frontier, no updates).
   - Definitions: MEMORY-ONLY bout = a later hearing (not the token's first in this life) at d >= 3. By construction
