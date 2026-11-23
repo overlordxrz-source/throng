@@ -11228,6 +11228,22 @@ more expensive, because it produces publishable-looking nulls.
   - Seed 10 launched 01:08:44 EST (laptop clock). First container line 06:09:16 UTC: "cap $5.5 = 18803s used 0s", env
     XT_EXTRA --offset-proj, REF / TWIN = the F3 files. Cap line checked within 2 min.
   - Spend: b1 metered $6.02 before seed 10; the F3 chain so far ~$5.6 incl. smokes (<= $20). Seed 10 cap $5.5.
+- **RESULT (entry stamped Nov 23 02:17:06 EST): SEED 10 (fallback (3) learner) at 3e7. Head watch CLEAR (head later d3 .971; early stop
+  A passed). Frontier 24 since 2e7. d12 reach given right .89-.94 incl. the DIAGONALS .89-.91.** Times copied from the
+  container log (UTC): 1e7 06:30:26, 2e7 06:51:14, 3e7 07:13:27 (~21 min per leg).
+  - Later right-head reach by sector (d3 / d12 / d21):
+    - 1e7: .97-.99 / .76-.88 / .24-.70 (frontier 11);
+    - 2e7: .90-.97 / .86-.92 / .62-.82 (frontier 24);
+    - 3e7: .92-.96 / .89-.94 / .73-.84.
+  - Head later (traj d3 / d12 / d21): .965 / .914 / .522 -> .977 / .944 / .919 -> .971 / .951 / .930.
+  - Cut per leg .44 / .43 / .36.
+  - rl2 d3 eval at 3e7 (modes 0 / 3 / 4): head .971 / .123 / .119; hungry reach .918 / .246 / .059. Shuffled and wiped
+    fall to chance, so the read is causal.
+  - Comparison: seed 9 at 3e7 had head .825, a 3-3 frontier stall to 22.8M, and d12 diagonals given right .77-.83; at 1e8
+    .80-.84.
+  - Under Cam's d12 caveat (the d12 diagonal is inside the 9-cell bitwise range), this d12 diagonal gain is indirect, as
+    predicted possible.
+  - Predictions: head >= .50 at 3e7 (p .85) -> HIT. Spend estimate $1.17 so far (cap $5.5).
 - **RESULT (Nov 16 ~01:40): THE LABEL COUNT** (`docs/data/learner_w2/label_count/`; each row is 100 rollout
   iterations, 819k steps, with that checkpoint's weights, world state and frontier, no updates).
   - Definitions: MEMORY-ONLY bout = a later hearing (not the token's first in this life) at d >= 3. By construction
