@@ -11330,6 +11330,49 @@ more expensive, because it produces publishable-looking nulls.
   - Read on the bar's own population (hungry, 2nd half of life), split as in bar_pop.py. Demonstrated bouts reach about 1 by construction, so the headline is NOT the bar reach. The quantities that matter are the failed-only share and the reach of non-demonstrated later bouts.
   - My p: the failed-only share falls from .137 to <= .05: .70. Non-demonstrated later-bout reach rises from .84 to >= .93: .65. A second demonstration fails at about the first one's rate (~.2 in reborn lives): .60.
   - Stop / read: if the failed-only share does not fall, then the stuck state is not just "no solved record" and the D1 reading is wrong.
+- **RESULT (entry stamped Nov 23 21:01:36 EST): D1-D3 + the D1 counterfactual, seed 10 (F3 learner) at 1e8, eval only, laptop, $0.** Files: `docs/data/port_w2/j1/d1/` (scripts `d1_anatomy.py`, `bar_pop.py`, `life_sat.py`; JSON per eval). Code: throng-toy `diag-d1` 9bd3dc5 = offset-proj abed942 + `--head-probs` + `--mem-audit`. The audit is a read-only look at the memory the head sees at each step. Evals: 24,000 steps (the bar's horizon) at d3 / 12 / 21; also 3,000-step runs.
+  - CONTROLS (all pass).
+    - Flag-off and audit runs are bitwise equal on all 20 shared traj fields.
+    - Reach, 2nd-half reach and hungry 2nd-half reach rebuilt from the traj equal the eval's own numbers in every file (d3 .9007, d12 .8578, d21 .8427, mode 3 .4556, mode 4 .3085, CF .9925).
+    - 0 of 120,630 solved matching records carry a stored label other than the true sector. A solved record stores item - start exactly.
+    - The laptop gives d12 reach .860 vs L4 .857: CPU vs GPU numerics, not bitwise.
+    - Two of my own analysis errors were caught and fixed before any number was used: the rebuilt reach counted bouts closed by death (the eval excludes them), and the item's sight radius is Chebyshev 1, not 3.
+  - D1, d12, 24k steps: 15,585 later hearings; P(right) .873; 1,985 misses.
+    - (c) audit: 99.5% of misses occur when memory holds ONLY FAILED (ate = 0) records for the heard word. The stored label of such a record is where the young stood at the timeout, so it is not the true sector. With a solved record present, P(right) = .9992.
+    - Every later hearing had at least one record for its word ("no record" = 0).
+    - (b) clustered by word: P(miss at the next hearing | miss) .93 vs .011 after a hit.
+    - (a) type of wrong sector: neighbour 605, opposite 229, other 1,151. The head follows some failed record's label in 53% of misses.
+    - How the failed state is written: all 760 such words began with a demonstrated FIRST hearing that timed out, and 759 / 760 of those bouts had the young eat world food.
+      - Of the failed first bouts, 1,206 / 1,210 ended SATED (energy reached H during the bout). Successful first bouts also eat world food (1,867 / 5,456) but stay hungry. Read: the young eats world food, is sated, stops following, and times out.
+      - The word then never recovers: 739 / 760 are never solved in that life. At d12 there is no search: wrong-head bouts reach ~0.
+    - (d) P(right) given a solved record is d-blind: .995 / .999 / .999 at d3 / 12 / 21. The fall in P(right) (.932 / .873 / .828) is carried by the failed-only share (.074 / .147 / .209). That share follows the first-bout failure rate, which rises with d (8.1% / 18.2% / 27.8%).
+  - THE BAR'S OWN POPULATION (hungry bouts, 2nd half of life; d12; 9,562 bouts; reach .8578).
+    - First hearings (demonstrated): share .147, reach .999.
+    - Later hearings with a solved record and a right head: cardinal .364 / .994, diagonal .352 / .989.
+    - Later hearings with failed records only: .137, reach about .01, which LOSES .136 of the .142 gap to 1.
+    - So the bar's gap is about 95% the failed-demonstration state. There is NO motor deficit on hungry bouts (diagonals .989).
+  - CORRECTION ON THE RECORD (to my seed-10 decomposition, accepted at 17:10Z; I withdraw it as an explanation of the bar).
+    - It used the 3,000-step evals, which see LIFE 0 ONLY. Life 0 starts from env.reset and is easier: first-bout failure 9.8% vs 19-20% in reborn lives; P(right) .941 vs ~.86. Reset energy = E0 = .6, the same as a newborn's, so the cause of the life-0 difference is not yet known.
+    - It also used ALL later bouts, including SATED ones, which the bar excludes. Of right-head failures, 485 / 632 (cardinal) and 666 / 921 (diagonal) are sated. Without them, reach given a right head is .977 / .959 (24k, d12, all later bouts) and .994 / .989 on the bar population.
+    - The "diagonals .85-.90" motor reading is therefore sated bouts, not walking. D2 agrees: seed-10 timeouts are stalls (stay + eat about 45-50% of moves; the item still ahead at the end, along-track +3.6 / +4.0), not seed 9's drift and overshoot. Reach given a right head: diagonal p < 1 .639 (n 1,003) vs p = 1 .904; cardinal .901 / .925.
+    - The 8-way + D4 gate now running was premised on a motor deficit of about .03-.04. On the bar's population that deficit is <= .006. The gate continues as ordered (capped $3.5); this is Cam's call.
+  - D3: what the controls measure.
+    - Mode 3 = a fresh random code at every bout open: memory is kept, but a record's token no longer names the sector.
+    - Mode 4 = memory h[HG:] zeroed at every bout open; the code and the GRU state are kept.
+    - In both, every first hearing is demonstrated and no later bout is (K = 1).
+    - Bar population, 24k: shuffled .456 = demonstrated first hearings (85.1% of eaten items, reach .998) + a chance-right head (share .088, reach .75) + wrong head 0 (no search). Wiped .309 = demonstrated first hearings 95.5% of eaten; right-head reach .012, so the walk needs a solved record, not just the head.
+    - Neither benign code-free search nor a leak: the controls' reach is the demonstrator. Over later, non-demonstrated bouts only: shuffled .111, wiped .020.
+    - "2x shuffled" binds because demonstrated first hearings put a floor under the shuffled reach.
+    - The reference oracle's own shuffled / wiped reach at 1e8 was never logged (its evals are mode 0 only). No new run.
+  - COUNTERFACTUAL (registered before data, stamp above): `--demo-hearings 2`, eval only (an existing world flag; trained with 1).
+    - The failed-only share of later, non-demonstrated bar bouts fell .160 -> .0034. P(right) on later hearings .998. Non-demonstrated later-bout reach .834 -> .989 (bar reach .9925, but that includes demonstrations).
+    - A second demonstration fails at .078 (.068 after a failed first; all 379 failures sated) vs .178 for a first.
+    - Read: the trained head and walk are fine once ONE solved record exists. The gap is the curriculum's single demonstration.
+  - SCORES.
+    - D1, Cam: bad records .55 / misreads .30 / missing .15. Mine: .45 / .35 / .20. The misses are clustered by word and the record's label is wrong, so "bad records" HITS in D1(b)/(c)'s terms (both of us). But no record is corrupted: the words simply never got a solved record. Misreads with a solved record present: .5% of misses (MISS). No record at all: 0 (MISS).
+    - D3, Cam: benign search .75 / leak .15. Mine: benign search .80. The outcome was neither: the demonstrator. Benign search MISS for both; Cam's leak .15 correctly low.
+    - Counterfactual, mine: HIT (.70), HIT (.65), MISS (.60; the second demonstration fails less).
+  - Nothing launched on the strength of this. NO LEARNER until Cam rules. Every lever (the demonstrator rule, the memory write, satiety) is a world or inborn change: Cam's ruling, and M's card for the memory write.
 - **RESULT (Nov 16 ~01:40): THE LABEL COUNT** (`docs/data/learner_w2/label_count/`; each row is 100 rollout
   iterations, 819k steps, with that checkpoint's weights, world state and frontier, no updates).
   - Definitions: MEMORY-ONLY bout = a later hearing (not the token's first in this life) at d >= 3. By construction

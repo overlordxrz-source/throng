@@ -13,6 +13,8 @@ for b in TA.bouts(z):
     sec = int(z["sec"][w, s0, n]); orb = "diag" if sec % 2 else "card"; ate = bool(z["cl_item"][w, s1, n])
     if z["first"][w, s0, n]:
         k = "first_dem"
+    elif z["dem"][w, s0, n]:                                      # a demonstrated REPEAT hearing (only with --demo-hearings > 1)
+        k = "repeat_dem"
     else:
         st = "solved" if z["ma_ns"][w, s0, n].sum() > 0 else "failed_only"
         k = f"later_{st}_{'right' if int(z['hl'][w, s0, n]) == sec else 'wrong'}_{orb}"
