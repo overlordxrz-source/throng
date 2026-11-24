@@ -1,0 +1,13 @@
+=== container start 01:13:44 seed 0 cap $0.2 = 683s used 0s remaining 683s env {'OUTTAG': 'smoke_m8o0', 'LEGSTEP': '204800', 'NLEG': '2', 'CHUNK': '60', 'EXTRA_O': '--moves8'}
+F3 s0 start 01:13:45 legs 2 x 204800 chunk 60
+F3 s0 1e7 frontier 1.0 01:15:20
+F3 TABLE s0 1e7 {"arm": "F3s0_1e7", "frontier": 1.0, "d3": [0.254, 0.354, 0.318, 0.556, 0.479, 0.399, 0.278, 0.357], "d12": [0.004, 0.012, 0.021, 0.139, 0.057, 0.014, 0.005, 0.011], "n3": [3802, 3898, 3902, 3890, 3917, 3950, 4037, 3928], "n12": [1152, 1147, 1085, 1148, 1195, 1157, 1152, 1142], "min3": 0.254, "min12": 0.004, "dead_lt030": [0, 1, 2, 3, 4, 5, 6, 7], "dead_le010": [0, 1, 2, 4, 5, 6, 7], "PASS": false, "SECONDARY": false, "QUALIFIES": false} | d21:   oracle       reach by sector 0.00 0.00 0.00 0.05 0.01 0.00 0.00 0.00  n [702, 690, 679, 667, 700, 702, 707, 704] 01:17:50
+=== container exit -9 SMOKE hard kill 20s into leg 2 01:18:26
+=== container start 01:18:30 seed 0 cap $0.2 = 683s used 281s remaining 402s env {'OUTTAG': 'smoke_m8o0', 'LEGSTEP': '204800', 'NLEG': '2', 'CHUNK': '60', 'EXTRA_O': '--moves8'}
+F3 s0 start 01:18:30 legs 2 x 204800 chunk 60
+F3 s0 1e7 leg already done (idempotent)
+F3 s0 2e7 frontier 3.0 01:19:51
+F3 TABLE s0 2e7 {"arm": "F3s0_2e7", "frontier": 3.0, "d3": [0.53, 0.587, 0.526, 0.613, 0.652, 0.516, 0.412, 0.413], "d12": [0.057, 0.056, 0.12, 0.135, 0.188, 0.031, 0.032, 0.009], "n3": [1796, 1789, 1891, 1820, 1891, 1915, 1780, 1865], "n12": [1061, 1086, 1079, 1145, 1036, 1027, 1060, 1140], "min3": 0.412, "min12": 0.009, "dead_lt030": [0, 1, 2, 3, 4, 5, 6, 7], "dead_le010": [0, 1, 5, 6, 7], "PASS": false, "SECONDARY": false, "QUALIFIES": false} | d21:   oracle       reach by sector 0.01 0.00 0.04 0.01 0.08 0.00 0.00 0.00  n [662, 650, 613, 666, 651, 672, 694, 650] 01:22:18
+F3 SPLIT s0 2e7 {'6': {'p_stay': 0.382, 'p_eat': 0.303, 'p_toward': 0.071, 'side_stay': 0.573, 'side_eat': 0.824}, '7': {'p_stay': 0.377, 'p_eat': 0.343, 'p_toward': 0.069, 'side_stay': 1.446, 'side_eat': 1.843}}
+F3 s0 DONE 01:23:12
+=== container exit 0  01:23:18

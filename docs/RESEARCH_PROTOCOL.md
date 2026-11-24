@@ -11379,6 +11379,20 @@ more expensive, because it produces publishable-looking nulls.
   - D3 vs Cam's rule-swap condition ("if D3 shows benign code-free search"): NOT met as written. D3 showed neither search nor a leak; the control reach is the demonstrator. The rule is Cam's call.
   - The life-0 vs reborn difference (first-bout failure 9.8% vs ~20%) is OPEN. It does not change the correction, because the bar is read on the 24k-step population.
   - SPEND HOLD: the gate continues as ordered. But I will NOT launch M8D4-REFTWIN ($3.5) on a gate pass unless Cam says go: its pre-authorization rested on the motor premise withdrawn above.
+- **RESULT (entry stamped Nov 23 21:33:19 EST): 8-WAY + D4 ORACLE GATE = (a). Both seeds pass: 0 events, 0 dead, frontier 24 from 2e7, 3-table QUALIFIES.** Run-ids M8D4-ORACLE-S0 / S1 (bac4cd7). Files: `docs/data/modal_b1/m8/` (m8_outcome.json, verdicts, d21 tables, run.out, ledgers).
+  - Ledgers: s0 3,932 s, s1 3,919 s of 5,982 s = $2.30 of the $3.5 gate cap. Smoke $0.17. No preemption. Metered b1 $13.44.
+  - The cap lines were checked within 2 min of each container start (from run.out): s0 $1.75 = 5982 s with --moves8; s1 the same.
+  - d21 cardinal minus diagonal (the gap both ways), 3e7 / 4e7 / 5e7: s0 -.052 / -.045 / -.157; s1 -.103 / -.118 / -.047.
+    - |gap| <= .20 on both seeds: no flag. But the sign has FLIPPED vs 4-way: diagonals now lead. This is the old 8-way pattern.
+    - s0's d21 cardinals fell .785 -> .670 from 3e7 to 5e7 (no sector event under the literal rule).
+  - vs 4-way F3 on the same gate tables (mean of 3e7-5e7), cardinal / diagonal:
+    - d3: s0 .982 / .950 -> .886 / .957; s1 .975 / .958 -> .882 / .957.
+    - d12: s0 .921 / .892 -> .852 / .908; s1 .922 / .885 -> .835 / .917.
+    - So 8-way buys +.01-.03 on diagonals and costs -.07 to -.10 on cardinals. Net, the oracle is WORSE at this stage (d12 mean s0 .906 -> .880).
+  - Read, with the D1 result: the learner's hungry-bout diagonals are already .989, and the 4-way oracle reference is .9943. So this motor lever has no measured gap to close, and it costs cardinals in the oracle.
+  - A lower 8-way reference would also LOWER the learner bar (.9 x ref), which is not a real gain. The reference step would measure exactly that.
+  - Scores: gate passes both, Cam .60 / me .55: HIT. |d21 gap| > .20, me .20: did not happen. Reference >= .98: not run.
+  - REFTWIN (M8D4-REFTWIN, $3.5) HELD, as recorded in the addendum: it launches only if Cam says go. Nothing is running on Modal.
 - **RESULT (Nov 16 ~01:40): THE LABEL COUNT** (`docs/data/learner_w2/label_count/`; each row is 100 rollout
   iterations, 819k steps, with that checkpoint's weights, world state and frontier, no updates).
   - Definitions: MEMORY-ONLY bout = a later hearing (not the token's first in this life) at d >= 3. By construction
