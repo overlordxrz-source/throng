@@ -11286,6 +11286,35 @@ more expensive, because it produces publishable-looking nulls.
     - The next candidate is 8-way + D4 (item 5, built and checked) or a read-confidence fix.
     - Item 3 (seed 9) found the diagonal loss MOTOR with a sharp read. Seed 10 shrank that motor share, and the head-side
       share is now comparable.
+- **RULING RECORDED (entry stamped Nov 23 20:01:39 EST): Cam Nov 23 ~17:10Z (time copied from Cam's message header).**
+  - Seed 10 = FAIL, recorded; nothing launched (correct). The decomposition and items 3 / 5 are accepted.
+  - Cam: reach .30 MISS (his 3rd learner-pass miss in a row; he will quote lower).
+  - FLAG, NO RULE CHANGE YET: "2x shuffled" now binds harder than the bar. Shuffled reach rose .25 (3e7) -> .48 (1e8), so
+    2x = .95 = .955 x ref, above .895.
+    - If D3 shows benign code-free search (no leak), FUTURE seeds only swap 2x-shuffled for head necessity: later head d12
+      true >= .85 AND shuffled, wiped <= .25; "shuffled + .30" is kept.
+    - Seeds 9 / 10 stay FAIL on the primary bar either way.
+  - D1-D3, eval only, on seed 10 at 1e8, d12, later bouts (laptop if < 10 min each, else Modal CPU, cap $0.5 total):
+    - D1 head-miss anatomy: (a) wrong sector = neighbour / opposite / other; (b) clustered by word in a life (bad record)
+      or scattered (misread); (c) memory audit at each miss (is there a record, is its label right, how was a wrong one
+      written); (d) which of a-c carries P(right)'s fall .97 / .94 / .92 at d3 / 12 / 21.
+    - D2: item 3 repeated on seed 10 (timeouts by orbit; reach given right for p < 1 vs p = 1 per orbit).
+    - D3: control anatomy. What modes 3 / 4 do; shuffled-mode reaches split into right head by chance / found while
+      walking toward another sector / found after a miss (sweep) / first hearing / other; the reference oracle's own
+      shuffled / wiped at 1e8 if logged.
+    - Cam p: D1 bad records .55, misreads .30, missing records .15; D3 benign search .75, leak .15.
+  - In parallel on Modal: the 8-WAY + D4 ORACLE chain (oracle (b') + --moves8 + target-KL .015 + --d4-side +
+    --offset-proj; branch moves8-d4).
+    - Run IDs registered first; an in-container smoke (25-iteration legs, resume); the cap line checked within 2 min.
+    - Gate: s0 + s1 to 5e7 under E1 rules. Report the d21 cardinal-diagonal gap both ways; flag |gap| > .20.
+    - Both pass -> s0 to 1e8 (3-table) -> reference -> twin (3e7) -> STOP. One fails -> report.
+    - Caps: gate $3.5; ref + twin $3.5 (only after a gate pass). Guard CAP $41.
+    - Cam p: gate passes both .60; reference >= .98 .80.
+  - NO LEARNER until Cam rules on D1-D3 + the 8-way gate.
+  - My reading of "gate $3.5": the TOTAL for both seeds, i.e. $1.75 each (projection ~$1.45 each from F3's $1.29 /
+    $1.47 to 5e7; +21%, under the +25% rule, which Cam's explicit cap overrides).
+  - My p: gate passes both .55; |d21 gap| > .20 on either seed .20; reference >= .98 .75. D1: bad records .45, misreads
+    .35, missing records .20. D3: benign search .80.
 - **RESULT (Nov 16 ~01:40): THE LABEL COUNT** (`docs/data/learner_w2/label_count/`; each row is 100 rollout
   iterations, 819k steps, with that checkpoint's weights, world state and frontier, no updates).
   - Definitions: MEMORY-ONLY bout = a later hearing (not the token's first in this life) at d >= 3. By construction
