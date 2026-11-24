@@ -11373,6 +11373,12 @@ more expensive, because it produces publishable-looking nulls.
     - D3, Cam: benign search .75 / leak .15. Mine: benign search .80. The outcome was neither: the demonstrator. Benign search MISS for both; Cam's leak .15 correctly low.
     - Counterfactual, mine: HIT (.70), HIT (.65), MISS (.60; the second demonstration fails less).
   - Nothing launched on the strength of this. NO LEARNER until Cam rules. Every lever (the demonstrator rule, the memory write, satiety) is a world or inborn change: Cam's ruling, and M's card for the memory write.
+- **ADDENDUM to the D1-D3 RESULT entry (entry stamped Nov 23 21:04:10 EST; after an independent check of the reading).**
+  - The counterfactual's ".834 -> .989" compares DIFFERENT populations. In the baseline, non-demonstrated later bouts are the 2nd and later hearings of a word; under `--demo-hearings 2` they are the 3rd and later. The clean CF number is the failed-only share, .160 -> .0034. The baseline itself already shows reach .994 / .989 (cardinal / diagonal) once a solved record exists, against the oracle reference .9943.
+  - Any demonstrator-based lever inflates the bar through demonstrated bouts (bar .9925 in the CF). A bar for such a lever would have to be read on non-demonstrated bouts only, or it passes trivially.
+  - D3 vs Cam's rule-swap condition ("if D3 shows benign code-free search"): NOT met as written. D3 showed neither search nor a leak; the control reach is the demonstrator. The rule is Cam's call.
+  - The life-0 vs reborn difference (first-bout failure 9.8% vs ~20%) is OPEN. It does not change the correction, because the bar is read on the 24k-step population.
+  - SPEND HOLD: the gate continues as ordered. But I will NOT launch M8D4-REFTWIN ($3.5) on a gate pass unless Cam says go: its pre-authorization rested on the motor premise withdrawn above.
 - **RESULT (Nov 16 ~01:40): THE LABEL COUNT** (`docs/data/learner_w2/label_count/`; each row is 100 rollout
   iterations, 819k steps, with that checkpoint's weights, world state and frontier, no updates).
   - Definitions: MEMORY-ONLY bout = a later hearing (not the token's first in this life) at d >= 3. By construction
