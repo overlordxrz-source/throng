@@ -14,7 +14,9 @@ import os
 
 import modal
 
-SHA = "abed942907474470edb60104584131a52516ed8f"   # throng-toy offset-proj (a7087f2 + --offset-proj)
+VARIANT = os.environ.get("F3_VARIANT", "")   # "" = fallback (3) 4-way (offset-proj abed942); "m8" = 8-way + D4 (+ proj) (branch moves8-d4)
+SHA = {"": "abed942907474470edb60104584131a52516ed8f", "m8": "bac4cd71c4621debdce148638b47806744f2f131"}[VARIANT]
+VENV = {"": {}, "m8": {"EXTRA_O": "--moves8"}}[VARIANT]
 REPO = "https://github.com/overlordxrz-source/throng.git"
 VOL = "/mnt/runs"
 HERE = os.path.dirname(os.path.abspath(__file__)); DOCS = os.path.join(os.path.dirname(HERE), "docs", "data")
@@ -35,7 +37,7 @@ volume = modal.Volume.from_name("throng-runs-b1", create_if_missing=True)
 image = (modal.Image.debian_slim(python_version="3.12").apt_install("git", "zsh")
          .run_commands(f"git clone {REPO} /root/tt", f"cd /root/tt && git checkout {SHA}", f'cd /root/tt && test "$(git rev-parse HEAD)" = "{SHA}"')
          .pip_install("jax[cuda12]==0.10.0", "flax==0.12.7", "optax==0.2.8", "numpy==2.5.4"))
-image = image.env({"SEED_CAP": str(CAP)})                               # the SAME cap inside the container (the ledger), fixed after the smoke
+image = image.env({"SEED_CAP": str(CAP), "F3_VARIANT": VARIANT})                               # the SAME cap inside the container (the ledger), fixed after the smoke
 for dst, src in AUX.items():
     image = image.add_local_file(src, dst, copy=True)
 
@@ -49,7 +51,7 @@ def run_oracle(seed: int, env: dict | None = None, kill_after_leg1_s: int = 0) -
     import time
     os.chdir("/root/tt")
     assert subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True, text=True).stdout.strip() == SHA
-    env = dict(env or {}); tag = env.get("OUTTAG", f"o{seed}"); out = f"{VOL}/oracle/{tag}"; os.makedirs(out, exist_ok=True)
+    env = dict(env or {}); tag = env.get("OUTTAG", f"{env.get('OUTTAG_PREFIX', 'o')}{seed}"); out = f"{VOL}/oracle/{tag}"; env.setdefault("OUTTAG", tag); os.makedirs(out, exist_ok=True)
     led = f"{out}/ledger{env.get('LEDGER_TAG', '')}.json"; volume.reload()   # one ledger per registered item
     used = json.load(open(led))["used_s"] if os.path.exists(led) else 0.0; remaining = CAP_S - used
     log = open(f"{out}/run.out", "a"); log.write(f"=== container start {time.strftime('%H:%M:%S')} seed {seed} cap ${CAP} = {CAP_S}s used {used:.0f}s remaining {remaining:.0f}s env {env}\n"); log.flush()
@@ -79,10 +81,10 @@ def run_oracle(seed: int, env: dict | None = None, kill_after_leg1_s: int = 0) -
     return f"seed {seed}: done"
 
 
-SMOKE_ENV = dict(OUTTAG="smoke_o0b", LEGSTEP="204800", NLEG="2", CHUNK="60")   # 25-iteration legs: port_w2 checkpoints every 20 iterations, so leg 1 leaves a ckpt at it 20 (the first smoke used 20-iteration legs: no ckpt, leg 2 retrained from scratch)
+SMOKE_ENV = dict(OUTTAG="smoke_o0b" if not VARIANT else "smoke_m8o0", LEGSTEP="204800", NLEG="2", CHUNK="60", **VENV)   # 25-iteration legs: port_w2 checkpoints every 20 iterations, so leg 1 leaves a ckpt at it 20 (the first smoke used 20-iteration legs: no ckpt, leg 2 retrained from scratch)
 
 
-RECIPE = "fallback3-oracle@abed942"   # oracle (b') + 4-way + target-KL .015 + --d4-side + --offset-proj (run_oracle_modal.sh)
+RECIPE = {"": "fallback3-oracle@abed942", "m8": "m8d4-oracle@bac4cd7"}[VARIANT]   # oracle (b') + target-KL .015 + --d4-side + --offset-proj (+ --moves8 for m8)
 PROTOCOL = os.path.join(os.path.dirname(HERE), "docs", "RESEARCH_PROTOCOL.md")
 
 
@@ -102,7 +104,7 @@ def _registered(run_id: str, seed: int) -> str:
     return ""
 
 
-CHAINS = {"": ({}, RECIPE), "reftwin": ({"NLEG": "10", "CHAIN": "reftwin", "LEDGER_TAG": "_reftwin"}, "fallback3-reftwin@abed942")}
+CHAINS = {"": ({**VENV, **({"OUTTAG_PREFIX": "m8o"} if VARIANT else {})}, RECIPE), "reftwin": ({**VENV, "NLEG": "10", "CHAIN": "reftwin", "LEDGER_TAG": "_reftwin", **({"OUTTAG_PREFIX": "m8o"} if VARIANT else {})}, {"": "fallback3-reftwin@abed942", "m8": "m8d4-reftwin@bac4cd7"}[VARIANT])}
 
 
 @app.local_entrypoint()

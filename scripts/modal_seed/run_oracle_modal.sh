@@ -6,8 +6,8 @@
 S=${1:?seed}; SP=/mnt/runs; M=$SP/oracle/${OUTTAG:-o$S}; mkdir -p $M; PY=python3; A=/root/aux
 cd /root/tt
 LEGSTEP=${LEGSTEP:-1e7}; NLEG=${NLEG:-5}; CHUNK=${CHUNK:-3000}; CHAIN=${CHAIN:-}
-O="--oracle --hunger-gate --item-size 0.1 --W 32 --gate honest --no-nav --target-kl 0.015 --d4-side --offset-proj --ppo-log"
-E="--learner rec --oracle --hunger-gate --item-size 0.1 --W 32 --d4-side --offset-proj"
+O="--oracle --hunger-gate --item-size 0.1 --W 32 --gate honest --no-nav --target-kl 0.015 --d4-side --offset-proj --ppo-log ${EXTRA_O:-}"
+E="--learner rec --oracle --hunger-gate --item-size 0.1 --W 32 --d4-side --offset-proj ${EXTRA_O:-}"
 tgt() { python3 -c "print('${1}e7' if '$LEGSTEP' == '1e7' else int(float('$LEGSTEP') * $1))"; }
 echo "F3 s$S start $(date '+%H:%M:%S') legs $NLEG x $LEGSTEP chunk $CHUNK"
 for K in $(seq 1 $NLEG); do
@@ -46,13 +46,13 @@ r=sum(x['hungry_reach_2nd_half'] for x in m)/3; print(json.dumps(dict(ref_seed=$
 python3 -c "
 import json; q=json.load(open('$M/F3_QUALIFIED')); j=json.load(open('$M/f3_ref_10e7.json')); j['modes']['0']['hungry_reach_2nd_half']=q['ref_mean']; j['note']='hungry_reach_2nd_half = mean of the 8e7/9e7/1e8 long evals of seed %d (F3)' % q['ref_seed']; json.dump(j, open('$M/f3_ref_mean.json','w'))"
 echo "F3 QUALIFIED $(cat $M/F3_QUALIFIED) $(date '+%H:%M:%S')"
-T="--hunger-gate --item-size 0.1 --W 32 --gate honest --no-nav --target-kl 0.015 --d4-side --offset-proj --frontier-schedule $M/f3s${S}_10e7_train.json"
+T="--hunger-gate --item-size 0.1 --W 32 --gate honest --no-nav --target-kl 0.015 --d4-side --offset-proj ${EXTRA_O:-} --frontier-schedule $M/f3s${S}_10e7_train.json"
 for K in 1 2 3; do
   [ -f $M/tw_${K}e7.params ] && [ -f $M/tw_${K}e7_train.json ] && { echo "F3 TWIN ${K}e7 already done (idempotent)"; continue; }
   for i in $(seq 1 100); do $PY w2/port_w2.py ${=T} --steps ${K}e7 --ckpt $M/tw.ckpt --max-seconds $CHUNK --save-params $M/tw_${K}e7.params --out $M/tw_${K}e7_train.json >> $M/tw.log 2>&1
     [ -f $M/tw_${K}e7_train.json ] && break; grep -q "Traceback\|NAN_STOP" $M/tw.log && { echo "F3 TWIN CRASH"; exit 1; }; done
   cp $M/tw.ckpt $M/tw_ckpt_${K}e7.ckpt; echo "F3 TWIN ${K}e7 done $(date '+%H:%M:%S')"
 done
-$PY w2/learner_w2_rl_traj.py --learner rec --hunger-gate --item-size 0.1 --W 32 --d4-side --offset-proj --init-params $M/tw_3e7.params --d-fixed 12 --eval-necessity 0 --out $M/tw_eval_d12.json >> $M/tw.log 2>&1
+$PY w2/learner_w2_rl_traj.py --learner rec --hunger-gate --item-size 0.1 --W 32 --d4-side --offset-proj ${EXTRA_O:-} --init-params $M/tw_3e7.params --d-fixed 12 --eval-necessity 0 --out $M/tw_eval_d12.json >> $M/tw.log 2>&1
 echo "F3 TWIN eval $(python3 -c "import json;m=json.load(open('$M/tw_eval_d12.json'))['modes']['0'];print('hungry_2nd', m.get('hungry_reach_2nd_half'), 'life', m.get('mean_life_steps'))") $(date '+%H:%M:%S')"
 echo "F3_REFTWIN_DONE $(date '+%H:%M:%S')"
