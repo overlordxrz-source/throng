@@ -11315,6 +11315,15 @@ more expensive, because it produces publishable-looking nulls.
     $1.47 to 5e7; +21%, under the +25% rule, which Cam's explicit cap overrides).
   - My p: gate passes both .55; |d21 gap| > .20 on either seed .20; reference >= .98 .75. D1: bad records .45, misreads
     .35, missing records .20. D3: benign search .80.
+- **REGISTERED (entry stamped Nov 23 20:02:39 EST): the 8-way + D4 oracle gate (Cam 17:10Z item 3).**
+  - Code: `scripts/modal_oracle.py` with F3_VARIANT=m8, on throng-toy moves8-d4 bac4cd7 (offset-proj abed942 + the
+    8-way + D4 checks; no trainer change). The recipe is fallback (3)'s plus --moves8 in training, tables, twin and twin
+    eval. Outputs to /oracle/m8o<S>.
+  - Smoke first: 25-iteration legs, a hard kill and resume, cap $0.20.
+  - RUN-ID: M8D4-ORACLE-S0 | seed 0 | recipe m8d4-oracle@bac4cd7 | cap $1.75
+  - RUN-ID: M8D4-ORACLE-S1 | seed 1 | recipe m8d4-oracle@bac4cd7 | cap $1.75
+  - Gate = E1 rules (e1_outcome.py) on both seeds' 5 tables, computed locally. Plus the d21 cardinal-diagonal gap both
+    ways, flagged if |gap| > .20.
 - **RESULT (Nov 16 ~01:40): THE LABEL COUNT** (`docs/data/learner_w2/label_count/`; each row is 100 rollout
   iterations, 819k steps, with that checkpoint's weights, world state and frontier, no updates).
   - Definitions: MEMORY-ONLY bout = a later hearing (not the token's first in this life) at d >= 3. By construction
