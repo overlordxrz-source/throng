@@ -11324,6 +11324,12 @@ more expensive, because it produces publishable-looking nulls.
   - RUN-ID: M8D4-ORACLE-S1 | seed 1 | recipe m8d4-oracle@bac4cd7 | cap $1.75
   - Gate = E1 rules (e1_outcome.py) on both seeds' 5 tables, computed locally. Plus the d21 cardinal-diagonal gap both
     ways, flagged if |gap| > .20.
+- **REGISTERED BEFORE DATA (entry stamped Nov 23 20:27:39 EST): D1 counterfactual, eval only, laptop, free (my addition to Cam 17:10Z item 2; no learner, no training).**
+  - Why: the D1 audit (result entry to follow) puts about 95% of the bar's lost reach on words whose demonstrated FIRST bout failed (the young ate world food and became sated), so memory holds only failed records and the word stays lost for the life.
+  - Test: the same seed-10 1e8 eval (d12, mode 0, 24,000 steps, diag worktree 9bd3dc5) with `--demo-hearings 2` (an existing flag; trained with 1). The parent then also demonstrates each word's second hearing in a life. This is an eval-only change to a world rule, not a candidate recipe.
+  - Read on the bar's own population (hungry, 2nd half of life), split as in bar_pop.py. Demonstrated bouts reach about 1 by construction, so the headline is NOT the bar reach. The quantities that matter are the failed-only share and the reach of non-demonstrated later bouts.
+  - My p: the failed-only share falls from .137 to <= .05: .70. Non-demonstrated later-bout reach rises from .84 to >= .93: .65. A second demonstration fails at about the first one's rate (~.2 in reborn lives): .60.
+  - Stop / read: if the failed-only share does not fall, then the stuck state is not just "no solved record" and the D1 reading is wrong.
 - **RESULT (Nov 16 ~01:40): THE LABEL COUNT** (`docs/data/learner_w2/label_count/`; each row is 100 rollout
   iterations, 819k steps, with that checkpoint's weights, world state and frontier, no updates).
   - Definitions: MEMORY-ONLY bout = a later hearing (not the token's first in this life) at d >= 3. By construction

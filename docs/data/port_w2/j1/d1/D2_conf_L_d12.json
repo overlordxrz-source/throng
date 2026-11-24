@@ -1,0 +1,82 @@
+{
+ "file": "L_d12_m0.npz",
+ "n_later": 15585,
+ "n_right": 13600,
+ "p_right": 0.873,
+ "tercile_cuts": [
+  1.0,
+  1.0
+ ],
+ "by_conf_orbit": {
+  "card_t0": {
+   "n": 5097,
+   "reach_right": 0.901,
+   "pmax_mean": 0.989
+  },
+  "card_t1": {
+   "n": 1675,
+   "reach_right": 0.925,
+   "pmax_mean": 1.0
+  },
+  "card_t2": {
+   "n": 0,
+   "reach_right": null,
+   "pmax_mean": null
+  },
+  "diag_t0": {
+   "n": 1003,
+   "reach_right": 0.639,
+   "pmax_mean": 0.923
+  },
+  "diag_t1": {
+   "n": 5825,
+   "reach_right": 0.904,
+   "pmax_mean": 1.0
+  },
+  "diag_t2": {
+   "n": 0,
+   "reach_right": null,
+   "pmax_mean": null
+  }
+ },
+ "mass": {
+  "card_ate": {
+   "n": 6140,
+   "p_true": 0.999,
+   "p_neighbours": 0.001
+  },
+  "card_failed": {
+   "n": 632,
+   "p_true": 0.919,
+   "p_neighbours": 0.055
+  },
+  "diag_ate": {
+   "n": 5907,
+   "p_true": 1.0,
+   "p_neighbours": 0.0
+  },
+  "diag_failed": {
+   "n": 921,
+   "p_true": 0.919,
+   "p_neighbours": 0.047
+  }
+ },
+ "moves": {
+  "card_ate": {
+   "into_true": 0.994,
+   "into_neighbour": 0.999
+  },
+  "card_failed": {
+   "into_true": 0.527,
+   "into_neighbour": 0.879
+  },
+  "diag_ate": {
+   "into_true": 0.991,
+   "into_neighbour": 0.991
+  },
+  "diag_failed": {
+   "into_true": 0.703,
+   "into_neighbour": 0.703
+  }
+ }
+}

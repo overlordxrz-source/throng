@@ -1,0 +1,6 @@
+start 20:07:05 aabbafa dirty:  M w2/learner_w2_rl_traj.py 
+flagoff d12 m0 exit 0 24s
+audit d12 m0,3,4 exit 0 78s
+audit d3 m0 exit 0 32s
+audit d21 m0 exit 0 32s
+D1 EVALS DONE 20:09:51
