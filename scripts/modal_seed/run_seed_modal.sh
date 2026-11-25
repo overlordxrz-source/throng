@@ -39,7 +39,7 @@ import sys,json;r=[json.loads(l[4:]) for l in sys.stdin];print('this-leg %.3f (n
   grep -q "EARLY_STOP frontier" $M/s$S.log && { echo "J1L S$S EARLY_STOP_B (FAIL) $(date '+%H:%M:%S')"; exit 0; }
   [ -f $M/s${S}_train.json ] && break
 done
-if [ "$SMOKE" = 1 ]; then      # smoke: the verdict step on a SYNTHETIC table (bar JSONs + a bysec file), and decomp on the real leg-2 npz
+if [ "$SMOKE" = 1 ] && [ "${VERDICT:-}" != v3 ]; then      # smoke (old rule): the verdict step on a SYNTHETIC table; a v3 smoke runs the real v3 block below on tiny evals (bar JSONs + a bysec file), and decomp on the real leg-2 npz
   python3 - "$M" <<'PYS'
 import json, sys
 M = sys.argv[1]; base = dict(hungry_2nd_true=0.95, hungry_2nd_shuffled=0.40, hungry_2nd_wiped=0.30, life_ratio=5.0, life_lb=4.5, need=0.8959, head_later=0.95, bouts_2nd_half={"0": 2500})
@@ -49,6 +49,25 @@ PYS
   python3 /root/aux/verdict3.py $M/v3_syn_{8,9,10}e7_bar.json $M/syn_bysec.txt > $M/v3_syn_verdict.json
   python3 /root/aux/decomp_d12.py $M/s${S}_${NLEG}e7_traj_d12_m0.npz > $M/smoke_decomp.json
   echo "SMOKE V3 synthetic verdict PASS=$(python3 -c "import json;print(json.load(open('$M/v3_syn_verdict.json'))['PASS'])") decomp_n=$(python3 -c "import json;d=json.load(open('$M/smoke_decomp.json'));print(list(d.values())[0]['later_all']['n'])") $(date '+%H:%M:%S')"
+  exit 0
+fi
+if [ "${VERDICT:-}" = v3 ]; then   # ---- MEASUREMENT RULE v3 (Cam Nov 24 ~23:55Z): reach on non-demonstrated bouts, fixed 24k horizon ----
+  V3_KS=${V3_KS:-"8 9 10"}; V3_ES=${V3_ES:-24000}                     # smoke-only overrides; defaults = the registered v3 reading
+  for K in ${=V3_KS}; do
+    P=$M/s${S}_${K}e7.params; [ -f $P ] || { echo "V3 S$S no params for ${K}e7 (early stop?)"; continue; }
+    E=$M/v3_s${S}_${K}e7_d12.json; EL=$M/v3_s${S}_${K}e7_d12_24k.json
+    [ -f $E ] || $PY w2/learner_w2_rl2.py ${=X} --seed $S --init-params $P --d-fixed 12 --eval-necessity 0 --out $E >> $M/v3_s${S}.log 2>&1
+    [ -f $EL ] || $PY w2/learner_w2_rl2.py ${=X} --seed $S --init-params $P --d-fixed 12 --eval-necessity 0,3,4 --eval-steps $V3_ES --out $EL >> $M/v3_s${S}.log 2>&1
+    BAR_ES=$V3_ES python3 $BAR/bar3v3.py $E $EL $REF_FILE $TWIN_FILE > $M/v3_s${S}_${K}e7_bar.json
+    echo "V3 S$S ${K}e7 BAR $(python3 -c "import json;b=json.load(open('$M/v3_s${S}_${K}e7_bar.json'));print({k: b[k] for k in ('true_nd','shuffled_nd','wiped_nd','need','life_ratio','life_lb','head_later','bouts_nd','PASS')})") $(date '+%H:%M:%S')"
+  done
+  VB=(); for K in ${=V3_KS}; do VB+=($M/v3_s${S}_${K}e7_bar.json); done
+  if [ -f $VB[1] ] && [ -f $VB[2] ] && [ -f $VB[3] ]; then
+    python3 $BAR/verdict3v3.py $VB > $M/v3_s${S}_verdict.json
+    echo "V3 S$S VERDICT $(python3 -c "import json;v=json.load(open('$M/v3_s${S}_verdict.json'));print({k: v[k] for k in ('mean_true','mean_shuffled','mean_wiped','need','c_reach','c_shuf30','c_2x','mean_life_ratio','life_lbs','c_life','final_dead','PASS')})") $(date '+%H:%M:%S')"
+  else
+    echo "V3 S$S NO VERDICT: fewer than 3 tables (early stop = FAIL as registered) $(date '+%H:%M:%S')"
+  fi
   exit 0
 fi
 P=$M/s${S}_10e7.params; [ -f $P ] || P=$(ls -t $M/s${S}_*e7.params | head -1)

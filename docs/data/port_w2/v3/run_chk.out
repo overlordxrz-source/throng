@@ -1,0 +1,7 @@
+opwt abed942 dirty: 
+opwt traj exit 0 71s
+opwt rl2 eval exit 0 62s
+v3wt abed942 dirty:  M w2/learner_w2_rl2.py  M w2/learner_w2_rl_traj.py 
+v3wt traj exit 0 55s
+v3wt rl2 eval exit 0 54s
+CHK DONE 19:08:11

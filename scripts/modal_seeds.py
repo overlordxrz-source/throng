@@ -14,9 +14,11 @@ import os
 
 import modal
 
-VARIANT = os.environ.get("SEED_VARIANT", "")       # "" = the seed-9 recipe (a7087f2); "f3" = fallback (3) learner (offset-proj abed942)
-SHA = {"": "a7087f23e5fd5aa2dfa01ff079d984a6c843ec88", "f3": "abed942907474470edb60104584131a52516ed8f"}[VARIANT]
-VARIANT_ENV = {"": {}, "f3": dict(XT_EXTRA="--offset-proj", REF_FILE="/mnt/runs/oracle/o0/f3_ref_mean.json", TWIN_FILE="/mnt/runs/oracle/o0/tw_eval_d12.json")}[VARIANT]
+VARIANT = os.environ.get("SEED_VARIANT", "")       # "" = the seed-9 recipe (a7087f2); "f3" = fallback (3) learner (offset-proj abed942); "f3k2" = F3-K2 under rule v3 (v3-k2)
+K2_SHA = "52d53b6a66e273eefd7acff73b12bb2a2b603d25"                                  # throng-toy v3-k2 (v3 eval metric + rl2 rec D4 / frontier-schedule)
+SHA = {"": "a7087f23e5fd5aa2dfa01ff079d984a6c843ec88", "f3": "abed942907474470edb60104584131a52516ed8f", "f3k2": K2_SHA}[VARIANT]
+VARIANT_ENV = {"": {}, "f3": dict(XT_EXTRA="--offset-proj", REF_FILE="/mnt/runs/oracle/o0/f3_ref_mean.json", TWIN_FILE="/mnt/runs/oracle/o0/tw_eval_d12.json"),
+               "f3k2": dict(XT_EXTRA="--offset-proj --demo-hearings 2", VERDICT="v3", REF_FILE="/mnt/runs/k2/ref_k2_mean.json", TWIN_FILE="/mnt/runs/twin/k2/tw_k2_eval_d12.json")}[VARIANT]
 REPO = "https://github.com/overlordxrz-source/throng.git"
 VOL = "/mnt/runs"
 HERE = os.path.dirname(os.path.abspath(__file__)); DOCS = os.path.join(os.path.dirname(HERE), "docs", "data")
@@ -28,6 +30,8 @@ AUX = {  # container path -> local source
     "/root/aux/head_later.py": os.path.join(DOCS, "port_w2", "e1", "head_later.py"),
     "/root/aux/bar3.py": os.path.join(DOCS, "learner_w2", "bar3.py"),
     "/root/aux/bysec.py": os.path.join(DOCS, "learner_w2", "relabel_screen", "policy_diag", "bysec.py"),
+    "/root/aux/bar3v3.py": os.path.join(DOCS, "port_w2", "v3", "bar3v3.py"),
+    "/root/aux/verdict3v3.py": os.path.join(DOCS, "port_w2", "v3", "verdict3v3.py"),
     "/root/aux/j1_ref_mean.json": os.path.join(J1, "j1_ref_mean.json"),
     "/root/aux/tw_eval_d12.json": os.path.join(J1, "tw_eval_d12.json"),
 }
@@ -88,7 +92,7 @@ def run_seed(seed: int, env: dict | None = None, kill_after_leg1_s: int = 0) -> 
 SMOKE_ENV = dict(OUTTAG="smoke_s9", SMOKE="1", LEGSTEP="163840", NLEG="2", CHUNK="60", EXTRA_TR="--early-stop-step 1e12")
 
 
-RECIPE = {"": "seed9-recipe@a7087f2", "f3": "fallback3-learner@abed942"}[VARIANT]   # + --offset-proj and the F3 reference / twin for "f3"
+RECIPE = {"": "seed9-recipe@a7087f2", "f3": "fallback3-learner@abed942", "f3k2": f"f3k2-learner@{K2_SHA[:7]}"}[VARIANT]   # + --offset-proj and the F3 reference / twin for "f3"
 PROTOCOL = os.path.join(os.path.dirname(HERE), "docs", "RESEARCH_PROTOCOL.md")
 
 
@@ -122,7 +126,8 @@ def main(seed: int, run_id: str = ""):
 def smoke():
     """Cam Nov 22 ~03:35Z item 4: tiny legs (163,840 steps), 2 legs, 60 s chunks; call 1 is hard-killed 30 s into leg 2;
     call 2 must skip leg 1 and resume leg 2 from the checkpoint; then the verdict step runs on a synthetic table."""
-    env = dict(SMOKE_ENV, **VARIANT_ENV, **({"OUTTAG": "smoke_f3l"} if VARIANT else {}))
+    env = dict(SMOKE_ENV, **VARIANT_ENV, **({"OUTTAG": "smoke_f3l"} if VARIANT == "f3" else {}),
+               **(dict(OUTTAG="smoke_f3k2", V3_KS="1 2 2", V3_ES="3000", TWIN_FILE="/mnt/runs/oracle/o0/tw_eval_d12.json") if VARIANT == "f3k2" else {}))   # v3 smoke: the real v3 block on tiny evals; the old twin file for plumbing only
     print(run_seed.remote(9, env, kill_after_leg1_s=30))
     print(run_seed.remote(9, env, 0))
 

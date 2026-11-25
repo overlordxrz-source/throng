@@ -1,0 +1,5 @@
+port_w2 25it exit 0
+rl2 25it exit 0
+rl2 twin K2 5it exit 0
+twin K2 life eval exit 0
+TWCHK2 DONE 19:14:50

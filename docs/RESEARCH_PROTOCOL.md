@@ -11417,6 +11417,33 @@ more expensive, because it produces publishable-looking nulls.
   - The F3 reference's long d12 evals ran 6,000 steps (the lengthening loop stops at >= 2000 bouts), not 24k.
   - TWIN-K2 needs TRAINER CODE, not a flag. rl2 (which has the demonstrator; `--learner rec` reproduces port_w2 bit-exactly, check A3) refuses `--d4-side` for rec and has no `--frontier-schedule`; the twin used both.
   - Plan: build rl2 rec + D4 + frontier-schedule behind a bit-exact positive control against port_w2 (demonstrator off), plus a mutant; then add `--demonstrator --parent-waits --demo-hearings 2` for training and for the twin's life eval. The paid twin run waits for Cam's go on this design.
+- **REGISTERED BEFORE DATA (entry stamped Nov 24 19:17:02 EST): the F3-K2 chain under rule v3 (Cam ~23:55Z Nov 24), code, checks, run IDs, predictions.**
+  - CODE: throng-toy `v3-k2` 52d53b6 = offset-proj abed942 + the v3 eval metric (93959e3) + rl2 rec D4 / frontier-schedule (52d53b6). Checks (files `docs/data/port_w2/v3/`):
+    - v3 metric ALL PASS: old JSON keys bit-equal (traj + rl2, modes 0 / 3); the new non-demonstrated reach equals the offline rebuild from the traj exactly (bouts 824 / 192, per sector to 1e-8); the negative control differs from all-bouts.
+    - `dem` <=> hearing index <= K for that word in that life, and constant within a bout: PASS (K = 2 mode 0; K = 1 modes 0 / 3). A wrong-K mutant fails. Mode 3 at K = 2 is checked in the D4 eval.
+    - rl2 rec + D4 + proj + target-KL + frontier schedule (demonstrator off) = port_w2's twin, params BITWISE equal: 3 iterations at a synthetic frontier 12, and 25 iterations on the real F3 schedule incl. the iteration-20 checkpoint. Mutants (no D4; no schedule) differ. The K = 2 twin path trains and life-evals.
+    - ep learner training bitwise unchanged vs abed942 (X flags + --demo-hearings 2, 3 iterations).
+  - MY v3 READING (flagged to Cam):
+    - Reach criteria on hungry, 2nd-half, d12, non-demonstrated bouts at a FIXED 24k horizon (`--eval-steps 24000`, modes 0 / 3 / 4); no lengthening loop.
+    - Life: the 3000-step eval vs the twin, both in the K = 2 world.
+    - Final-sector rule: any sector of the 1e8 table's non-demonstrated d12 reach (ALL heads) < .30 -> FAIL.
+    - Reference: F3 s0 8e7 / 9e7 / 1e8 at 24k on the v3 class, mean, in two eval worlds: (i) as trained (no demonstrator) and (ii) + `--demonstrator --parent-waits --demo-hearings 2`. My default is (ii), pending Cam. Laptop evals ran on 93959e3, whose traj eval is identical to 52d53b6.
+  - SCRIPTS: `scripts/modal_twin.py` + `scripts/modal_seed/run_twin_modal.sh` (TWIN-K2: rl2 rec, --d4-side --offset-proj --demonstrator --parent-waits --demo-hearings 2, --gate honest --no-nav --target-kl 0.015, the F3 s0 1e8 frontier schedule, 3 x 1e7 legs, life eval 3000 steps). `scripts/modal_seeds.py` SEED_VARIANT=f3k2 (XT_EXTRA "--offset-proj --demo-hearings 2", VERDICT=v3 -> `bar3v3.py` / `verdict3v3.py`). Server-side timeout = cap / $1.053 per h, 1 retry, ledger, item watches as before.
+  - SMOKES (cap $0.30 each): the twin smoke (2 x 20-iteration legs, hard kill + resume, life eval) and the f3k2 learner smoke (2 tiny legs, kill + resume, the REAL v3 block on 3000-step evals; the old twin file for plumbing only).
+  - RUN-ID: TWIN-K2 | seed 0 | recipe twin-k2@52d53b6 | cap $1.5
+    - HELD until Cam's go on the twin design (see the observations entry).
+  - RUN-ID: F3K2-LEARNER-S11 | seed 11 | recipe f3k2-learner@52d53b6 | cap $5.5
+  - RUN-ID: F3K2-LEARNER-S12 | seed 12 | recipe f3k2-learner@52d53b6 | cap $5.5
+    - Both launch only when the reference file (/k2/ref_k2_mean.json) and the twin file (/twin/k2/tw_k2_eval_d12.json) are on the volume. Watches at 3e7 (stop A) / 5e7 (stop B) as before.
+  - MY p (before any of the reference data was looked at):
+    - Reference (i) mean >= .985: .85. |reference (ii) - .9943| <= .01: .75.
+    - TWIN-K2 life > 493: .65 (Cam .70).
+    - Each seed PASS: .70 (Cam .60); CONFIRMED (both pass): .55 (Cam .55); life PASS: .90 (Cam .95); later P(right) >= .97 at 1e8: .75 (Cam .70).
+  - D4 (free, eval only; seed-10 1e8 params, K = 1 as in D1, d12, 24k; diag worktree 50260b3 `--birth-audit` + `--mem-audit`).
+    - "Hearth" does not exist in the code. I read it as the young's BIRTH position (a reborn agent appears where its predecessor died; life 0 at uniform random positions, with food = capacity everywhere).
+    - Table, life 0 vs reborn: food within 12 cells at birth and at each first hearing; energy at birth (E0 = .6 for both by construction) and at each first hearing; age at first hearings. The parent exists only during demonstrations (it appears at the young's position at bout open), so I report the demonstrator's mean distance during failed first demonstrations instead of a position at birth.
+    - My hypothesis: reborn agents are born where their predecessor grazed, inside a food patch. They eat more world food, are sated more often, open bouts later and abandon more first demonstrations.
+    - My p: food within 12 cells at birth higher for reborn than for life 0 (despite life 0's full capacity): .65. Energy at first-hearing open higher for reborn: .60.
 - **RESULT (Nov 16 ~01:40): THE LABEL COUNT** (`docs/data/learner_w2/label_count/`; each row is 100 rollout
   iterations, 819k steps, with that checkpoint's weights, world state and frontier, no updates).
   - Definitions: MEMORY-ONLY bout = a later hearing (not the token's first in this life) at d >= 3. By construction
