@@ -1,0 +1,28 @@
+=== container start 00:28:31 twin cap $0.3 = 1025s used 0s remaining 1025s sha 52d53b6 env {'OUTTAG': 'smoke_k2', 'LEGSTEP': '163840', 'NLEG': '2', 'CHUNK': '60'}
+TWIN-K2 start 00:28:31 legs 2 x 163840 chunk 60 sched /mnt/runs/oracle/o0/f3s0_10e7_train.json
+TWIN 1e7 done frontier 1.0 00:30:03
+=== container exit -9 SMOKE hard kill 30s into leg 2 00:30:50
+=== container start 00:30:52 twin cap $0.3 = 1025s used 139s remaining 886s sha 52d53b6 env {'OUTTAG': 'smoke_k2', 'LEGSTEP': '163840', 'NLEG': '2', 'CHUNK': '60'}
+TWIN-K2 start 00:30:52 legs 2 x 163840 chunk 60 sched /mnt/runs/oracle/o0/f3s0_10e7_train.json
+TWIN 1e7 already done (idempotent)
+TWIN 2e7 done frontier 1.0 00:32:09
+Traceback (most recent call last):
+  File "<string>", line 1, in <module>
+FileNotFoundError: [Errno 2] No such file or directory: '/mnt/runs/twin/smoke_k2/tw_k2_eval_d12.json'
+TWIN eval  00:32:13
+TWIN_K2_DONE 00:32:13
+=== container exit 0  00:32:22
+=== container start 00:33:15 twin cap $0.3 = 1025s used 230s remaining 795s sha 52d53b6 env {'OUTTAG': 'smoke_k2', 'LEGSTEP': '163840', 'NLEG': '2', 'CHUNK': '60'}
+TWIN-K2 start 00:33:15 legs 2 x 163840 chunk 60 sched /mnt/runs/oracle/o0/f3s0_10e7_train.json
+TWIN 1e7 already done (idempotent)
+TWIN 2e7 already done (idempotent)
+TWIN eval life 258.2380676269531 hungry_2nd 0.0 nd 0.0 demo_bouts 6960.0 00:33:57
+TWIN_K2_DONE 00:33:57
+=== container exit 0 SMOKE hard kill 30s into leg 2 00:33:59
+=== container start 00:34:00 twin cap $0.3 = 1025s used 274s remaining 751s sha 52d53b6 env {'OUTTAG': 'smoke_k2', 'LEGSTEP': '163840', 'NLEG': '2', 'CHUNK': '60'}
+TWIN-K2 start 00:34:00 legs 2 x 163840 chunk 60 sched /mnt/runs/oracle/o0/f3s0_10e7_train.json
+TWIN 1e7 already done (idempotent)
+TWIN 2e7 already done (idempotent)
+TWIN eval life 258.2380676269531 hungry_2nd 0.0 nd 0.0 demo_bouts 6960.0 00:34:41
+TWIN_K2_DONE 00:34:41
+=== container exit 0  00:34:44

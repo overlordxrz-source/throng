@@ -11464,6 +11464,15 @@ more expensive, because it produces publishable-looking nulls.
       - Reborn agents open more first bouts in food (share above 4 cells of food: .29 vs .36). At life 0's food mix, reborn failure would be .157 (vs .195 actual, .098 for life 0).
     - Read: food near the young at the demonstration's open drives the failure (no food -> ~0% fail). Reborn agents are born in richer places (where the predecessor grazed), which explains about 40% of the doubling. The rest is within food bins: reborn fail more at the same food (4-6: .45 vs .165). Open; candidate causes are age at the hearing and the world state; not chased.
     - Scores, mine: food at birth higher for reborn (.65) HIT; energy at the first-hearing open higher for reborn (.60) MISS.
+- **RESULT (entry stamped Nov 24 20:03:35 EST): both K2 smokes PASS; the chain is ready; TWIN-K2 and the seeds wait for Cam.** Files `docs/data/modal_b1/k2_smokes/`.
+  - TWIN-K2 smoke (`modal_twin.py::smoke`, 52d53b6): 2 x 20-iteration legs; hard kill 30 s into leg 2; the retry skipped leg 1 and resumed at 163,840 from the checkpoint; the ledger carried.
+    - The first run's life eval FAILED: zsh did not split `$WORLD`, and the script printed DONE anyway. Both were fixed (`${=WORLD}`; DONE only if the eval file exists) and the rerun wrote `tw_k2_eval_d12.json` in the K = 2 world (rec, demonstrator, K 2, parent-waits, D4, proj, 3000 steps, 32 worlds).
+    - Total 318 s ($0.09). A cosmetic artifact: one rerun call printed a "hard kill" label on a clean exit 0, because its kill trigger matched leg-1 text left in the reused run.out.
+  - f3k2 learner smoke (`modal_seeds.py::smoke`, SEED_VARIANT=f3k2). The first launch failed locally before any container (duplicate TWIN_FILE in my env merge; fixed).
+    - The rerun: cap line right (XT_EXTRA "--offset-proj --demo-hearings 2", VERDICT v3, REF /k2/ref_k2_mean.json, the old twin file for plumbing only). Kill + resume worked (leg 1 skipped, ledger 393 s carried). The real v3 block ran on 3000-step evals: bar3v3 per checkpoint (need .8938) and verdict3v3 (PASS False on an untrained policy, as expected); exit 0.
+    - Used 1,023 of 1,025 s: right at the cap. The real seeds' margin is about 12% (seed 10 used $4.82 of $5.5 with the same evals).
+  - Metered b1 $13.79; guard CAP $41.
+  - WAITING FOR CAM: (1) go on TWIN-K2 as built ($1.5); (2) the reference world, (i) .9931 (my default) or (ii) .9745. The seeds launch only after the twin file exists.
 - **RESULT (Nov 16 ~01:40): THE LABEL COUNT** (`docs/data/learner_w2/label_count/`; each row is 100 rollout
   iterations, 819k steps, with that checkpoint's weights, world state and frontier, no updates).
   - Definitions: MEMORY-ONLY bout = a later hearing (not the token's first in this life) at d >= 3. By construction

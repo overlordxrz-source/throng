@@ -1,0 +1,21 @@
+=== container start 00:45:22 seed 9 cap $0.3 = 1025s used 0s remaining 1025s env {'OUTTAG': 'smoke_f3k2', 'SMOKE': '1', 'LEGSTEP': '163840', 'NLEG': '2', 'CHUNK': '60', 'EXTRA_TR': '--early-stop-step 1e12', 'XT_EXTRA': '--offset-proj --demo-hearings 2', 'VERDICT': 'v3', 'REF_FILE': '/mnt/runs/k2/ref_k2_mean.json', 'TWIN_FILE': '/mnt/runs/oracle/o0/tw_eval_d12.json', 'V3_KS': '1 2 2', 'V3_ES': '3000'}
+J1L S9 start 00:45:22
+J1L S9 1e7 frontier 1.0 00:51:16
+  later_right  reach by sector 0.04 0.03 0.08 0.06 0.06 0.04 0.07 0.02  n [241, 383, 176, 144, 173, 210, 227, 574]
+  later_right  reach by sector 0.00 0.00 0.00 0.00 0.00 0.00 0.00 0.00  n [18, 28, 16, 8, 19, 17, 21, 14]
+  later_right  reach by sector 0.00 0.00 0.00 0.00 0.00 0.00 0.00 0.00  n [6, 2, 6, 4, 9, 3, 10, 9]
+J1L S9 1e7 WATCH head_later {"s9_1e7_traj_d3_m0.npz": {"acc": 0.124, "n": 17255}, "s9_1e7_traj_d12_m0.npz": {"acc": 0.134, "n": 1057}, "s9_1e7_traj_d21_m0.npz": {"acc": 0.152, "n": 323}} cut this-leg 0.053 (n_it 20; chunk restarts replay <= 20 its)
+=== container exit -9 SMOKE hard kill 30s into leg 2 00:51:55
+=== container start 00:51:56 seed 9 cap $0.3 = 1025s used 393s remaining 632s env {'OUTTAG': 'smoke_f3k2', 'SMOKE': '1', 'LEGSTEP': '163840', 'NLEG': '2', 'CHUNK': '60', 'EXTRA_TR': '--early-stop-step 1e12', 'XT_EXTRA': '--offset-proj --demo-hearings 2', 'VERDICT': 'v3', 'REF_FILE': '/mnt/runs/k2/ref_k2_mean.json', 'TWIN_FILE': '/mnt/runs/oracle/o0/tw_eval_d12.json', 'V3_KS': '1 2 2', 'V3_ES': '3000'}
+J1L S9 start 00:51:57
+J1L S9 1e7 leg already done (idempotent; container retry)
+J1L S9 2e7 frontier 1.0 00:56:44
+  later_right  reach by sector 0.00 0.00 0.01 0.02 0.01 0.01 0.01 0.01  n [559, 289, 337, 85, 315, 154, 518, 261]
+  later_right  reach by sector 0.00 0.00 0.00 0.00 0.00 0.00 0.00 0.00  n [23, 25, 7, 8, 18, 13, 21, 16]
+  later_right  reach by sector 0.00 0.00 0.00 0.00 0.00 0.00 0.00 0.00  n [5, 7, 2, 1, 1, 2, 7, 2]
+J1L S9 2e7 WATCH head_later {"s9_2e7_traj_d3_m0.npz": {"acc": 0.127, "n": 19878}, "s9_2e7_traj_d12_m0.npz": {"acc": 0.126, "n": 1059}, "s9_2e7_traj_d21_m0.npz": {"acc": 0.118, "n": 228}} cut this-leg 0.414 (n_it 20; chunk restarts replay <= 20 its)
+V3 S9 1e7 BAR {'true_nd': 0.0, 'shuffled_nd': 0.0, 'wiped_nd': 0.0, 'need': 0.8937799394130707, 'life_ratio': 0.8522975929978118, 'life_lb': 0.7972681096268162, 'head_later': 0.1292116492986679, 'bouts_nd': {'0': 57.0, '3': 70.0, '4': 82.0}, 'PASS': False} 00:59:35
+V3 S9 2e7 BAR {'true_nd': 0.0, 'shuffled_nd': 0.0, 'wiped_nd': 0.0, 'need': 0.8937799394130707, 'life_ratio': 0.8278427205100957, 'life_lb': 0.7902362763269295, 'head_later': 0.12421990931034088, 'bouts_nd': {'0': 8.0, '3': 20.0, '4': 14.0}, 'PASS': False} 01:02:25
+V3 S9 2e7 BAR {'true_nd': 0.0, 'shuffled_nd': 0.0, 'wiped_nd': 0.0, 'need': 0.8937799394130707, 'life_ratio': 0.8278427205100957, 'life_lb': 0.7902362763269295, 'head_later': 0.12421990931034088, 'bouts_nd': {'0': 8.0, '3': 20.0, '4': 14.0}, 'PASS': False} 01:02:25
+V3 S9 VERDICT {'mean_true': 0.0, 'mean_shuffled': 0.0, 'mean_wiped': 0.0, 'need': 0.8937799394130707, 'c_reach': False, 'c_shuf30': False, 'c_2x': True, 'mean_life_ratio': 0.8359943446726676, 'life_lbs': [0.7972681096268162, 0.7902362763269295, 0.7902362763269295], 'c_life': False, 'final_dead': [0, 1, 2, 3, 4, 5, 6, 7], 'PASS': False} 01:02:25
+=== container exit 0  01:02:27
