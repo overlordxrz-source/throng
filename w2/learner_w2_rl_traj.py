@@ -177,7 +177,8 @@ def main():
         lp = jnp.take_along_axis(jax.nn.log_softmax(lg), act[:, None], 1)[:, 0]
         item = dict(item, sat=item["sat"] | (item["act"] & (s.energy >= H)))  # no longer a hungry bout once E reached H
         tok_now = code[ar, item["sec"]]; hear_now = item["act"] & (item["t"] == 0)
-        baud = dict(ba_E=s.energy.astype(jnp.float16), ba_food12=env.window(cfg, s.food, s.pos, 12).reshape(N, -1).sum(-1).astype(jnp.float32)) if a.birth_audit else {}   # DIAG D4
+        baud = dict(ba_E=s.energy.astype(jnp.float16), ba_food12=env.window(cfg, s.food, s.pos, 12).reshape(N, -1).sum(-1).astype(jnp.float32),
+                    ba_demd=jnp.where(c["dem_on"] & item["act"], jnp.abs(NI.torus(c["dem_pos"] - s.pos, L)).max(-1), -1).astype(jnp.int16)) if a.birth_audit else {}   # DIAG D4
         if a.mem_audit and ep:                                              # DIAG D1c: read-only audit of the memory the head sees this step
             mem_ = h[:, HG: HG + a.slots * 11].reshape(N, a.slots, 11); ptr_ = h[:, HG + a.slots * 11].astype(jnp.int32)
             mt_ = (mem_[:, :, :8].sum(-1) > 0) & (mem_[:, :, :8].argmax(-1) == tok_now[:, None]); sol_ = mem_[:, :, 10] > 0.5
@@ -336,7 +337,7 @@ def main():
                           **(dict(lg=f["lg"].astype(jnp.float16), lgn=f["lgn"].astype(jnp.float16), lgp=f["lgp"].astype(jnp.float16)) if a.logits else {}),
                           **(dict(hpf=jax.nn.softmax(f["hl"]).astype(jnp.float16)) if a.head_probs else {}),
                           **({k_: f[k_] for k_ in ("ma_ns", "ma_nu", "ma_last", "ma_tok")} if a.mem_audit and ep else {}),
-                          **({k_: f[k_] for k_ in ("ba_E", "ba_food12")} if a.birth_audit else {}))
+                          **({k_: f[k_] for k_ in ("ba_E", "ba_food12", "ba_demd")} if a.birth_audit else {}))
                 return (c2, A), tr
             z = jnp.float32(0.0)
             A0 = dict(**{f"{p_}_{n_}": z for p_ in ("n", "i", "t", "d", "hn", "hi") for n_ in ("dem_kept", "dem_lost", "late_hok", "late_hbad")}, ate2h=z, closed2h=z, ateh=z, closedh=z, demstep=z, demfar=z, **{f"{p_}_{n_}_{d_}": z for p_ in ("c", "g") for n_ in ("item", "tmax", "death") for d_ in ("all", "dem")}, alive=z, deaths=z, oldage=z, ateD=z, closedD=z, cnt=jnp.zeros(N), mx=z, ovf=z, over=z, recs=z, paid=z, ate=z, closed=z, ate2=z, closed2=z, h1=z, n1=z, hL=z, nL=z, cd=jnp.zeros(25), ad=jnp.zeros(25))
