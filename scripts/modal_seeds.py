@@ -126,8 +126,8 @@ def main(seed: int, run_id: str = ""):
 def smoke():
     """Cam Nov 22 ~03:35Z item 4: tiny legs (163,840 steps), 2 legs, 60 s chunks; call 1 is hard-killed 30 s into leg 2;
     call 2 must skip leg 1 and resume leg 2 from the checkpoint; then the verdict step runs on a synthetic table."""
-    env = dict(SMOKE_ENV, **VARIANT_ENV, **({"OUTTAG": "smoke_f3l"} if VARIANT == "f3" else {}),
-               **(dict(OUTTAG="smoke_f3k2", V3_KS="1 2 2", V3_ES="3000", TWIN_FILE="/mnt/runs/oracle/o0/tw_eval_d12.json") if VARIANT == "f3k2" else {}))   # v3 smoke: the real v3 block on tiny evals; the old twin file for plumbing only
+    env = {**SMOKE_ENV, **VARIANT_ENV, **({"OUTTAG": "smoke_f3l"} if VARIANT == "f3" else {}),
+           **(dict(OUTTAG="smoke_f3k2", V3_KS="1 2 2", V3_ES="3000", TWIN_FILE="/mnt/runs/oracle/o0/tw_eval_d12.json") if VARIANT == "f3k2" else {})}   # v3 smoke: the real v3 block on tiny evals; the old twin file for plumbing only
     print(run_seed.remote(9, env, kill_after_leg1_s=30))
     print(run_seed.remote(9, env, 0))
 
