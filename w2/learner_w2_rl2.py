@@ -298,6 +298,8 @@ def main():
                          ate=A["ate"] + f["ate"].sum(), closed=A["closed"] + f["closed"].sum(),
                          ate2=A["ate2"] + (f["ate"] & late).sum(), closed2=A["closed2"] + (f["closed"] & late).sum(),
                          ate2h=A["ate2h"] + (f["hate"] & late).sum(), closed2h=A["closed2h"] + (f["hung"] & late).sum(),
+                         **(lambda nd_, sh_: dict(ate2hN=A["ate2hN"] + (f["hate"] & late & nd_).sum(), closed2hN=A["closed2hN"] + (f["hung"] & late & nd_).sum(),  # v3 (Cam Nov 24 ~23:55Z): NON-demonstrated
+                                                  ate2hNs=A["ate2hNs"] + (sh_ * (f["hate"] & late & nd_)[:, None]).sum(0), closed2hNs=A["closed2hNs"] + (sh_ * (f["hung"] & late & nd_)[:, None]).sum(0)))(~f["dem"], jax.nn.one_hot(f["sec"], 8)),
                          ateh=A["ateh"] + f["hate"].sum(), closedh=A["closedh"] + f["hung"].sum(),
                          demstep=A["demstep"] + f["demstep"].sum(), demfar=A["demfar"] + f["demfar"].sum(),
                          h1=A["h1"] + (ok & f["first"]).sum(), n1=A["n1"] + f["first"].sum(),
@@ -313,7 +315,7 @@ def main():
                          cnt=jnp.where(end, 0.0, cnt))
                 return (c2, A), None
             z = jnp.float32(0.0)
-            A0 = dict(ate2h=z, closed2h=z, ateh=z, closedh=z, demstep=z, demfar=z, **{f"{p_}_{n_}_{d_}": z for p_ in ("c", "g") for n_ in ("item", "tmax", "death") for d_ in ("all", "dem")}, alive=z, deaths=z, oldage=z, ateD=z, closedD=z, cnt=jnp.zeros(N), mx=z, ovf=z, over=z, recs=z, paid=z, ate=z, closed=z, ate2=z, closed2=z, h1=z, n1=z, hL=z, nL=z, cd=jnp.zeros(25), ad=jnp.zeros(25))
+            A0 = dict(ate2hN=z, closed2hN=z, ate2hNs=jnp.zeros(8), closed2hNs=jnp.zeros(8), ate2h=z, closed2h=z, ateh=z, closedh=z, demstep=z, demfar=z, **{f"{p_}_{n_}_{d_}": z for p_ in ("c", "g") for n_ in ("item", "tmax", "death") for d_ in ("all", "dem")}, alive=z, deaths=z, oldage=z, ateD=z, closedD=z, cnt=jnp.zeros(N), mx=z, ovf=z, over=z, recs=z, paid=z, ate=z, closed=z, ate2=z, closed2=z, h1=z, n1=z, hL=z, nL=z, cd=jnp.zeros(25), ad=jnp.zeros(25))
             (cF, A), _ = jax.lax.scan(body, (c, A0), jax.random.split(jax.random.fold_in(key, 2), a.eval_steps))
             cnt = A["cnt"]                                                   # lives still open at the end of the horizon
             A = dict(A, ovf=A["ovf"] + (cnt > a.slots).sum(), over=A["over"] + jnp.maximum(cnt - a.slots, 0.0).sum(), recs=A["recs"] + cnt.sum())
@@ -329,6 +331,8 @@ def main():
                        reach_2nd_half=float(tot["ate2"] / max(tot["closed2"], 1)),
                        hungry_reach=float(tot["ateh"] / max(tot["closedh"], 1)), hungry_reach_2nd_half=float(tot["ate2h"] / max(tot["closed2h"], 1)),
                        hungry_bouts_2nd_half=float(tot["closed2h"]),
+                       hungry_reach_2nd_half_nd=float(tot["ate2hN"] / max(tot["closed2hN"], 1)), hungry_bouts_2nd_half_nd=float(tot["closed2hN"]),   # v3: non-demonstrated bouts only
+                       hungry_reach_2nd_half_nd_bysec=[float(tot["ate2hNs"][s_] / max(tot["closed2hNs"][s_], 1)) for s_ in range(8)], hungry_bouts_2nd_half_nd_bysec=[float(v_) for v_ in tot["closed2hNs"]],
                        demo_steps=float(tot["demstep"]), demo_frac_parent_over_2_cells=float(tot["demfar"] / max(tot["demstep"], 1)),
                        closures={f"{n_}_{d_}": [float(tot[f"c_{n_}_{d_}"]), float(tot[f"g_{n_}_{d_}"])] for n_ in ("item", "tmax", "death") for d_ in ("all", "dem")},
                        max_records_per_life=float(max(q["mx"] for q in per)), lives_overflowing=float(tot["ovf"]),
