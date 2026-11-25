@@ -47,7 +47,7 @@ from w2.gate import HonestGate  # noqa: E402
 from w2 import lookahead as LA  # noqa: E402
 from w2 import relabel as RL  # noqa: E402
 from w2 import lr_anneal as LRA  # noqa: E402
-from w2.d4 import EpAgentDevD4  # noqa: E402
+from w2.d4 import EpAgentDevD4, RecAgentD4  # noqa: E402
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "scripts"))
 import ckpt as _ck  # noqa: E402
 
@@ -83,6 +83,7 @@ def main():
     ap.add_argument("--demonstrator", action="store_true"); ap.add_argument("--demo-hearings", type=int, default=1)
     ap.add_argument("--policy", default="learner", choices=["learner", "follower", "copyparent"]); ap.add_argument("--head-only", action="store_true")
     ap.add_argument("--init-params", default=""); ap.add_argument("--frontier0", type=float, default=1.0)
+    ap.add_argument("--frontier-schedule", default="", help="Cam Nov 24 ~23:55Z TWIN-K2 (= port_w2's DEAF TWIN option): replay another run's frontier from its train JSON curve (latest logged value at or before the current step); the gate is off")
     ap.add_argument("--early-stop-frontier", type=float, default=0.0, help="stop (counted FAIL) if the frontier has not passed this by half the steps")
     ap.add_argument("--eval-necessity", default="", help="EVAL: comma list of modes (0,3,4) on the necessity keys; no training")
     ap.add_argument("--eval-W", type=int, default=32); ap.add_argument("--eval-steps", type=int, default=3000)
@@ -107,12 +108,12 @@ def main():
     Dx = 100 + 11 + 6 + 1 + 8 + (4 if a.moves8 else 0); NA = 10 if a.moves8 else 6
     assert not (a.lr_anneal and a.target_kl is None), "--lr-anneal is applied through the target-KL update (G2: target-KL is standard)"
     assert not (a.moves8 and (not a.no_nav or a.policy != "learner")), "--moves8: learner policy with --no-nav only"
-    assert not (a.d4_side and not ep), '--d4-side in rl2: the ep learner only'
+    assert not (a.d4_side and not ep and not a.no_nav), '--d4-side in rl2: the ep learner, or rec with --no-nav (TWIN-K2: port_w2\'s RecAgentD4)'
     HG = 128 * (8 if a.d4_side else 1)
     if ep:
         rnet = (EpAgentDevD4 if a.d4_side else EpAgentDev)(S=a.slots, use_hind=a.hindsight > 0, shared_tok=a.shared_tok, n_act=NA); Hd = HG + a.slots * 11 + 1   # same params as EpAgent
     else:
-        rnet = RecAgent(128, n_act=NA); Hd = 128
+        rnet = RecAgentD4(128, n_act=NA) if a.d4_side else RecAgent(128, n_act=NA); Hd = HG   # rec + --d4-side = port_w2's twin agent (hidden 8 x 128)
     rp = rnet.init(jax.random.PRNGKey(a.seed), jnp.zeros((Hd,)), jnp.zeros((Dx,)))
     pp = {k: dict(v) for k, v in rp["params"].items()}
     for k in ("Dense_0", "Dense_1", "Dense_2", "Dense_3"):
@@ -361,7 +362,17 @@ def main():
             print(f"LR_ANNEAL resume t24 {t24} ({'checkpoint' if 't24' in Ck else 'curve'})", flush=True)
         print(f"resumed at {steps:,} steps, frontier {dfront}", flush=True)
     t0 = time.time(); nupd = a.policy != "learner" and not a.head_only
+    SCHED = [(c_["steps"], c_["frontier"]) for c_ in json.load(open(a.frontier_schedule))["curve"]] if a.frontier_schedule else None
+
+    def sched_front(st_):                                               # = port_w2.sched_front
+        fr = 1.0
+        for s_, f_ in SCHED:
+            if s_ <= st_:
+                fr = f_
+        return float(fr)
     while steps < a.steps:
+        if SCHED is not None:
+            dfront = sched_front(steps)
         if a.ckpt and it % 20 == 0 and it > 0:
             _ck.save(a.ckpt, dict(p=p, ost=ost, c=c, key=key, dfront=dfront, recent=recent, steps=steps, it=it, curve=curve, rng=rng.bit_generator.state, gate=GATE.state(), **(dict(t24=(-1.0 if t24 is None else float(t24))) if a.lr_anneal else {})))
             if a.max_seconds and time.time() - t0 > a.max_seconds:
@@ -443,9 +454,9 @@ def main():
         recent.extend([1] * n_eat + [0] * max(n_close - n_eat, 0)); recent = recent[-500:]
         inr = LA.in_range(R_["d"], dfront); n_la = int((R_["hung"] & ~inr).sum())   # lookahead bouts are not scored
         if a.gate == "honest":
-            if GATE.add(int((R_["hate"] & inr).sum()), int((R_["hung"] & inr).sum())) and dfront < a.d_max:
+            if SCHED is None and GATE.add(int((R_["hate"] & inr).sum()), int((R_["hung"] & inr).sum())) and dfront < a.d_max:
                 dfront += 1; print(f"GATE_UP frontier -> {dfront:.0f} at {steps:,} (last windows {GATE.scores[-2:]})", flush=True)
-        elif len(recent) >= 500 and np.mean(recent) >= 0.8 and dfront < a.d_max:
+        elif SCHED is None and len(recent) >= 500 and np.mean(recent) >= 0.8 and dfront < a.d_max:
             dfront += 1; recent = []
         if a.lr_anneal and t24 is None and dfront >= a.lr_anneal_frontier:   # G2: the frontier first reaches 24
             t24 = float(steps); print(f"LR_ANNEAL t24 {t24:,.0f}; anneal starts at {LRA.anneal_start(t24, a.lr_anneal_after):,.0f}", flush=True)
