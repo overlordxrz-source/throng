@@ -1,0 +1,87 @@
+{
+ "file": "d4_d12_m0.npz",
+ "food12_tercile_cuts": [
+  0.0,
+  4.27
+ ],
+ "births": {
+  "life0": {
+   "n": 128,
+   "food12_median": 1.88,
+   "food12_mean": 3.44,
+   "energy_mean": 0.6001
+  },
+  "reborn": {
+   "n": 900,
+   "food12_median": 5.99,
+   "food12_mean": 6.47,
+   "energy_mean": 0.6001
+  }
+ },
+ "first_bouts": {
+  "life0": {
+   "n": 915,
+   "fail": 0.0984,
+   "food12_median": 0.001,
+   "food12_median_failed": 6.283,
+   "food12_median_ok": 0.0,
+   "energy_open_mean": 0.6682,
+   "energy_open_mean_failed": 0.6518,
+   "energy_open_mean_ok": 0.67,
+   "age_median": 205.0,
+   "demd_mean_failed": 1.917,
+   "demd_mean_ok": 1.6,
+   "demd_max_failed": 2.0,
+   "demd_max_ok": 2.0,
+   "failed_sated": 90,
+   "failed_gen": 89
+  },
+  "reborn": {
+   "n": 5751,
+   "fail": 0.1947,
+   "food12_median": 0.027,
+   "food12_median_failed": 6.032,
+   "food12_median_ok": 0.0,
+   "energy_open_mean": 0.6663,
+   "energy_open_mean_failed": 0.6321,
+   "energy_open_mean_ok": 0.6745,
+   "age_median": 682.0,
+   "demd_mean_failed": 1.938,
+   "demd_mean_ok": 1.6,
+   "demd_max_failed": 2.0,
+   "demd_max_ok": 2.0,
+   "failed_sated": 1116,
+   "failed_gen": 1108
+  }
+ },
+ "fail_by_food_tercile": {
+  "life0": {
+   "t0": {
+    "n": 319,
+    "fail": 0.0
+   },
+   "t1": {
+    "n": 341,
+    "fail": 0.044
+   },
+   "t2": {
+    "n": 255,
+    "fail": 0.2941
+   }
+  },
+  "reborn": {
+   "t0": {
+    "n": 1903,
+    "fail": 0.0053
+   },
+   "t1": {
+    "n": 1881,
+    "fail": 0.0388
+   },
+   "t2": {
+    "n": 1967,
+    "fail": 0.5272
+   }
+  }
+ }
+}

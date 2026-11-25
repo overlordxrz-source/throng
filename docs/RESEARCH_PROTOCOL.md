@@ -11444,6 +11444,26 @@ more expensive, because it produces publishable-looking nulls.
     - Table, life 0 vs reborn: food within 12 cells at birth and at each first hearing; energy at birth (E0 = .6 for both by construction) and at each first hearing; age at first hearings. The parent exists only during demonstrations (it appears at the young's position at bout open), so I report the demonstrator's mean distance during failed first demonstrations instead of a position at birth.
     - My hypothesis: reborn agents are born where their predecessor grazed, inside a food patch. They eat more world food, are sated more often, open bouts later and abandon more first demonstrations.
     - My p: food within 12 cells at birth higher for reborn than for life 0 (despite life 0's full capacity): .65. Energy at first-hearing open higher for reborn: .60.
+- **RESULT (entry stamped Nov 24 19:34:43 EST): the v3 REFERENCE (chain a) and D4. Eval only, laptop, $0.** Files `docs/data/port_w2/v3/ref/`, `docs/data/port_w2/v3/d4/`, `D4_birth.json`, `D4_food_bins.json`.
+  - REFERENCE: F3 oracle s0 at 8e7 / 9e7 / 1e8, d12, 24k, v3 class (non-demonstrated hungry 2nd half).
+    - (i) eval world as trained (no demonstrator): .9882 / .9956 / .9955, mean .9931 (bar .8938), 7,861-10,028 bouts each. Moves -.0012 from .9943: no flag.
+    - (ii) + `--demonstrator --parent-waits --demo-hearings 2`: .9379 / .9965 / .9892, mean .9745. Moves -.0198: FLAG.
+      - In world (ii) the oracle is HARMED. It dies (mean life 2,512 and 5,505 steps at 8e7 and 1e8 vs 24,000 with no deaths). Its demonstrated bouts mostly fail (all-bouts reach .50 / .69), and its non-demonstrated bout count collapses (1,352-4,892).
+      - The oracle never saw a demonstrator in training. This is an out-of-distribution effect, not a reference. (Hypothesis, not checked: the parent mark shares an observation channel with something the oracle uses.)
+    - DEFAULT CHANGED to (i): it is the clean reach ceiling and the stricter bar (.8938 vs .877). The file /k2/ref_k2_mean.json on the volume holds (i), with a note. Cam's call.
+    - Scores, mine: reference (i) >= .985 (.85) HIT; |(ii) - .9943| <= .01 (.75) MISS.
+  - `dem` <=> hearing index <= K at K = 2: also PASS in mode 3 (2,536 bouts) and mode 0 (3,328).
+  - D4 (seed 10 at 1e8, K = 1, d12, 24k; diag worktree 76c11ca = 50260b3 + the demonstrator distance). "Hearth" = the young's birth position.
+    - Births: food within 12 cells, median 1.88 (life 0, n 128) vs 5.99 (reborn, n 900); mean 3.44 vs 6.47. Energy at birth .600 for both (E0, by construction).
+    - First-hearing (demonstrated) bouts: fail .098 (life 0, n 915) vs .195 (reborn, n 5,751).
+      - Food within 12 cells at the bout open: median 6.3 / 6.0 for FAILED bouts vs 0.0 / 0.0 for successful ones.
+      - Energy at the open: .668 vs .666 (not higher for reborn). Failed bouts open slightly LOWER (.652 / .632 vs .670 / .675).
+      - Age at first hearings: median 205 vs 682. The demonstrator stays within 2 cells in both (mean 1.92-1.94 on failed vs 1.60 on successful bouts), so this is not a lost parent.
+    - Failure by food at the open (bins of food within 12 cells, life 0 / reborn):
+      - 0-0.5: .003 / .007. 0.5-2: .16 / .10. 2-4: .10 / .15. 4-6: .165 / .45. 6-8: .34 / .45. 10+: .50 / .79.
+      - Reborn agents open more first bouts in food (share above 4 cells of food: .29 vs .36). At life 0's food mix, reborn failure would be .157 (vs .195 actual, .098 for life 0).
+    - Read: food near the young at the demonstration's open drives the failure (no food -> ~0% fail). Reborn agents are born in richer places (where the predecessor grazed), which explains about 40% of the doubling. The rest is within food bins: reborn fail more at the same food (4-6: .45 vs .165). Open; candidate causes are age at the hearing and the world state; not chased.
+    - Scores, mine: food at birth higher for reborn (.65) HIT; energy at the first-hearing open higher for reborn (.60) MISS.
 - **RESULT (Nov 16 ~01:40): THE LABEL COUNT** (`docs/data/learner_w2/label_count/`; each row is 100 rollout
   iterations, 819k steps, with that checkpoint's weights, world state and frontier, no updates).
   - Definitions: MEMORY-ONLY bout = a later hearing (not the token's first in this life) at d >= 3. By construction
