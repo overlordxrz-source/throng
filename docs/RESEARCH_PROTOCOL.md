@@ -11473,6 +11473,27 @@ more expensive, because it produces publishable-looking nulls.
     - Used 1,023 of 1,025 s: right at the cap. The real seeds' margin is about 12% (seed 10 used $4.82 of $5.5 with the same evals).
   - Metered b1 $13.79; guard CAP $41.
   - WAITING FOR CAM: (1) go on TWIN-K2 as built ($1.5); (2) the reference world, (i) .9931 (my default) or (ii) .9745. The seeds launch only after the twin file exists.
+- **RULING + RE-REGISTRATION (entry stamped Nov 25 00:47:58 EST): Cam's GO on F3-K2 (~05:55Z Nov 25), recorded before any chain data.**
+  - Cam ACCEPTED the premise corrections: the F3 reference and twin had no demonstrator; the reference eval was 6k; TWIN-K2 needed code.
+  - ON THE RECORD (Cam): every past learner-vs-twin life ratio (seed 9 5.89, seed 10 6.09, earlier ones) compared a demonstrated learner with an undemonstrated twin. Those life premiums are CONFOUNDED by the parent's led meals. They stand as recorded numbers, not as listening premiums.
+  - DECISION A: GO on TWIN-K2 as built (cap $1.5, run ID TWIN-K2 above; the HOLD is released). Launched on this entry.
+  - DECISION B: the reference is (i), as trained: mean .9931, bar .8938 (`/k2/ref_k2_mean.json`, already on the volume). Reason (Cam): the reference is the ceiling of a perfect-input agent on non-demonstrated bouts; (ii) measures the oracle failing in a world it never trained in; (i) is the stricter bar.
+  - v3 READING CONFIRMED as written in the registration above. Added as INFORMATION (not a criterion): the d3 per-sector right-head table. Each leg already writes it (`s<S>_<K>e7_bysec.txt`, the d3 / d12 / d21 later_right reach by sector); I report the d3 row at 8e7 / 9e7 / 1e8.
+  - FREE once the twin file exists: seed 10's 1e8 life eval vs TWIN-K2 in the K = 2 world (information only; seed 10's verdict unchanged).
+  - CAPS RAISED (Cam): the learner smoke ended at 1,023 / 1,025 s, so each learner seed's cap is $6.0 (server-side timeout = 6.0 / 1.053 h = 20,512 s).
+    - The guard needs exactly one line per run ID, so the seeds get NEW run IDs. The two $5.5 lines above (F3K2-LEARNER-S11 / S12) are WITHDRAWN, never launched; a launch at SEED_CAP=6.0 refuses them (cap mismatch).
+    - If a seed hits its cap inside the verdict step only (all legs done), I may rerun that eval-only step once with <= $0.8 and report it (Cam). The evals are idempotent (existing eval JSONs are skipped).
+  - RUN-ID: F3K2-S11-C6 | seed 11 | recipe f3k2-learner@52d53b6 | cap $6.0
+  - RUN-ID: F3K2-S12-C6 | seed 12 | recipe f3k2-learner@52d53b6 | cap $6.0
+  - RUN-ID: F3K2-S13-C6 | seed 13 | recipe f3k2-learner@52d53b6 | cap $6.0
+    - Seed 13 launches ONLY on a split (one PASS, one FAIL). Both PASS -> CONFIRMED (stage 1 done), no seed 13. Both FAIL -> report with the decomposition on the v3 population; launch nothing.
+  - BUDGET: $13.79 + 1.5 + 12 (+ 6 for seed 13) <= $33.3. Guard CAP $41.
+  - D4 RECORDED by Cam: food at the open drives demonstration failure; birth placement explains ~40%; the rest stays open. Stage-2 notes: birth placement; "repeat until eaten". Nothing more now.
+  - PREDICTIONS. Cam: each seed .60; CONFIRMED .55; life PASS vs TWIN-K2 .85 (lower because the twin now gets led meals); TWIN-K2 life > 493 .80. Mine, unchanged from the registration, except life PASS .90 -> .85, revised now (before any TWIN-K2 data) for Cam's reason: each seed PASS .70; CONFIRMED .55; later P(right) >= .97 at 1e8 .75; TWIN-K2 life > 493 .65.
+- **PREDICTION (entry stamped Nov 25 00:50:34 EST), before its output is read: seed 10's 1e8 life eval in the K = 2 world (information only, Cam ~05:55Z Nov 25 item 1).** Running on the laptop (`~/throng-backup/scratch/s10k2/`, code v3-k2 52d53b6; the f3k2 v3 block's 3000-step life command on `s10_10e7.params`).
+  - Known before (old data): seed 10 at K = 1 lived the whole 3000-step eval (life 3000); the old undemonstrated twin lived 492.94.
+  - My p: seed 10 at K = 2 lives the whole eval (life >= 2990): .85. Against TWIN-K2 (when it exists), ratio >= 1.3 with bootstrap LB > 1: .85; ratio >= 3: .55.
+  - TWIN-K2 launched at the ruling entry above (app ap-8TwP3JN4nkWe68rISrxTjG); its cap line is checked in the container log on the volume.
 - **RESULT (Nov 16 ~01:40): THE LABEL COUNT** (`docs/data/learner_w2/label_count/`; each row is 100 rollout
   iterations, 819k steps, with that checkpoint's weights, world state and frontier, no updates).
   - Definitions: MEMORY-ONLY bout = a later hearing (not the token's first in this life) at d >= 3. By construction
