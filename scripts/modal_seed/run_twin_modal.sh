@@ -19,6 +19,7 @@ for K in $(seq 1 $NLEG); do
     [ -f $M/tw_${K}e7.params ] && break; grep -q "Traceback\|NAN_STOP" $M/tw.log && { echo "TWIN CRASH"; exit 1; }; done
   cp $M/tw.ckpt $M/tw_ckpt_${K}e7.ckpt; echo "TWIN ${K}e7 done $(grep -o 'frontier [0-9.]*' $M/tw.log | tail -1) $(date '+%H:%M:%S')"
 done
-$PY w2/learner_w2_rl_traj.py --learner rec $WORLD --init-params $M/tw_${NLEG}e7.params --d-fixed 12 --eval-necessity 0 --out $M/tw_k2_eval_d12.json >> $M/tw.log 2>&1
+$PY w2/learner_w2_rl_traj.py --learner rec ${=WORLD} --init-params $M/tw_${NLEG}e7.params --d-fixed 12 --eval-necessity 0 --out $M/tw_k2_eval_d12.json >> $M/tw.log 2>&1
 echo "TWIN eval $(python3 -c "import json;m=json.load(open('$M/tw_k2_eval_d12.json'))['modes']['0'];print('life', m.get('mean_life_steps'), 'hungry_2nd', m.get('hungry_reach_2nd_half'), 'nd', m.get('hungry_reach_2nd_half_nd'), 'demo_bouts', m.get('bouts_demonstrated'))") $(date '+%H:%M:%S')"
+[ -f $M/tw_k2_eval_d12.json ] || { echo "TWIN EVAL FAILED (no tw_k2_eval_d12.json)"; exit 1; }
 echo "TWIN_K2_DONE $(date '+%H:%M:%S')"
