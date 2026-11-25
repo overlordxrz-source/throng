@@ -11393,6 +11393,30 @@ more expensive, because it produces publishable-looking nulls.
   - A lower 8-way reference would also LOWER the learner bar (.9 x ref), which is not a real gain. The reference step would measure exactly that.
   - Scores: gate passes both, Cam .60 / me .55: HIT. |d21 gap| > .20, me .20: did not happen. Reference >= .98: not run.
   - REFTWIN (M8D4-REFTWIN, $3.5) HELD, as recorded in the addendum: it launches only if Cam says go. Nothing is running on Modal.
+- **RULING RECORDED (entry stamped Nov 24 19:02:54 EST): Cam ~23:55Z Nov 24 on D1-D3 + the 8-way gate (time copied from Cam's message header).**
+  - D1-D3 accepted; the reftwin hold was right.
+    - Cam's errors (his words, condensed): he accepted a decomposition not computed on the bar's population and built the .88 / .89 / .91 estimates on it; he bought the 8-way gate ($2.30) alongside the diagnostics that removed its premise. "Diagnose before buying."
+    - Cam's scores: D1 clustering HIT, but the mechanism was a MISSING solved record (his .15), not a wrong label (.55): MISS on mechanism. D3 search .75 MISS; leak .15 correctly low. Gate .60 HIT.
+    - My D1 scoring is corrected accordingly: I scored "bad records" a HIT by D1(b)/(c)'s wording. By mechanism it is the missing-solved-record case: my .20 / Cam's .15, so a low-probability HIT, and "bad records" a MISS.
+  - NEW STANDING RULE: any decomposition offered as the explanation of a verdict is computed on that verdict's own population and horizon (here d12, hungry 2nd half, 24k steps, sated bouts excluded as the bar does).
+  - 8-way + D4 PARKED: no reftwin; branch moves8-d4 kept.
+  - MEASUREMENT RULE v3 (future seeds only; register before any new run): every reach criterion (bar = .9 x ref; shuffled + .30; 2x shuffled; final sector < .30) is computed on NON-DEMONSTRATED bouts.
+    - Population: hungry, 2nd half, d12, 24k horizon, hearing index > K for that word in that life.
+    - The reference is measured on the same class. The life criterion is unchanged (vs the twin of the same world).
+    - The D3-conditional head-necessity swap is withdrawn. Seed 10 under v3 is ~.834: still FAIL.
+  - WORLD CHANGE: the parent demonstrates each word on its first K = 2 hearings (`--demo-hearings 2`, an existing flag). Parent-side only; no card.
+    - Parked: "no record when sated" and satiety rules. Stage-2 note: "repeat until the young eats the called item".
+    - Recipe F3-K2 = relabel + no-nav + 4-way + target-KL .015 + --d4-side + --offset-proj + --demo-hearings 2.
+  - CHAIN: (a) REFERENCE, free: F3 oracle s0 8e7 / 9e7 / 1e8 at K = 2 on the v3 class, mean; flag a move > .01 from .9943. (b) TWIN-K2 on L4: deaf twin, same world incl. K = 2, 3e7, cap $1.5. (c) Learner seeds 11 + 12 in parallel on L4, $5.5 each, to 1e8; in-container v3 verdict (3-table, life vs TWIN-K2); watches at 3e7 / 5e7. (d) Both PASS -> CONFIRMED (stage 1 done); split -> seed 13 ($5.5); both FAIL -> report with the v3-population decomposition.
+    - Budget <= $31.5 b1; guard CAP $41.
+    - Cam's p: each seed PASS .60; CONFIRMED .55; life PASS .95; later P(right) >= .97 at 1e8 .70; TWIN-K2 life > 493 .70.
+  - FREE, parallel: D4. Why does first-demonstration failure double in reborn lives? At each birth, life 0 vs reborn: world food within 12 cells of the hearth, the young's start position and energy, the parent's position.
+- **OBSERVATIONS ON THE CHAIN'S PREMISES (same entry; from the configs on the volume, copied back to ~/throng-backup/modal_b1/f3/files/o0/).**
+  - The F3 REFERENCE and the F3 TWIN had NO DEMONSTRATOR, in training (port_w2.py has no demonstrator code; its docstring says "Adult lives only (no parent / juvenile phase)") and in eval (tw_eval_d12.json and f3_ref_10e7.json: demonstrator False).
+    - So every past life ratio (seed 10's 6.09, for example) compared a demonstrated learner against an undemonstrated twin. Cam's "TWIN-K2 life > 493" assumed the old twin already had one led meal per word.
+  - The F3 reference's long d12 evals ran 6,000 steps (the lengthening loop stops at >= 2000 bouts), not 24k.
+  - TWIN-K2 needs TRAINER CODE, not a flag. rl2 (which has the demonstrator; `--learner rec` reproduces port_w2 bit-exactly, check A3) refuses `--d4-side` for rec and has no `--frontier-schedule`; the twin used both.
+  - Plan: build rl2 rec + D4 + frontier-schedule behind a bit-exact positive control against port_w2 (demonstrator off), plus a mutant; then add `--demonstrator --parent-waits --demo-hearings 2` for training and for the twin's life eval. The paid twin run waits for Cam's go on this design.
 - **RESULT (Nov 16 ~01:40): THE LABEL COUNT** (`docs/data/learner_w2/label_count/`; each row is 100 rollout
   iterations, 819k steps, with that checkpoint's weights, world state and frontier, no updates).
   - Definitions: MEMORY-ONLY bout = a later hearing (not the token's first in this life) at d >= 3. By construction
